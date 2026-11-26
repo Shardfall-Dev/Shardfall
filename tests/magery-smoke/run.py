@@ -1,14 +1,15 @@
 # Browser smoke run for the Magery integration (needs Python Playwright + Chrome).
-# usage: python3 tests/magery-smoke/run.py Shardfall_v0.15.html [/path/to/chrome]
+# usage: python3 tests/magery-smoke/run.py Shardfall_v0.16.html [/path/to/chrome]
 import sys, json, os, subprocess
 from playwright.sync_api import sync_playwright
-here = os.path.dirname(os.path.abspath(__file__)); f = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else 'Shardfall_v0.15.html')
+here = os.path.dirname(os.path.abspath(__file__)); f = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else 'Shardfall_v0.16.html')
 chrome = sys.argv[2] if len(sys.argv) > 2 else '/usr/bin/google-chrome'
 EXPECT = {
   'casting.js': {'held': 'magery.05', 'release': True, 'learn': True, 'held2': 'magery.18', 'expired': True, 'burst': {'hits': [2, 3.1]}},
   'spells.js': {'mind': 14, 'quake': {'b2': 46, 'self': True}, 'meteor': [11, 11, 11], 'reactiveAfter': {'pool': 15, 'houndLost': 2, 'playerLost': 0}, 'firePulsesWithinSecond': 2,
                 'dispel': {'midBlocked': True, 'passAfterDispel': True}, 'immune': True, 'rebindWhileImmune': False, 'banished': True, 'creatureExpired': True, 'recall': True,
                 'overweightRejected': True, 'gatePanel': 'mgate', 'invis': True, 'invisAfterMove': False, 'night': True, 'form': 'boar', 'armed': True, 'remoteSpent': True, 'opened': True, 'savedHot': {'k': 'spell', 'id': 'magery.42'}},
+  'cancel.js': {'hiddenIdle': True, 'prepGone': True, 'reserved': 4, 'prepLedger': {'pearlsBack': True, 'refundOnCancel': 2}, 'held': True, 'heldGone': True, 'recovering': True, 'holdLedger': {'pearls': True, 'refundOnCancel': 0}, 'escCleared': True},
   'targeting.js': {'keptAfterMiss': True, 'releasedOnTap': True, 'scrollInterrupt': {'after': {'scroll': 1, 'manaLost': 3}}, 'scrollHeld': 'magery.12', 'scrollLeft': 0},
 }
 def sub(exp, got, path=''):

@@ -924,6 +924,18 @@ function armHeld() {
   if (sp.id === 'magery.56') openPanel('mform');
   log(`${sp.n} is held for ${MG.HOLD} s. Tap ${TGT_TEXT[sp.tgt] || 'a target'} to release.`, '#ffe08a');
 }
+// the dedicated Cancel-cast button (and Esc): during prep it is an interruption (half mana, reagents back);
+// a held spell is let go unused — its charge was spent at a successful prep — with the normal recovery
+function cancelCast() {
+  if (P.prep) return interruptPrep('You stop preparing ' + P.prep.sp.n + '.');
+  if (!P.held) return; const sp = P.held.sp; P.held = null; AIM = null; P.spellReadyAt = GT + MG.RECOVERY; closeMagicPanel(); sfx('fizzle');
+  log('You let ' + sp.n + ' go unreleased.', '#a8a8a8');
+}
+function castCancelButton() {
+  const b = $('#b-mcancel'); if (!b) return; const on = !!(P.prep || P.held) && !P.ghost; b.hidden = !on; if (!on) return;
+  const sp = (P.prep || P.held).sp, left = P.prep ? Math.max(0, P.prep.t1 - GT) : Math.max(0, P.held.until - GT);
+  b.querySelector('small').textContent = (P.prep ? 'prep ' : 'held ') + left.toFixed(1) + ' s'; b.title = 'Cancel ' + sp.n; b.classList.toggle('held', !!P.held);
+}
 function closeMagicPanel() { if (['mrunes', 'mform', 'mmark'].includes(PANEL)) closePanel(); }
 // second tap on the slot: release at the explicit selection (never an automatic pick)
 function releaseSelected() {
@@ -1313,13 +1325,15 @@ function drawForm(g, e, x, y) { const f = e === P && P.mg && P.mg.form; if (!f) 
 
 /* ---------- hotbar signs: drag on desktop, "Assign to slot" or long-press on touch ---------- */
 function magicSlots() {
+  castCancelButton();
   document.querySelectorAll('.slot').forEach((b, i0) => { const s = P.hotbar[i0 + P.hbPage * 3]; const id = s && s.k === 'spell' && MG.SPELL[s.id] ? s.id : ''; const url = id ? signURL(id) : ''; if (b._ic === url) return; b._ic = url;
     b.style.backgroundImage = url ? `linear-gradient(rgba(8,12,24,.05),rgba(8,12,24,.55)),url(${url})` : ''; b.style.backgroundSize = url ? 'cover' : ''; b.classList.toggle('msl', !!url); });
 }
 let LP = null;
 function bindMagicInput() {
   if (bindMagicInput.done) return; bindMagicInput.done = true; const pan = $('#panel');
-  const css = document.createElement('style'); css.textContent = '.slot.msl b,.slot.msl small{text-shadow:0 0 3px #000,0 0 6px #000}.slot.drop{border-color:#ffd060}.msig{width:34px;height:34px;border-radius:6px;margin-right:6px;flex:none;cursor:grab;touch-action:none;-webkit-touch-callout:none;user-select:none}.row.na .msig{filter:grayscale(.85) brightness(.6)}.mdet{margin:2px 0 8px 40px;line-height:1.35}'; document.head.appendChild(css);
+  const css = document.createElement('style'); css.textContent = '.slot.msl b,.slot.msl small{text-shadow:0 0 3px #000,0 0 6px #000}.slot.drop{border-color:#ffd060}.msig{width:34px;height:34px;border-radius:6px;margin-right:6px;flex:none;cursor:grab;touch-action:none;-webkit-touch-callout:none;user-select:none}.row.na .msig{filter:grayscale(.85) brightness(.6)}.mdet{margin:2px 0 8px 40px;line-height:1.35}#b-mcancel{flex-direction:column;gap:1px;border-color:#c05a4a}#b-mcancel[hidden]{display:none}#b-mcancel b{font:600 11px var(--px);color:#ffb0a0}#b-mcancel small{font:9px var(--px);color:var(--dim);max-width:62px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}#b-mcancel.held{box-shadow:0 0 10px rgba(255,208,96,.6)}'; document.head.appendChild(css);
+  { const act = $('#act'), b = document.createElement('button'); b.className = 'round'; b.id = 'b-mcancel'; b.dataset.a = 'mcancel'; b.hidden = true; b.setAttribute('aria-label', 'Cancel cast'); b.style.cssText = '--x:72px;--y:146px;width:66px'; b.innerHTML = '<b>✕ Cancel</b><small></small>'; if (act) act.appendChild(b); }
   pan.addEventListener('dragstart', e => { const s = e.target.closest && e.target.closest('[data-msp]'); if (!s) return; e.dataTransfer.setData('text/x-shardfall-spell', s.dataset.msp); e.dataTransfer.effectAllowed = 'copy'; });
   pan.addEventListener('pointerdown', e => { const s = e.target.closest && e.target.closest('[data-msp]'); if (!s || e.pointerType === 'mouse') return; LP = setTimeout(() => { LP = null; ACT.assign({ k: 'spell', id: s.dataset.msp }); }, 520); });
   for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) pan.addEventListener(ev, () => { if (LP) { clearTimeout(LP); LP = null; } });
@@ -1386,7 +1400,7 @@ function mageryBoot(saved) {
     mcast: d => { closePanel(); castSlot(d.s); }, mread: d => { closePanel(); castSlot(d.s, { scroll: true }); },
     mlearn: d => { const r = MG.learn(P.pack, MG.SPELL[d.s].scroll); log(r.ok ? `${r.spell.n} is written into your spellbook.` : cap1(r.reason) + '.', r.ok ? '#7ee08a' : '#ffb070'); renderPanel(); save(); },
     mrune: d => { if (P.held) releaseHeld({ rune: true }, { rune: d.u }); }, mmarkok: d => { closePanel(); if (P.held) releaseHeld({ rune: true }, { rune: d.u, confirm: true }); },
-    mform: d => { if (P.held) releaseHeld(P, { form: d.f }); }, mgate: stepGate });
+    mform: d => { if (P.held) releaseHeld(P, { form: d.f }); }, mgate: stepGate, mcancel: cancelCast });
   bindMagicInput();
 }
 
@@ -2728,7 +2742,7 @@ function refreshHud() {
   document.querySelectorAll('.slot').forEach((b, i0) => { const i = i0 + P.hbPage * 3; const s = P.hotbar[i]; const [a, c] = slotLabel(s); b.querySelector('b').textContent = a; b.querySelector('small').textContent = c; const held = s && s.k === 'spell' && P.held && P.held.sp.id === s.id, prep = s && s.k === 'spell' && P.prep && P.prep.sp.id === s.id; b.classList.toggle('held', !!held); b.classList.toggle('prep', !!prep); let cd = 0; if (s && s.k === 'item' && SF.CONSUMABLES[s.id] && P.cd) cd = Math.max(0, (P.cd[SF.CONSUMABLES[s.id].fam] || 0) - GT); b.querySelector('em').textContent = cd ? Math.ceil(cd) : ''; }); magicSlots();
   const g = $('#ghost'); g.hidden = !P.ghost;
   if (P.ghost) { const left = 12 - (GT - P.ghostAt); const s = SHRINES.find(z => z.id === P.bound); const body = ents.find(e => e.mine && !e.gone); g.querySelector('p').textContent = (body ? `Your body is ${Math.round(dist(body, P))} m away, crumbling in ${Math.ceil((body.expires - GT) / 60)} min. ` : '') + 'Walk to a shrine or healer, or return to your bound shrine.'; const b = g.querySelector('button'); b.disabled = left > 0; b.textContent = left > 0 ? `Return to ${s.n} in ${Math.ceil(left)} s` : `Return to ${s.n} now`; }
-  $('#b-int').hidden = !canInteract(); $('#b-cancel').hidden = !(P.prep || P.held || AIM || P.task);
+  $('#b-int').hidden = !canInteract(); $('#b-cancel').hidden = !((AIM && !P.held) || P.task);
   const o = questObjective(), ob = $('#obj'); ob.hidden = !o; if (o) ob.querySelector('span').textContent = o.t;
   document.body.classList.toggle('pan-open', !!PANEL && !['loot', 'picker', 'quest'].includes(PANEL));
   if (SCREEN === 'map') drawMap();
@@ -2810,7 +2824,7 @@ const ACT = {
   qaccept: () => { if (Q().beacon !== 0) return; Q().beacon = 1; SF.addItem(P.pack, SF.newItem('wick', 1)); log('Quest accepted: A Light for the Quay. You receive a dry wick.', '#ffe08a'); say(P.talkTo || QW(), 'Lantern Road, north. Stick to the road.'); closePanel(); save(); },
   qwick: () => { if (Q().beacon !== 1 || hasWick()) return; SF.addItem(P.pack, SF.newItem('wick', 1)); log('The Quaywarden hands you another wick.', '#ffe08a'); closePanel(); save(); },
   qturn: () => { if (Q().beacon !== 2) return; Q().beacon = 3; SF.addItem(P.pack, SF.newItem('bandage', 5)); SF.addItem(P.pack, SF.newItem('gold', 40)); log('Quest complete: A Light for the Quay. +5 bandages, +40 gold.', '#7ee08a'); log('Brine Road runs east to the gate. Past the gate pillars, full-loot wilderness rules begin.', '#ffb070'); closePanel(); save(); },
-  atk: toggleArm, interact, cancel: () => { P.armed = false; if (P.prep) interruptPrep('You stop preparing.'); P.held = null; AIM = null; P.batch = null; if (P.task) { log(P.task.label + ' cancelled.'); P.task = null; } P.meditating = null; },
+  atk: toggleArm, interact, cancel: () => { P.armed = false; if (P.prep || P.held) cancelCast(); AIM = null; P.batch = null; if (P.task) { log(P.task.label + ' cancelled.'); P.task = null; } P.meditating = null; },
   cycle: () => { const L = ents.filter(e => e.kind === 'mon' && alive(e) && dist(e, P) < 16 && los(P, e)).sort((a, b) => dist(a, P) - dist(b, P)); if (!L.length) return log('No creatures in sight.'); const i = L.indexOf(P.sel); P.sel = L[(i + 1) % L.length]; },
   slot: d => useSlot(+d.i + (P.hbPage || 0) * 3), page: () => { P.hbPage = ((P.hbPage || 0) + 1) % 3; },
   abil: d => { ABIL[d.id].fn(); }, petcmd: d => petCommand(d.c), appraise: d => { const it = findU(P.pack, d.u); if (!it) return; closePanel(); P.task = { kind: 'appraise', item: it, label: 'Appraising', t0: GT, t1: GT + SF.APPRAISE_TIME, still: true, x0: P.x, y0: P.y }; },

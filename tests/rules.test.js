@@ -1,5 +1,5 @@
-// usage: node tests/rules.test.js Shardfall_v0.15.html  — runs the pure rules module (the <script> that defines SF) with no browser
-const fs = require('fs'); const html = fs.readFileSync(process.argv[2] || 'Shardfall_v0.15.html', 'utf8');
+// usage: node tests/rules.test.js Shardfall_v0.16.html  — runs the pure rules module (the <script> that defines SF) with no browser
+const fs = require('fs'); const html = fs.readFileSync(process.argv[2] || 'Shardfall_v0.16.html', 'utf8');
 const src = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]).find(t => t.includes('SF.METALS'));
 const m = { exports: {} }; new Function('module', 'globalThis', src)(m, {}); const SF = m.exports;
 let fails = 0; const eq = (a, b, msg) => { const ok = JSON.stringify(a) === JSON.stringify(b); if (!ok) { fails++; console.log('FAIL', msg, a, '!=', b); } else console.log('ok  ', msg); };

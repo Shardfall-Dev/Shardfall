@@ -1,4 +1,4 @@
-# Magery integration — status (v0.15)
+# Magery integration — status (v0.16)
 
 Source brief: `Magery_Brief.txt`. Book: `Shardfall_Spellbook.html` / `Spellbook.md`. Data: `spells.json` (embedded verbatim in `src/magery.js`; `tests/magery.test.js` checks they match).
 
@@ -12,6 +12,7 @@ Source brief: `Magery_Brief.txt`. Book: `Shardfall_Spellbook.html` / `Spellbook.
 
 - All 64 records, eight per circle, stable IDs `magery.01`–`magery.64`, sign art from the atlas in the book and on the hotbar.
 - Book success per the brief (I–VI linear to .99; VII–VIII `.02 + .025 × (M − gate)`), scroll gates and chance, 3 s hold, 350 ms recovery, reserve-at-start ledger (interrupt: half mana rounded up, items back; fizzle: everything spent), 0.3 m drift, 70% walk for Lesser Mend and Arcane Arrow, any positive damage interrupts.
+- Cancel cast: a dedicated button (and Esc) during prep or hold. Prep → interruption ledger; hold → let go unused (charge already spent), 350 ms recovery.
 - Target chosen at release, never automatically. A wrong tap keeps the spell and names the required target. Adapters: living, self/friend, ground, ground-or-anchor, adjacent ground, chest, field segment/gate mouth, rune (panel), summon.
 - Resistance with the recipient's Wardcraft, `half_then_focus`, `half_only`, `negates`, `poison_tier`, `duration`, `banish_check`; one roll per actor per impact; impacts deduplicated by event ID; committed hits follow the recipient and die with it or on a level change.
 - Direct hits with per-spell impact delays (Delayed Explosion 2 s, bolt/fireball/lightning/pillar 1 s), Mindburst with backfire, shared pools (Chain Lightning, Meteor Shower), Earthshaker, poison with replace rules, cure/area cure, heals.

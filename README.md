@@ -4,7 +4,7 @@ A T2A-era Ultima Online-style 2.5D isometric sandbox RPG for phones, built as a 
 
 ## Play
 
-Open `Shardfall_v0.15.html` in a browser (phone or desktop). Everything — code, art and audio — is inside that one file. Progress saves to the browser's local storage.
+Open `Shardfall_v0.16.html` in a browser (phone or desktop). Everything — code, art and audio — is inside that one file. Progress saves to the browser's local storage.
 
 ## Layout
 
@@ -15,13 +15,17 @@ Open `Shardfall_v0.15.html` in a browser (phone or desktop). Everything — code
 - `src/magery-art.js` — the 64 spell signs as one embedded atlas.
 - `src/magic.js` — casting in the world: prepare → hold → release, targets, effects, fields, runes, summons, spellbook panel, hotbar signs.
 - `src/game.js` — the game: world generation, rendering, input, NPCs, quests, crafting UI, save/load.
-- `build.sh` — joins the parts into one playable file: `./build.sh 0.16` → `Shardfall_v0.16.html`.
-- `Shardfall_v0.15.html` — the current built game.
+- `build.sh` — joins the parts into one playable file: `./build.sh 0.17` → `Shardfall_v0.17.html`.
+- `Shardfall_v0.16.html` — the current built game.
 - `docs/Shardfall_Crafting_Guide.md` — the crafting design guide the build follows.
 - `docs/magery/` — the Magery kit: brief (`Magery_Brief.txt`), illustrated book (`Shardfall_Spellbook.html`, `Spellbook.md`), `spells.json`, reference math, and `STATUS.md` (what is in, what differs, what is left).
-- `tests/rules.test.js` — deterministic rules tests: `node tests/rules.test.js Shardfall_v0.15.html`
-- `tests/magery.test.js` — Magery rules tests: `node tests/magery.test.js Shardfall_v0.15.html`
-- `tests/magery-smoke/run.py` — in-browser Magery scenarios (Playwright + Chrome): `python3 tests/magery-smoke/run.py Shardfall_v0.15.html`
+- `tests/rules.test.js` — deterministic rules tests: `node tests/rules.test.js Shardfall_v0.16.html`
+- `tests/magery.test.js` — Magery rules tests: `node tests/magery.test.js Shardfall_v0.16.html`
+- `tests/magery-smoke/run.py` — in-browser Magery scenarios (Playwright + Chrome): `python3 tests/magery-smoke/run.py Shardfall_v0.16.html`
+
+## v0.16 — Cancel cast
+
+- A dedicated **✕ Cancel** button appears above the hotbar while a spell is being prepared or held, with the time left. During preparation it counts as an interruption (half the mana, reagents back); a held spell is let go unused, with the normal 0.35 s recovery. Esc does the same.
 
 ## v0.15 — Magery: the Eight Circles
 

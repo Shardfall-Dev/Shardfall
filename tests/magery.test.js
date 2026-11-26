@@ -1,7 +1,7 @@
-// usage: node tests/magery.test.js Shardfall_v0.15.html — runs the rules module and the Magery module (SF.MAGERY) with no browser.
+// usage: node tests/magery.test.js Shardfall_v0.16.html — runs the rules module and the Magery module (SF.MAGERY) with no browser.
 // Covers the pure delivery checks from docs/magery/Magery_Brief.txt; world behaviour is covered by the in-browser smoke run.
 const fs = require('fs'); const path = require('path');
-const html = fs.readFileSync(process.argv[2] || 'Shardfall_v0.15.html', 'utf8');
+const html = fs.readFileSync(process.argv[2] || 'Shardfall_v0.16.html', 'utf8');
 const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
 const rules = scripts.find(t => t.includes('SF.METALS')), magery = scripts.find(t => t.includes('SF.MAGERY = MG'));
 const m = { exports: {} }; new Function('module', 'globalThis', rules)(m, {}); const SF = m.exports;

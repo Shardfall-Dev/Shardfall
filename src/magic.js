@@ -75,6 +75,18 @@ function armHeld() {
   if (sp.id === 'magery.56') openPanel('mform');
   log(`${sp.n} is held for ${MG.HOLD} s. Tap ${TGT_TEXT[sp.tgt] || 'a target'} to release.`, '#ffe08a');
 }
+// the dedicated Cancel-cast button (and Esc): during prep it is an interruption (half mana, reagents back);
+// a held spell is let go unused — its charge was spent at a successful prep — with the normal recovery
+function cancelCast() {
+  if (P.prep) return interruptPrep('You stop preparing ' + P.prep.sp.n + '.');
+  if (!P.held) return; const sp = P.held.sp; P.held = null; AIM = null; P.spellReadyAt = GT + MG.RECOVERY; closeMagicPanel(); sfx('fizzle');
+  log('You let ' + sp.n + ' go unreleased.', '#a8a8a8');
+}
+function castCancelButton() {
+  const b = $('#b-mcancel'); if (!b) return; const on = !!(P.prep || P.held) && !P.ghost; b.hidden = !on; if (!on) return;
+  const sp = (P.prep || P.held).sp, left = P.prep ? Math.max(0, P.prep.t1 - GT) : Math.max(0, P.held.until - GT);
+  b.querySelector('small').textContent = (P.prep ? 'prep ' : 'held ') + left.toFixed(1) + ' s'; b.title = 'Cancel ' + sp.n; b.classList.toggle('held', !!P.held);
+}
 function closeMagicPanel() { if (['mrunes', 'mform', 'mmark'].includes(PANEL)) closePanel(); }
 // second tap on the slot: release at the explicit selection (never an automatic pick)
 function releaseSelected() {
@@ -464,13 +476,15 @@ function drawForm(g, e, x, y) { const f = e === P && P.mg && P.mg.form; if (!f) 
 
 /* ---------- hotbar signs: drag on desktop, "Assign to slot" or long-press on touch ---------- */
 function magicSlots() {
+  castCancelButton();
   document.querySelectorAll('.slot').forEach((b, i0) => { const s = P.hotbar[i0 + P.hbPage * 3]; const id = s && s.k === 'spell' && MG.SPELL[s.id] ? s.id : ''; const url = id ? signURL(id) : ''; if (b._ic === url) return; b._ic = url;
     b.style.backgroundImage = url ? `linear-gradient(rgba(8,12,24,.05),rgba(8,12,24,.55)),url(${url})` : ''; b.style.backgroundSize = url ? 'cover' : ''; b.classList.toggle('msl', !!url); });
 }
 let LP = null;
 function bindMagicInput() {
   if (bindMagicInput.done) return; bindMagicInput.done = true; const pan = $('#panel');
-  const css = document.createElement('style'); css.textContent = '.slot.msl b,.slot.msl small{text-shadow:0 0 3px #000,0 0 6px #000}.slot.drop{border-color:#ffd060}.msig{width:34px;height:34px;border-radius:6px;margin-right:6px;flex:none;cursor:grab;touch-action:none;-webkit-touch-callout:none;user-select:none}.row.na .msig{filter:grayscale(.85) brightness(.6)}.mdet{margin:2px 0 8px 40px;line-height:1.35}'; document.head.appendChild(css);
+  const css = document.createElement('style'); css.textContent = '.slot.msl b,.slot.msl small{text-shadow:0 0 3px #000,0 0 6px #000}.slot.drop{border-color:#ffd060}.msig{width:34px;height:34px;border-radius:6px;margin-right:6px;flex:none;cursor:grab;touch-action:none;-webkit-touch-callout:none;user-select:none}.row.na .msig{filter:grayscale(.85) brightness(.6)}.mdet{margin:2px 0 8px 40px;line-height:1.35}#b-mcancel{flex-direction:column;gap:1px;border-color:#c05a4a}#b-mcancel[hidden]{display:none}#b-mcancel b{font:600 11px var(--px);color:#ffb0a0}#b-mcancel small{font:9px var(--px);color:var(--dim);max-width:62px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}#b-mcancel.held{box-shadow:0 0 10px rgba(255,208,96,.6)}'; document.head.appendChild(css);
+  { const act = $('#act'), b = document.createElement('button'); b.className = 'round'; b.id = 'b-mcancel'; b.dataset.a = 'mcancel'; b.hidden = true; b.setAttribute('aria-label', 'Cancel cast'); b.style.cssText = '--x:72px;--y:146px;width:66px'; b.innerHTML = '<b>✕ Cancel</b><small></small>'; if (act) act.appendChild(b); }
   pan.addEventListener('dragstart', e => { const s = e.target.closest && e.target.closest('[data-msp]'); if (!s) return; e.dataTransfer.setData('text/x-shardfall-spell', s.dataset.msp); e.dataTransfer.effectAllowed = 'copy'; });
   pan.addEventListener('pointerdown', e => { const s = e.target.closest && e.target.closest('[data-msp]'); if (!s || e.pointerType === 'mouse') return; LP = setTimeout(() => { LP = null; ACT.assign({ k: 'spell', id: s.dataset.msp }); }, 520); });
   for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) pan.addEventListener(ev, () => { if (LP) { clearTimeout(LP); LP = null; } });
@@ -537,7 +551,7 @@ function mageryBoot(saved) {
     mcast: d => { closePanel(); castSlot(d.s); }, mread: d => { closePanel(); castSlot(d.s, { scroll: true }); },
     mlearn: d => { const r = MG.learn(P.pack, MG.SPELL[d.s].scroll); log(r.ok ? `${r.spell.n} is written into your spellbook.` : cap1(r.reason) + '.', r.ok ? '#7ee08a' : '#ffb070'); renderPanel(); save(); },
     mrune: d => { if (P.held) releaseHeld({ rune: true }, { rune: d.u }); }, mmarkok: d => { closePanel(); if (P.held) releaseHeld({ rune: true }, { rune: d.u, confirm: true }); },
-    mform: d => { if (P.held) releaseHeld(P, { form: d.f }); }, mgate: stepGate });
+    mform: d => { if (P.held) releaseHeld(P, { form: d.f }); }, mgate: stepGate, mcancel: cancelCast });
   bindMagicInput();
 }
 
