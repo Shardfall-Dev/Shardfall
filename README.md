@@ -21,6 +21,7 @@ Progress saves to the browser's local storage.
 - `assets/music/v1.0.0/` — the Saltmarsh soundtrack: five MIDI sources, MP3 renders and `soundtrack.json`.
 - `src/assets.js` — embedded sprite sheets and art (data URIs; large, not meant for hand-editing).
 - `src/magery-art.js` — the 64 spell signs as one embedded atlas.
+- `src/bestiary-art.js` — the 11 bestiary v1 sheets and their manifest, embedded (generated: `python3 tools/embed_bestiary.py` reads `assets/bestiary/Shardfall_Bestiary_v1.0.0.zip`).
 - `src/magic.js` — casting in the world: prepare → hold → release, targets, effects, fields, runes, summons, spellbook panel, hotbar signs.
 - `src/game.js` — the game: world generation, rendering, input, NPCs, quests, crafting UI, save/load.
 - `build.sh` — joins the parts into the game: `./build.sh 0.18` → `Shardfall_v0.18.html` (web build, 3.7 MB); `./build.sh 0.18 --offline` → `Shardfall_v0.18_offline.html` (22 MB, every sound inside, not committed). Needs `python3`.
@@ -33,6 +34,7 @@ Progress saves to the browser's local storage.
 - `tests/magery.test.js` — Magery rules tests: `node tests/magery.test.js Shardfall_v0.18.html`
 - `tests/magery-smoke/run.py` — in-browser Magery scenarios (Playwright + Chrome): `python3 tests/magery-smoke/run.py Shardfall_v0.18.html`
 - `tests/sfx-smoke/run.py` — browser checks for sound, music, doors and footsteps (Playwright + Chrome; serves the web build on a local port): `python3 tests/sfx-smoke/run.py "$PWD/Shardfall_v0.18.html"`
+- `tests/bestiary-smoke/run.py` — bestiary checks in the built game (sheets load, pixel-exact cells, 8 facings, walk / wind-up / impact against the player; preview screenshots when the pack is extracted): `python3 tests/bestiary-smoke/run.py Shardfall_v0.18.html [chrome] [screenshot-dir]`
 
 ## v0.18 — online play and music
 
@@ -45,6 +47,13 @@ Progress saves to the browser's local storage.
 - World sounds pan with the view, fade with distance and stay silent for hidden foes and rooms out of sight. Up to 14 voices; mute is remembered; audio starts from your first tap or key press and pauses in the background.
 - Kit building doors now open and close (Interact, E or tap the door), block movement when closed, and are remembered in your save. Older saves load with every door open.
 - Footsteps follow the surface: timber piers and floors, stone, grass, dirt, sand, mud and shallows. A cobbled quayside now joins the piers to the plaza road.
+
+## v0.18 — Bestiary v1
+
+- Eleven creatures from the bestiary pack are in the game data and renderer: orc, ettin, troll, lizardman, gargoyle, earth elemental, giant spider, dire wolf, harpy, slime and the Lich Lord (boss).
+- Sprites follow the existing combat states: neutral when standing, the walk cycle while moving, the wind-up pose for the whole telegraph and the impact pose on the strike resolution, then recover. Facing is locked from the telegraph to the end of the swing.
+- Sheets are drawn untouched (no outline, tint or alpha cut), so the Lich Lord's turquoise rim and gold glints show as painted.
+- Not yet: spawn placement, balance (stats are provisional placeholders), dedicated death art. Corpses use the standard bones. To see one, run `__SF.spawnMon('lich_lord')` in the browser console.
 
 ## v0.16 — Cancel cast
 
