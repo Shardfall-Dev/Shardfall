@@ -92,7 +92,10 @@ const navCost = (x, y) => { const t = tAt(x, y); return t === T.RD || t === T.BR
 function navClear(pass, o) { return (ax, ay, bx, by) => { const n = Math.ceil(Math.hypot(bx - ax, by - ay) * 3); for (let i = 1; i < n; i++) if (!pass(Math.floor(ax + .5 + (bx - ax) * i / n), Math.floor(ay + .5 + (by - ay) * i / n))) return false; return segFree(ax + .5, ay + .5, bx + .5, by + .5, o.doors); }; }
 const navFlags = o => (o.doors ? 'd' : '') + (o.avoidProt ? 'p' : '');
 /* ask for a path; the answer arrives in a later step (or at once from the cache) */
+/* the nearest standable tile to (x, y) within r, or (x, y) itself: a path starts and ends on open ground */
+function navSnap(x, y, r) { if (navStatic(x, y)) return [x, y]; for (let k = 1; k <= (r || 3); k++) for (let dy = -k; dy <= k; dy++) for (let dx = -k; dx <= k; dx++) if (Math.max(Math.abs(dx), Math.abs(dy)) === k && navStatic(x + dx, y + dy)) return [x + dx, y + dy]; return [x, y]; }
 function navRequest(sx, sy, gx, gy, o, fresh) {
+  [sx, sy] = navSnap(sx, sy); [gx, gy] = navSnap(gx, gy);
   const key = sx + ',' + sy + '>' + gx + ',' + gy + '|' + navFlags(o) + '|' + NAV.epoch, hit = !fresh && NAV.cache.get(key);
   const job = { key, status: 'running', path: null, reason: null };
   if (hit) { NAV.hits++; job.status = 'found'; job.path = hit; return job; }
@@ -116,7 +119,7 @@ function navTick() {
 function buildNavGraph() {
   const G = SIM.newNavGraph(); let n = 0; const pts = [];
   const snap = (x, y) => { if (navStatic(Math.floor(x), Math.floor(y))) return [x, y]; for (let r = 1; r <= 8; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (Math.max(Math.abs(dx), Math.abs(dy)) === r && navStatic(Math.floor(x) + dx, Math.floor(y) + dy)) return [Math.floor(x) + dx + .5, Math.floor(y) + dy + .5]; return [x, y]; };
-  const node = (x, y, o) => { if (o.keep) [x, y] = snap(x, y);   // a named place in the water (a ford, a strand) is reached at its nearest dry tile
+  const node = (x, y, o) => { [x, y] = snap(x, y);   // a named place in the water (a ford, a strand) is reached at its nearest dry tile
  for (const p of pts) if (Math.hypot(p.x - x, p.y - y) < 3.5 && !o.keep) { if (o.name && !G.node(p.id).name) Object.assign(G.node(p.id), { name: o.name, kind: o.kind }); return p.id; } const id = (o.kind || 'pt') + ':' + (n++); G.addNode(id, Object.assign({ x, y }, o)); pts.push({ id, x, y }); return id; };
   const road = (poly, name) => { let prev = null; for (let i = 0; i < poly.length; i++) { const [x, y] = poly[i]; if (prev) { const p = G.node(prev), d = Math.hypot(x - p.x, y - p.y), k = Math.ceil(d / 25); for (let s = 1; s < k; s++) { const id = node(p.x + (x - p.x) * s / k, p.y + (y - p.y) * s / k, { kind: 'road', road: name }); G.addEdge(prev, id); prev = id; } } const id = node(x, y, { kind: 'road', road: name }); if (prev) G.addEdge(prev, id); prev = id; } };
   for (const [k, poly] of Object.entries(ROUTE)) road(poly, k);
@@ -124,15 +127,21 @@ function buildNavGraph() {
   // join a place to the nearest point of each road within reach and to the nearest town, so a town where two roads begin joins both
   // a link is made only if a walker can really get there (A* over the same tiles the navigator uses), so no link crosses a channel
   const walkPass = navPass({ doors: true }), walkStep = navCanStep({ doors: true }); let checks = 0;
-  const reach = (a, b) => { checks++; const pad = 40, s = SIM.findPath({ sx: Math.floor(a.x), sy: Math.floor(a.y), gx: Math.floor(b.x), gy: Math.floor(b.y), passable: walkPass, canStep: walkStep, cost: navCost, minCost: .7, maxNodes: 40000, goalR: 1.5,
-    bounds: [Math.min(a.x, b.x) - pad, Math.min(a.y, b.y) - pad, Math.max(a.x, b.x) + pad, Math.max(a.y, b.y) + pad] }); return s.status === 'found'; };
+  const reach = (a, b) => { checks++; const s0 = navSnap(Math.floor(a.x), Math.floor(a.y)), g0 = navSnap(Math.floor(b.x), Math.floor(b.y)); const pad = Math.max(40, Math.round(Math.hypot(a.x - b.x, a.y - b.y) * .4)), s = SIM.findPath({ sx: s0[0], sy: s0[1], gx: g0[0], gy: g0[1], passable: walkPass, canStep: walkStep, cost: navCost, minCost: .7, maxNodes: b.maxNodes || 60000, goalR: 1.5,
+    bounds: [Math.min(a.x, b.x) - pad, Math.min(a.y, b.y) - pad, Math.max(a.x, b.x) + pad, Math.max(a.y, b.y) + pad] }); return s.status === 'found' ? s.path : null; };
   const link = (id, maxD, any) => { const a = G.node(id), cand = {};
     for (const r of G.ids()) { if (r === id) continue; const b = G.node(r); if (!any && b.kind !== 'road' && b.kind !== 'town') continue; if (b.kind === 'stair' || b.kind === 'gate' || b.kind === 'pier') continue; const d = Math.hypot(a.x - b.x, a.y - b.y); if (d > maxD) continue; const k = any ? 'any:' + b.kind : b.kind === 'road' ? 'road:' + b.road : 'town'; (cand[k] = cand[k] || []).push({ r, d }); }
-    let n = 0; for (const k in cand) for (const c of cand[k].sort((p, q) => p.d - q.d).slice(0, any ? 8 : 3)) if (reach(a, G.node(c.r))) { G.addEdge(id, c.r); n++; break; } return n; };
+    let n = 0; for (const k in cand) for (const c of cand[k].sort((p, q) => p.d - q.d).slice(0, any ? 8 : 3)) { const path = reach(a, G.node(c.r)); if (!path) continue; chain(id, c.r, path); n++; break; } return n; };
+  // a long link is laid along its verified path as short legs (≤ 35 tiles), so every leg stays within one search budget
+  const chain = (a, b, path) => { let prev = a; for (let i = 35; i < path.length - 12; i += 35) { const [x, y] = path[i]; const id = 'trail:' + (n++); G.addNode(id, { x: x + .5, y: y + .5, kind: 'trail' }); G.addEdge(prev, id); prev = id; } G.addEdge(prev, b); };
   for (const t of ANN.towns || []) link(node(t.x, t.y, { kind: 'town', name: t.n, keep: 1 }), 70);
   const lms = Object.entries(LM).map(([k, l]) => { const id = node(l.x + .5, l.y + .5, { kind: k === 'quay' ? 'town' : 'landmark', name: l.n, keep: 1 }); link(id, 60); return id; });
   for (const id of lms) if (G.edges(id).length === 0 || G.node(id).kind === 'landmark') link(id, 160, true);   // wilderness landmarks off the roads join the nearest place
   for (const r of ANN.routes || []) { const w = r.id === 'packet' ? 'packet' : r.kind; const a = node(r.a.x, r.a.y, { kind: 'pier', name: r.a.n + ' ' + w + ' pier', keep: 1 }), b = node(r.b.x, r.b.y, { kind: 'pier', name: r.b.n + ' ' + w + ' pier', keep: 1 }); link(a, 200); link(b, 200); G.addEdge(a, b, { kind: 'travel', cost: 25, via: w }); }
+  // camps, dungeon mouths and Southwatch join the road where their trail meets it (known from the frontier build), else the nearest place
+  for (const st of (typeof FRONT !== 'undefined' ? FRONT.sites : [])) { const id = node(st.x + .5, st.y + (st.k === 'dungeon' ? 2.5 : .5), { kind: st.k, name: st.n, keep: 1 });
+    const j = st.join && G.nearest(st.join[0], st.join[1], q => q.kind === 'road' || q.kind === 'town'), path = j && reach(G.node(id), Object.assign({ maxNodes: 120000 }, j));
+    if (path) chain(id, j.id, path); else link(id, 280, true); }
   const gates = (ANN.gates || []).map(g => { const id = node(g.x, g.y, { kind: 'gate', name: (g.n || '') + ' moongate', keep: 1 }); link(id, 200); return id; });
   for (const a of gates) for (const b of gates) if (a < b) G.addEdge(a, b, { kind: 'travel', cost: 15, via: 'moongate' });
   const st = STAIRS.map(s => ({ s, a: node(s.x + .5, s.y + .5, { kind: 'stair', keep: 1 }), b: node(s.to.x, s.to.y, { kind: 'stair', keep: 1 }) }));

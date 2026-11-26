@@ -2,9 +2,10 @@
    Design reference: the four classic Britannian towns (mining, river trade, rangers and ferry, mages), redrawn with
    original coastlines, streets and footprints. Anniabreen shares the world grid with the Saltmarsh slice: it starts
    AO tiles east of the origin. Coordinates in this file are local (x − AO) unless a name says global.
-   Distances follow the walk speed in game.js (SF.WALK × MOVE_SCALE ≈ 6.15 tiles/s at full stick):
-   forge → first ore face ≈ 17 s, Mynoc → Vespar by cart road ≈ 75 s, Skara landing → fork ≈ 46 s, fork → Mynoc or
-   Vespar ≈ 75 s, Moonglen harbor → college ≈ 24 s (measured in tests/anniabreen-smoke). */
+   Distances follow the walk speed in game.js (SF.WALK × MOVE_SCALE ≈ 6.15 tiles/s at full stick). Since v0.23 the
+   wilderness between the towns is stretched ×1.35 (annStretch): forge → first ore face ≈ 19 s (unchanged, inside Mynoc),
+   Mynoc → Vespar by cart road ≈ 104 s, Skara landing → fork ≈ 66 s, fork → Mynoc ≈ 91 s, fork → Vespar ≈ 104 s,
+   Moonglen harbor → college ≈ 24 s (unchanged) — measured in tests/anniabreen-smoke. */
 const AO = 640;
 const ANN_BOUNDS = [AO + 40, 40, AO + 1440, 830];
 const ANN_ZONE_NAME = { mynoc: 'Mynoc · protected', mine: 'Mynoc Mine · protected', vespar: 'Vespar · protected', skara: 'Skara Bryn · protected', skaraland: 'Skara Bryn landing · protected',
@@ -59,7 +60,7 @@ const AL = {
   mgPier: [1263, 776], mgGate: [1205, 603], mgCourt: [1265, 630], obs: [1258, 434] };
 
 function genAnniabreen(carve, disc) {
-  const r = mulberry(2026), LW = Math.min(W - AO, 1460), LH = H;
+  const r = mulberry(2026), LW = ANN_W0, LH = ANN_H0;   // drawn in the original v1.0 frame, then stretched (annStretch)
   const S = (x, y, t) => tSet(x + AO, y, t), Gt = (x, y) => tAt(x + AO, y);
   const nA = annNoise(r, 34, LW, LH), nB = annNoise(r, 34, LW, LH), nF = annNoise(r, 16, LW, LH), nF2 = annNoise(r, 6, LW, LH), nR = annNoise(r, 9, LW, LH), nC = annNoise(r, 60, LW, LH);
   const ell = (o, x, y, j) => Math.hypot((x - o.cx) / o.rx, (y - o.cy) / o.ry) + j < 1;
@@ -272,25 +273,119 @@ function genAnniabreen(carve, disc) {
     { type: 'boar', x: 360 + AO, y: 610, r: 40, max: 6 }, { type: 'boar', x: 330 + AO, y: 470, r: 44, max: 5 }, { type: 'rat', x: 262 + AO, y: 712, r: 14, max: 4 },
     { type: 'skeleton', x: 470 + AO, y: 700, r: 9, max: 2 }, { type: 'hound', x: 720 + AO, y: 150, r: 40, max: 4, pack: 2 }, { type: 'snapper', x: 790 + AO, y: 640, r: 22, max: 3 },
     { type: 'spider', x: 1340 + AO, y: 430, r: 18, max: 3 }, { type: 'rat', x: 860 + AO, y: 660, r: 12, max: 3 });
+  annStretch(carve);
   for (const s of SPAWNS) if (s.n === undefined) { s.n = 0; s.next = 0; }
+}
+
+/* ================= THE STRETCH (world expansion, v0.23): wider wilderness between the same towns =================
+   Anniabreen v1.0 is drawn first in its original frame (ANN_W0 × ANN_H0, local coordinates). annStretch then moves it to
+   the larger world: every town (and the fork and Miner's Cross) moves as one rigid block by a whole number of tiles, so
+   streets, buildings, doors, NPC posts and protection are untouched; the wilderness between them is stretched by ANN_S
+   (inverse-distance blend of the towns' moves and a frame scaled by ANN_S, checked fold-free: smallest local area ×0.92).
+   Terrain is resampled, then roads and rivers are carved again along their stretched lines so they stay clean. */
+const ANN_W0 = 1460, ANN_H0 = 900, ANN_S = 1.35, ANN_G = 4;
+const ANN_RIGID = { mynoc: [500, 192, 654, 322], vespar: [818, 488, 1040, 642], skara: [60, 585, 262, 695], moonglen: [1185, 420, 1345, 795], fork: [466, 664, 492, 688], cross: [668, 385, 746, 444] };
+const WARP = { anchors: null, fw: null, iv: null, fwW: 0, ivW: 0, ivH: 0 };
+function annAnchors() {
+  if (WARP.anchors) return WARP.anchors; const k = ANN_S - 1, A = [];
+  for (const [id, b] of Object.entries(ANN_RIGID)) A.push({ id, b, rigid: true, t: [Math.round(k * (b[0] + b[2]) / 2), Math.round(k * (b[1] + b[3]) / 2)] });
+  for (let x = 0; x <= ANN_W0; x += 146) for (const y of [0, ANN_H0]) A.push({ id: 'frame', b: [x, y, x, y], t: [k * x, k * y] });
+  for (let y = 150; y < ANN_H0; y += 150) for (const x of [0, ANN_W0]) A.push({ id: 'frame', b: [x, y, x, y], t: [k * x, k * y] });
+  return WARP.anchors = A;
+}
+const boxD = (b, x, y) => Math.hypot(Math.max(b[0] - x, 0, x - b[2]), Math.max(b[1] - y, 0, y - b[3]));
+/* the move of an original point (local): exact whole tiles inside a town, a smooth blend elsewhere */
+function annDispExact(x, y) { let sx = 0, sy = 0, sw = 0; for (const a of annAnchors()) { const q = boxD(a.b, x, y); if (a.rigid && q < 1e-9) return a.t; const w = 1 / ((q + 1e-6) * (q + 1e-6)); sx += w * a.t[0]; sy += w * a.t[1]; sw += w; } return [sx / sw, sy / sw]; }
+let ANN_RIG = null; const annRigids = () => ANN_RIG || (ANN_RIG = annAnchors().filter(a => a.rigid));
+function annRigidAt(x, y) { for (const a of annRigids()) if (x >= a.b[0] && x <= a.b[2] && y >= a.b[1] && y <= a.b[3]) return a; return null; }
+function annDisp(x, y) {   // fast: exact in towns, bilinear on a 4-tile grid elsewhere
+  const a = annRigidAt(x, y); if (a) return a.t; const G = ANN_G, gw = WARP.fwW;
+  if (!WARP.fw) { const nw = Math.ceil(ANN_W0 / G) + 2, nh = Math.ceil(ANN_H0 / G) + 2; WARP.fwW = nw; WARP.fw = new Float32Array(nw * nh * 2); for (let j = 0; j < nh; j++) for (let i = 0; i < nw; i++) { const d = annDispExact(i * G, j * G); WARP.fw[(j * nw + i) * 2] = d[0]; WARP.fw[(j * nw + i) * 2 + 1] = d[1]; } return annDisp(x, y); }
+  const fx = Math.min(Math.max(x / G, 0), gw - 1.001), fy = Math.min(Math.max(y / G, 0), WARP.fw.length / 2 / gw - 1.001), i = Math.floor(fx), j = Math.floor(fy), u = fx - i, v = fy - j, F = WARP.fw;
+  const at = (ii, jj, c) => F[(jj * gw + ii) * 2 + c]; return [0, 1].map(c => (at(i, j, c) * (1 - u) + at(i + 1, j, c) * u) * (1 - v) + (at(i, j + 1, c) * (1 - u) + at(i + 1, j + 1, c) * u) * v);
+}
+/* original local → new global, and new global → original local (towns exactly; elsewhere solved on a grid and interpolated) */
+function annWarp(lx, ly) { const d = annDisp(lx, ly); return [lx + d[0] + AO, ly + d[1]]; }
+function annUnwarp(gx, gy) {
+  const qx = gx - AO, qy = gy;
+  for (const a of annRigids()) { const px = qx - a.t[0], py = qy - a.t[1]; if (px >= a.b[0] && px <= a.b[2] && py >= a.b[1] && py <= a.b[3]) return [px, py]; }
+  const G = ANN_G; if (!WARP.iv) { const nw = Math.ceil(ANN_W0 * ANN_S / G) + 3, nh = Math.ceil(ANN_H0 * ANN_S / G) + 3; WARP.ivW = nw; WARP.ivH = nh; WARP.iv = new Float32Array(nw * nh * 2);
+    for (let j = 0; j < nh; j++) { let px = 0, py = j * G / ANN_S; for (let i = 0; i < nw; i++) { const tx = i * G, ty = j * G; if (i === 0 || j && i % 32 === 0) { px = tx / ANN_S; py = ty / ANN_S; for (let it = 0; it < 24; it++) { const d = annDisp(px, py); px += (tx - px - d[0]) * .6; py += (ty - py - d[1]) * .6; } }
+      else { px += G / ANN_S; for (let it = 0; it < 6; it++) { const d = annDisp(px, py); px += (tx - px - d[0]) * .8; py += (ty - py - d[1]) * .8; } }   // warm start from the neighbour
+      WARP.iv[(j * nw + i) * 2] = px; WARP.iv[(j * nw + i) * 2 + 1] = py; } } }
+  const fx = Math.min(Math.max(qx / G, 0), WARP.ivW - 1.001), fy = Math.min(Math.max(qy / G, 0), WARP.ivH - 1.001), i = Math.floor(fx), j = Math.floor(fy), u = fx - i, v = fy - j, F = WARP.iv, gw = WARP.ivW;
+  const at = (ii, jj, c) => F[(jj * gw + ii) * 2 + c]; return [0, 1].map(c => (at(i, j, c) * (1 - u) + at(i + 1, j, c) * u) * (1 - v) + (at(i, j + 1, c) * (1 - u) + at(i + 1, j + 1, c) * u) * v);
+}
+const annDense = (pts, step) => { const out = []; for (let i = 0; i < pts.length - 1; i++) { const [ax, ay] = pts[i], [bx, by] = pts[i + 1], n = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) / step)); for (let k = 0; k < n; k++) out.push([ax + (bx - ax) * k / n, ay + (by - ay) * k / n]); } out.push(pts[pts.length - 1].slice()); return out; };
+const annWarpPoly = (localPts, step) => annDense(localPts, step || 3).map(([x, y]) => annWarp(x, y));
+function annStretch(carve) {
+  const W0 = ANN_W0, H0 = ANN_H0, NW = Math.ceil(W0 * ANN_S) + 6, NH = Math.min(H, Math.ceil(H0 * ANN_S) + 6);
+  // 1. the original frame, then a clean sea where the stretched Anniabreen goes
+  const old = new Uint8Array(W0 * H0), oldP = new Uint8Array(W0 * H0);
+  for (let y = 0; y < H0; y++) for (let x = 0; x < W0; x++) { old[y * W0 + x] = tAt(x + AO, y); oldP[y * W0 + x] = PROT[y * W + x + AO]; }
+  for (let y = 0; y < H; y++) for (let x = AO; x < W; x++) { map[y * W + x] = T.WA; PROT[y * W + x] = 0; }
+  // 2. resample: towns copied tile for tile; elsewhere the nearest original tile, without roads and rivers (carved again below)
+  const rivM = new Uint8Array(W0 * H0); for (const l of [AL.river, AL.C1, AL.C2, AL.C3, AL.X]) for (const [a, b] of annDense(l, 1)) for (let dy = -5; dy <= 5; dy++) for (let dx = -5; dx <= 5; dx++) { const x = Math.round(a) + dx, y = Math.round(b) + dy; if (x >= 0 && y >= 0 && x < W0 && y < H0 && Math.hypot(x - a, y - b) < 4.2) rivM[y * W0 + x] = 1; }
+  const nearRiver = (x, y) => rivM[Math.round(y) * W0 + Math.round(x)] === 1;
+  const rigid = new Uint8Array(NW * NH); annUnwarp(AO, 0); const IV = WARP.iv, ivW = WARP.ivW, ivH = WARP.ivH, RG = annRigids(), G4 = ANN_G;
+  for (let y = 0; y < NH; y++) for (let x = 0; x < NW && x + AO < W; x++) {
+    let px, py, rg = null; for (const a of RG) { const qx = x - a.t[0], qy = y - a.t[1]; if (qx >= a.b[0] && qx <= a.b[2] && qy >= a.b[1] && qy <= a.b[3]) { px = qx; py = qy; rg = a; break; } }
+    if (!rg) { const fx = Math.min(x / G4, ivW - 1.001), fy = Math.min(y / G4, ivH - 1.001), i = fx | 0, j = fy | 0, u = fx - i, v = fy - j, k00 = (j * ivW + i) * 2, k10 = k00 + 2, k01 = k00 + ivW * 2, k11 = k01 + 2;
+      px = (IV[k00] * (1 - u) + IV[k10] * u) * (1 - v) + (IV[k01] * (1 - u) + IV[k11] * u) * v; py = (IV[k00 + 1] * (1 - u) + IV[k10 + 1] * u) * (1 - v) + (IV[k01 + 1] * (1 - u) + IV[k11 + 1] * u) * v; rg = annRigidAt(px, py); }
+    const ix = Math.round(px), iy = Math.round(py); if (rg) rigid[y * NW + x] = 1;
+    if (ix < 0 || iy < 0 || ix >= W0 || iy >= H0) continue;
+    let t = old[iy * W0 + ix];
+    if (!rg) { if (t === T.RD || t === T.BR) t = T.G; else if ((t === T.WA || t === T.SH) && px > 180 && px < 1030 && py > 150 && py < 700 && nearRiver(px, py)) t = T.G; }
+    map[y * W + x + AO] = t; if (oldP[iy * W0 + ix]) PROT[y * W + x + AO] = 1;
+  }
+  const loose = (x, y) => { const lx = x - AO; return lx >= 0 && y >= 0 && lx < NW && y < NH && !rigid[y * NW + lx]; };
+  // 3. rivers and roads again, along their stretched lines (only outside the towns, which kept theirs)
+  const water = (pts, hw) => annAlong(annWarpPoly(pts).map(([x, y]) => [x - AO, y]), hw + 1.3, (x, y, d) => { const gx = x + AO; if (!loose(gx, y)) return; if (d <= hw) tSet(gx, y, T.WA); else if (tAt(gx, y) !== T.WA) tSet(gx, y, T.SH); });
+  water(AL.river, 2.6); water(AL.C1, 2.4); water(AL.C2, 2.4); water(AL.C3, 2.4); water(AL.X, 2.2);
+  const road = pts => { const P2 = annWarpPoly(pts, 2); for (const [x, y] of P2) for (let oy = 0; oy < 3; oy++) for (let ox = 0; ox < 3; ox++) { const gx = Math.round(x) + ox, gy = Math.round(y) + oy; if (!loose(gx, gy)) continue; const t = tAt(gx, gy); if (t === T.FL || t === T.WL || t === T.DR || t === T.AK) continue; tSet(gx, gy, t === T.WA || t === T.SH || t === T.BR ? T.BR : T.RD); } };
+  for (const k of ['forest', 'north', 'east', 'cart']) road(AL[k]);
+  ANN.roads = { forest: annWarpPoly(AL.forest, 10), north: annWarpPoly(AL.north, 10), east: annWarpPoly(AL.east, 10), cart: annWarpPoly(AL.cart, 10) };
+  ANN.river0 = ANN.river; ANN.river = annWarpPoly(AL.river, 10);
+  // 4. thin the stretched woods again: one tree in a 3×3 cell, so every wood stays walkable
+  { const cell = new Set(); for (let y = 0; y < NH; y++) for (let x = AO; x < AO + NW && x < W; x++) { if (tAt(x, y) !== T.TR || !loose(x, y)) continue; /* towns were thinned already and are left alone */ const k = Math.floor(x / 3) + ',' + Math.floor(y / 3); if (x % 3 === 2 || y % 3 === 2 || cell.has(k)) tSet(x, y, T.G); else cell.add(k); } }
+  // 5. move everything the towns placed, rigidly (whole tiles)
+  const mv = (x, y) => { const lx = x - AO; const d = annRigidAt(lx, y) ? annRigidAt(lx, y).t : annDisp(lx, y); return [Math.round(d[0]), Math.round(d[1])]; };
+  const inAnn = x => x >= AO;
+  const pieces = []; for (const [k, a] of PIECES) if (k % W >= AO) { pieces.push([k, a]); PIECES.delete(k); }
+  for (const [k, a] of pieces) { const kx = k % W, ky = (k - kx) / W, [dx, dy] = mv(kx + .5, ky + .5); for (const p of a) { p.x += dx; p.y += dy; p.d += dx + dy; if (p.x1 !== undefined) { p.x1 += dx; p.y1 += dy; } } const nk = (ky + dy) * W + kx + dx; const b = PIECES.get(nk); if (b) b.push(...a); else PIECES.set(nk, a); }
+  const rects = new Set(); for (const [k, a] of ECOL) if (k % W >= AO) { for (const r of a) rects.add(r); ECOL.delete(k); }
+  for (const r of rects) { const [dx, dy] = mv((r[0] + r[2]) / 2, (r[1] + r[3]) / 2); r[0] += dx; r[2] += dx; r[1] += dy; r[3] += dy;
+    for (let y = Math.floor(r[1] - .5); y <= Math.floor(r[3] + .5); y++) for (let x = Math.floor(r[0] - .5); x <= Math.floor(r[2] + .5); x++) { const k = y * W + x; let a = ECOL.get(k); if (!a) ECOL.set(k, a = []); a.push(r); } }
+  for (const [k, a] of [...DOORK]) if (k % W >= AO) DOORK.delete(k);
+  for (const d of DOORS) if (inAnn(d.x)) { const [dx, dy] = mv(d.x + .5, d.y); d.x += dx; d.y += dy; d.key = d.x + ',' + d.y; for (let i = 0; i < 4; i++) d.col[i] += i % 2 ? dy : dx;
+    for (let ty = Math.floor(d.col[1] - .5); ty <= Math.floor(d.col[3] + .5); ty++) for (let tx = Math.floor(d.col[0] - .5); tx <= Math.floor(d.col[2] + .5); tx++) { const k = ty * W + tx; let a = DOORK.get(k); if (!a) DOORK.set(k, a = []); a.push(d); } }
+  for (const B of new Set([...KBUILD, ...BUILD])) if (inAnn(B.x)) { const [dx, dy] = mv(B.cx, B.cy); B.x += dx; B.y += dy; B.cx += dx; B.cy += dy; if (B.roof) for (const r of B.roof) { r[1] += dx; r[2] += dy; } }
+  for (const L of [LIGHTS, STATIONS, SHRINES, ANN.towns, ANN.labels, ANN.gates, ANN.signs, ANN.npcs]) for (const o of L) if (inAnn(o.x)) { const [dx, dy] = mv(o.x, o.y); o.x += dx; o.y += dy; }
+  for (const rt of ANN.routes) for (const e of [rt.a, rt.b]) if (inAnn(e.x)) { const [dx, dy] = mv(e.x, e.y); e.x += dx; e.y += dy; }
+  for (const z of ANN.zones) { const [dx, dy] = mv((z.x0 + z.x1) / 2, (z.y0 + z.y1) / 2); z.x0 += dx; z.x1 += dx; z.y0 += dy; z.y1 += dy; }
+  { const m = ANN.mine, [dx, dy] = mv((m.x0 + m.x1) / 2, (m.y0 + m.y1) / 2); m.x0 += dx; m.x1 += dx; m.y0 += dy; m.y1 += dy; m.front += dy; }
+  for (const sp of SPAWNS) if (inAnn(sp.x)) { const [x, y] = annWarp(sp.x - AO, sp.y); sp.x = x; sp.y = y; sp.r = Math.round(sp.r * ANN_S); }
+  ANN.stretched = { s: ANN_S, w: NW, h: NH };
 }
 
 /* ---------------- zones, node grades ---------------- */
 function annZone(x, y) {
   if (x < SW) return 'sea';
   for (const z of ANN.zones) if (x >= z.x0 && x <= z.x1 && y >= z.y0 && y <= z.y1) return z.id;
-  const t = tAt(x, y); const lx = x - AO;
+  const t = tAt(x, y); const fz = typeof frontierZone === 'function' ? frontierZone(x, y) : null; if (fz) return fz;
+  const [lx, ly] = annUnwarp(x, y); y = ly;                                      // the rules below are written in the original v1.0 frame
+  if (lx > ANN_W0 || y > ANN_H0) return t === T.WA ? 'sea' : 'fields';
   if (Math.hypot((lx - AL.moon.cx) / AL.moon.rx, (y - AL.moon.cy) / AL.moon.ry) < 1.06) return t === T.WA ? 'sea' : 'mglen';
   if (t === T.WA && (lx < 190 || lx > 1012 || y > 940 || y < 75)) return 'sea';
   if (y < 190) return 'ridge';
-  if (ANN.river && annPolyD(x, y, ANN.river) < 42 && y < 520) return 'vale';
+  if (ANN.river0 && annPolyD(lx + AO, y, ANN.river0) < 42 && y < 520) return 'vale';
   if (lx < 520) return 'woods';
   return 'fields';
 }
 /* Mynoc's first chamber: grade 1 faces near the adit, grade 2 at the back; ridge rock grade 3; elsewhere grade 2 */
 function annTier(x, y) {
   const m = ANN.mine; if (m && x >= m.x0 - 1 && x <= m.x1 + 1 && y >= m.y0 - 1 && y <= m.y1 + 1) return y >= m.front ? 0 : 1;
-  if (hash(x, y) % 41 === 0) return 3; const z = annZone(x, y); return z === 'ridge' ? 2 : z === 'mglen' || z === 'moonglen' ? 1 : 1;
+  if (hash(x, y) % 41 === 0) return 3; const z = annZone(x, y); return z === 'ridge' || z === 'greyspine' ? 2 : z === 'mglen' || z === 'moonglen' ? 1 : 1;
 }
 
 /* ---------------- NPCs, talk and travel ---------------- */
@@ -345,8 +440,8 @@ function annTick() {
   const g = annNearGate(.8); if (!g) { if (!annNearGate(1.9)) st.out = true; if (PANEL === 'mgpick' && MGPICK && Math.hypot(MGPICK.x - P.x, MGPICK.y - P.y) > 3.3) { MGPICK = null; closePanel(); } return; }
   if (st.out && PANEL !== 'mgpick') { st.out = false; annOpenGate(g); }
 }
-function annInteract() { const g = annNearGate(3.1); if (g) { annOpenGate(g); return true; } const s = annNearSign(2.2); if (s) { log('The sign reads: ' + s.lines.join(' · '), '#e8d8b0'); return true; } return false; }
-function annCanInteract() { return !!(P && (annNearGate(3.1) || annNearSign(2.2))); }
+function annInteract() { if (frontierInteract()) return true; const g = annNearGate(3.1); if (g) { annOpenGate(g); return true; } const s = annNearSign(2.2); if (s) { log('The sign reads: ' + s.lines.join(' · '), '#e8d8b0'); return true; } return false; }
+function annCanInteract() { return !!(P && (frontierCanInteract() || annNearGate(3.1) || annNearSign(2.2))); }
 const annNearSign = r => ANN.signs.find(s => Math.hypot(s.x - P.x, s.y - P.y) <= r);
 
 /* ---------------- overlay, minimap and map symbols ---------------- */

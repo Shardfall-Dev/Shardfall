@@ -855,7 +855,7 @@ function petTick(p, dt) {
 }
 
 /* ================= WORLD: the island slice ================= */
-const W = 2100, H = 900, SW = 600;   // v0.20: Saltmarsh keeps its 600×600 slice at the origin; Anniabreen lies east of it (src/anniabreen.js)
+const W = 2620, H = 1520, SW = 600;   // v0.23: Saltmarsh keeps its 600×600 slice at the origin; Anniabreen (stretched) lies east of it (src/anniabreen.js), the new lands south (src/frontier.js)
 const T = { G: 0, TR: 1, WA: 2, RK: 3, SA: 4, RD: 5, FL: 6, WL: 7, DI: 8, SH: 9, FG: 10, AN: 11, BR: 12, DR: 13, AK: 14, LP: 15, BN: 16, ST: 17, FP: 18, RB: 19, SB: 20, HB: 21, SC: 22, FN: 23, BL: 24, MR: 25, SD: 26, SU: 27, CH: 28, CF: 29 };
 const BLK = new Uint8Array(64); for (const t of [T.TR, T.WA, T.RK, T.WL, T.FG, T.AN, T.AK, T.LP, T.BN, T.ST, T.FP, T.FN, T.BL, T.MR, T.CH]) BLK[t] = 1;
 const LOSB = new Uint8Array(64); SOFT[T.TR] = .2; SOFT[T.RK] = .22; SOFT[T.MR] = .16; for (const t of [T.WL, T.RK, T.FG, T.BL]) LOSB[t] = 1;     // trees and reeds are foliage: no LOS block
@@ -975,7 +975,7 @@ function genWorld() {
   // Homestead Belt lease plots (decor)
   for (let px = 240; px < 410; px += 26) for (const py of [88, 108]) for (let i = 0; i < 14; i++) for (let j = 0; j < 12; j++) { if (tAt(px + i, py + j) === T.WA) continue; const e = i === 0 || j === 0 || i === 13 || j === 11; if (e && !(i === 6 || i === 7)) tSet(px + i, py + j, T.FN); else if (!e) tSet(px + i, py + j, T.G); }
   placeQuayNodes();
-  genAnniabreen(carve, disc);
+  genAnniabreen(carve, disc); genFrontier(carve, disc);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const t = map[y * W + x]; if (t === T.LP) LIGHTS.push({ x, y, r: 5 }); if (t === T.FG) LIGHTS.push({ x, y, r: 4 }); if (t === T.AK) LIGHTS.push({ x, y, r: 4 }); }
 }
 const RES = new Map();
@@ -2255,7 +2255,7 @@ function migrateSave(s, raw) {
     s.combatReform = r; s.v = 3;
   }
   if (s.v < 4) {   // v0.20 Anniabreen: the grid widened from 600 to W tiles; tile-keyed node and survey records move with it
-    const re = k => { k = +k; return Math.floor(k / 600) * W + k % 600; };
+    const re = k => { k = +k; return Math.floor(k / 600) * 2100 + k % 600; };   // the v0.20 grid width; v6 moves these on to the current one
     s.nodes = (s.nodes || []).map(n => [re(n[0])].concat(n.slice(1)));
     const sv = s.char.cx && s.char.cx.survey; if (sv) { const o = {}; for (const k in sv) o[re(k)] = sv[k]; s.char.cx.survey = o; }
     s.v = 4;
@@ -2263,7 +2263,28 @@ function migrateSave(s, raw) {
   if (s.v < 5) {   // v0.21 Living World Phase 1: additive. `sim` (world seed, actor-id counter) starts fresh; nothing existing changes, so no snapshot is needed
     s.sim = s.sim || null; s.v = 5;
   }
+  if (s.v < 6) migrateV6(s, raw);
   return s;
+}
+/* v0.23 world expansion: the grid grew from 2100 × 900 to W × H and Anniabreen was stretched (annStretch). Everything saved at
+   an Anniabreen position follows it: towns move by whole tiles, so town records stay exact; wilderness resource and survey
+   records are dropped (that ground was redrawn). A snapshot of the old save is kept once. */
+function migrateV6(s, raw) {
+  try { if (raw && !localStorage.getItem(SAVEKEY + '.prev5')) localStorage.setItem(SAVEKEY + '.prev5', raw); } catch (e) { }
+  const OW = 2100, ann = x => x >= AO;
+  const pos = o => { if (o && Number.isFinite(o.x) && ann(o.x)) { const [x, y] = annWarp(o.x - AO, o.y); o.x = x; o.y = y; } };
+  const key = k => { k = +k; const x = k % OW, y = Math.floor(k / OW); if (!ann(x)) return y * W + x; if (!annRigidAt(x - AO, y)) return null; const [nx, ny] = annWarp(x - AO, y); return Math.round(ny) * W + Math.round(nx); };
+  const c = s.char; pos(c);
+  s.nodes = (s.nodes || []).map(n => { const k = key(n[0]); return k === null ? null : [k].concat(n.slice(1)); }).filter(Boolean);
+  if (c.cx && c.cx.survey) { const o = {}; for (const k in c.cx.survey) { const nk = key(k); if (nk !== null) o[nk] = c.cx.survey[k]; } c.cx.survey = o; }
+  if (c.cx && c.cx.doors) { const o = {}; for (const k in c.cx.doors) { const [x, y] = k.split(',').map(Number); if (ann(x)) { const [nx, ny] = annWarp(x - AO, y); o[Math.round(nx) + ',' + Math.round(ny)] = c.cx.doors[k]; } else o[k] = c.cx.doors[k]; } c.cx.doors = o; }
+  for (const pn of (c.cx && c.cx.pins) || []) pos(pn);
+  for (const co of s.corpses || []) pos(co);
+  if (s.ally) { pos(s.ally); if (s.ally.body) pos(s.ally.body); }
+  const rune = it => { if (it && it.mark) pos(it.mark); };
+  for (const k of ['pack', 'bank']) if (c[k]) c[k].items.forEach(rune); for (const k in c.equip || {}) rune(c.equip[k]); for (const co of s.corpses || []) (co.items || []).forEach(rune);
+  if (s.ally) (s.ally.pack || []).forEach(rune);
+  s.worldMoved = true; s.v = 6;
 }
 function migrateV2(s, raw) {
   const walk = fn => { const c = s.char; for (const k of ['pack', 'bank']) if (c[k]) c[k].items.forEach(fn); for (const k in c.equip || {}) if (c.equip[k]) fn(c.equip[k]); for (const co of s.corpses || []) co.items.forEach(fn); };
@@ -2337,7 +2358,7 @@ function save() {
     const pets = ents.filter(e => e.kind === 'pet' && e.type && !e.summon && !e.gone && e.hp > 0).map(e => ({ type: e.type, hp: e.hp, order: e.order === 'stay' ? 'stay' : 'follow', slots: e.slots, name: e.name, dx: e.x - P.x, dy: e.y - P.y }));
     const nodes = []; for (const [k, o] of RES) nodes.push([k, o.gen || 1, o.spec || 0, o.n, o.max || 0, Math.round(o.t * 10) / 10]);
     const ally = allySave(); if (ally) { [ally.equip.weapon, ally.equip.shield, ally.equip.armor].forEach(scan); ally.pack.forEach(scan); if (ally.body) ally.body.items.forEach(scan); }
-    localStorage.setItem(SAVEKEY, JSON.stringify({ v: 5, char: c, corpses, pets, nodes, ally, sim: WS ? WS.save() : null, uid: maxUid + 1, gt: GT, savedAt: Date.now() }));
+    localStorage.setItem(SAVEKEY, JSON.stringify({ v: 6, char: c, corpses, pets, nodes, ally, sim: WS ? WS.save() : null, uid: maxUid + 1, gt: GT, savedAt: Date.now() }));
     DEV.lastSave = { ok: true, at: GT }; return true;
   } catch (e) { DEV.lastSave = { ok: false, at: GT }; return false; }
 }
@@ -2384,6 +2405,7 @@ function boot(saved, fresh) {
     if (P.ghost && !Number.isFinite(c.ghostAt)) P.ghostAt = GT - 12; }
   else { P = newChar(fresh); starterKit(); }
   P.cx = Object.assign({ survey: {}, pins: [], track: null, mark: false, doors: {} }, P.cx || {}); P.batch = null; applyDoorState();
+  if (saved && !canStand(P, P.x, P.y)) { find: for (let r = 1; r <= 12; r++) for (let a = 0; a < 16; a++) { const x = P.x + Math.cos(a / 8 * Math.PI) * r, y = P.y + Math.sin(a / 8 * Math.PI) * r; if (canStand(P, x, y)) { P.x = x; P.y = y; break find; } } }   // never load into a wall or a tree
   WS = SIM.create({ clock: () => GT, saved: saved && saved.sim, onError: e => console.error(e) }); simAdopt(P);   // actor ids continue from the save
   if (saved && !(saved.sim && saved.sim.clock)) WS.clock.setHour(GT, (GT / 60 + 9) % 24);   // older saves keep the hour they were at; from now on a day lasts 120 minutes
   NAV.walk = null; NAV.edge = null; NAV.graph = null; devInit();
@@ -2408,7 +2430,7 @@ loadScout(SCOUT_SRC); renderCC(); resize(); requestAnimationFrame(loop);
 function spawnMon(type, dx = 3, dy = 0) { const d = MON[type]; if (!d) return null; let x = P.x + dx, y = P.y + dy;
   for (let r = 0; r < 6 && BLK[tAt(Math.floor(x), Math.floor(y))]; r += .5) for (let a = 0; a < 8; a++) { const nx = P.x + dx + Math.cos(a * Math.PI / 4) * r, ny = P.y + dy + Math.sin(a * Math.PI / 4) * r; if (!BLK[tAt(Math.floor(nx), Math.floor(ny))]) { x = nx; y = ny; break; } }
   return addEnt({ kind: 'mon', type, name: d.n, x, y, hp: d.hp, max: d.hp, state: 'idle', home: { x, y }, sect: 0, ward: 0 }); }
-window.__SF = { get WS() { return WS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
+window.__SF = { get WS() { return WS; }, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
 
 }
 </script>
