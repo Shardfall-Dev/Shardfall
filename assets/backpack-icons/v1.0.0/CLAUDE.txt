@@ -1,0 +1,1 @@
+Unpack the adjacent ZIP. Use items.json keyed by the inventory item's id to crop backpack.png at the listed pixel rectangle. Embed the atlas and mapping in the single-file game build. Render the same icon in the backpack and hover/tap detail panel. Keep stack counts legible and sorting functional. Rebuild and check desktop and phone layouts.

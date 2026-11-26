@@ -1,0 +1,136 @@
+{
+  "version": "1.0.0",
+  "frame": {
+    "width": 160,
+    "height": 160,
+    "pivot": [
+      80,
+      137
+    ]
+  },
+  "rows": [
+    "S",
+    "SW",
+    "W",
+    "NW",
+    "N",
+    "NE",
+    "E",
+    "SE"
+  ],
+  "columns": [
+    "stepA",
+    "neutral",
+    "stepB",
+    "windup",
+    "impact"
+  ],
+  "animations": {
+    "idle": {
+      "frames": [
+        1
+      ],
+      "durationMs": [
+        1000
+      ],
+      "loop": true
+    },
+    "walk": {
+      "frames": [
+        0,
+        1,
+        2,
+        1
+      ],
+      "durationMs": [
+        125,
+        100,
+        125,
+        100
+      ],
+      "loop": true
+    },
+    "attack": {
+      "frames": [
+        3,
+        4,
+        1
+      ],
+      "durationMs": [
+        230,
+        110,
+        170
+      ],
+      "loop": false,
+      "contactIndex": 1
+    }
+  },
+  "mobs": [
+    {
+      "id": "orc",
+      "name": "Orc",
+      "atlas": "orc.png",
+      "boss": false
+    },
+    {
+      "id": "ettin",
+      "name": "Ettin",
+      "atlas": "ettin.png",
+      "boss": false
+    },
+    {
+      "id": "troll",
+      "name": "Troll",
+      "atlas": "troll.png",
+      "boss": false
+    },
+    {
+      "id": "lizardman",
+      "name": "Lizardman",
+      "atlas": "lizardman.png",
+      "boss": false
+    },
+    {
+      "id": "gargoyle",
+      "name": "Gargoyle",
+      "atlas": "gargoyle.png",
+      "boss": false
+    },
+    {
+      "id": "earth_elemental",
+      "name": "Earth Elemental",
+      "atlas": "earth_elemental.png",
+      "boss": false
+    },
+    {
+      "id": "giant_spider",
+      "name": "Giant Spider",
+      "atlas": "giant_spider.png",
+      "boss": false
+    },
+    {
+      "id": "dire_wolf",
+      "name": "Dire Wolf",
+      "atlas": "dire_wolf.png",
+      "boss": false
+    },
+    {
+      "id": "harpy",
+      "name": "Harpy",
+      "atlas": "harpy.png",
+      "boss": false
+    },
+    {
+      "id": "slime",
+      "name": "Slime",
+      "atlas": "slime.png",
+      "boss": false
+    },
+    {
+      "id": "lich_lord",
+      "name": "Lich Lord",
+      "atlas": "lich_lord.png",
+      "boss": true
+    }
+  ]
+}

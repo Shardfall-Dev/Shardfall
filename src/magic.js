@@ -8,7 +8,8 @@ const FIELDS = [], GATES = [], RESOLVED = new Set();
 let CASTID = 0;
 
 /* ---------- actors: one view of the player, pets, summons and creatures ---------- */
-const isLiving = a => a && (a === P ? !P.ghost : alive(a) && (a.kind === 'mon' || a.kind === 'pet'));
+const isLiving = a => a && (a === P ? !P.ghost : alive(a) && (a.kind === 'mon' || a.kind === 'pet' || (a.kind === 'ally' && !a.ghost)));
+const isPlayerGhost = e => (e.kind === 'player' || e.kind === 'ally') && e.ghost;
 const mgOf = a => a.mg || (a.mg = {});
 const MON_R = m => { const d = MON[m.type]; return d && d.wardcraft !== undefined ? d.wardcraft : cl(Math.round((d ? d.diff : 30) - 15), 0, 100); };   // tuning: creature Wardcraft
 const rOf = a => a === P ? sv('wardcraft') : a.summon ? 30 : MON_R(a);
@@ -17,12 +18,12 @@ const tacticsOf = a => a === P ? sv('tactics') : (MON[a.type] || {}).atk || 40;
 const nameOf = a => a === P ? 'you' : a.name || (MON[a.type] || {}).n || 'it';
 const mval = () => sv('spellcraft'), eval_ = () => sv('focus');
 function knownSpells() { return MG.bookSpells(P.pack); }
-function hurt(a, amt, src, kind) { if (amt <= 0) { floater(a.x, a.y, '0', '#c8c8c8'); return; } if (a === P) damagePlayer(amt, src === P ? null : src, kind === 'spell' ? 'spell' : kind); else damageMon(a, amt, kind, src); }
+function hurt(a, amt, src, kind) { if (amt <= 0) { floater(a.x, a.y, '0', '#c8c8c8'); return; } damageActor(a, amt, kind, src); }   // the shared damage entry (src/game.js)
 function aggro(a, src) { if (a !== P && a.kind === 'mon' && alive(a) && !a.target) { a.target = src || P; a.state = 'chase'; } }
 function healActor(a, amt) { const max = a === P ? SF.maxHp(P) : a.max; const b = a.hp; a.hp = Math.min(max, a.hp + amt); FX.push({ k: 'heal', x: a.x, y: a.y, t0: GT, dur: .8 }); floater(a.x, a.y, '+' + Math.round(a.hp - b), '#7ee08a'); return a.hp - b; }
 function livingNear(x, y, r, pred) { const out = []; for (const e of ents) if (isLiving(e) && Math.hypot(e.x - x, e.y - y) <= r + 1e-6 && (!pred || pred(e))) out.push(e); return out; }
 function standable(x, y) { const tx = Math.floor(x), ty = Math.floor(y); if (x < 0 || y < 0 || BLK[tAt(tx, ty)] || [T.WA, T.BR].includes(tAt(tx, ty))) return false; return canStand(P, x, y) && !fieldBlocks(x, y); }
-function occupied(x, y, except) { return ents.some(e => e !== except && !e.gone && (e.kind === 'mon' || e.kind === 'pet' || e.kind === 'npc' || e === P) && !e.dead && Math.hypot(e.x - x, e.y - y) < .55); }
+function occupied(x, y, except) { return ents.some(e => e !== except && !e.gone && (e.kind === 'mon' || e.kind === 'pet' || e.kind === 'npc' || e.kind === 'ally' || e === P) && !e.dead && Math.hypot(e.x - x, e.y - y) < .55); }
 
 /* ---------- prepare ---------- */
 function castSlot(id, opt) {
@@ -47,25 +48,25 @@ function castSlot(id, opt) {
   const delay = stowWeapon(); P.meditating = null;
   P.prep = { sp, t0: GT + delay, t1: GT + delay + sp.prep, x0: P.x, y0: P.y, scroll, escrow: { mana: sp.mp, items }, rid: ++CASTID };
   if (delay) log('You stow your weapon.');
-  say(P, sp.chant); FX.push({ k: 'msign', e: P, id: sp.id, t0: GT, dur: delay + sp.prep + .2 }); sfx('cast');
+  say(P, sp.chant); FX.push({ k: 'msign', e: P, id: sp.id, t0: GT, dur: delay + sp.prep + .2 });   // preparing is quiet; magic.prepare plays when it holds
 }
 function interruptPrep(msg) {
   if (!P.prep) return; const pr = P.prep, c = MG.interruptCost(pr.sp.mp); P.prep = null;
   for (const r of pr.escrow.items) give(r, 1);                                   // reagents (or scroll) come back
   P.mana = Math.min(SF.maxMana(P), P.mana + pr.escrow.mana - c);                   // half the mana, rounded up, is spent
-  log(msg + ` (−${c} mana)`, '#ffb070'); P.spellReadyAt = GT + MG.RECOVERY; sfx('fizzle');
+  log(msg + ` (−${c} mana)`, '#ffb070'); P.spellReadyAt = GT + MG.RECOVERY; snd('magic.fizzle', { key: 'P' });
 }
 function prepTick() {
   if (P.prep && GT >= P.prep.t1) {
     const pr = P.prep, sp = pr.sp; P.prep = null; const M = mval();
     const ch = sp.legacy ? SF.spellSuccess(M, sp.min) : MG.chance(sp, M, pr.scroll);
     const ok = R() < ch; gain('spellcraft', sp.legacy ? sp.min + 15 : (pr.scroll ? MG.scrollGate(sp) : sp.min) + 10);
-    if (!ok) { log((pr.scroll ? 'The scroll crumbles and the spell fizzles.' : 'The spell fizzles.'), '#a8a8a8'); P.spellReadyAt = GT + MG.RECOVERY; sfx('fizzle'); FX.push({ k: 'puff', x: P.x, y: P.y, t0: GT, dur: .6 }); return; }
-    P.held = { sp, t0: GT, until: GT + MG.HOLD, scroll: pr.scroll, rid: pr.rid }; sfx('cast');
+    if (!ok) { log((pr.scroll ? 'The scroll crumbles and the spell fizzles.' : 'The spell fizzles.'), '#a8a8a8'); P.spellReadyAt = GT + MG.RECOVERY; snd('magic.fizzle', { key: 'P' }); FX.push({ k: 'puff', x: P.x, y: P.y, t0: GT, dur: .6 }); return; }
+    P.held = { sp, t0: GT, until: GT + MG.HOLD, scroll: pr.scroll, rid: pr.rid }; snd('magic.prepare', { key: 'P' });
     if (sp.tgt === 'self' && (sp.legacy || !['magery.56'].includes(sp.id))) { if (releaseHeld(P)) return; }
     armHeld();
   }
-  if (P.held && GT >= P.held.until) { log(P.held.sp.n + ' fades unreleased.', '#a8a8a8'); P.held = null; AIM = null; P.spellReadyAt = GT + MG.RECOVERY; closeMagicPanel(); }
+  if (P.held && GT >= P.held.until) { log(P.held.sp.n + ' fades unreleased.', '#a8a8a8'); snd('magic.fizzle', { key: 'P', gain: .6 }); P.held = null; AIM = null; P.spellReadyAt = GT + MG.RECOVERY; closeMagicPanel(); }
 }
 const TGT_TEXT = { living: 'a living creature', friend: 'yourself, a pet or a creature', ground: 'visible ground', anchor: 'ground or a creature', adjacent: 'free ground next to you', container: 'a chest', object: 'a chest latch', rune: 'one of your runes', field: 'a field segment or gate mouth', summon: 'a summoned creature', ghost: 'a ghost within 2 m', self: 'yourself' };
 function armHeld() {
@@ -79,7 +80,7 @@ function armHeld() {
 // a held spell is let go unused — its charge was spent at a successful prep — with the normal recovery
 function cancelCast() {
   if (P.prep) return interruptPrep('You stop preparing ' + P.prep.sp.n + '.');
-  if (!P.held) return; const sp = P.held.sp; P.held = null; AIM = null; P.spellReadyAt = GT + MG.RECOVERY; closeMagicPanel(); sfx('fizzle');
+  if (!P.held) return; const sp = P.held.sp; P.held = null; AIM = null; P.spellReadyAt = GT + MG.RECOVERY; closeMagicPanel(); snd('magic.fizzle', { key: 'P' });
   log('You let ' + sp.n + ' go unreleased.', '#a8a8a8');
 }
 function castCancelButton() {
@@ -100,7 +101,7 @@ function heldTap(hits, w) {
   if (!P.held) return false; const sp = P.held.sp;
   const nearSelf = Math.hypot(w.x - P.x, w.y - P.y) < .7;
   if (sp.tgt === 'living' || sp.tgt === 'friend' || sp.tgt === 'summon' || sp.tgt === 'ghost') {
-    const t = hits.find(e => sp.tgt === 'summon' ? e.summon : sp.tgt === 'ghost' ? e.kind === 'player' && e.ghost : isLiving(e)) || ((sp.tgt === 'friend' || sp.tgt === 'living') && nearSelf ? P : null);
+    const t = hits.find(e => sp.tgt === 'summon' ? e.summon : sp.tgt === 'ghost' ? isPlayerGhost(e) : isLiving(e)) || ((sp.tgt === 'friend' || sp.tgt === 'living') && nearSelf ? P : null);
     if (t) { releaseHeld(t); return true; }
     log(`${sp.n} needs ${TGT_TEXT[sp.tgt]}. The spell is still held.`, '#ffb070'); return true;
   }
@@ -119,7 +120,7 @@ function releaseHeld(t, extra) {
     case 'living': if (!isLiving(t)) return rej(`${sp.n} needs ${TGT_TEXT.living}.`); break;
     case 'friend': if (!isLiving(t)) return rej(`${sp.n} needs ${TGT_TEXT.friend}.`); break;
     case 'summon': if (!t.summon || !alive(t)) return rej('Only a summoned creature can be banished.'); break;
-    case 'ghost': if (!(t.kind === 'player' && t.ghost)) return rej('No ghost is offering to return.'); break;
+    case 'ghost': if (!isPlayerGhost(t)) return rej('No ghost is offering to return.'); break;
     case 'anchor': { if (isPt) { const e = livingNear(t.x, t.y, .7).sort((a, b) => Math.hypot(a.x - t.x, a.y - t.y) - Math.hypot(b.x - t.x, b.y - t.y))[0]; target = e ? { x: e.x, y: e.y, anchor: e } : { x: t.x, y: t.y }; } else target = { x: t.x, y: t.y, anchor: t }; break; }
     case 'rune': if (!t.rune) return rej('Choose one of your runes.'); break;
     default: break;
@@ -132,6 +133,7 @@ function releaseHeld(t, extra) {
   const res = sp.legacy ? (applyLegacy(sp, target), true) : effectOn(sp, target, extra || {});
   if (res === false) return false;                                                // effect refused the target: the hold timer keeps running
   playOnce('CastRelease', 0); P.held = null; AIM = null; P.spellReadyAt = GT + MG.RECOVERY; closeMagicPanel();
+  if (!sp.legacy) { if (sp.delay) snd('magic.release', { key: 'P' }); if (!DELIVERED[sp.effect]) spellSnd(sp, target === P ? P : pos); }   // launch, then the effect where it lands
   if (P.hidden && !(sp.effect === 'concealment' && target === P)) reveal(P.mg && P.mg.invis > GT ? 'Casting ends your invisibility.' : 'Your spell reveals you.');
   if (target !== P && pos.x !== undefined) faceToward(P, pos.x, pos.y);
   return true;
@@ -153,7 +155,7 @@ function spellHit(sp, a, base, ctx) {
 // committed single-target delivery: follows the recipient; death or a level change cancels it
 function deliver(sp, a, ctx, fn) {
   const lvl = levelAt(Math.floor(a.x), Math.floor(a.y)) || null;
-  const go = () => { if (!isLiving(a)) return; if ((levelAt(Math.floor(a.x), Math.floor(a.y)) || null) !== lvl) return; fn(); };
+  const go = () => { if (!isLiving(a)) return; if ((levelAt(Math.floor(a.x), Math.floor(a.y)) || null) !== lvl) return; spellSnd(sp, a); fn(); };
   if (!sp.delay) return go();
   if (sp.id === 'magery.43') EFX.push({ k: 'mark', e: a, col: '#ff6a20', until: GT + sp.delay });
   else if (sp.id === 'magery.51') EFX.push({ k: 'mring', e: a, col: '#ffb040', until: GT + sp.delay });
@@ -198,7 +200,7 @@ function effectOn(sp, t, x) {
     case 'transformation': { const form = x.form || (mgOf(P).lastForm) || 'hound'; const g = mgOf(P); g.form = { type: form, until: GT + MG.polymorph(M) }; g.lastForm = form; FX.push({ k: 'puff', x: P.x, y: P.y, t0: GT, dur: .6 }); log('You take the form of a ' + MON[form].n + '.', '#c8e0ff'); return true; }
     case 'movement': { if (!standable(t.x, t.y) || occupied(t.x, t.y, P)) { log('Blink Step needs open, legal ground.', '#ffb070'); return false; } FX.push({ k: 'puff', x: P.x, y: P.y, t0: GT, dur: .4 }); P.x = t.x; P.y = t.y; FX.push({ k: 'puff', x: P.x, y: P.y, t0: GT, dur: .4 }); return true; }
     case 'shared_damage': { const c = { x: t.x, y: t.y }; EFX.push({ k: 'groundwarn', x: c.x, y: c.y, r: sp.radius, t0: GT, at: GT + sp.delay, fn: () => areaPool(sp, c, ctx) }); gain('focus', sp.min + 10); return true; }
-    case 'area_percent_hit': { const c = { x: P.x, y: P.y }; EFX.push({ k: 'groundwarn', x: c.x, y: c.y, r: sp.radius, t0: GT, at: GT + sp.delay, fn: () => { for (const v of livingNear(c.x, c.y, sp.radius, e => e !== P && los(c, e))) { const n = MG.earthshaker(v.hp); hurt(v, n, P, 'spell'); aggro(v, P); log(`Earthshaker → ${nameOf(v)}: ${n}`, '#c8a0ff', 'combat'); } FX.push({ k: 'boom', x: c.x, y: c.y, r: 3, t0: GT, dur: .7 }); sfx('boom'); } }); return true; }
+    case 'area_percent_hit': { const c = { x: P.x, y: P.y }; EFX.push({ k: 'groundwarn', x: c.x, y: c.y, r: sp.radius, t0: GT, at: GT + sp.delay, fn: () => { for (const v of livingNear(c.x, c.y, sp.radius, e => e !== P && los(c, e))) { const n = MG.earthshaker(v.hp); hurt(v, n, P, 'spell'); aggro(v, P); log(`Earthshaker → ${nameOf(v)}: ${n}`, '#c8a0ff', 'combat'); } FX.push({ k: 'boom', x: c.x, y: c.y, r: 3, t0: GT, dur: .7 }); sndAt('combat.blast', c); } }); return true; }
     case 'barrier': case 'damage_field': case 'poison_field': case 'control_field': return placeField(sp, t, M, E, ctx);
     case 'field_removal': return dispelField(t);
     case 'summon': return summonAt(sp, t, M);
@@ -222,7 +224,7 @@ function applyStats(a, stats, amount, until) {
 function armorBoon(a, M) { const g = mgOf(a); g.armor = { v: MG.armorBonus(M), until: GT + MG.boonDuration(M) }; floater(a.x, a.y, '+' + g.armor.v + ' armor', '#e8d090'); }
 function cureActor(a, M, bonus, quiet) {
   if (!a.poison) { if (!quiet) log(nameOf(a) === 'you' ? 'You are not poisoned.' : 'Nothing to cure.'); return; }
-  if (R() < MG.cureChance(M, a.poison.tier, bonus)) { a.poison = null; if (a === P) P.poisonImmune = GT + 1; floater(a.x, a.y, 'cured', '#7ee08a'); }
+  if (R() < MG.cureChance(M, a.poison.tier, bonus)) { a.poison = null; if (a === P) P.poisonImmune = GT + 1; floater(a.x, a.y, 'cured', '#7ee08a'); if (sndOnce('cure', .4)) sndAt('magic.heal', a); }
   else { floater(a.x, a.y, 'cure fails', '#c8c8c8'); log('The poison holds.', '#ffb070'); }
 }
 function applyPoison(a, tier) {
@@ -256,6 +258,7 @@ function bindActor(a, M, ctx, sp) {
 }
 function banish(v) { if (v.gone) return; FX.push({ k: 'ring', x: v.x, y: v.y, c: '#e0e0ff', t0: GT, dur: .7 }); log(v.name + ' is banished.', '#e0e0ff'); rmEnt(v); if (P.sel === v) P.sel = null; }
 function areaPool(sp, c, ctx) {
+  spellSnd(sp, c);   // one cue at detonation, not one per victim
   const victims = livingNear(c.x, c.y, sp.radius, e => e !== P && los(c, e));
   if (!victims.length) { log(sp.n + ' strikes empty ground.', '#a8a8a8'); return; }          // no eligible victims: the pool is discarded
   const pool = MG.rollBase(sp.id, ctx.M, R); const shares = MG.splitPool(pool, victims.map(v => ({ id: v.id, dist: Math.hypot(v.x - c.x, v.y - c.y), v })));
@@ -286,7 +289,7 @@ function chestSpell(sp, pt, M, E) {
 // one charge; opener only if within one tile of the latch. Uses the trapping mage's M/E and the opener's R.
 function springRuneTrap(c, remote) {
   const tr = c && c.rtrap; if (!tr) return; c.rtrap = null; const cpos = { x: c.x + .5, y: c.y + .5 };
-  FX.push({ k: 'boom', x: cpos.x, y: cpos.y, r: .8, t0: GT, dur: .5 }); sfx('boom');
+  FX.push({ k: 'boom', x: cpos.x, y: cpos.y, r: .8, t0: GT, dur: .5 }); sndAt('combat.blast', cpos);
   const who = !P.ghost && Math.hypot(P.x - cpos.x, P.y - cpos.y) <= (remote ? 1 : 2.2) ? P : null;
   if (!who) { log('The rune trap bursts at the latch, harming no one.', '#ffb070'); return; }
   const r = MG.resolveHit({ mode: 'half_then_focus', base: MG.rollBase('magery.13', tr.M, R), circle: 2, M: tr.M, E: tr.E, R: rOf(who) }, R);
@@ -402,13 +405,13 @@ function summonTick(p, dt) {
   else if (s.ranged && dd <= rng && los(p, t)) { p.ready = GT + s.ranged[2]; const from = { x: p.x, y: p.y }; EFX.push({ k: 'proj', x: from.x, y: from.y, tx: t.x, ty: t.y, t0: GT, t1: GT + .3, col: s.col || '#c8e0ff', big: 1, at: GT + .3, fn: () => summonRanged(p, t) }); }
 }
 const ACC = 60;                                                                     // tuning: summon attack skill for the NPC hit roll
-function summonMelee(p, t) {
-  const s = p.summon; const def = t === P ? defRating() : (MON[t.type] || { def: 30 }).def; if (R() >= SF.accuracy(ACC, def)) { floater(t.x, t.y, 'miss', '#c8c8c8'); return; }
-  const raw = rnd(s.melee[0], s.melee[1]); const arm = t === P ? armorVal() : (MON[t.type] || { armor: 10 }).armor; const dmg = Math.max(1, Math.round(raw * (1 - arm / (arm + 90))));
-  hurt(t, dmg, p, 'phys'); if (s.id === 'magery.58' && R() < .25) applyPoison(t, 2);
+function summonMelee(p, t) {                                                          // a physical blow: the shared resolver (src/game.js)
+  const s = p.summon; if (!fighterAlive(t)) return; const A = fighter(p), D = fighter(t);
+  if (R() >= SF.hitChance(A.atk, D.def)) { missFx(t, p); return; }
+  const m = applyBlow(A, t); if (m && m.final > 0 && s.id === 'magery.58' && R() < .25) applyPoison(t, 2);
 }
 function summonRanged(p, t) {
-  if (!isLiving(t)) return; const s = p.summon; const def = t === P ? defRating() : (MON[t.type] || { def: 30 }).def; if (R() >= SF.accuracy(ACC, def)) { floater(t.x, t.y, 'miss', '#c8c8c8'); return; }
+  if (!isLiving(t)) return; const s = p.summon; if (R() >= SF.hitChance(ACC, fighter(t).def)) { floater(t.x, t.y, 'miss', '#c8c8c8'); return; }   // the hit roll; the bolt itself is spell damage
   const r = MG.resolveHit({ mode: 'half_only', base: rnd(s.ranged[0], s.ranged[1]), circle: s.circle, M: s.M, E: 0, R: rOf(t) }, R); hurt(t, r.applied, p, 'spell');
 }
 
@@ -558,15 +561,15 @@ function mageryBoot(saved) {
 /* ---------- launch-book spells: kept castable for old hotbars that still name them ---------- */
 function spellDmg(base) { return SF.spellDamage(base, sv('focus'), 0); }
 function applyLegacy(sp, t) {
-  sfx('cast'); const sc = sv('spellcraft');
-  if (sp.heal) { const amt = Math.round(sp.heal[0] + sp.heal[1] * sc); const tgt = t.kind ? t : P; const b = tgt.hp; tgt.hp = Math.min(tgt === P ? SF.maxHp(P) : tgt.max, tgt.hp + amt); FX.push({ k: 'heal', x: tgt.x, y: tgt.y, t0: GT, dur: .8 }); floater(tgt.x, tgt.y, '+' + Math.round(tgt.hp - b), '#7ee08a'); return; }
-  if (sp.absorb) { P.veil = { left: sp.absorb, until: GT + sp.dur }; floater(P.x, P.y, 'stoneveil', '#c8b890'); return; }
-  if (sp.recall) { const s = SHRINES.find(z => z.id === P.bound); P.x = s.x + .5; P.y = s.y + 1.7; FX.push({ k: 'ring', x: P.x, y: P.y, c: '#ffe08a', t0: GT, dur: .8 }); log('You return to the ' + s.n + '.'); return; }
-  if (sp.summon) { if (petSlotsUsed() > 0) return log('The Reedling needs both control slots. Dismiss your pets first.'); addEnt({ kind: 'pet', type: null, name: 'Reedling', x: P.x + 1, y: P.y, hp: 40, max: 40, until: GT + sp.summon, order: 'follow', slots: 2 }); log('A Reedling rises from the reeds.', '#ffe08a'); return; }
-  if (sp.cloud) { EFX.push({ k: 'cloud', x: t.x, y: t.y, r: sp.radius, until: GT + sp.cloud }); for (const m of ents) if (m.kind === 'mon' && m.target === P && !los(m, P)) { m.state = 'return'; m.target = null; } return; }
-  if (sp.root) { EFX.push({ k: 'root', x: t.x, y: t.y, r: sp.radius, until: GT + sp.root }); for (const m of ents) if (m.kind === 'mon' && alive(m) && Math.hypot(m.x - t.x, m.y - t.y) <= sp.radius) { m.rooted = GT + sp.root; floater(m.x, m.y, 'rooted', '#c8a070'); if (!m.target) { m.target = P; m.state = 'chase'; } } return; }
-  if (sp.id === 'saltstorm') { EFX.push({ k: 'groundwarn', x: t.x, y: t.y, r: sp.radius, t0: GT, at: GT + sp.warn, fn: () => { FX.push({ k: 'bolt', x: t.x, y: t.y, t0: GT, dur: .3 }); for (const m of ents.slice()) if (m.kind === 'mon' && alive(m) && Math.hypot(m.x - t.x, m.y - t.y) <= sp.radius) damageMon(m, spellDmg(sp.dmg), 'spell'); gain('focus', sp.min + 10); } }); return; }
+  const sc = sv('spellcraft');
+  if (sp.heal) { const amt = Math.round(sp.heal[0] + sp.heal[1] * sc); const tgt = t.kind ? t : P; const b = tgt.hp; tgt.hp = Math.min(tgt === P ? SF.maxHp(P) : tgt.max, tgt.hp + amt); FX.push({ k: 'heal', x: tgt.x, y: tgt.y, t0: GT, dur: .8 }); floater(tgt.x, tgt.y, '+' + Math.round(tgt.hp - b), '#7ee08a'); spellSnd(sp, tgt); return; }
+  if (sp.absorb) { P.veil = { left: sp.absorb, until: GT + sp.dur }; floater(P.x, P.y, 'stoneveil', '#c8b890'); spellSnd(sp, P); return; }
+  if (sp.recall) { const s = SHRINES.find(z => z.id === P.bound); P.x = s.x + .5; P.y = s.y + 1.7; FX.push({ k: 'ring', x: P.x, y: P.y, c: '#ffe08a', t0: GT, dur: .8 }); log('You return to the ' + s.n + '.'); SFXA.cancelPending(); spellSnd(sp, P); return; }
+  if (sp.summon) { if (petSlotsUsed() > 0) return log('The Reedling needs both control slots. Dismiss your pets first.'); addEnt({ kind: 'pet', type: null, name: 'Reedling', x: P.x + 1, y: P.y, hp: 40, max: 40, until: GT + sp.summon, order: 'follow', slots: 2 }); log('A Reedling rises from the reeds.', '#ffe08a'); spellSnd(sp, { x: P.x + 1, y: P.y }); return; }
+  if (sp.cloud) { EFX.push({ k: 'cloud', x: t.x, y: t.y, r: sp.radius, until: GT + sp.cloud }); spellSnd(sp, t); for (const m of ents) if (m.kind === 'mon' && m.target === P && !los(m, P)) { m.state = 'return'; m.target = null; } return; }
+  if (sp.root) { EFX.push({ k: 'root', x: t.x, y: t.y, r: sp.radius, until: GT + sp.root }); spellSnd(sp, t); for (const m of ents) if (m.kind === 'mon' && alive(m) && Math.hypot(m.x - t.x, m.y - t.y) <= sp.radius) { m.rooted = GT + sp.root; floater(m.x, m.y, 'rooted', '#c8a070'); if (!m.target) { m.target = P; m.state = 'chase'; } } return; }
+  if (sp.id === 'saltstorm') { EFX.push({ k: 'groundwarn', x: t.x, y: t.y, r: sp.radius, t0: GT, at: GT + sp.warn, fn: () => { FX.push({ k: 'bolt', x: t.x, y: t.y, t0: GT, dur: .3 }); spellSnd(sp, t); for (const m of ents.slice()) if (m.kind === 'mon' && alive(m) && Math.hypot(m.x - t.x, m.y - t.y) <= sp.radius) damageMon(m, spellDmg(sp.dmg), 'spell'); gain('focus', sp.min + 10); } }); return; }
   const m = t; if (m === P || m.kind !== 'mon') return; if (!m.target) { m.target = P; m.state = 'chase'; }
-  if (sp.unweave) { if (m.ward > 0) { m.ward = 0; floater(m.x, m.y, 'unwoven', '#c8a0ff'); } else log('There is no ward on that creature to unweave.'); return; }
-  if (sp.hex) { m.hexUntil = GT + sp.hex; floater(m.x, m.y, 'hexed', '#c97bff'); return; }
+  if (sp.unweave) { if (m.ward > 0) { m.ward = 0; floater(m.x, m.y, 'unwoven', '#c8a0ff'); spellSnd(sp, m); } else log('There is no ward on that creature to unweave.'); return; }
+  if (sp.hex) { m.hexUntil = GT + sp.hex; floater(m.x, m.y, 'hexed', '#c97bff'); spellSnd(sp, m); return; }
 }
