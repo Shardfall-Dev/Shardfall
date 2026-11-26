@@ -1,0 +1,34 @@
+Shardfall • GitHub audio handoff v1.0.1
+Runtime sound pack v1.0.0 • 107 events • 249 WAV takes • game v0.17
+
+Claude, work directly in the private Shardfall-Dev/Shardfall repository. Use a GitHub identity that can read this repository. Start by fetching the current branches and reading README.md on the branch you will edit. The audio integration already exists in PR #2. Use its code and assets as the starting point. Preserve work on other systems and check the current PR state before choosing a base.
+
+GET THE SOUND BUILD
+Run these commands from an existing authenticated repository checkout:
+
+  git fetch origin feature/sfx-v1.0.0
+  git worktree add --detach ../shardfall-sfx FETCH_HEAD
+  cd ../shardfall-sfx
+
+Choose a free worktree path if that directory already exists. For a browser download, open PR #2, follow its head branch, and choose Code > Download ZIP. The exact v0.17 snapshot used to verify this handoff is commit 1a7b5dafaee095232ac39be60e1ced8974a89708. If PR #2 has merged into main, use current main for new work. For edits on the checked-out snapshot, create a named working branch first.
+
+FILES TO USE
+• assets/audio/manifest.json maps event IDs to versioned WAV paths and mix gains. Resolve each path relative to assets/audio/. Each row lists alternatives. Choose one take per event.
+• assets/audio/sfx/ contains all 249 mono PCM WAVs. Try door.wood.open_01_v1.0.0.wav and skeleton.death_01_v1.0.0.wav first.
+• src/audio.js owns unlocking, decoding, caching, mixing and voice limits. src/game.js owns weapon contact, doors, chest and corpse interactions, footsteps, creatures, crafting and quest events. src/magic.js owns active Magery casts and impacts.
+• docs/Shardfall_Audio.md describes the integration. tools/embed_audio.py embeds browser audio when build.sh assembles the offline game. Shardfall_v0.17.html is the playable build in the verified snapshot.
+• The SFX MIDI editor performances, custom Foley SoundFont and original preview are distributed in the separate original v1.0.0 authoring ZIP. Every effect required to run the game is present in GitHub as WAV.
+
+CHECK THE OTHER SYSTEMS BEFORE MERGING
+• Main carries the crafting guide in docs/Shardfall_Crafting_Guide.md, the 64-spell Magery data and status in docs/magery/, and the five music cues in assets/music/v1.0.0/. A feature checkout can predate the soundtrack commit. Fetch current main when reconciling work.
+• PR #4 contains the bestiary art handoff and project instructions. PR #6 integrates creatures with rendering and combat. PR #5 handles the graphical backpack. Inspect each PR before editing shared game, audio or UI code. Check the current state on GitHub because these PRs can merge independently.
+• Reconcile the newer source modules before building the next game version. Preserve the soundtrack, spell resolution, material gathering, creature hooks, inventory interactions and save migration. Use the repository's build script to regenerate the versioned HTML after source integration.
+• Keep the sound release version in every new asset filename. Preserve stable event IDs and update every path in the manifest when takes change. This v1.0.1 revision updates the handoff. The sounds in PR #2 remain v1.0.0.
+
+CHECKS FOR THE SOUND BRANCH
+  ./build.sh 0.17
+  node tests/rules.test.js Shardfall_v0.17.html
+  node tests/magery.test.js Shardfall_v0.17.html
+  python3 tests/sfx-smoke/run.py "$PWD/Shardfall_v0.17.html"
+
+Use the actual game version documented on a later branch. Try first input from the HUD on a phone, a door open/close, a dock-to-stone transition, a missed swing, a skeleton impact, a declined spell target, and a successful craft. Record browser/device coverage with the tested commit. Return a pull request URL and the exact asset and playable build paths.
