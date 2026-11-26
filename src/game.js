@@ -65,9 +65,9 @@ function starterKit() {
   if (P.skills[top].v > 0) { P.equip.weapon = SF.newItem(w, 1); if (w === 'shortbow') add('arrow', 80); } else add('dagger', 1);
   if (P.skills.shieldwork.v > 0 && !(P.equip.weapon && SF.WEAPONS[SF.ITEMS[P.equip.weapon.id].wpn].two)) P.equip.shield = SF.newItem('buckler', 1);
   for (const [k, tool] of [['woodcutting', 'hatchet'], ['mining', 'pickaxe'], ['skinning', 'knife'], ['fishing', 'rod'], ['smithing', 'tongs'], ['tailoring', 'sewkit'], ['carpentry', 'knife'], ['fletching', 'knife']]) if (P.skills[k].v > 0 && !SF.count(P.pack, tool)) add(tool, 1);
-  if (P.skills.spellcraft.v > 0) for (const r of Object.values(SF.REAGENT)) add(r, 12);
+  if (P.skills.spellcraft.v > 0) mageryStarter(add);
   if (P.skills.alchemy.v > 0) add('vial', 6);
-  P.hotbar = [{ k: 'item', id: 'bandage' }, P.skills.spellcraft.v > 0 ? { k: 'spell', id: 'mend' } : { k: 'item', id: 'draught' }, P.skills.spellcraft.v > 0 ? { k: 'spell', id: 'needle' } : P.skills.concealment.v > 0 ? { k: 'act', id: 'hide' } : { k: 'act', id: 'track' }, P.skills.spellcraft.v >= 200 ? { k: 'spell', id: 'ember' } : { k: 'act', id: 'meditate' }];
+  P.hotbar = [{ k: 'item', id: 'bandage' }, P.skills.spellcraft.v > 0 ? { k: 'spell', id: 'magery.04' } : { k: 'item', id: 'draught' }, P.skills.spellcraft.v > 0 ? { k: 'spell', id: 'magery.05' } : P.skills.concealment.v > 0 ? { k: 'act', id: 'hide' } : { k: 'act', id: 'track' }, { k: 'act', id: 'meditate' }];
 }
 const cap = () => ({ slots: SF.SLOTS, kg: SF.carryKg(P) });
 const packKg = () => SF.containerKg(P.pack) + Object.values(P.equip).filter(Boolean).reduce((a, it) => a + SF.itemKg(it), 0);
@@ -75,16 +75,16 @@ const overweight = () => packKg() > SF.carryKg(P) + 1e-9;
 const wDef = () => { const it = P.equip.weapon; if (it && it.cond !== undefined && it.cond <= 0) return SF.WEAPONS.unarmed; return SF.WEAPONS[it ? SF.ITEMS[it.id].wpn : 'unarmed']; };
 function wear(it, amt) { if (!it || !SF.WEARABLE(it.id)) return; if (it.cond === undefined) { it.cond = 100; it.maxc = 100; } const before = it.cond; it.cond = Math.max(0, it.cond - amt); const lim = .2 * (it.maxc || 100); if (before >= lim && it.cond < lim) log(SF.itemName(it) + ' is badly worn (−15%). Repair it soon.', '#ffb070'); if (before > 0 && it.cond <= 0) log(SF.itemName(it) + ' has broken and gives no benefit.', '#ff6a5a'); }
 const armorType = () => P.equip.armor ? (SF.ITEMS[P.equip.armor.id].armor || 'none') : 'none';
-const armorVal = () => { const it = P.equip.armor; return Math.round((SF.ARMOR[armorType()] || 0) * SF.condFactor(it && it.cond, it && it.maxc)); };
+const armorVal = () => magicArmor(P) + armorBase(); const armorBase = () => { const it = P.equip.armor; return Math.round((SF.ARMOR[armorType()] || 0) * SF.condFactor(it && it.cond, it && it.maxc)); };
 const defRating = () => P.skills[wDef().skill].v / 10;
 const inCombat = () => GT - (P.lastCombat || -99) < 6;
 function give(id, q, extra) { const r = SF.addItem(P.pack, SF.newItem(id, q, extra), cap()); if (!r.ok) { log('Your pack is full: ' + r.reason + '. ' + SF.ITEMS[id].n + ' left on the ground.', '#ffb070'); dropPile(SF.newItem(id, q, extra)); } return r.ok; }
 function dropPile(it) { let c = ents.find(e => e.kind === 'corpse' && e.pile && Math.hypot(e.x - P.x, e.y - P.y) < 1); if (!c) { const cont = SF.newContainer('pile'); c = addEnt({ kind: 'corpse', pile: true, name: 'dropped items', x: P.x, y: P.y, cont, expires: GT + 600 }); } c.cont.items.push(it); }
 
 /* ---------- movement ---------- */
-function canStand(e, x, y) { const r = .26; if (colBlocked(x, y, r)) return false; for (const [ox, oy] of [[-r, -r], [r, -r], [-r, r], [r, r]]) if (blockedAt(x + ox, y + oy)) return false; if (e.kind === 'mon' && !e.quest && protAt(x, y)) return false; return true; }
+function canStand(e, x, y) { const r = .26; if (colBlocked(x, y, r)) return false; if (FIELDS.length && fieldBlocks(x, y)) return false; for (const [ox, oy] of [[-r, -r], [r, -r], [-r, r], [r, r]]) if (blockedAt(x + ox, y + oy)) return false; if (e.kind === 'mon' && !e.quest && protAt(x, y)) return false; return true; }
 function moveBy(e, dx, dy) { let moved = 0; if (canStand(e, e.x + dx, e.y)) { e.x += dx; moved += Math.abs(dx); } if (canStand(e, e.x, e.y + dy)) { e.y += dy; moved += Math.abs(dy); } return moved; }
-function los(a, b) { const d = Math.hypot(b.x - a.x, b.y - a.y), n = Math.ceil(d / .25); for (let i = 1; i < n; i++) { const x = a.x + (b.x - a.x) * i / n, y = a.y + (b.y - a.y) * i / n; if (LOSB[tAt(Math.floor(x), Math.floor(y))]) return false; for (const f of EFX) if (f.k === 'cloud' && Math.hypot(x - f.x, y - f.y) < f.r && !(Math.hypot(a.x - f.x, a.y - f.y) < f.r && Math.hypot(b.x - f.x, b.y - f.y) < f.r)) return false; } return true; }
+function los(a, b) { const d = Math.hypot(b.x - a.x, b.y - a.y), n = Math.ceil(d / .25); for (let i = 1; i < n; i++) { const x = a.x + (b.x - a.x) * i / n, y = a.y + (b.y - a.y) * i / n; if (LOSB[tAt(Math.floor(x), Math.floor(y))]) return false; if (FIELDS.length && fieldBlocksSight(x, y)) return false; for (const f of EFX) if (f.k === 'cloud' && Math.hypot(x - f.x, y - f.y) < f.r && !(Math.hypot(a.x - f.x, a.y - f.y) < f.r && Math.hypot(b.x - f.x, b.y - f.y) < f.r)) return false; } return true; }
 function playerMove(dt) {
   let vx = 0, vy = 0, want = 0;
   if (JOY.on && !P.dead) { const jx = JOY.x - JOY.x0, jy = JOY.y - JOY.y0, m = Math.hypot(jx, jy); if (m > 10) { const tx = jx / HW + jy / HH, ty = jy / HH - jx / HW, tm = Math.hypot(tx, ty); vx = tx / tm; vy = ty / tm; want = Math.min(1, m / 56); JOY.sprint = !!P.sprintOn || (SETTINGS.stickSprint && m > 70); } }
@@ -119,8 +119,8 @@ function damagePlayer(amt, src, kind) {
   if (P.ghost || amt <= 0) return; P.lastCombat = GT; P.lastHit = GT;
   if (P.veil && P.veil.until > GT && kind === 'phys') { const a = Math.min(P.veil.left, amt.raw || 0); P.veil.left -= a; }
   P.hp -= amt; floater(P.x, P.y, '-' + amt, '#ff6a5a'); sfx('hit');
-  if (P.prep && kind !== 'poison') interruptPrep('Your preparation is interrupted!');
-  if (P.prep && kind === 'poison' && GT - (P.poisonInt || -9) >= 1) { P.poisonInt = GT; interruptPrep('Poison breaks your concentration.'); }
+  if (P.prep) interruptPrep(kind === 'poison' ? 'Poison breaks your concentration.' : 'Your preparation is interrupted!');
+  if (P.rooted > GT) P.rooted = 0;
   if (P.task && P.task.kind === 'vet' && kind !== 'poison') { P.task.t1 += .25; }
   else if (P.task && P.task.kind === 'bandage' && kind !== 'poison') { const add = Math.min(SF.BANDAGE_PRESSURE, SF.BANDAGE_PRESSURE_MAX - P.task.pressure); if (add > 0) { P.task.pressure += add; P.task.t1 += add; } }
   else if (P.task && P.task.kind !== 'bandage' && P.task.kind !== 'vet') { log(P.task.label + ' interrupted.'); P.task = null; }
@@ -208,7 +208,7 @@ function damageMon(m, amt, kind, src) {
   if (!alive(m)) return; src = src || P; m.hitT = GT;
   if (m.ward > 0 && kind !== 'poison') { const a = Math.min(m.ward, amt); m.ward -= a; amt -= a; floater(m.x, m.y, 'ward ' + a, '#e8d090'); if (m.ward <= 0) floater(m.x, m.y, 'ward broken', '#e8d090'); if (amt <= 0) return; }
   m.hp -= amt; floater(m.x, m.y, String(amt), kind === 'spell' ? '#c8a0ff' : kind === 'poison' ? '#7be07b' : '#ffd27a'); sfx('hit'); if (src === P || (src && src.kind === 'pet')) P.lastCombat = GT;
-  m.pacified = 0; if (m.rooted > GT && kind !== 'poison') m.rooted = 0;
+  m.pacified = 0; if (m.rooted > GT) m.rooted = 0;
   if (m.hidden) m.hidden = false;
   if (!m.target || m.target === P && src && src.kind === 'pet' && R() < .3 || (m.provoked && m.provoked < GT)) { m.target = src.kind ? src : P; m.provoked = 0; m.state = m.state === 'idle' || m.state === 'return' ? 'chase' : m.state; }
   if (m.hp <= 0) killMon(m, src);
@@ -267,8 +267,8 @@ function strikeOne(m, t, dmgR, ranged) {
   const d = MON[m.type];
   if (t.kind === 'mon' || t.kind === 'pet') { const td = MON[t.type] || { def: 30, armor: 10 }; if (R() >= SF.accuracy(d.atk, td.def)) { floater(t.x, t.y, 'miss', '#c8c8c8'); return; } damageMon(t, Math.max(1, Math.round(rnd(dmgR[0], dmgR[1]) * (1 - td.armor / (td.armor + 90)))), 'phys', m); return; }
   if (P.ghost || P.hidden) return;
-  if (R() >= SF.accuracy(d.atk, defRating())) { floater(P.x, P.y, 'dodge', '#c8c8c8'); sfx('miss'); return; }
-  let raw = rnd(dmgR[0], dmgR[1]); if (m.hexUntil > GT) raw *= .88;
+  if (R() >= SF.accuracy(d.atk + monAcc(m), defRating())) { floater(P.x, P.y, 'dodge', '#c8c8c8'); sfx('miss'); return; }
+  let raw = monRaw(m, rnd(dmgR[0], dmgR[1])); if (m.hexUntil > GT) raw *= .88; if (!ranged) { raw = meleeWard(m, raw); if (raw <= 0) return; }
   if (P.veil && P.veil.until > GT && P.veil.left > 0) { const a = Math.min(P.veil.left, raw); P.veil.left -= a; raw -= a; if (a) floater(P.x, P.y, 'veil ' + Math.round(a), '#c8b890'); if (raw <= 0) return; }
   const av = armorVal(); let dmg = Math.round(raw * (1 - av / (av + 90)));
   if (P.equip.armor) wear(P.equip.armor, .2);
@@ -292,76 +292,7 @@ function spawnTick() {
   }
 }
 
-/* ---------- magic: prepare → hold → release ---------- */
-const hasRegs = sp => [...sp.r].every(ch => SF.count(P.pack, SF.REAGENT[ch]) > 0);
-function castSlot(id) {
-  const sp = SF.SPELL[id]; if (P.ghost) return log('Ghosts cannot cast.');
-  if (P.held && P.held.sp.id === id) { if (sp.t === 'ground') { log('Tap the ground to place ' + sp.n + '.'); return; } return releaseHeld(sp.t === 'ally' ? (P.sel && P.sel.kind === 'player' ? P : (P.sel || P)) : autoTarget()); }
-  if (P.prep) return log('You are already preparing a spell.');
-  if (GT < (P.spellReadyAt || 0)) return log('Your hands are still recovering.');
-  if (sv('spellcraft') < sp.min) return log(`${sp.n} needs Spellcraft ${sp.min}.`, '#ffb070');
-  if (sp.t === 'enemy' && !autoTarget()) return log('No creature in sight for ' + sp.n + '.', '#ffb070');
-  if (!hasRegs(sp)) return log('Missing reagents: ' + [...sp.r].map(c => SF.ITEMS[SF.REAGENT[c]].n).join(', ') + '.', '#ffb070');
-  if (P.mana < sp.mp) return log('Not enough mana.', '#ffb070');
-  if (P.held) { log('You let ' + P.held.sp.n + ' go.'); P.held = null; AIM = null; }
-  const delay = stowWeapon(); P.armed = P.armed && true; P.meditating = null;
-  P.prep = { sp, t0: GT + delay, t1: GT + delay + sp.prep, x0: P.x, y0: P.y }; if (delay) log('You stow your weapon.');
-}
-function interruptPrep(msg) { if (!P.prep) return; const c = SF.interruptCost(P.prep.sp.mp); P.mana = Math.max(0, P.mana - c); log(msg + ` (−${c} mana)`, '#ffb070'); P.prep = null; P.spellReadyAt = GT + SF.SPELL_RECOVERY; sfx('fizzle'); }
-function prepTick() {
-  if (P.prep && GT >= P.prep.t1) {
-    const sp = P.prep.sp; P.prep = null;
-    if (!hasRegs(sp) || P.mana < sp.mp) { log('You lack the resources to finish ' + sp.n + '.', '#ffb070'); return; }
-    for (const ch of sp.r) SF.removeQty(P.pack, SF.REAGENT[ch], 1); P.mana -= sp.mp;
-    const ok = R() < SF.spellSuccess(sv('spellcraft'), sp.min); gain('spellcraft', sp.min + 15);
-    if (!ok) { log('The spell fizzles.', '#a8a8a8'); P.spellReadyAt = GT + SF.SPELL_RECOVERY; sfx('fizzle'); FX.push({ k: 'puff', x: P.x, y: P.y, t0: GT, dur: .6 }); return; }
-    if (sp.t === 'self') { playOnce('CastRelease', 0); return applySpell(sp, P); }
-    P.held = { sp, t0: GT }; sfx('cast');
-    if (sp.t === 'ground') AIM = { kind: 'spell', r: sp.radius || .6, range: sp.range || SF.SPELL_RANGE, fn: pt => releaseHeld(pt) };
-    log(sp.n + ' is held. ' + (sp.t === 'ground' ? 'Tap the ground.' : 'Fight as normal; tap the slot again (or your target) to release.'), '#ffe08a');
-  }
-  if (false) { log(P.held.sp.n + ' fades unreleased.', '#a8a8a8'); P.held = null; AIM = null; P.spellReadyAt = GT + SF.SPELL_RECOVERY; }
-}
-function releaseHeld(t) {
-  const sp = P.held && P.held.sp; if (!sp) return;
-  const rng = sp.range || SF.SPELL_RANGE;
-  if (sp.t === 'enemy' && (!t || t.kind !== 'mon' || !alive(t))) return log('Choose a hostile creature for ' + sp.n + '.', '#ffb070');
-  if (sp.t === 'ally' && (!t || (t !== P && t.kind !== 'pet'))) t = P;
-  if (sp.t === 'ally' && t === P && P.sel && P.sel.kind === 'mon') t = P;
-  if (sp.t === 'ally' && sp.revive) return log('No consenting ghost is near. (Wakecall needs other players.)', '#ffb070');
-  const pt = t.kind ? t : t;
-  if (Math.hypot(pt.x - P.x, pt.y - P.y) > rng + .01) return log('Out of range (' + rng + ' m).', '#ffb070');
-  if (pt !== P && !los(P, pt)) return log('No line of sight.', '#ffb070');
-  if (sp.blink) { const tx = Math.floor(pt.x), ty = Math.floor(pt.y); if (BLK[tAt(tx, ty)] || !los(P, pt)) return log('Step Between cannot cross that.', '#ffb070'); }
-  playOnce('CastRelease', 0); P.held = null; AIM = null; P.spellReadyAt = GT + SF.SPELL_RECOVERY; if (P.hidden) reveal('Your spell reveals you.');
-  if (pt !== P) faceToward(P, pt.x, pt.y);
-  applySpell(sp, pt);
-}
-function spellDmg(base) { return SF.spellDamage(base, sv('focus'), 0); }
-function applySpell(sp, t) {
-  sfx('cast'); const sc = sv('spellcraft');
-  if (sp.heal) { const amt = Math.round(sp.heal[0] + sp.heal[1] * sc); const tgt = t.kind ? t : P; const b = tgt.hp; tgt.hp = Math.min(tgt === P ? SF.maxHp(P) : tgt.max, tgt.hp + amt); FX.push({ k: 'heal', x: tgt.x, y: tgt.y, t0: GT, dur: .8 }); floater(tgt.x, tgt.y, '+' + Math.round(tgt.hp - b), '#7ee08a'); return; }
-  if (sp.cure) { if (P.poison) { P.poison = null; P.poisonImmune = GT + 1; floater(P.x, P.y, 'cured', '#7ee08a'); } else log('Nothing to cleanse.'); return; }
-  if (sp.absorb) { P.veil = { left: sp.absorb, until: GT + sp.dur }; floater(P.x, P.y, 'stoneveil', '#c8b890'); return; }
-  if (sp.recall) { const s = SHRINES.find(z => z.id === P.bound); P.x = s.x + .5; P.y = s.y + 1.7; FX.push({ k: 'ring', x: P.x, y: P.y, c: '#ffe08a', t0: GT, dur: .8 }); log('You return to the ' + s.n + '.'); return; }
-  if (sp.summon) { if (petSlotsUsed() > 0) return log('The Reedling needs both control slots. Dismiss your pets first.'); addEnt({ kind: 'pet', type: null, name: 'Reedling', x: P.x + 1, y: P.y, hp: 40, max: 40, until: GT + sp.summon, order: 'follow', slots: 2 }); log('A Reedling rises from the reeds. Select a creature and press its Attack order.', '#ffe08a'); return; }
-  if (sp.unweave) { if (t.ward > 0) { t.ward = 0; floater(t.x, t.y, 'unwoven', '#c8a0ff'); log('You unravel its ward.'); } else log('There is no ward on that creature to unweave.'); return; }
-  if (sp.blink) { P.x = t.x; P.y = t.y; FX.push({ k: 'puff', x: P.x, y: P.y, t0: GT, dur: .4 }); return; }
-  if (sp.reveal) { FX.push({ k: 'ring', x: t.x, y: t.y, c: '#fff0a0', t0: GT, dur: 1 }); for (const m of ents) if (m.kind === 'mon' && m.hidden && Math.hypot(m.x - t.x, m.y - t.y) <= sp.radius) { m.hidden = false; floater(m.x, m.y, 'revealed', '#fff0a0'); } for (const tr of TRAPS) if (tr.hidden && Math.hypot(tr.x - t.x, tr.y - t.y) <= sp.radius) tr.hidden = false; return; }
-  if (sp.cloud) { EFX.push({ k: 'cloud', x: t.x, y: t.y, r: sp.radius, until: GT + sp.cloud }); for (const m of ents) if (m.kind === 'mon' && m.target === P && !los(m, P)) { m.state = 'return'; m.target = null; } return; }
-  if (sp.root) { EFX.push({ k: 'root', x: t.x, y: t.y, r: sp.radius, until: GT + sp.root }); for (const m of ents) if (m.kind === 'mon' && alive(m) && Math.hypot(m.x - t.x, m.y - t.y) <= sp.radius) { m.rooted = GT + sp.root; floater(m.x, m.y, 'rooted', '#c8a070'); if (!m.target) { m.target = P; m.state = 'chase'; } } return; }
-  if (sp.id === 'saltstorm') { EFX.push({ k: 'groundwarn', x: t.x, y: t.y, r: sp.radius, t0: GT, at: GT + sp.warn, fn: () => { FX.push({ k: 'bolt', x: t.x, y: t.y, t0: GT, dur: .3 }); for (const m of ents.slice()) if (m.kind === 'mon' && alive(m) && Math.hypot(m.x - t.x, m.y - t.y) <= sp.radius) { damageMon(m, spellDmg(sp.dmg), 'spell'); } gain('focus', sp.min + 10); } }); return; }
-  // single-target hostile spells
-  const m = t; if (!m.target) { m.target = P; m.state = 'chase'; }
-  if (sp.flat) { damageMon(m, sp.flat, 'spell'); if (m.state === 'tele') { m.state = 'rec'; m.st = GT; floater(m.x, m.y, 'disrupted', '#c8a0ff'); } return; }
-  if (sp.hex) { m.hexUntil = GT + sp.hex; floater(m.x, m.y, 'hexed', '#c97bff'); return; }
-  if (sp.poison) { at(sp.delay, () => { if (alive(m)) { m.poison = { tier: sp.poison, ticks: SF.POISON_TICKS, next: GT + SF.POISON_GAP }; floater(m.x, m.y, 'poisoned', '#5bd65b'); } }); return; }
-  if (sp.dmg) { const dmg = spellDmg(sp.dmg); gain('focus', sp.min + 10);
-    if (sp.travel) { EFX.push({ k: 'proj', x: P.x, y: P.y, tx: m.x, ty: m.y, t0: GT, t1: GT + sp.travel, col: sp.el === 'fire' ? '#ff7a30' : '#9cd0ff', big: 1, at: GT + sp.travel, fn: () => { if (alive(m) && (!sp.los || los(P, m))) damageMon(m, dmg, 'spell'); } }); return; }
-    if (sp.delay) { const mk = { k: 'mark', e: m, col: sp.id === 'bellfire' ? '#ffd040' : '#ff6a20', until: GT + sp.delay }; EFX.push(mk); at(sp.delay, () => { if (alive(m)) { FX.push({ k: 'boom', x: m.x, y: m.y, r: 1, t0: GT, dur: .5 }); damageMon(m, dmg, 'spell'); } }); return; }
-    damageMon(m, dmg, 'spell'); }
-}
-const TIMERS = []; function at(d, fn) { TIMERS.push({ t: GT + d, fn }); }
+/* ---------- magic: prepare → hold → release lives in src/magic.js (castSlot, prepTick, releaseHeld, interruptPrep, TIMERS/at) ---------- */
 
 /* ---------- abilities: bandage, consumables, hide, track, meditate ---------- */
 function useBandage(t) {
@@ -512,6 +443,7 @@ function update(dt) {
   for (let i = EFX.length - 1; i >= 0; i--) { const f = EFX[i]; if (f.at && GT >= f.at) { f.at = 0; try { f.fn && f.fn(); } catch (e) { console.error(e); } if (f.k !== 'flask') { EFX.splice(i, 1); continue; } } if (f.until && GT > f.until) EFX.splice(i, 1); else if (f.k === 'proj' && GT > f.t1 + .05) EFX.splice(i, 1); }
   for (let i = FX.length - 1; i >= 0; i--) if (GT - FX[i].t0 > FX[i].dur) FX.splice(i, 1);
   if (!P) return;
+  magicTick(dt);
   playerMove(dt); if (P.lunge) { P.lunge += dt / .2; if (P.lunge >= 1) P.lunge = 0; }
   if (!P.ghost) {
     attackTick(); prepTick();
@@ -536,6 +468,7 @@ function update(dt) {
   if (GT - saveT > 15) { saveT = GT; if (!save() && !P._saveWarn) { P._saveWarn = true; log('Saving failed (browser storage full?). Your last saved game is still safe.', '#ff9a6a'); } }
 }
 function petTick(p, dt) {
+  if (p.summon) return summonTick(p, dt);
   if (p.until && GT > p.until) { rmEnt(p); log('The Reedling sinks back into the reeds.'); return; }
   const d = MON[p.type] || { speed: 5, reach: 1.1, rec: 1.4, atk: 50, dmg: [4, 7] };
   const t = p.order === 'attack' && alive(p.tgt) && p.tgt.kind === 'mon' ? p.tgt : null; if (p.order === 'attack' && !t) p.order = 'follow';
@@ -863,7 +796,7 @@ function chestLoot(tier) { const c = SF.newContainer('chest'); const add = (id, 
   if (tier === 1) { add('gold', 40, 90); add('draught', 0, 1); add('ironbar', 1, 2); add('lockpick', 1, 3); add(pick(Object.values(SF.REAGENT)), 3, 6); }
   if (tier === 2) { add('gold', 100, 200); add('bellshard', 1, 2); add('draught', 1, 2); if (R() < .35) add(pick(['chain', 'glaive', 'crossbow', 'leather']), 1, 1); }
   return c; }
-function openChest(c) { P.lootOpen = { kind: 'chest', x: c.x + .5, y: c.y + .5, cont: c.cont, name: 'chest', expires: c.refill }; openPanel('loot'); }
+function openChest(c) { springRuneTrap(c, false); P.lootOpen = { kind: 'chest', x: c.x + .5, y: c.y + .5, cont: c.cont, name: 'chest', expires: c.refill }; openPanel('loot'); }
 function springOnPlayer() { damagePlayer(SF.TRAP.dmg, null, 'phys'); P.slowUntil = GT + SF.TRAP.slowFor; log('A snare bites your leg! Slowed.', '#ff8a6a'); }
 function interactExtra() {
   // chests
@@ -1256,11 +1189,13 @@ function drawEnt(e) {
   if (e.ward > 0) { g.strokeStyle = 'rgba(255,220,120,.8)'; g.lineWidth = 2; g.beginPath(); g.ellipse(x, y - 20 * big, 22 * big, 30 * big, 0, 0, 7); g.stroke(); }
   if (e.kind === 'pet') { g.strokeStyle = '#5aa8ff'; g.lineWidth = 1.5; g.beginPath(); g.ellipse(x, y, 14 * big, 7 * big, 0, 0, 7); g.stroke(); }
   if (P.sel === e && !P.ghost) { g.strokeStyle = relColor(e); g.lineWidth = 2; g.beginPath(); g.ellipse(x, y, 20 * big, 10 * big, 0, 0, 7); g.stroke(); }
-  if (e.kind === 'player') drawScout(g, e, x, y, P.ghost ? 'ghost' : (P.look.cloak || null));
+  if (e.kind === 'player' && drawForm(g, e, x, y)) { }
+  else if (e.kind === 'player') drawScout(g, e, x, y, P.ghost ? 'ghost' : (P.look.cloak || null));
   else if (e.kind === 'npc') drawScout(g, e, x, y, NPC_COL[e.role] || '#5a5a5a');
   else if (e.kind === 'mon' && MON[e.type].scout) drawScout(g, e, x, y, MON[e.type].scout);
   else if ((e.kind === 'mon' || (e.kind === 'pet' && e.type)) && MSI[e.type]) { drawSheet(g, e.type, e.sect, sheetFrame(e), x, y); }
   else if (e.kind === 'mon' || (e.kind === 'pet' && e.type)) { const s = beastSprite(e); g.imageSmoothingEnabled = false; g.drawImage(s, Math.round(x - s.ox), Math.round(y - s.oy)); if (e.rooted > GT) { g.fillStyle = 'rgba(120,90,50,.6)'; g.fillRect(x - 12, y - 4, 24, 4); } }
+  else if (e.summon) drawSummon(g, e, x, y);
   else if (e.kind === 'pet') { g.globalAlpha = .85; g.fillStyle = '#7ab060'; g.beginPath(); g.ellipse(x, y - 14, 8, 12, 0, 0, 7); g.fill(); g.fillStyle = '#c8e890'; g.fillRect(x - 4, y - 20, 2, 2); g.fillRect(x + 2, y - 20, 2, 2); g.strokeStyle = '#5a8a40'; g.lineWidth = 2; g.beginPath(); g.moveTo(x - 6, y - 24); g.lineTo(x - 10, y - 36); g.moveTo(x + 5, y - 24); g.lineTo(x + 9, y - 38); g.stroke(); }
   g.restore();
 }
@@ -1280,7 +1215,7 @@ function drawCorpse(e) {
   if (e.mine) { g.fillStyle = '#f0c94a'; g.fillRect(x - 2, y - 30 + Math.sin(GT * 4) * 3, 4, 10); g.beginPath(); g.moveTo(x - 6, y - 20 + Math.sin(GT * 4) * 3); g.lineTo(x + 6, y - 20 + Math.sin(GT * 4) * 3); g.lineTo(x, y - 13 + Math.sin(GT * 4) * 3); g.fill(); }
 }
 function drawEffects() {
-  const g = ctx;
+  const g = ctx; drawMagicFx(g);
   for (const tr of TRAPS) { if (tr.hidden) continue; const X = SX(tr.x, tr.y), Y = SY(tr.x, tr.y); g.strokeStyle = tr.owner === 'P' ? '#8ac0ff' : '#c8c8c8'; g.lineWidth = 2; g.beginPath(); g.ellipse(X, Y, 9, 4.5, 0, 0, 7); g.stroke(); g.fillStyle = '#9a9a9a'; for (let i = -2; i <= 2; i++) g.fillRect(X + i * 3 - 1, Y - 4, 2, 4); }
   for (const f of EFX) {
     const X = SX(f.x, f.y), Y = SY(f.x, f.y);
@@ -1302,7 +1237,7 @@ function drawEffects() {
   }
 }
 function hourOfDay() { return (GT / 60 + 9) % 24; }
-function darkness() { if (P && levelAt(Math.floor(P.x), Math.floor(P.y))) return .8; const h = hourOfDay(); let d = 0; if (h >= 20 || h < 5) d = .6; else if (h >= 18) d = (h - 18) / 2 * .6; else if (h < 7) d = (7 - h) / 2 * .6; return d; }
+function darkness() { if (nightSight()) return 0; if (P && levelAt(Math.floor(P.x), Math.floor(P.y))) return .8; const h = hourOfDay(); let d = 0; if (h >= 20 || h < 5) d = .6; else if (h >= 18) d = (h - 18) / 2 * .6; else if (h < 7) d = (7 - h) / 2 * .6; return d; }
 const PXF = '"Pixelify Sans", ui-monospace, monospace';
 function render() {
   if (!P) return; const LW = LB.width, LH = LB.height, vw = LW, vh = LH;
@@ -1345,7 +1280,7 @@ function drawOverlay(camX, camY) {
   // action bars under the player
   const bar = (lbl, p, col, row) => { const y = py + 14 + row * 20; g.fillStyle = 'rgba(10,14,30,.88)'; g.fillRect(px - 52, y, 104, 16); g.strokeStyle = '#c8a860'; g.lineWidth = 1; g.strokeRect(px - 51.5, y + .5, 103, 15); g.fillStyle = col; g.fillRect(px - 50, y + 11, 100 * cl(p, 0, 1), 3); g.font = `11px ${PXF}`; g.fillStyle = '#fff'; g.fillText(lbl, px, y + 10); };
   let row = 0;
-  if (P.prep) bar('Preparing ' + P.prep.sp.n, (GT - P.prep.t0) / (P.prep.t1 - P.prep.t0), '#b070ff', row++);
+  if (P.prep) bar((P.prep.sp.legacy ? 'Preparing ' : '“' + P.prep.sp.chant + '” · ') + P.prep.sp.n, (GT - P.prep.t0) / (P.prep.t1 - P.prep.t0), '#b070ff', row++);
   if (P.held) bar('Holding ' + P.held.sp.n + ' · tap slot to release', 1, '#ffd060', row++);
   if (P.swing) bar('Wind-up', (GT - P.swing.t0) / (P.swing.t1 - P.swing.t0), '#ff8060', row++);
   if (P.task) bar(P.task.label, (GT - P.task.t0) / (P.task.t1 - P.task.t0), '#6ec6ff', row++);
@@ -1376,14 +1311,14 @@ function bar(id, v, m, lbl) { const el = $(id); el.querySelector('i').style.widt
 function refreshHud() {
   if (!P) return; bar('#hp', P.hp, SF.maxHp(P), 'HP'); bar('#sp', P.stam, SF.maxStam(P), 'ST'); bar('#mp', P.mana, SF.maxMana(P), 'MP');
   $('#pname').textContent = P.name + (P.ghost ? ' · ghost' : '');
-  const chips = []; if (P.hidden) chips.push(`hidden ${Math.max(0, P.stepBudget)} steps`); if (P.poison) chips.push('poisoned'); if (P.meditating) chips.push('meditating'); if (P.veil && P.veil.until > GT && P.veil.left > 0) chips.push('stoneveil ' + Math.round(P.veil.left)); if (P.fed > GT) chips.push('fed'); if (overweight()) chips.push('overweight'); if (inCombat() && !P.ghost) chips.push('in combat');
+  const chips = []; if (P.hidden) chips.push(`hidden ${Math.max(0, P.stepBudget)} steps`); if (P.poison) chips.push('poisoned'); if (P.meditating) chips.push('meditating'); if (P.veil && P.veil.until > GT && P.veil.left > 0) chips.push('stoneveil ' + Math.round(P.veil.left)); if (P.fed > GT) chips.push('fed'); if (overweight()) chips.push('overweight'); if (inCombat() && !P.ghost) chips.push('in combat'); if (!P.ghost) chips.push(...magicChips());
   $('#chips').textContent = chips.join(' · ');
   $('#zone').textContent = ZONE_NAME[zoneAt(Math.floor(P.x), Math.floor(P.y))] || '';
   const h = hourOfDay(); $('#clock').textContent = String(Math.floor(h)).padStart(2, '0') + ':' + String(Math.floor(h % 1 * 60)).padStart(2, '0');
   const sb = $('#b-run'); sb.classList.toggle('on', !!P.sprintOn); sb.textContent = P.sprintOn ? 'Sprint on' : 'Sprint';
   const ab = $('#b-atk'); ab.classList.toggle('on', !!P.armed); ab.querySelector('b').textContent = P.armed ? 'Armed' : 'Attack'; ab.querySelector('small').textContent = wDef().fam + (P.drawn ? '' : ' · stowed');
   P.hbPage = P.hbPage || 0; $('#b-page').textContent = 'Bar ' + (P.hbPage + 1) + '/3';
-  document.querySelectorAll('.slot').forEach((b, i0) => { const i = i0 + P.hbPage * 3; const s = P.hotbar[i]; const [a, c] = slotLabel(s); b.querySelector('b').textContent = a; b.querySelector('small').textContent = c; const held = s && s.k === 'spell' && P.held && P.held.sp.id === s.id, prep = s && s.k === 'spell' && P.prep && P.prep.sp.id === s.id; b.classList.toggle('held', !!held); b.classList.toggle('prep', !!prep); let cd = 0; if (s && s.k === 'item' && SF.CONSUMABLES[s.id] && P.cd) cd = Math.max(0, (P.cd[SF.CONSUMABLES[s.id].fam] || 0) - GT); b.querySelector('em').textContent = cd ? Math.ceil(cd) : ''; });
+  document.querySelectorAll('.slot').forEach((b, i0) => { const i = i0 + P.hbPage * 3; const s = P.hotbar[i]; const [a, c] = slotLabel(s); b.querySelector('b').textContent = a; b.querySelector('small').textContent = c; const held = s && s.k === 'spell' && P.held && P.held.sp.id === s.id, prep = s && s.k === 'spell' && P.prep && P.prep.sp.id === s.id; b.classList.toggle('held', !!held); b.classList.toggle('prep', !!prep); let cd = 0; if (s && s.k === 'item' && SF.CONSUMABLES[s.id] && P.cd) cd = Math.max(0, (P.cd[SF.CONSUMABLES[s.id].fam] || 0) - GT); b.querySelector('em').textContent = cd ? Math.ceil(cd) : ''; }); magicSlots();
   const g = $('#ghost'); g.hidden = !P.ghost;
   if (P.ghost) { const left = 12 - (GT - P.ghostAt); const s = SHRINES.find(z => z.id === P.bound); const body = ents.find(e => e.mine && !e.gone); g.querySelector('p').textContent = (body ? `Your body is ${Math.round(dist(body, P))} m away, crumbling in ${Math.ceil((body.expires - GT) / 60)} min. ` : '') + 'Walk to a shrine or healer, or return to your bound shrine.'; const b = g.querySelector('button'); b.disabled = left > 0; b.textContent = left > 0 ? `Return to ${s.n} in ${Math.ceil(left)} s` : `Return to ${s.n} now`; }
   $('#b-int').hidden = !canInteract(); $('#b-cancel').hidden = !(P.prep || P.held || AIM || P.task);
@@ -1422,7 +1357,7 @@ function renderPanel(top) {
 }
 const PANELS = {
   bag: () => { const kg = packKg(), mk = SF.carryKg(P); let h = `<div class="note">${P.pack.items.length}/${SF.SLOTS} stacks · ${kg.toFixed(1)}/${mk.toFixed(1)} kg ${kg > mk ? '<b class="warn">overweight: walk only</b>' : ''} · ${SF.count(P.pack, 'gold')} gold</div>`;
-    for (const it of P.pack.items) { const d = SF.ITEMS[it.id]; let a = ''; if (d.slot) a += btn('equip', 'Equip', { u: it.uid }); if (d.use === 'consume' || d.use === 'bandage') a += btn('useitem', 'Use', { id: it.id }); if (d.use === 'eat') a += btn('useitem', 'Eat', { id: it.id }); if (d.use || SF.CONSUMABLES[it.id]) a += btn('assign', 'Slot', { k: 'item', id: it.id }); if (SF.WEARABLE(it.id) && (it.cond !== undefined && it.cond < (it.maxc || 100))) a += btn('repair', 'Repair', { u: it.uid }); a += btn('appraise', 'Appraise', { u: it.uid }); if (d.trade) a += btn('drop', 'Drop', { u: it.uid }); h += `<div class="row"><span class="nm">${esc(iname(it))}${d.trade ? '' : ' <span class="note">protected</span>'}</span><span class="v">${SF.itemKg(it).toFixed(2)} kg</span>${a}</div>`; }
+    for (const it of P.pack.items) { const d = SF.ITEMS[it.id]; let a = ''; if (d.slot) a += btn('equip', 'Equip', { u: it.uid }); if (d.use === 'consume' || d.use === 'bandage') a += btn('useitem', 'Use', { id: it.id }); if (d.use === 'eat') a += btn('useitem', 'Eat', { id: it.id }); if (d.use || SF.CONSUMABLES[it.id]) a += btn('assign', 'Slot', { k: 'item', id: it.id }); if (SF.WEARABLE(it.id) && (it.cond !== undefined && it.cond < (it.maxc || 100))) a += btn('repair', 'Repair', { u: it.uid }); a += magicItemActions(it); a += btn('appraise', 'Appraise', { u: it.uid }); if (d.trade) a += btn('drop', 'Drop', { u: it.uid }); h += `<div class="row"><span class="nm">${esc(iname(it))}${d.trade ? '' : ' <span class="note">protected</span>'}</span><span class="v">${SF.itemKg(it).toFixed(2)} kg</span>${a}</div>`; }
     return ['Pack', h]; },
   gear: () => { const t = (k, n) => `<span>${n}</span><span>${P[k]}</span>`; let h = `<div class="kv">${t('str', 'Strength')}${t('dex', 'Dexterity')}${t('int', 'Intellect')}<span>Stat total</span><span>${P.str + P.dex + P.int} / 225</span><span>Health</span><span>${Math.floor(P.hp)} / ${SF.maxHp(P)}</span><span>Stamina</span><span>${Math.floor(P.stam)} / ${SF.maxStam(P)}</span><span>Mana</span><span>${Math.floor(P.mana)} / ${SF.maxMana(P)}</span><span>Armor</span><span>${armorVal()} (${armorType()})</span><span>Weapon</span><span>${wDef().fam} · ${wDef().dmg.join('–')} · reach ${wDef().reach} m · recovery ${SF.recovery(wDef().rec, P.dex, P.stam / SF.maxStam(P)).toFixed(2)} s</span><span>Bound shrine</span><span>${SHRINES.find(s => s.id === P.bound).n}</span><span>Skills</span><span>${f1(SF.totalSkill(P))} / 700.0</span></div><div class="sec">Equipped</div>`;
     for (const s of ['weapon', 'shield', 'armor']) { const it = P.equip[s]; h += `<div class="row"><span class="v" style="width:4.5em">${s}</span><span class="nm">${it ? esc(iname(it)) : '<span class="note">empty</span>'}</span>${it && SF.WEARABLE(it.id) && it.cond !== undefined && it.cond < (it.maxc || 100) ? btn('repair', 'Repair', { u: it.uid }) : ''}${it && SF.ITEMS[it.id].trade ? btn('uneq', 'Remove', { s }) : ''}</div>`; }
@@ -1431,9 +1366,7 @@ const PANELS = {
     for (const [k, n, g, live] of SF.SKILLS) { const s = P.skills[k]; const lk = s.lock === 'raise' ? '▲' : s.lock === 'hold' ? '■' : '▼'; h += `<div class="row ${live ? '' : 'na'}"><span class="nm">${n}${live ? '' : ' <span class="note">later milestone</span>'}</span><span class="v">${f1(s.v)}</span>${btn('lock', lk, { k })}</div>`; }
     h += '<div class="sec">Recent skill checks</div>' + (SKLOG.slice(-14).reverse().map(l => `<div class="note">${SF.SKILL[l.k].n}: ${esc(l.r)}</div>`).join('') || '<p class="note">None yet.</p>');
     return ['Skills', h]; },
-  spells: () => { let h = `<div class="note">Spellcraft ${f1(P.skills.spellcraft.v)} · prepare → hold (3 s) → release. Reagents: R reed ash, S shell dust, M marshroot, L lantern oil, B black salt.</div>`;
-    for (const sp of SF.SPELLS) { const ok = sv('spellcraft') >= sp.min; h += `<div class="row ${ok ? '' : 'na'}"><span class="nm">${sp.n} <span class="note">min ${sp.min} · ${sp.mp} mp · ${sp.prep}s · ${sp.r} · ${Math.round(SF.spellSuccess(sv('spellcraft'), sp.min) * 100)}%</span></span>${ok ? btn('cast', 'Cast', { s: sp.id }, 'ac') + btn('assign', 'Slot', { k: 'spell', id: sp.id }) : ''}</div>`; }
-    return ['Spellbook', h]; },
+  spells: () => spellbookPanel(),
   abilities: () => ['Abilities', `<p class="note">Use now or put an action on a hotbar slot (two bars of four).</p>` + [['hide', 'Hide (Concealment)'], ['track', 'Track (Tracking)'], ['meditate', 'Meditate'], ['brace', 'Braced Guard (Shieldwork 50)'], ['search', 'Search (finds hidden foes and snares)'], ['tame', 'Tame (Taming)'], ['vet', 'Treat pet (Veterinary)'], ['lullaby', 'Lullaby (needs a lute)'], ['discord', 'Discord (needs a lute)'], ['provoke', 'Provoke (needs a lute)'], ['pick', 'Pickpocket a smuggler'], ['coat', 'Coat weapon with venom (Venomcraft 30)'], ['trap', 'Set a snare (Trapcraft)']].map(([id, n]) => `<div class="row"><span class="nm">${n}</span>${ABIL[id] ? btn('abil', 'Use', { id }) : ''}${btn('assign', 'Slot', { k: 'act', id })}</div>`).join('')],
   assign: () => ['Choose a slot', `<p class="note">Assign ${esc(ASSIGN.k === 'spell' ? SF.SPELL[ASSIGN.id].n : ASSIGN.k === 'item' ? SF.ITEMS[ASSIGN.id].n : (ABIL[ASSIGN.id] ? ABIL[ASSIGN.id].n : ASSIGN.id))} to:</p><div class="grid2">${P.hotbar.map((_, i) => btn('setslot', 'Bar ' + (1 + Math.floor(i / 3)) + ' · ' + (i % 3 + 1) + ': ' + esc(slotLabel(P.hotbar[i])[0]), { i })).join('')}</div>`],
   loot: () => { const c = P.lootOpen; if (!c || c.gone) return null; const ls = c.cont ? SF.lootStatus(c.cont, P.id, GT) : { label: '' }; let h = `<div class="note">${c.mine ? 'Your body · ' : ''}${esc(ls.label || '')} · crumbles in ${Math.ceil((c.expires - GT) / 60)} min · pack ${P.pack.items.length}/${SF.SLOTS}, ${packKg().toFixed(1)}/${SF.carryKg(P).toFixed(1)} kg</div>`;
@@ -1835,7 +1768,7 @@ function tapWorld(sx, sy) {
   if (AIM) { const pt = { x: w.x, y: w.y }; if (Math.hypot(pt.x - P.x, pt.y - P.y) > AIM.range) return log('Out of range.', '#ffb070'); return AIM.fn(pt); }
   if (P.ghost) return;
   const hits = hitEnts(w.wx, w.wy);
-  if (P.held) { const sp = P.held.sp; const t = hits.find(e => sp.t === 'enemy' ? e.kind === 'mon' : e.kind === 'pet'); if (t) { if (P.sel === t) return releaseHeld(t); P.sel = t; t.nameUntil = GT + 3; return; } if (sp.t === 'ally') return; }
+  if (P.held && heldTap(hits, w)) return;
   if (hits.length > 1 && hits[0].kind !== hits[1].kind && Math.abs(dist(hits[0], hits[1])) < .8) { PICK = hits.slice(0, 5); return openPanel('picker'); }
   if (hits.length) { if (hits[0].kind === 'corpse') { P.sel = hits[0]; if (dist(hits[0], P) <= 2.2) return interact(); return log('Walk next to the remains to loot them.'); } P.sel = hits[0]; if (P.sel.kind === 'mon') P.sel.nameUntil = GT + 3; return; }
   const tl = tallAt(w.wx, w.wy); const tx = tl ? tl.x : Math.floor(w.x), ty = tl ? tl.y : Math.floor(w.y);
@@ -1868,9 +1801,10 @@ const SAVEKEY = 'shardfall.save.v1';
 function save() {
   if (!P || deletingSave) return false; try {
     const c = {}; for (const k of ['name', 'x', 'y', 'str', 'dex', 'int', 'hp', 'stam', 'mana', 'skills', 'pack', 'bank', 'equip', 'look', 'bound', 'quest', 'freeLessons', 'hotbar', 'ghost', 'ghostAt', 'gainLog', 'recipeN', 'cx']) c[k] = P[k];
+    if (P.base) Object.assign(c, P.base); c.magery = { mig: (P.mg && P.mg.mig) || 0 };
     const corpses = ents.filter(e => e.mine && !e.gone).map(e => ({ x: e.x, y: e.y, items: e.cont.items, left: e.expires - GT, diedAgo: GT - e.cont.diedAt }));
     let maxUid = 0; const scan = it => { if (it && it.uid > maxUid) maxUid = it.uid; }; P.pack.items.forEach(scan); P.bank.items.forEach(scan); Object.values(P.equip).forEach(scan); corpses.forEach(c2 => c2.items.forEach(scan));
-    const pets = ents.filter(e => e.kind === 'pet' && e.type && !e.gone && e.hp > 0).map(e => ({ type: e.type, hp: e.hp, order: e.order === 'stay' ? 'stay' : 'follow', slots: e.slots, name: e.name, dx: e.x - P.x, dy: e.y - P.y }));
+    const pets = ents.filter(e => e.kind === 'pet' && e.type && !e.summon && !e.gone && e.hp > 0).map(e => ({ type: e.type, hp: e.hp, order: e.order === 'stay' ? 'stay' : 'follow', slots: e.slots, name: e.name, dx: e.x - P.x, dy: e.y - P.y }));
     const nodes = []; for (const [k, o] of RES) nodes.push([k, o.gen || 1, o.spec || 0, o.n, o.max || 0, Math.round(o.t * 10) / 10]);
     localStorage.setItem(SAVEKEY, JSON.stringify({ v: 2, char: c, corpses, pets, nodes, uid: maxUid + 1, gt: GT, savedAt: Date.now() }));
     return true;
@@ -1920,6 +1854,7 @@ function boot(saved, fresh) {
   P.cx = Object.assign({ survey: {}, pins: [], track: null, mark: false }, P.cx || {}); P.batch = null;
   ents.unshift(P); P.sect = P.sect || 0; P.drawn = false; P.readyAt = 0; while (P.hotbar.length < 9) P.hotbar.push(null); Q(); populate(); seedTraps();
   if (saved) for (const pt of saved.pets || []) { const d = MON[pt.type]; if (!d) continue; const near = Math.hypot(pt.dx || 0, pt.dy || 0) < 12; addEnt({ kind: 'pet', type: pt.type, name: pt.name || 'your ' + d.n, x: P.x + (near ? pt.dx : 1), y: P.y + (near ? pt.dy : 0), hp: Math.min(pt.hp, d.hp), max: d.hp, state: '', home: { x: P.x, y: P.y }, sect: 0, ward: 0, order: pt.order, slots: pt.slots || 1, target: null }); }
+  mageryBoot(saved);
   $('#cc').hidden = true; document.body.classList.toggle('mirror', SETTINGS.mirror);
   log('Welcome to Saltmarsh Quay, ' + P.name + '. Bank what you cannot afford to lose.', '#ffe08a');
   log('Left stick moves; the Sprint button runs. Tap to target. Attack arms your swings. Interact gathers, loots and talks.', '#b6a68a');
