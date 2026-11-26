@@ -1,11 +1,11 @@
 # Living World Phase 1 in the built game (Playwright + Chrome): stable actor ids, controller dispatch, the shared damage entry,
 # death exactly once, bounded events, save/load identity, the v4 → v5 save migration and seeded determinism.
-# usage: python3 tests/world-smoke/run.py Shardfall_v0.21.html [/path/to/chrome]
+# usage: python3 tests/world-smoke/run.py Shardfall_v0.22.html [/path/to/chrome]   (runs phase2.py after its own checks)
 # The animation loop is held (requestAnimationFrame is stubbed before the page runs) so every step is driven by the test
 # through __SF.update(0.05); one scenario releases it and lets the real loop run.
 import sys, json, os
 from playwright.sync_api import sync_playwright
-here = os.path.dirname(os.path.abspath(__file__)); f = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else 'Shardfall_v0.21.html')
+here = os.path.dirname(os.path.abspath(__file__)); f = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else 'Shardfall_v0.22.html')
 chrome = sys.argv[2] if len(sys.argv) > 2 else '/usr/bin/google-chrome'
 HOLD = "window.__rafHold = true; { const raf = window.requestAnimationFrame.bind(window); window.__raf = raf; window.requestAnimationFrame = cb => window.__rafHold ? (window.__rafCb = cb, 0) : raf(cb); }"
 SEED = "S => { let a = %d >>> 0; S.setRng(() => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }); }"
@@ -50,7 +50,7 @@ with sync_playwright() as p:
     const out = { moved, npcStill, monCtl: m.ctrl, npcCtl: n.ctrl, npcTick: !!S.CONTROL[n.ctrl], tamed: [r2.actorId === id, r2.archetype, r2.ctrl], followed: Math.hypot(r2.x - P.x, r2.y - P.y) < d0 };
     S.ents.splice(S.ents.indexOf(r2), 1); r2.gone = true; return out; }""")
   check(r['moved'] and r['monCtl'] == 'AnimalAI', 'an idle boar wanders under its controller', r)
-  check(r['npcStill'] and r['npcCtl'] == 'MerchantAI' and not r['npcTick'], 'merchants have no tick yet and stay at their posts', r)
+  check(r['npcStill'] and r['npcCtl'] == 'MerchantAI', 'merchants with no travel goal stay at their posts', r)
   check(r['tamed'] == [True, 'pet', 'PetAI'] and r['followed'], 'a tamed creature keeps its id, becomes a pet and follows', r)
 
   # 3. the shared damage entry and death exactly once (player ← creature, creature ← creature, creature killed twice)
@@ -116,4 +116,6 @@ with sync_playwright() as p:
   r = J(pg, "() => ({ gt: __SF.GT, n: __SF.WS.reg.size, sz: __SF.WS.bus.size })")
   check(r['gt'] > 2 and r['n'] > 100 and not errs, 'the live loop runs with the new dispatch', {'r': r, 'errs': errs[:5]}); ctx.close()
   b.close()
+import subprocess   # phase 2: clock, light, navigation, developer panel
+r = subprocess.run([sys.executable, os.path.join(here, 'phase2.py'), f, chrome], capture_output=True, text=True); print(r.stdout.strip() or r.stderr[-800:]); fails += r.returncode != 0
 print('ALL PASS' if not fails else f'{fails} FAILED'); sys.exit(1 if fails else 0)
