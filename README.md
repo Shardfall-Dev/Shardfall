@@ -8,7 +8,12 @@ Open `Shardfall_v0.14.html` in a browser (phone or desktop). Everything — code
 
 ## Layout
 
-- `Shardfall_v0.14.html` — the current build. The first `<script>` is the pure rules module (`SF`: items, skills, recipes, crafting math); the last `<script>` is the game (world, UI, quests, save/load).
+- `src/head.html` — page markup and CSS (HUD, panels).
+- `src/rules.js` — the pure rules module (`SF`): items, skills, recipes, materials, crafting and repair math. No DOM.
+- `src/assets.js` — embedded sprite sheets and art (data URIs; large, not meant for hand-editing).
+- `src/game.js` — the game: world generation, rendering, input, NPCs, quests, crafting UI, save/load.
+- `build.sh` — joins the four parts into one playable file: `./build.sh 0.15` → `Shardfall_v0.15.html`.
+- `Shardfall_v0.14.html` — the current built game.
 - `docs/Shardfall_Crafting_Guide.md` — the crafting design guide the build follows.
 - `tests/rules.test.js` — deterministic rules tests: `node tests/rules.test.js Shardfall_v0.14.html`
 
