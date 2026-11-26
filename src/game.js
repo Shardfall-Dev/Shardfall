@@ -48,7 +48,7 @@ function gain(key, diff, ctx) {
 
 /* ---------- sound: src/audio.js (SFXA) plays the sound pack; this section decides what plays and where ---------- */
 let AC = null, muted = false;   // AC is SFXA's shared AudioContext once a gesture unlocks it; muted persists in SETTINGS
-const SND = { gainAt: -9, hurtAt: -9, stepAcc: 0, zone: null, ambNext: 0, ambPos: null, grp: {} };
+const SND = { gainAt: -9, hurtAt: -9, stepAcc: 0, zone: null, ambNext: 0, ambPos: null, grp: {}, musWant: undefined, musAt: 0, musFirst: 0 };
 const snd = (ev, o) => SFXA.play(ev, o);                                                     // UI and the player's own sounds: centred
 const sndAt = (ev, at, o) => SFXA.play(ev, Object.assign({ pos: { x: at.x, y: at.y }, ent: at.kind ? at : null, key: at.id }, o || {}));
 const sndOnce = (k, cd) => { if (GT < (SND.grp[k] || 0)) return false; SND.grp[k] = GT + cd; return true; };   // group cooldown
@@ -114,10 +114,21 @@ const SPELL_SND = { mend: 'magic.heal', gmend: 'magic.heal', cleanse: 'magic.hea
 const EFFECT_SND = { heal: 'magic.heal', armor_boon: 'magic.ward', area_armor_boon: 'magic.ward', melee_ward: 'magic.ward', spell_ward: 'magic.ward', movement: 'magic.blink', travel: 'magic.blink', control: 'magic.root', control_field: 'magic.root', poison: 'magic.poison', poison_field: 'magic.poison', stat_penalty: 'magic.hex', stat_penalty_area: 'magic.hex', dispel: 'magic.dispel', area_dispel: 'magic.dispel', field_removal: 'magic.dispel', summon: 'magic.summon' };
 const DELIVERED = { direct: 1, delayed_hit: 1, conditional_hit: 1, poison: 1, shared_damage: 1, area_percent_hit: 1, cleanse: 1, area_cleanse: 1 };   // these sound where and when they land
 const spellSnd = (sp, at) => sndAt(SPELL_SND[sp.id] || EFFECT_SND[sp.effect] || 'magic.release', at, { key: 'spell' });
+/* soundtrack by area (assets/music/v1.0.0): the town, the shore, the open road, the marsh, the ruins.
+   A new area's track starts after a few seconds there, so walking along a border does not flip it back and forth. */
+const ZONE_MUSIC = { quay: '01-saltmarsh-home', homes: '01-saltmarsh-home', beacon: '02-lanterns-on-the-quay', safe: '05-beyond-the-tidegate', roads: '05-beyond-the-tidegate', cross: '05-beyond-the-tidegate', pine: '05-beyond-the-tidegate',
+  ford: '03-mist-on-the-causeway', silt: '03-mist-on-the-causeway', ashfen: '03-mist-on-the-causeway', camp: '03-mist-on-the-causeway', wreck: '03-mist-on-the-causeway',
+  bell: '04-the-empty-watch', bell1: '04-the-empty-watch', bell2: '04-the-empty-watch', bell3: '04-the-empty-watch' };
+function musicTick(z) {
+  const want = P.ghost ? null : ZONE_MUSIC[z] || null;
+  if (want !== SND.musWant) { SND.musWant = want; SND.musAt = GT + (SFXA.musicNow || SND.musFirst ? 3 : 0); SND.musFirst = 1; }
+  if (GT >= SND.musAt) SFXA.music(SND.musWant);
+}
 /* per frame: drop cancelled scheduled sounds, clear stale ones on a zone change, schedule sparse ambience */
 function sndTick() {
   SFXA.tick(); if (!P) return;
   const x = Math.floor(P.x), y = Math.floor(P.y), z = zoneAt(x, y);
+  musicTick(z);
   if (z !== SND.zone) { if (SND.zone !== null) SFXA.cancelPending(); SND.zone = z; SND.ambNext = GT + 2; }
   if (GT < SND.ambNext || !AC) return; const r = SFXA.rand; SND.ambNext = GT + 4 + r() * 6;
   const near = (test, rad) => { for (let k = 0; k < 28; k++) { const a = r() * 6.283, d = 3 + r() * rad, tx = Math.floor(P.x + Math.cos(a) * d), ty = Math.floor(P.y + Math.sin(a) * d); if (test(tAt(tx, ty), tx, ty)) return { x: tx + .5, y: ty + .5 }; } return null; };
@@ -1425,6 +1436,7 @@ const KEYS = {}; const SETTINGS = { mirror: false, stickSprint: false };
 try { Object.assign(SETTINGS, JSON.parse(localStorage.getItem('shardfall.settings') || '{}')); } catch (e) { }
 const saveSettings = () => { try { localStorage.setItem('shardfall.settings', JSON.stringify(SETTINGS)); } catch (e) { } };
 muted = !!SETTINGS.muted; SFXA.setMuted(muted);   // mute persists with the other settings
+SFXA.musicOn = SETTINGS.music !== false;           // music on unless turned off in the menu
 
 /* ---------- HUD ---------- */
 function bar(id, v, m, lbl) { const el = $(id); el.querySelector('i').style.width = cl(v / m * 100, 0, 100) + '%'; el.querySelector('span').textContent = lbl + ' ' + Math.floor(v) + '/' + m; }
@@ -1509,7 +1521,7 @@ const PANELS = {
     return ['Master Vey, trainer', h]; },
   log: () => ['Combat and system log', LOG.slice(-150).reverse().map(l => `<div style="color:${l.c};padding:2px 0">${esc(l.t)}</div>`).join('')],
   picker: () => ['Which one?', PICK.map((e, i) => `<div class="row"><span class="nm">${esc(e.name)}</span><span class="v">${dist(e, P).toFixed(1)} m</span>${btn('pick', 'Select', { i })}</div>`).join('')],
-  menu: () => ['Menu', `<div class="grid2">${btn('open', 'Abilities', { p: 'abilities' })}${btn('open', 'Log', { p: 'log' })}${btn('zoom', 'Zoom ×' + ZOOM)}${btn('mirror', SETTINGS.mirror ? 'Right-handed layout' : 'Left-handed layout')}${btn('sprintt', SETTINGS.stickSprint ? 'Stick sprint: on (push far)' : 'Stick sprint: off (button only)')}${btn('mute', muted ? 'Sound off' : 'Sound on')}${btn('savenow', 'Save now')}${btn('open', 'How to play', { p: 'help' })}</div><p class="note" style="margin-top:12px">Shardfall web slice · offline M1. ${btn('wipe', 'Delete character', {}, 'on')}</p>`],
+  menu: () => ['Menu', `<div class="grid2">${btn('open', 'Abilities', { p: 'abilities' })}${btn('open', 'Log', { p: 'log' })}${btn('zoom', 'Zoom ×' + ZOOM)}${btn('mirror', SETTINGS.mirror ? 'Right-handed layout' : 'Left-handed layout')}${btn('sprintt', SETTINGS.stickSprint ? 'Stick sprint: on (push far)' : 'Stick sprint: off (button only)')}${btn('mute', muted ? 'Sound off' : 'Sound on')}${btn('music', SFXA.musicOn ? 'Music on' : 'Music off')}${btn('savenow', 'Save now')}${btn('open', 'How to play', { p: 'help' })}</div><p class="note" style="margin-top:12px">Shardfall web slice · offline M1. ${btn('wipe', 'Delete character', {}, 'on')}</p>`],
   quest: () => questPanel(), journal: () => journalPanel(),
   help: () => ['How to play', `<p><b>Move</b> with the floating stick on the left. Press <b>Sprint</b> to run faster; it drains 7 stamina a second and switches off when you run out. Tapping the world never moves you.</p><p><b>Target</b> by tapping a creature, person, corpse or resource, or press <b>Target</b> to cycle nearby creatures. Tap your portrait to target yourself.</p><p><b>Attack</b> arms your basic attack on the selected creature; with nothing selected it picks the nearest creature you can see. Enemy spells do the same. You swing whenever it is in reach and your weapon is ready. It never chases, picks targets, casts or loots for you. <b>Cancel</b> disarms and stops actions.</p><p><b>Spells</b>: tap a spell slot to prepare (stand still), it is then held for 3 s; tap a target or tap the slot again to release. Ground spells need a tap on the ground. Casting stows your weapon.</p><p><b>Interact</b> gathers, opens bodies and chests, disarms revealed snares, talks and uses stations in reach. Stairs in the Sunken Bell ruin and the north Ashfen hatch lead down three levels to the Bellkeeper.</p><p><b>Menu → Abilities</b> holds Search, Tame, pet care, bard songs, pickpocketing, venom and snares. <b>Bar</b> cycles through three pages of three slots.</p><p><b>Death</b> in the wilderness leaves tradeable gear on your body for 12 minutes. On protected roads you keep your gear. Walk to a shrine or healer, or wait 12 s to return to your bound shrine. Bank what you cannot afford to lose.</p><p><b>Crafting</b>: Interact at the forge, anvil, bench, still or fire. Pick a category, then a recipe: the detail shows every input, the metal, your odds and what a failure costs before you commit. Mining and smithing mentors stand by the public forge.</p><p><b>Skills</b> rise 0.1 at a time from real use against suitable difficulty, to 100 each and 700 total.</p><p class="note">Keyboard: WASD/arrows move, Shift sprints, Space attack, E interact, 1–3 current bar slots, Tab target, Esc cancel.</p>`] };
 let PICK = [];
@@ -1552,7 +1564,7 @@ const ACT = {
   pick: d => { P.sel = PICK[+d.i]; closePanel(); },
   petatk: () => petCommand('attack'),
   zoom: () => { ZOOM = ZOOMS[(ZOOMS.indexOf(ZOOM) + 1) % ZOOMS.length]; resize(); renderPanel(); }, mirror: () => { SETTINGS.mirror = !SETTINGS.mirror; document.body.classList.toggle('mirror', SETTINGS.mirror); saveSettings(); renderPanel(); },
-  sprintt: () => { SETTINGS.stickSprint = !SETTINGS.stickSprint; saveSettings(); renderPanel(); }, sprint: () => { if (P.ghost) return; if (!P.sprintOn && P.stam < 5) return log('Too tired to sprint.', '#ffb070'); P.sprintOn = !P.sprintOn; }, mute: () => { muted = !muted; SETTINGS.muted = muted; saveSettings(); SFXA.setMuted(muted); renderPanel(); }, savenow: () => { log(save() ? 'Saved.' : 'Save failed. Check browser storage.'); },
+  sprintt: () => { SETTINGS.stickSprint = !SETTINGS.stickSprint; saveSettings(); renderPanel(); }, sprint: () => { if (P.ghost) return; if (!P.sprintOn && P.stam < 5) return log('Too tired to sprint.', '#ffb070'); P.sprintOn = !P.sprintOn; }, mute: () => { muted = !muted; SETTINGS.muted = muted; saveSettings(); SFXA.setMuted(muted); renderPanel(); }, music: () => { SFXA.musicOn = !SFXA.musicOn; SETTINGS.music = SFXA.musicOn; saveSettings(); renderPanel(); }, savenow: () => { log(save() ? 'Saved.' : 'Save failed. Check browser storage.'); },
   wipe: () => { const el = $('#panel .pb'); if (!el.querySelector('[data-a=wipe2]')) el.insertAdjacentHTML('beforeend', '<p>Delete this character for good? ' + btn('wipe2', 'Yes, delete', {}, 'on') + '</p>'); }, wipe2: () => { try { localStorage.removeItem(SAVEKEY); deletingSave = true; } catch (e) { return log('Could not delete the saved character.'); } location.reload(); },
   rotok: () => { $('#rot').hidden = true; ROTOK = true; } };
 let ROTOK = false;

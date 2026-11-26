@@ -3,7 +3,12 @@
    Generic engine only: it knows the manifest, takes, voices, buses, mute and the page lifecycle.
    What plays where is decided by the game (sound section of src/game.js) through window.SFXA.
    - Takes come from SFX_DATA (base64 WAV bytes embedded by tools/embed_audio.py, keyed by the exact
-     manifest path). A hosted build without SFX_DATA fetches assets/audio/<path> with the same manifest.
+     manifest path) in the offline build. The web build has no SFX_DATA: it fetches the small AAC copy from
+     SFX_WEB (assets/audio/web/<path>.m4a) the first time a take is needed, or the WAV master in
+     assets/audio/<path> where the browser cannot decode AAC.
+   - Music (MUSIC, the Saltmarsh soundtrack) is one looping track at a time on its own bus, chosen by the
+     game per area through SFXA.music(id). A track is downloaded only when an area first asks for it, and
+     only the playing track stays decoded (a decoded minute of stereo is about 20 MB of memory).
    - Each take is decoded once, lazily, and cached; every playback gets its own BufferSource and nodes.
    - Never blocks the game: a sound whose take decodes too late for its moment is dropped. */
 (function () {
@@ -11,6 +16,9 @@
 const MAN = typeof SFX_MANIFEST !== 'undefined' ? SFX_MANIFEST : { events: {}, peak: {}, dur: {} };
 const DATA = typeof SFX_DATA !== 'undefined' ? SFX_DATA : {};
 const BASE = 'assets/audio/';
+const WEB = typeof SFX_WEB !== 'undefined' ? SFX_WEB : null;
+const MUS = typeof MUSIC !== 'undefined' ? MUSIC : {};
+const AAC = (() => { try { return !!document.createElement('audio').canPlayType('audio/mp4; codecs="mp4a.40.2"'); } catch (e) { return false; } })();
 const MASTER = .70, MAX_VOICES = 14;
 const LARGE = { 'combat.blast': 1, 'boss.bell': 1, 'magic.storm': 1, 'world.beacon': 1, 'world.bell': 1 };
 /* priority: UI 5 · danger/strike/door 3 · actions 2 · footsteps 1 · ambience 0 (distance lowers it further) */
@@ -44,6 +52,7 @@ function ensure() {
 function onRunning() {
   if (!ctx || ctx.state !== 'running') return;
   if (!warmed) { warmed = true; for (const f of unlockFns) { try { f(ctx); } catch (e) { console.error(e); } } }
+  musicApply(); prefetchTakes();
 }
 for (const t of ['pointerdown', 'touchstart', 'touchend', 'mousedown', 'keydown', 'click']) document.addEventListener(t, ensure, true);
 document.addEventListener('visibilitychange', () => {
@@ -52,10 +61,30 @@ document.addEventListener('visibilitychange', () => {
 });
 
 function b64bytes(s) { const bin = atob(s), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; }
+/* web build: after the first gesture, quietly download every small take (about 2 MB in all) a few at a time,
+   so a sound heard for the first time is ready for its moment; decoding still waits until it is played */
+const takeBytes = new Map();     // web path -> Promise of bytes
+function webBytes(url) { let p = takeBytes.get(url); if (!p) { p = fetchBytes(url); takeBytes.set(url, p); p.catch(() => takeBytes.delete(url)); } return p; }
+let prefetched = false;
+function prefetchTakes() {
+  if (prefetched || !WEB || !AAC || typeof fetch === 'undefined') return; prefetched = true;
+  const q = Object.keys(MAN.dur || {}).map(rel => WEB + rel.replace(/\.wav$/, '.m4a'));
+  const next = () => { const u = q.shift(); if (u) webBytes(u).then(next, next); };
+  setTimeout(() => { for (let i = 0; i < 4; i++) next(); }, 1500);
+}
+async function fetchBytes(url) { const r = await fetch(url); if (!r.ok) throw new Error(url + ' ' + r.status); return r.arrayBuffer(); }
 function decodeBytes(ab) { return new Promise((ok, no) => { const p = ctx.decodeAudioData(ab, ok, no); if (p && p.then) p.then(ok, no); }); }
 function load(rel) {
   const have = bufs.get(rel); if (have) return have;
-  const p = (async () => { const ab = DATA[rel] ? b64bytes(DATA[rel]) : await (await fetch(BASE + rel)).arrayBuffer(); const b = await decodeBytes(ab); bufs.set(rel, b); return b; })();
+  const p = (async () => {
+    let b = null;
+    if (DATA[rel]) b = await decodeBytes(b64bytes(DATA[rel]));
+    else {
+      if (WEB && AAC) try { b = await decodeBytes((await webBytes(WEB + rel.replace(/\.wav$/, '.m4a'))).slice(0)); } catch (e) { b = null; }
+      if (!b) b = await decodeBytes(await fetchBytes(BASE + rel));
+    }
+    bufs.set(rel, b); return b;
+  })();
   bufs.set(rel, p); p.catch(e => { bufs.delete(rel); console.warn('sound', rel, e); });
   return p;
 }
@@ -71,6 +100,43 @@ function makeRoom(prio) {
   let low = null; for (const v of voices) if (!low || v.prio < low.prio) low = v;
   if (!low || low.prio >= prio) return false;
   try { low.src.stop(); } catch (e) { } voices.delete(low); return true;
+}
+
+/* ---- music: one looping track, crossfaded; only the current one decoded ---- */
+const MUSIC_VOL = .38, FADE = 2.2;
+let musicOn = true, musicWant = null, musicCur = null, musicLoading = null, musicTok = 0;
+const musicBytes = new Map();    // id -> Promise of the compressed bytes (small; kept so a return visit needs no download)
+function musicFetch(id) {
+  let p = musicBytes.get(id); if (p) return p;
+  const t = MUS[id];
+  p = (async () => { if (AAC) try { return { ab: await fetchBytes(t.web), web: true }; } catch (e) { } return { ab: await fetchBytes(t.mp3), web: false }; })();
+  musicBytes.set(id, p); p.catch(e => { musicBytes.delete(id); console.warn('music', id, e); });
+  return p;
+}
+async function musicDecode(id) {
+  const got = await musicFetch(id);
+  try { return await decodeBytes(got.ab.slice(0)); }                       // slice: decoding detaches the bytes
+  catch (e) { if (!got.web) throw e; musicBytes.set(id, Promise.resolve({ ab: await fetchBytes(MUS[id].mp3), web: false })); return decodeBytes((await musicBytes.get(id)).ab.slice(0)); }
+}
+function musicFadeOut(cur) {
+  if (!cur) return; const t = ctx.currentTime;
+  cur.g.gain.cancelScheduledValues(t); cur.g.gain.setValueAtTime(cur.g.gain.value, t); cur.g.gain.linearRampToValueAtTime(0, t + FADE);
+  try { cur.src.stop(t + FADE + .05); } catch (e) { }
+}
+function musicApply() {
+  if (!ctx || ctx.state !== 'running') return;
+  const id = musicOn && MUS[musicWant] ? musicWant : null;
+  if ((musicCur ? musicCur.id : musicLoading) === id) return;
+  const tok = ++musicTok; musicFadeOut(musicCur); musicCur = null; musicLoading = id;
+  if (!id) return;
+  musicDecode(id).then(buf => {
+    if (tok !== musicTok || !ctx) return;
+    musicLoading = null;
+    const src = ctx.createBufferSource(), g = ctx.createGain(), t = ctx.currentTime;
+    src.buffer = buf; src.loop = true; src.loopStart = 0; src.loopEnd = Math.min(MUS[id].loopEnd || buf.duration, buf.duration);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(MUSIC_VOL, t + FADE); src.connect(g); g.connect(musicBus); src.start(t);
+    musicCur = { id, src, g };
+  }, e => { if (tok === musicTok) musicLoading = null; console.warn('music', id, e); });
 }
 
 /* where(): set by the game. Given a world point (and its emitter, if any) it returns null when the sound must
@@ -116,6 +182,10 @@ const API = {
   /* per frame: a scheduled sound whose action was cancelled before it became audible is dropped */
   tick() { if (!ctx) return; const t = ctx.currentTime; for (const r of [...pending]) { if (r.at !== undefined && r.at <= t) { pending.delete(r); continue; } if (r.valid && !r.valid()) { r.cancel(); if (r.voice) voices.delete(r.voice); } } },
   cancelPending, stopCat,
+  /* music(id): the track this area wants (a MUSIC id, or null for silence); safe to call every frame */
+  music(id) { if (id === musicWant) return; musicWant = id; musicApply(); },
+  get musicOn() { return musicOn; }, set musicOn(v) { musicOn = !!v; musicApply(); },
+  get musicNow() { return musicCur ? musicCur.id : null; },
   setMuted(m) {
     muted = !!m; if (!ctx) return; const t = ctx.currentTime; master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(master.gain.value, t);
     if (muted) { master.gain.setTargetAtTime(0, t, .015); cancelPending(); setTimeout(() => { if (muted) stopCat('all'); }, 120); }

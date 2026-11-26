@@ -2,3 +2,5 @@ node_modules/
 .DS_Store
 *.png
 .sfx_embed.tmp
+Shardfall_v*_offline.html
+_site/

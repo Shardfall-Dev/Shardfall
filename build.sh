@@ -1,12 +1,15 @@
 #!/bin/sh
-# Assemble the single-file game from src/. Usage: ./build.sh 0.17  → Shardfall_v0.17.html
+# Assemble the game from src/.
+#   ./build.sh 0.18            → Shardfall_v0.18.html          web build (small; sound and music load from assets/audio/web/)
+#   ./build.sh 0.18 --offline  → Shardfall_v0.18_offline.html  one big file with every sound embedded, plays from disk; not committed
+# The web build needs to be served (GitHub Pages, or `python3 -m http.server` in this folder): opened straight
+# from disk the game runs but stays silent. After changing any sound, run tools/encode_web_audio.sh first.
 # Order matters: rules (SF) → magery rules (SF.MAGERY) → sound pack + player (SFXA) → assets (opens the game block) → magery art → magic → game.
-# tools/embed_audio.py embeds assets/audio/ (manifest + WAVs) so the built file plays offline;
-# a hosted build can serve assets/audio/ beside the page instead.
 set -e
-V="${1:?usage: ./build.sh <version>}"
+V="${1:?usage: ./build.sh <version> [--offline]}"
 cd "$(dirname "$0")"
-python3 tools/embed_audio.py assets/audio > .sfx_embed.tmp
-cat src/head.html src/rules.js src/magery.js .sfx_embed.tmp src/audio.js src/assets.js src/magery-art.js src/magic.js src/game.js > "Shardfall_v$V.html"
+if [ "$2" = "--offline" ]; then OUT="Shardfall_v${V}_offline.html"; MODE=""; else OUT="Shardfall_v$V.html"; MODE="--hosted"; fi
+python3 tools/embed_audio.py assets/audio $MODE > .sfx_embed.tmp
+cat src/head.html src/rules.js src/magery.js .sfx_embed.tmp src/audio.js src/assets.js src/magery-art.js src/magic.js src/game.js > "$OUT"
 rm -f .sfx_embed.tmp
-echo "built Shardfall_v$V.html"
+echo "built $OUT ($(du -h "$OUT" | cut -f1))"
