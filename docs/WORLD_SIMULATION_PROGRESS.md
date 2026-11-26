@@ -4,7 +4,13 @@ The roadmap is `docs/WORLD_SIMULATION_MASTER.md` (the full specification, unchan
 
 **Status words:** **Tested** — implemented and covered by an automated test that passes. **Implemented** — in the build, checked by hand only. **Partial** — some of the item is in; the rest is listed. **Planned** — not started. **Blocked** — waiting on something named.
 
-**Current build:** v0.21 (`Shardfall_v0.21.html`), branch `feature/living-world-phase1`. It is stacked on `feature/anniabreen-map` (v0.20, PR #11), which is stacked on `integration/v0.19` (PR #10). `main` is still at v0.16. Merge in that order.
+**Current build:** v0.22 (`Shardfall_v0.22.html`), branch `feature/living-world-phase2` (PR #13). The branches stack:
+
+- `feature/living-world-phase2` on `feature/living-world-phase1` (v0.21, PR #12)
+- `feature/living-world-phase1` on `feature/anniabreen-map` (v0.20, PR #11)
+- `feature/anniabreen-map` on `integration/v0.19` (PR #10)
+
+`main` is still at v0.16. Merge in the order #10, #11, #12, #13.
 
 ---
 
@@ -15,7 +21,7 @@ The spec's development sequence (§29, phases A–G) is numbered 1–7 here. Eac
 | # | Spec | Phase | Depends on | Status |
 |---|---|---|---|---|
 | 1 | A | Audit and architecture: actor ids, archetypes and controllers, shared damage entry, structured events, seeded streams, deterministic tests | — | **Tested** (v0.21) |
-| 2 | B | Clock and navigation: fixed 50 ms simulation step, persistent world clock (120 min day), day/night lighting and local lights, A* plus a waypoint graph, doors, stuck recovery, developer debug panel | 1 | Planned |
+| 2 | B | Clock and navigation: fixed 50 ms simulation step, persistent world clock (120 min day), day/night lighting and local lights, A* plus a waypoint graph, doors, stuck recovery, developer debug panel | 1 | **Tested** (v0.22) |
 | 3 | C | Population and monster ecosystem: regions and habitats, species profiles as data, roaming, territories, predator/prey, monster-vs-monster factions, creature audio | 1, 2 | Planned |
 | 4 | D | Living NPCs: named townsfolk with homes, workplaces and schedules; guards patrolling; merchants travelling; resource workers; basic adventurers | 1, 2, 3 (factions) | Planned |
 | 5 | E | Shared combat and law: NPC-vs-NPC and NPC-vs-monster combat, NPC spellcasting through Magery, actor death and looting, criminal flags, murder counts, guards, witnesses | 1, 3, 4 | Planned |
@@ -106,8 +112,108 @@ Spatial indexing (phase 6 in the spec) is needed earlier: phase 3 adds dozens of
 - **combat-smoke `playtest.py` fails on v0.20 and v0.21 alike.** A phone tap on "Bandage Wren" times out because the HUD re-renders the button every 120 ms, so Playwright never sees it "stable".
 - **sfx-smoke "a whiff" is flaky on v0.19/v0.20.** This is noted in PR #11.
 - **magery-smoke `migration.py` can fail at random.** Its Sable Curtain step casts once with the unseeded generator, so a fizzle fails it. It was seen once in 7 runs; the build makes no difference.
+- **magery-smoke `cancel.js` can fail the same way.** Its cast is also unseeded; seen once during the phase 2 run. It held 10/10 when repeated on both builds.
 
 ---
+
+## Phase 2 — Clock and navigation (v0.22) — **Tested**
+
+### What was built
+
+- **Fixed 50 ms simulation step (§4).**
+  - The game loop now runs `update()` in whole 50 ms steps from an accumulator (`SIM.newStepper`): at most 5 per frame, and a longer stall is dropped rather than replayed.
+  - Rendering is separate. It blends each actor's position between the last two steps and draws with a render clock that trails the simulation by the same fraction, so nothing on screen is ahead of the simulation.
+  - When the tab is hidden the world pauses. On return the accumulator restarts, so there is no catch-up burst.
+- **World clock (§5).**
+  - `SIM.newClock`: one in-game day lasts 120 real minutes, one hour 5 minutes, configurable.
+  - The periods follow the spec table: deep night 00–05, dawn 05–07, daylight 07–17, sunset 17–19, night 19–24.
+  - Time of day is a pure function of simulation time plus one saved offset. Setting the time moves the offset and never jumps simulation time.
+  - The clock is saved in the `sim` block (SIM state v2), and older saves keep the hour they were at.
+  - The HUD clock under the minimap shows a sun, moon or half-moon glyph and the time; its tooltip names the period and day.
+- **Day and night (§6).**
+  - `SIM.lightAt(hour)` gives smooth key frames: clear daylight, warm orange dawn, orange-red sunset, and a blue night at most 62 % dark so the game stays readable.
+  - Local lights cut through the dark and add a warm glow that grows with the darkness: street lamps, forges, anvils, the camp fire, lit doorways after dusk, glowing creatures (wisps), fire and magic projectiles, and blasts.
+  - Light shapes are cached sprites, not per-frame gradients. Night drawing costs about 5.8 ms on desktop against about 4.3 ms by day; see Performance.
+  - Dungeons keep their own darkness at any hour.
+  - **Night Sight** now lifts about two thirds of the dark and widens your light, instead of turning night into day (spec §6).
+- **Navigation (§14).**
+  - **Walkability.** A tile is walkable if a body of the player's radius can stand at its centre (cached). Each tile-to-tile step is also swept against the real colliders and cached per direction, because walls and doors are 0.15 m strips on tile edges that a centre test cannot see.
+  - **Search.** `SIM.newSearch` is an A* that runs in slices: 8 directions, no corner cutting, road and bridge tiles cheaper so routes follow roads. Waypoints are then smoothed.
+  - **Search budget.** At most 3,000 search nodes per 50 ms step across all actors, oldest request first. Finished paths are cached (an LRU of 256), and the cache is invalidated when any door changes.
+  - **The travel graph**, built on first use in about 250 ms on desktop:
+    - Nodes are road points every 25 tiles (merged where roads meet), the four Anniabreen towns, Saltmarsh Quay, its seven landmarks, every ferry, boat and packet pier, the three public moongates and the dungeon stairs.
+    - A link is made only if a real path search confirms it, so none crosses a channel. Named places in water, such as the ford, are reached at their nearest dry tile.
+    - Long journeys run Dijkstra over the graph, then local paths leg by leg. Boats, the ferry, moongates and stairs are taken as one action.
+  - **Doors.** Humanoid travellers open a closed door, pass and close it behind them, which also keeps the saved door state right. An actor that may not open doors never paths through a closed one.
+  - **Stuck recovery.** Progress is distance gained toward the current waypoint, so sliding along a wall does not count:
+    - 1.5 s without gain: sidestep.
+    - Twice: plan again from where it stands.
+    - Four times: give up and let the controller choose. A traveller goes home once.
+    - A search that has not answered in 8 s also gives up.
+  - **Species rules.** The search accepts a flag that keeps an actor out of protected towns, ready for creatures in phase 3. Water is impassable to everyone; no swimmers exist yet.
+- **Townsfolk controllers.** CivilianAI, MerchantAI and GuardAI now follow a travel goal when one is set. Existing townsfolk have none and stand at their posts as before; daily routines are phase 4.
+- **Developer panel (§27).** Only with `?dev` in the address; there is no way to open it in normal play. A small DEV button opens it.
+  - **Live stats:**
+    - Version, simulation rate and real steps per second, FPS.
+    - Actors (all and visible). Regional and distant counts wait for the simulation tiers (phase 6).
+    - NPC and creature counts by archetype.
+    - Time, day, period, day length and light level.
+    - Path queue, cache, searches, failures and cache hits.
+    - Average controller time per step, audio voices.
+    - Save size and last save result.
+    - Recent events.
+    - Factions are shown as "none yet": they arrive in phase 3.
+  - **Controls:** Dawn, Noon, Dusk and Midnight; ±1 h; Day/night; Pause/Resume; Step; Run +1 min and +10 min (a slice per frame); Save now; spawn a test traveller to any named place; remove travellers.
+  - **Inspector:** tap an actor to see its id, archetype, controller, position, state and target, health, home, goal and current leg, territory and criminal status.
+  - **Overlays:** paths, perception radius, territory (home and leash) and collision around the player.
+
+### Tests
+
+- `node tests/world.test.js`, 86 checks. New in phase 2:
+  - The stepper: whole steps, alpha, stall handling, and frame-slicing independence.
+  - The clock: start time, hour length, all ten period boundaries, setting the time, save/load, changing the day length.
+  - The light curve: noon, night cap, no jump over .02 per minute, warm dawn and dusk, blue night.
+  - A*: the maze, steps on open ground only, no corner cutting, unreachable goals, the node budget, sliced runs, road preference, a blocked goal, smoothing.
+  - The travel graph: Dijkstra preferring a gate, two-way edges, isolated nodes, nearest node; the LRU.
+- `python3 tests/world-smoke/phase2.py` (called by `world-smoke/run.py`), 36 checks in Chrome:
+  1. **Clock:** 09:00 on a 120-minute day, shown in the HUD. 5 simulated minutes make one hour. Setting 22:00 shows night. The time survives a reload, and a save from before the clock keeps its old hour.
+  2. **Light:** noon clear; night .62 and blue; dawn and dusk warm and half dark; Night Sight between 0 and .25; a dungeon .8 at noon; drawing works in every case.
+  3. **Graph:** 21 named places all reachable from the Quay; all 153 walk links pass a real search; the travel kinds are ferry, boat, packet, moongate and stairs.
+  4. **Journeys from Saltmarsh Quay,** each keeping searches within the 3,000-node budget:
+     - Brine Crossroads: 47 s.
+     - Shore Beacon: 25 s.
+     - Mynoc: 109 s, by packet boat and the cart road.
+     - Moonglen: 79 s, packet then boat.
+     - Skara Bryn: 89 s, packet then moongate.
+  5. **Stairs and doors:**
+     - Down the stairs into the Sunken Bell: 72 s.
+     - A closed door is opened, used and closed behind (and saved).
+     - An actor that cannot open doors is refused, and the door stays shut.
+     - A route forced through a wall re-plans and still arrives.
+  6. **Load:** 12 travellers at once stay inside the per-step budget, and the queue drains.
+  7. **Live loop:** 3.00 s of real time gives 3.00 s simulated, in whole 50 ms steps. There is no DEV button without `?dev`.
+  8. **Panel:** all the listed stats; Midnight; Pause and Resume; spawning and inspecting a traveller; overlays and Run +1 min without errors.
+- **Phase 1 checks.** `world-smoke/run.py` still passes on v0.22, including the seeded run that is identical step for step, which now includes the path searches.
+- **Regression.** Every suite on v0.22, compared with the v0.20 baseline from phase 1:
+
+| Suite | v0.20 | v0.22 |
+|---|---|---|
+| rules / magery / combat / world (node) | pass | pass |
+| magery-smoke | pass | failed once (`cancel.js` and `migration.py`: unseeded fizzles); then passed twice in a row; `cancel.js` alone held 10/10 on v0.21 and v0.22 |
+| combat-smoke | 6 pass, `playtest.py` fails | same: 6 pass, `playtest.py` fails at line 66 |
+| backpack-smoke | 32/32 | 32/32 |
+| bestiary-smoke | 123/123 | 123/123 |
+| anniabreen-smoke | 37/37 | 37/37; the same walking times to 0.1 s |
+| sfx-smoke | 48/48 | 48/48 |
+| world-smoke (phase 1 + phase 2) | — | 23 + 36 checks, all pass |
+
+### Decisions
+
+- **Old saves keep their hour.** The 24-minute day becomes the spec's 120-minute day, which changes when night falls for existing characters.
+- **Night Sight no longer makes night into day,** as the spec asks (§6). It still clearly helps.
+- **Only test travellers move in this phase.** The townsfolk controllers can follow goals; routines, merchants on the road and guards on patrol are phase 4, and creatures using paths come with territories in phase 3.
+- **"Night must affect the gameplay world" (§6)** is limited to light in this phase. Perception at night, nocturnal creatures and undead activity are phase 3, where perception is built.
+- **Graph build timing.** The travel graph is built on first use (about 250 ms desktop), not at boot, so starting the game is not slower. Phase 3 will build it during population setup.
 
 ## Implementation matrix (audit of v0.20 against the spec)
 
@@ -116,16 +222,16 @@ Spatial indexing (phase 6 in the spec) is needed earlier: phase 3 adds dozens of
 | 2 | Rules: no engine, offline, saves migrate | Single-file web build via `build.sh`. Works offline after load (`--offline` build embeds audio). Saves v1→v4 with snapshots. | Respected; save v5 | — |
 | 3 | Actor architecture | `ents[]` of plain objects keyed by `kind` (`mon`, `npc`, `pet`, `ally`, `corpse`); player `P` separate; numeric per-session ids | **Tested:** stable ids, archetypes, controllers, optional components | Phase 4 adds civilian/guard/merchant ticks |
 | 3 | Shared action services | One physical resolver (`swingAt`/`strikeOne` → `applyBlow`) for player, Wren, pets, creatures. Magery in `magic.js`. Bandaging, gathering, crafting are player-only. | **Tested:** shared damage entry `damageActor`, death once | Movement, gather, craft, loot and trade for any actor: phases 4–5 |
-| 4 | Simulation/render separation, timestep, events, seeded RNG | `update(dt)` with frame dt (capped 0.1 s); `render()` separate; `R` swappable (`setRng`); world gen seeded (`mulberry(1999)`); no event log | **Tested:** events, seeded streams, deterministic test harness. Fixed step: **Planned** (phase 2) | Phase 2 |
-| 5 | World clock | `hourOfDay()` = `(GT/60 + 9) % 24`: a 24-minute day, starting at 09:00. `GT` is saved, so time already persists. HUD clock exists. | Planned | Phase 2: 120-minute day, periods, setting |
-| 6 | Day/night visuals | `darkness()` overlay with radial holes for the player, `LIGHTS` and blasts. Night Sight sets darkness to 0. Dungeons fixed at 0.8. | Planned | Phase 2: tinted dawn/sunset, local lights, Night Sight partial |
+| 4 | Simulation/render separation, timestep, events, seeded RNG | `update(dt)` with frame dt (capped 0.1 s); `render()` separate; `R` swappable (`setRng`); world gen seeded (`mulberry(1999)`); no event log | **Tested:** events, seeded streams, deterministic harness (phase 1); fixed 50 ms step with interpolation (phase 2) | — |
+| 5 | World clock | `hourOfDay()` = `(GT/60 + 9) % 24`: a 24-minute day, starting at 09:00. `GT` is saved, so time already persists. HUD clock exists. | **Tested** (phase 2): 120-minute day, periods, saved, HUD | Offline progression stays off (spec) |
+| 6 | Day/night visuals | `darkness()` overlay with radial holes for the player, `LIGHTS` and blasts. Night Sight sets darkness to 0. Dungeons fixed at 0.8. | **Tested** (phase 2): tinted periods, local lights and glow, partial Night Sight, dungeons apart | Torch items and spell light radii when those exist; night gameplay in phase 3 |
 | 7 | NPC life | 58 static NPCs (Saltmarsh + Anniabreen towns), roles, shops, dialogue lines; no movement or schedules | Classified (civilian/merchant/guard) | Phase 4 |
 | 8 | NPC adventurers | Wren: one hireling with skills, equipment, bandaging, ghost/resurrection, follow/wait | Classified (hireling) | Phase 4 |
 | 9–10 | Monster ecosystem | `MON` table (23 types) with aggro, leash, speed, loot, skin; `SPAWNS` point spawners with caps and respawn timers; `aiMon` idle/chase/telegraph/strike/recover/return | Classified (animal/monster/criminal), dispatched by controller | Phase 3: profiles, habitats, activity hours |
 | 11 | Factions | None; creatures target only the player, pets or Wren (or a provoked creature) | Planned | Phase 3 (species), phase 5 (law) |
 | 12 | Utility AI + state machines | `aiMon` state machine; no utility scoring, personality or hysteresis | Planned | Phase 3–4 |
 | 13 | Perception | Aggro radius + `los()`; hidden player ignored; no hearing, sleep or night vision | Planned | Phase 3 |
-| 14 | Pathfinding | None: straight-line steering with a sidestep (`moveBy`); doors, bridges, stairs and moongates exist | Planned | Phase 2 |
+| 14 | Pathfinding | None: straight-line steering with a sidestep (`moveBy`); doors, bridges, stairs and moongates exist | **Tested** (phase 2): A* + travel graph, doors, stairs, boats, gates, stuck recovery, budget | Creatures use it in phase 3 (territories, pursuit limits); crowding at doors in phase 4 |
 | 15 | Population | `SPAWNS` point spawners: Saltmarsh, Anniabreen (8: boars, rats, a cemetery pair of skeletons, hounds, snappers, spiders) and dungeon rooms; bestiary creatures have stats but no spawns | Planned | Phase 3 |
 | 16 | Camps | Ashfen outlaw camp (static vendors, smugglers spawner) | Planned | Phase 3 |
 | 17 | Dungeons | Sunken Bell, 3 levels, seeded rooms, Bellkeeper boss, chests, stairs; Mynoc mine first chamber | Dungeon spawns/chests now deterministic | Phase 3; the spec's Anniabreen dungeon network is not in the repo yet (**Blocked** on that work) |
@@ -137,14 +243,14 @@ Spatial indexing (phase 6 in the spec) is needed earlier: phase 3 adds dozens of
 | 24 | Animation | Player: 8-direction walk/attack clips per weapon family. Rat and skeleton sheets. 11 bestiary sheets (walk, wind-up, impact; no death, cast, sleep). Other creatures procedural. | Untouched | Backlog below |
 | 25 | Performance tiers | Whole-world update each frame; render culls to the viewport | Measured (below) | Phase 6; spatial index in phase 3 |
 | 26 | Persistence | localStorage, one key, ~JSON; snapshots for v2/v3/premagery; nodes, player, pets, Wren, the player's corpses, door states | v5 (`sim`) **Tested** | Phase 6 |
-| 27 | Debug tools | `window.__SF` test hooks; no panel | Hooks extended | Phase 2 panel |
+| 27 | Debug tools | `window.__SF` test hooks; no panel | **Tested** (phase 2): `?dev` panel, inspector, controls, overlays | Faction view in phase 3; tier counts in phase 6 |
 | 28 | First milestone | Two Anniabreen towns + road + forest + cemetery exist as map; nothing lives there yet | Planned | Phases 2–5 |
 
 ### Conflicts and risks found in the audit
 
 - **Base branch.** The newest playable work is two unmerged PRs deep (#10 → #11). This branch adds a third. If #11 changes, rebase this onto it; the changes touch few lines outside `src/world.js`.
-- **Time scale.** The current 24-minute day becomes the spec's 120-minute day in phase 2. That changes when night falls for existing players; the clock setting is configurable.
-- **Night Sight.** It removes darkness entirely today; the spec asks for partial. This is a behaviour change to agree on in phase 2.
+- **Time scale (resolved in phase 2).** The day is now 120 minutes as specified. Old saves keep their hour; the length is one setting (`SIM.CLOCK.dayMinutes`).
+- **Night Sight (resolved in phase 2).** It is now partial, per the spec.
 - **Ids versus ally `aid`.** Wren's `aid: 'wren'` (bandage links, body ownership) is kept as is. Her actor id is `npc:wren`.
 - **Quadratic push-apart.** `aiMon` checks every entity against every other for push-apart. With 212 entities this is fine; at the spec's hundreds it is not. A spatial index is needed in phase 3.
 - **Anniabreen is thinly populated.** The spec's milestone names Anniabreen places (graveyard, forest, dungeon). The map has 8 simple spawners, no camps and no dungeon network yet.
@@ -174,17 +280,25 @@ Spatial indexing (phase 6 in the spec) is needed earlier: phase 3 adds dozens of
 
 ## Performance (desktop Chrome, this container, 212 entities, Saltmarsh Quay)
 
-| Build | `update(0.05)` | `render()` |
-|---|---|---|
-| v0.20 | 0.79 ms | 4.6 ms |
-| v0.21 | 0.80 ms | 4.8 ms |
+| Build | `update(0.05)` | `render()` by day | `render()` at night |
+|---|---|---|---|
+| v0.20 | 0.79 ms | 4.6 ms | — |
+| v0.21 | 0.80 ms | 4.8 ms | — |
+| v0.22 | 0.80 ms | 4.3 ms | 5.8 ms |
 
-Average of 3 runs × 4000 updates and 200 renders. The difference is within run-to-run noise. Phone figures are not measured yet (phase 6).
+- Each figure is the average of 3 runs of 4,000 updates and 200 renders.
+- Night costs the full-screen tint plus the cached light sprites. Before the sprites were cached it was 7.9 ms.
+- **Path searches** are capped at 3,000 nodes per step. Twelve travellers starting at once stay under the cap, and their whole journeys cost about 0.7 ms per step on average.
+- **The travel graph** is built once, in about 250 ms.
+- **Phones are not measured yet.** That is phase 6, but the night pass and the graph build are the two numbers to watch.
 
----
+## Next task (phase 3, first step)
 
-## Next task (phase 2, first step)
+Turn creatures into a data-driven ecosystem:
 
-Introduce the fixed 50 ms simulation step with render interpolation for actor positions. Then move the world clock to a configurable 120-minute day with the spec's periods, persisted in `sim`.
+1. Species profiles (§9–10) for the creatures that have art: rat, boar, hound, dire wolf, skeleton, spider, orc and the rest of the bestiary. Each profile has habitat, activity hours, faction, aggression, courage, group size, territory and pursuit limits.
+2. A faction table (§11).
+3. Perception with night vision (§13).
+4. A chunk-based spatial index, replacing the quadratic push-apart.
 
-Keep `tests/world-smoke` determinism green, and add clock tests: save/load keeps the time, and periods change at the right hours.
+Creatures then roam their territories with the phase 2 navigator, and skeletons wake at night.
