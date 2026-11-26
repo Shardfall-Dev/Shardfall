@@ -4,14 +4,14 @@ The roadmap is `docs/WORLD_SIMULATION_MASTER.md` (the full specification, unchan
 
 **Status words:** **Tested** — implemented and covered by an automated test that passes. **Implemented** — in the build, checked by hand only. **Partial** — some of the item is in; the rest is listed. **Planned** — not started. **Blocked** — waiting on something named.
 
-**Current build:** v0.23 (`Shardfall_v0.23.html`), branch `feature/world-expansion` (PR #14). The branches stack:
+**Current build:** v0.23 (`Shardfall_v0.23.html`), branch `feature/world-expansion` (PR #16). The branches stack:
 
 - `feature/world-expansion` on `feature/living-world-phase2` (v0.22, PR #13)
 - `feature/living-world-phase2` on `feature/living-world-phase1` (v0.21, PR #12)
 - `feature/living-world-phase1` on `feature/anniabreen-map` (v0.20, PR #11)
 - `feature/anniabreen-map` on `integration/v0.19` (PR #10)
 
-`main` is still at v0.16. Merge in the order #10, #11, #12, #13, #14.
+`main` is still at v0.16. Merge in the order #10, #11, #12, #13, #16. PRs #14 (Gear menu fix) and #15 (backpack icons) were opened in parallel against `integration/v0.19`; they touch `game.js`, `head.html`, `build.sh` and `README.md`, so whichever lands second needs a rebase.
 
 ---
 
