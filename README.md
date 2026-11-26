@@ -33,6 +33,7 @@ Progress saves to the browser's local storage.
 - `tests/rules.test.js` — deterministic rules tests: `node tests/rules.test.js Shardfall_v0.18.html`
 - `tests/magery.test.js` — Magery rules tests: `node tests/magery.test.js Shardfall_v0.18.html`
 - `tests/magery-smoke/run.py` — in-browser Magery scenarios (Playwright + Chrome): `python3 tests/magery-smoke/run.py Shardfall_v0.18.html`
+- `tests/backpack-smoke/run.py` — in-browser backpack checks (saved character, three sorts, desktop hover, phone tap, actions after sorting): `python3 tests/backpack-smoke/run.py Shardfall_v0.18.html`
 - `tests/sfx-smoke/run.py` — browser checks for sound, music, doors and footsteps (Playwright + Chrome; serves the web build on a local port): `python3 tests/sfx-smoke/run.py "$PWD/Shardfall_v0.18.html"`
 - `tests/bestiary-smoke/run.py` — bestiary checks in the built game (sheets load, pixel-exact cells, 8 facings, walk / wind-up / impact against the player; preview screenshots when the pack is extracted): `python3 tests/bestiary-smoke/run.py Shardfall_v0.18.html [chrome] [screenshot-dir]`
 
