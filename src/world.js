@@ -9,7 +9,7 @@
    Anything here must stay serialisable and independent of how an action was triggered (touch, mouse, AI or network). */
 (function (root) {
 'use strict';
-const SIM = { VERSION: 1 };
+const SIM = { VERSION: 2 };   // 2: the world clock joins the saved state
 
 /* ---------------- archetypes, controllers, optional components ----------------
    An archetype says what an actor is; its controller says what drives it. Components are optional: a rat has no
@@ -119,9 +119,125 @@ SIM.create = function (opt) {
     if (!e.actorId) e.actorId = key.id && W.ids.claim(key.id) ? key.id : key.name ? W.ids.named(key.prefix || archetype, key.name) : W.ids.seq(key.prefix || archetype);
     e.archetype = archetype; e.ctrl = SIM.controllerFor(archetype); W.reg.add(e.actorId, e); return e.actorId; };
   W.drop = e => { if (e && e.actorId) W.reg.remove(e.actorId); };
-  W.save = () => ({ v: SIM.VERSION, seed: W.seed, ids: W.ids.save() });
+  W.clock = SIM.newClock(saved.clock, opt.clockCfg);
+  W.save = () => ({ v: SIM.VERSION, seed: W.seed, ids: W.ids.save(), clock: W.clock.save() });
   return W;
 };
+
+/* ---------------- fixed simulation step (Phase 2) ----------------
+   advance(realSeconds, fn) runs fn(step) as many whole steps as the accumulated time allows, at most maxSteps per call
+   (a long stall is dropped, not replayed), and returns { steps, alpha, dropped } where alpha in [0, 1) is how far the
+   renderer is between the last two steps. Simulation never depends on the frame rate. */
+SIM.newStepper = opt => {
+  opt = opt || {}; const step = opt.step || .05, maxSteps = opt.maxSteps || 5; let acc = 0;
+  return { step, maxSteps,
+    advance(dt, fn) { if (!(dt > 0)) dt = 0; acc += dt; let n = 0; while (acc >= step - 1e-9 && n < maxSteps) { acc -= step; n++; fn(step); } let dropped = 0; if (acc >= step) { dropped = acc - acc % step; acc %= step; } return { steps: n, alpha: Math.min(.999, Math.max(0, acc / step)), dropped }; },
+    reset() { acc = 0; }, get acc() { return acc; } };
+};
+
+/* ---------------- the world clock (Phase 2, master spec §5) ----------------
+   Time of day is a pure function of simulation seconds: hour = (t · 24 / day length + offset) mod 24. The offset is the
+   only clock state; setting the time moves it, so simulation time itself never jumps. Real time while the game is closed
+   does not count (simulation seconds only advance while the game runs). */
+SIM.CLOCK = { dayMinutes: 120, startHour: 9 };
+SIM.PERIODS = [['deepnight', 0, 5], ['dawn', 5, 7], ['day', 7, 17], ['sunset', 17, 19], ['night', 19, 24]];
+SIM.periodOf = h => { h = ((h % 24) + 24) % 24; for (const [n, a, b] of SIM.PERIODS) if (h >= a && h < b) return n; return 'deepnight'; };
+SIM.newClock = (saved, cfg) => {
+  cfg = Object.assign({}, SIM.CLOCK, cfg || {}); saved = saved || {};
+  const c = { dayMinutes: saved.dayMinutes || cfg.dayMinutes, offset: saved.offset !== undefined ? saved.offset : cfg.startHour };
+  const perSec = () => 24 / (c.dayMinutes * 60);
+  return {
+    hourAt: t => (((t * perSec() + c.offset) % 24) + 24) % 24,
+    dayAt: t => Math.floor((t * perSec() + c.offset) / 24) + 1,
+    periodAt(t) { return SIM.periodOf(this.hourAt(t)); },
+    setHour(t, h) { c.offset = (((h - t * perSec()) % 24) + 24) % 24; },              // move the clock, not the simulation
+    setDayMinutes(t, m) { const h = this.hourAt(t); c.dayMinutes = m; this.setHour(t, h); },
+    secondsPerHour: () => c.dayMinutes * 60 / 24,
+    save: () => ({ dayMinutes: c.dayMinutes, offset: c.offset }),
+    get dayMinutes() { return c.dayMinutes; } };
+};
+SIM.fmtHour = h => { const m = Math.floor(((h % 24) + 24) % 24 * 60 + 1e-6) % 1440; return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
+
+/* outdoor light by hour (§6): `dark` is the overlay opacity (night stays readable, at most .62), `col` its colour.
+   Key frames give a cool blue night, a warm dawn and an orange-red sunset; values between them blend smoothly. */
+SIM.LIGHT_KEYS = [[0, .62, [8, 12, 40]], [4.6, .62, [8, 12, 40]], [5.6, .42, [44, 26, 46]], [6.4, .24, [150, 80, 26]], [7.4, 0, [150, 96, 40]], [16.6, 0, [170, 80, 20]],
+  [17.6, .22, [190, 84, 14]], [18.5, .34, [150, 44, 24]], [19.4, .5, [24, 16, 52]], [20.5, .62, [8, 12, 40]], [24, .62, [8, 12, 40]]];
+SIM.lightAt = h => {
+  h = ((h % 24) + 24) % 24; const K = SIM.LIGHT_KEYS; let i = 0; while (i < K.length - 2 && h >= K[i + 1][0]) i++;
+  const [h0, d0, c0] = K[i], [h1, d1, c1] = K[i + 1], k = h1 > h0 ? (h - h0) / (h1 - h0) : 0, s = k * k * (3 - 2 * k), mix = (a, b) => a + (b - a) * s;
+  return { dark: mix(d0, d1), col: [0, 1, 2].map(j => Math.round(mix(c0[j], c1[j]))), period: SIM.periodOf(h) };
+};
+
+/* ---------------- grid search (Phase 2, §14) ----------------
+   newSearch({ sx, sy, gx, gy, passable(x, y), canStep(x, y, nx, ny), cost(x, y) ≥ minCost, minCost, maxNodes, goalR, bounds }) is an A* over
+   tiles, 8-connected, with no corner cutting. It runs in slices: step(budget) expands at most `budget` nodes and returns
+   'running', 'found' or 'failed' (reason 'budget' when maxNodes is spent, 'unreachable' when the open set empties).
+   The start tile is always accepted (an actor may stand against a trunk); the goal is reached within goalR tiles. */
+function heap() { const a = []; return { push(f, k) { a.push([f, k]); let i = a.length - 1; while (i) { const p = (i - 1) >> 1; if (a[p][0] <= a[i][0]) break; [a[p], a[i]] = [a[i], a[p]]; i = p; } },
+  pop() { const top = a[0], last = a.pop(); if (a.length) { a[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < a.length && a[l][0] < a[m][0]) m = l; if (r < a.length && a[r][0] < a[m][0]) m = r; if (m === i) break; [a[m], a[i]] = [a[i], a[m]]; i = m; } } return top; },
+  get size() { return a.length; } }; }
+const DIRS = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, Math.SQRT2], [1, -1, Math.SQRT2], [-1, 1, Math.SQRT2], [-1, -1, Math.SQRT2]];
+SIM.newSearch = o => {
+  const KW = 1 << 16, key = (x, y) => y * KW + x, minC = o.minCost || 1, maxNodes = o.maxNodes || 20000, goalR = o.goalR || 0, b = o.bounds;
+  const cost = o.cost || (() => 1), pass = o.passable;
+  const oct = (x, y) => { const dx = Math.abs(x - o.gx), dy = Math.abs(y - o.gy); return (dx + dy + (Math.SQRT2 - 2) * Math.min(dx, dy)) * minC; };
+  const g = new Map(), par = new Map(), closed = new Set(), open = heap(); const k0 = key(o.sx, o.sy); g.set(k0, 0); open.push(oct(o.sx, o.sy), k0);
+  const s = { status: 'running', path: null, expanded: 0, reason: null };
+  const inB = (x, y) => !b || (x >= b[0] && y >= b[1] && x <= b[2] && y <= b[3]);
+  s.step = budget => {
+    if (s.status !== 'running') return s.status; let n = 0;
+    while (open.size && n < budget) {
+      const [, k] = open.pop(); if (closed.has(k)) continue; closed.add(k); n++; s.expanded++;
+      const x = k % KW, y = (k - x) / KW;
+      if (Math.hypot(x - o.gx, y - o.gy) <= goalR + 1e-9) { const path = []; let c = k; while (c !== undefined) { const cx = c % KW; path.push([cx, (c - cx) / KW]); c = par.get(c); } s.path = path.reverse(); s.status = 'found'; return s.status; }
+      if (s.expanded >= maxNodes) { s.status = 'failed'; s.reason = 'budget'; return s.status; }
+      const gk = g.get(k);
+      for (const [dx, dy, len] of DIRS) {
+        const nx = x + dx, ny = y + dy; if (!inB(nx, ny) || !pass(nx, ny)) continue;
+        if (dx && dy && (!pass(x + dx, y) || !pass(x, y + dy))) continue;           // no squeezing between two blocked corners
+        if (o.canStep && !o.canStep(x, y, nx, ny)) continue;                          // walls and doors that lie on tile edges
+        const nk = key(nx, ny); if (closed.has(nk)) continue; const ng = gk + len * Math.max(minC, cost(nx, ny));
+        if (ng < (g.has(nk) ? g.get(nk) : Infinity)) { g.set(nk, ng); par.set(nk, k); open.push(ng + oct(nx, ny), nk); }
+      }
+    }
+    if (!open.size && s.status === 'running') { s.status = 'failed'; s.reason = 'unreachable'; }
+    return s.status; };
+  return s;
+};
+SIM.findPath = o => { const s = SIM.newSearch(o); s.step(Infinity); return s; };
+/* string-pull a tile path into few waypoints: keep a corner only where the straight line to a later point is not clear */
+SIM.smoothPath = (path, clear) => {
+  if (!path || path.length < 3) return path ? path.slice() : []; const out = [path[0]]; let i = 0;
+  while (i < path.length - 1) { let j = path.length - 1; while (j > i + 1 && !clear(path[i][0], path[i][1], path[j][0], path[j][1])) j--; out.push(path[j]); i = j; }
+  return out;
+};
+
+/* ---------------- the travel graph (§14): regional waypoints for long journeys ----------------
+   Nodes are towns, road points, junctions, gates, piers and stairs. 'walk' edges are followed with local paths;
+   'travel' edges (ferry, boat, moongate, stairs) move an actor across in one action. route() is Dijkstra. */
+SIM.newNavGraph = () => {
+  const nodes = new Map(), adj = new Map();
+  const G = {
+    addNode(id, n) { nodes.set(id, Object.assign({ id }, n)); if (!adj.has(id)) adj.set(id, []); return id; },
+    addEdge(a, b, e) { e = e || {}; if (!nodes.has(a) || !nodes.has(b) || a === b) return; const A = nodes.get(a), B = nodes.get(b);
+      const c = e.cost !== undefined ? e.cost : Math.hypot(A.x - B.x, A.y - B.y), kind = e.kind || 'walk';
+      if (!adj.get(a).some(x => x.to === b && x.kind === kind)) adj.get(a).push({ to: b, cost: c, kind, via: e.via || null });
+      if (!e.oneWay && !adj.get(b).some(x => x.to === a && x.kind === kind)) adj.get(b).push({ to: a, cost: c, kind, via: e.via || null }); },
+    node: id => nodes.get(id) || null, edges: id => adj.get(id) || [], ids: () => [...nodes.keys()],
+    get size() { return nodes.size; },
+    nearest(x, y, pred) { let best = null, bd = Infinity; for (const n of nodes.values()) { if (pred && !pred(n)) continue; const d = Math.hypot(n.x - x, n.y - y); if (d < bd) { bd = d; best = n; } } return best; },
+    route(from, to) {
+      if (!nodes.has(from) || !nodes.has(to)) return null; const dist = new Map([[from, 0]]), prev = new Map(), h = heap(); h.push(0, from); const done = new Set();
+      while (h.size) { const [d, id] = h.pop(); if (done.has(id)) continue; done.add(id); if (id === to) break;
+        for (const e of adj.get(id)) { const nd = d + e.cost; if (nd < (dist.has(e.to) ? dist.get(e.to) : Infinity)) { dist.set(e.to, nd); prev.set(e.to, { from: id, e }); h.push(nd, e.to); } } }
+      if (!dist.has(to)) return null; const legs = []; let c = to; while (c !== from) { const p = prev.get(c); legs.push({ from: p.from, to: c, kind: p.e.kind, via: p.e.via }); c = p.from; }
+      return { cost: dist.get(to), legs: legs.reverse() }; } };
+  return G;
+};
+
+/* a small least-recently-used cache (paths between tiles) */
+SIM.newLRU = cap => { const m = new Map(); return { get(k) { if (!m.has(k)) return undefined; const v = m.get(k); m.delete(k); m.set(k, v); return v; },
+  set(k, v) { if (m.has(k)) m.delete(k); m.set(k, v); if (m.size > cap) m.delete(m.keys().next().value); }, clear() { m.clear(); }, get size() { return m.size; } }; };
 
 /* ---------------- debug view of one actor (developer tools; no gameplay depends on it) ---------------- */
 SIM.inspect = (e, extra) => {
