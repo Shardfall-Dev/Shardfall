@@ -74,7 +74,12 @@ with sync_playwright() as p:
 
   # 5. a v0.22 save made in Vespar, with a rune marked in Mynoc, a worked Mynoc ore face and a shut Vespar door, moves with the map
   old = os.path.join(tempfile.mkdtemp(), 'Shardfall_v0.22.html'); repo = os.path.dirname(os.path.dirname(here))
-  open(old, 'wb').write(subprocess.run(['git', '-C', repo, 'show', 'feature/living-world-phase2:Shardfall_v0.22.html'], capture_output=True, check=True).stdout)
+  # the v0.22 build from git: the phase 2 commit itself, so this works after its branch is merged or deleted
+  for ref in ['e59be0201e7a80393453d469ddf46ef0e115241c', 'feature/living-world-phase2', 'origin/feature/living-world-phase2']:
+    got = subprocess.run(['git', '-C', repo, 'show', ref + ':Shardfall_v0.22.html'], capture_output=True)
+    if got.returncode == 0: break
+  else: raise SystemExit('Shardfall_v0.22.html not found in git: fetch commit e59be02 (git fetch origin e59be0201e7a80393453d469ddf46ef0e115241c)')
+  open(old, 'wb').write(got.stdout)
   ctx, pg, errs = page(b, old); new_char(pg)
   raw = J(pg, """() => { const S = __SF, P = S.P; P.x = 903.5 + 640; P.y = 579.5; const rune = S.SF.newItem('rune', 1); rune.mark = { x: 556.5 + 640, y: 296, name: 'Mynoc' }; S.SF.addItem(P.pack, rune);
     S.RES.set(219 * S.GW + 611 + 640, { gen: 1, n: 2, max: 8, t: 0 }); const d = S.DOORS.find(d => d.x > 1450 && d.x < 1700 && d.y > 560 && d.y < 620); S.setDoor(d, false); S.save(); return localStorage.getItem('shardfall.save.v1'); }""")
