@@ -21,6 +21,7 @@ Open `Shardfall_v0.16.html` in a browser (phone or desktop). Everything — code
 - `docs/magery/` — the Magery kit: brief (`Magery_Brief.txt`), illustrated book (`Shardfall_Spellbook.html`, `Spellbook.md`), `spells.json`, reference math, and `STATUS.md` (what is in, what differs, what is left).
 - `tests/rules.test.js` — deterministic rules tests: `node tests/rules.test.js Shardfall_v0.16.html`
 - `tests/magery.test.js` — Magery rules tests: `node tests/magery.test.js Shardfall_v0.16.html`
+- `tests/backpack-smoke/run.py` — in-browser backpack checks (saved character, three sorts, desktop hover, phone tap, actions after sorting): `python3 tests/backpack-smoke/run.py Shardfall_v0.16.html`
 - `tests/magery-smoke/run.py` — in-browser Magery scenarios (Playwright + Chrome): `python3 tests/magery-smoke/run.py Shardfall_v0.16.html`
 
 ## v0.16 — Cancel cast
