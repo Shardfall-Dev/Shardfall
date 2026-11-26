@@ -67,12 +67,14 @@ const takeBytes = new Map();     // web path -> Promise of bytes
 function webBytes(url) { let p = takeBytes.get(url); if (!p) { p = fetchBytes(url); takeBytes.set(url, p); p.catch(() => takeBytes.delete(url)); } return p; }
 let prefetched = false;
 function prefetchTakes() {
-  if (prefetched || !WEB || !AAC || typeof fetch === 'undefined') return; prefetched = true;
+  if (prefetched || !WEB || !AAC || !CAN_FETCH || typeof fetch === 'undefined') return; prefetched = true;
   const q = Object.keys(MAN.dur || {}).map(rel => WEB + rel.replace(/\.wav$/, '.m4a'));
   const next = () => { const u = q.shift(); if (u) webBytes(u).then(next, next); };
   setTimeout(() => { for (let i = 0; i < 4; i++) next(); }, 1500);
 }
-async function fetchBytes(url) { const r = await fetch(url); if (!r.ok) throw new Error(url + ' ' + r.status); return r.arrayBuffer(); }
+/* opened straight from disk (file://) the browser refuses every fetch and logs an error for each, so don't try */
+const CAN_FETCH = typeof location === 'undefined' || location.protocol !== 'file:';
+async function fetchBytes(url) { if (!CAN_FETCH) throw new Error('no network from file://: ' + url); const r = await fetch(url); if (!r.ok) throw new Error(url + ' ' + r.status); return r.arrayBuffer(); }
 function decodeBytes(ab) { return new Promise((ok, no) => { const p = ctx.decodeAudioData(ab, ok, no); if (p && p.then) p.then(ok, no); }); }
 function load(rel) {
   const have = bufs.get(rel); if (have) return have;
