@@ -6,7 +6,7 @@ A T2A-era Ultima Online-style 2.5D isometric sandbox RPG for phones, built as a 
 
 **Online:** every merge to `main` publishes the newest build on GitHub Pages (`.github/workflows/pages.yml`; one-time setup: Settings → Pages → Source: GitHub Actions. Pages on a private repository needs a paid GitHub plan, and the site itself is public): `https://shardfall-dev.github.io/Shardfall/`. On iPhone, Share → Add to Home Screen gives it an app icon.
 
-**On your computer:** run `python3 -m http.server` in this folder and open `http://localhost:8000/Shardfall_v0.19.html`. The game loads its sound and music from `assets/audio/web/`, so it needs to be served like this; opened straight from disk it plays silently. For a single file that plays from disk with sound effects, build `./build.sh 0.19 --offline`.
+**On your computer:** run `python3 -m http.server` in this folder and open `http://localhost:8000/Shardfall_v0.19.1.html`. The game loads its sound and music from `assets/audio/web/`, so it needs to be served like this; opened straight from disk it plays silently. For a single file that plays from disk with sound effects, build `./build.sh 0.19.1 --offline`.
 
 Progress saves to the browser's local storage.
 
@@ -24,21 +24,26 @@ Progress saves to the browser's local storage.
 - `src/bestiary-art.js` — the 11 bestiary v1 sheets and their manifest, embedded (generated: `python3 tools/embed_bestiary.py` reads `assets/bestiary/Shardfall_Bestiary_v1.0.0.zip`).
 - `src/magic.js` — casting in the world: prepare → hold → release, targets, effects, fields, runes, summons, spellbook panel, hotbar signs.
 - `src/game.js` — the game: world generation, rendering, input, NPCs, quests, crafting UI, save/load, and the one physical-combat resolver every swing goes through.
-- `build.sh` — joins the parts into the game: `./build.sh 0.19` → `Shardfall_v0.19.html` (web build, 5.8 MB); `./build.sh 0.19 --offline` → `Shardfall_v0.19_offline.html` (22 MB, every sound inside, not committed). Needs `python3`.
-- `Shardfall_v0.19.html` — the current built game.
+- `build.sh` — joins the parts into the game: `./build.sh 0.19` → `Shardfall_v0.19.1.html` (web build, 5.8 MB); `./build.sh 0.19.1 --offline` → `Shardfall_v0.19.1_offline.html` (22 MB, every sound inside, not committed). Needs `python3`.
+- `Shardfall_v0.19.1.html` — the current built game.
 - `.github/workflows/pages.yml` — publishes the newest build to GitHub Pages as `index.html`, with the audio beside it.
 - `docs/Shardfall_Audio.md` — what plays when, the audio pipeline and sound-release versioning.
 - `docs/Shardfall_Crafting_Guide.md` — the crafting design guide the build follows.
 - `docs/combat/STATUS.md` — combat and First Aid: the rules, the weapon table, the save migration, sources and every approximation.
 - `docs/magery/` — the Magery kit: brief (`Magery_Brief.txt`), illustrated book (`Shardfall_Spellbook.html`, `Spellbook.md`), `spells.json`, reference math, and `STATUS.md` (what is in, what differs, what is left).
-- `tests/rules.test.js` — deterministic rules tests: `node tests/rules.test.js Shardfall_v0.19.html`
-- `tests/magery.test.js` — Magery rules tests: `node tests/magery.test.js Shardfall_v0.19.html`
-- `tests/combat.test.js` — combat and First Aid rules tests: `node tests/combat.test.js Shardfall_v0.19.html`
-- `tests/magery-smoke/run.py` — in-browser Magery scenarios (Playwright + Chrome): `python3 tests/magery-smoke/run.py Shardfall_v0.19.html`
-- `tests/combat-smoke/run.py` — in-browser combat, archery, First Aid, reload, old-save and phone play-test scenarios: `python3 tests/combat-smoke/run.py Shardfall_v0.19.html` (screenshots in `$COMBAT_SHOTS`, default `/tmp/combat-shots`)
-- `tests/backpack-smoke/run.py` — in-browser backpack checks (saved character, three sorts, desktop hover, phone tap, actions after sorting): `python3 tests/backpack-smoke/run.py Shardfall_v0.19.html`
-- `tests/sfx-smoke/run.py` — browser checks for sound, music, doors and footsteps (Playwright + Chrome; serves the web build on a local port): `python3 tests/sfx-smoke/run.py "$PWD/Shardfall_v0.19.html"`
-- `tests/bestiary-smoke/run.py` — bestiary checks in the built game (sheets load, pixel-exact cells, 8 facings, walk / wind-up / impact against the player; preview screenshots when the pack is extracted): `python3 tests/bestiary-smoke/run.py Shardfall_v0.19.html [chrome] [screenshot-dir]`
+- `tests/rules.test.js` — deterministic rules tests: `node tests/rules.test.js Shardfall_v0.19.1.html`
+- `tests/magery.test.js` — Magery rules tests: `node tests/magery.test.js Shardfall_v0.19.1.html`
+- `tests/combat.test.js` — combat and First Aid rules tests: `node tests/combat.test.js Shardfall_v0.19.1.html`
+- `tests/magery-smoke/run.py` — in-browser Magery scenarios (Playwright + Chrome): `python3 tests/magery-smoke/run.py Shardfall_v0.19.1.html`
+- `tests/combat-smoke/run.py` — in-browser combat, archery, First Aid, reload, old-save and phone play-test scenarios: `python3 tests/combat-smoke/run.py Shardfall_v0.19.1.html` (screenshots in `$COMBAT_SHOTS`, default `/tmp/combat-shots`)
+- `tests/backpack-smoke/run.py` — in-browser backpack checks (saved character, three sorts, desktop hover, phone tap, actions after sorting): `python3 tests/backpack-smoke/run.py Shardfall_v0.19.1.html`
+- `tests/sfx-smoke/run.py` — browser checks for sound, music, doors and footsteps (Playwright + Chrome; serves the web build on a local port): `python3 tests/sfx-smoke/run.py "$PWD/Shardfall_v0.19.1.html"`
+- `tests/bestiary-smoke/run.py` — bestiary checks in the built game (sheets load, pixel-exact cells, 8 facings, walk / wind-up / impact against the player; preview screenshots when the pack is extracted): `python3 tests/bestiary-smoke/run.py Shardfall_v0.19.1.html [chrome] [screenshot-dir]`
+
+## v0.19.1 — Gear menu fix
+
+- **Menu → Gear** opens the Character panel again. It still called a swing-speed formula that the Second Age combat merge had replaced, so the panel failed to build and the hotbars stayed hidden. The weapon line now shows the real swing time from the combat rules.
+- A panel that fails to build now closes cleanly and gives the hotbars back instead of leaving them hidden.
 
 ## v0.19 — everything together
 
