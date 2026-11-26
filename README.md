@@ -4,24 +4,35 @@ A T2A-era Ultima Online-style 2.5D isometric sandbox RPG for phones, built as a 
 
 ## Play
 
-Open `Shardfall_v0.16.html` in a browser (phone or desktop). Everything — code, art and audio — is inside that one file. Progress saves to the browser's local storage.
+Open `Shardfall_v0.17.html` in a browser (phone or desktop). Everything — code, art and sound — is inside that one file, so it plays offline. Progress saves to the browser's local storage.
 
 ## Layout
 
 - `src/head.html` — page markup and CSS (HUD, panels).
 - `src/rules.js` — the pure rules module (`SF`): items, skills, recipes, materials, crafting and repair math. No DOM.
 - `src/magery.js` — the Magery rules module (`SF.MAGERY`): the 64 spells (data from `docs/magery/spells.json`), success, resistance, damage, statuses, save migration. No DOM.
+- `src/audio.js` — the Web Audio player for the sound pack (`SFXA`).
+- `assets/audio/` — sound pack v1.0.0: `manifest.json` and mono WAV takes. `tools/embed_audio.py` embeds them at build time.
 - `src/assets.js` — embedded sprite sheets and art (data URIs; large, not meant for hand-editing).
 - `src/magery-art.js` — the 64 spell signs as one embedded atlas.
 - `src/magic.js` — casting in the world: prepare → hold → release, targets, effects, fields, runes, summons, spellbook panel, hotbar signs.
 - `src/game.js` — the game: world generation, rendering, input, NPCs, quests, crafting UI, save/load.
-- `build.sh` — joins the parts into one playable file: `./build.sh 0.17` → `Shardfall_v0.17.html`.
-- `Shardfall_v0.16.html` — the current built game.
+- `build.sh` — embeds the sound pack and joins the parts into one playable file: `./build.sh 0.17` → `Shardfall_v0.17.html` (needs `python3`).
+- `Shardfall_v0.17.html` — the current built game.
+- `docs/Shardfall_Audio.md` — what plays when, the audio pipeline and sound-release versioning.
 - `docs/Shardfall_Crafting_Guide.md` — the crafting design guide the build follows.
 - `docs/magery/` — the Magery kit: brief (`Magery_Brief.txt`), illustrated book (`Shardfall_Spellbook.html`, `Spellbook.md`), `spells.json`, reference math, and `STATUS.md` (what is in, what differs, what is left).
-- `tests/rules.test.js` — deterministic rules tests: `node tests/rules.test.js Shardfall_v0.16.html`
-- `tests/magery.test.js` — Magery rules tests: `node tests/magery.test.js Shardfall_v0.16.html`
-- `tests/magery-smoke/run.py` — in-browser Magery scenarios (Playwright + Chrome): `python3 tests/magery-smoke/run.py Shardfall_v0.16.html`
+- `tests/rules.test.js` — deterministic rules tests: `node tests/rules.test.js Shardfall_v0.17.html`
+- `tests/magery.test.js` — Magery rules tests: `node tests/magery.test.js Shardfall_v0.17.html`
+- `tests/magery-smoke/run.py` — in-browser Magery scenarios (Playwright + Chrome): `python3 tests/magery-smoke/run.py Shardfall_v0.17.html`
+- `tests/sfx-smoke/run.py` — offline browser checks for sound, doors and footsteps (Playwright + Chrome): `python3 tests/sfx-smoke/run.py "$PWD/Shardfall_v0.17.html"`
+
+## v0.17 — sound pack v1.0.0
+
+- 107 recorded sound events replace the old synth beeps: weapons by family timed to the contact frame, distinct impacts (flesh, bone, armor, blunt, shield), creature alerts, wind-ups and deaths, magic, gathering, crafting, loot, UI, quests and sparse ambience.
+- World sounds pan with the view, fade with distance and stay silent for hidden foes and rooms out of sight. Up to 14 voices; mute is remembered; audio starts from your first tap or key press and pauses in the background.
+- Kit building doors now open and close (Interact, E or tap the door), block movement when closed, and are remembered in your save. Older saves load with every door open.
+- Footsteps follow the surface: timber piers and floors, stone, grass, dirt, sand, mud and shallows. A cobbled quayside now joins the piers to the plaza road.
 
 ## v0.16 — Cancel cast
 

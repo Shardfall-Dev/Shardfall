@@ -1,0 +1,898 @@
+{
+  "version": 1,
+  "sampleRate": 32000,
+  "events": {
+    "door.wood.open": {
+      "category": "Doors",
+      "gain": 0.71,
+      "files": [
+        "sfx/door.wood.open_01_v1.0.0.wav",
+        "sfx/door.wood.open_02_v1.0.0.wav",
+        "sfx/door.wood.open_03_v1.0.0.wav"
+      ]
+    },
+    "door.wood.close": {
+      "category": "Doors",
+      "gain": 0.71,
+      "files": [
+        "sfx/door.wood.close_01_v1.0.0.wav",
+        "sfx/door.wood.close_02_v1.0.0.wav",
+        "sfx/door.wood.close_03_v1.0.0.wav"
+      ]
+    },
+    "door.iron.open": {
+      "category": "Doors",
+      "gain": 0.71,
+      "files": [
+        "sfx/door.iron.open_01_v1.0.0.wav",
+        "sfx/door.iron.open_02_v1.0.0.wav",
+        "sfx/door.iron.open_03_v1.0.0.wav"
+      ]
+    },
+    "door.iron.close": {
+      "category": "Doors",
+      "gain": 0.71,
+      "files": [
+        "sfx/door.iron.close_01_v1.0.0.wav",
+        "sfx/door.iron.close_02_v1.0.0.wav",
+        "sfx/door.iron.close_03_v1.0.0.wav"
+      ]
+    },
+    "door.locked": {
+      "category": "Doors",
+      "gain": 0.71,
+      "files": [
+        "sfx/door.locked_01_v1.0.0.wav",
+        "sfx/door.locked_02_v1.0.0.wav",
+        "sfx/door.locked_03_v1.0.0.wav"
+      ]
+    },
+    "door.unlock": {
+      "category": "Doors",
+      "gain": 0.71,
+      "files": [
+        "sfx/door.unlock_01_v1.0.0.wav",
+        "sfx/door.unlock_02_v1.0.0.wav",
+        "sfx/door.unlock_03_v1.0.0.wav"
+      ]
+    },
+    "door.knock": {
+      "category": "Doors",
+      "gain": 0.71,
+      "files": [
+        "sfx/door.knock_01_v1.0.0.wav",
+        "sfx/door.knock_02_v1.0.0.wav",
+        "sfx/door.knock_03_v1.0.0.wav"
+      ]
+    },
+    "chest.open": {
+      "category": "Doors",
+      "gain": 0.71,
+      "files": [
+        "sfx/chest.open_01_v1.0.0.wav",
+        "sfx/chest.open_02_v1.0.0.wav",
+        "sfx/chest.open_03_v1.0.0.wav"
+      ]
+    },
+    "chest.close": {
+      "category": "Doors",
+      "gain": 0.71,
+      "files": [
+        "sfx/chest.close_01_v1.0.0.wav",
+        "sfx/chest.close_02_v1.0.0.wav",
+        "sfx/chest.close_03_v1.0.0.wav"
+      ]
+    },
+    "gate.chain": {
+      "category": "Doors",
+      "gain": 0.71,
+      "files": [
+        "sfx/gate.chain_01_v1.0.0.wav",
+        "sfx/gate.chain_02_v1.0.0.wav",
+        "sfx/gate.chain_03_v1.0.0.wav"
+      ]
+    },
+    "weapon.draw": {
+      "category": "Combat",
+      "gain": 0.83,
+      "files": [
+        "sfx/weapon.draw_01_v1.0.0.wav",
+        "sfx/weapon.draw_02_v1.0.0.wav"
+      ]
+    },
+    "weapon.stow": {
+      "category": "Combat",
+      "gain": 0.83,
+      "files": [
+        "sfx/weapon.stow_01_v1.0.0.wav",
+        "sfx/weapon.stow_02_v1.0.0.wav"
+      ]
+    },
+    "swing.sword": {
+      "category": "Combat",
+      "gain": 0.83,
+      "files": [
+        "sfx/swing.sword_01_v1.0.0.wav",
+        "sfx/swing.sword_02_v1.0.0.wav",
+        "sfx/swing.sword_03_v1.0.0.wav"
+      ]
+    },
+    "swing.dagger": {
+      "category": "Combat",
+      "gain": 0.83,
+      "files": [
+        "sfx/swing.dagger_01_v1.0.0.wav",
+        "sfx/swing.dagger_02_v1.0.0.wav",
+        "sfx/swing.dagger_03_v1.0.0.wav"
+      ]
+    },
+    "swing.glaive": {
+      "category": "Combat",
+      "gain": 0.83,
+      "files": [
+        "sfx/swing.glaive_01_v1.0.0.wav",
+        "sfx/swing.glaive_02_v1.0.0.wav",
+        "sfx/swing.glaive_03_v1.0.0.wav"
+      ]
+    },
+    "swing.hammer": {
+      "category": "Combat",
+      "gain": 0.83,
+      "files": [
+        "sfx/swing.hammer_01_v1.0.0.wav",
+        "sfx/swing.hammer_02_v1.0.0.wav",
+        "sfx/swing.hammer_03_v1.0.0.wav"
+      ]
+    },
+    "swing.unarmed": {
+      "category": "Combat",
+      "gain": 0.83,
+      "files": [
+        "sfx/swing.unarmed_01_v1.0.0.wav",
+        "sfx/swing.unarmed_02_v1.0.0.wav",
+        "sfx/swing.unarmed_03_v1.0.0.wav"
+      ]
+    },
+    "bow.release": {
+      "category": "Combat",
+      "gain": 0.83,
+      "files": [
+        "sfx/bow.release_01_v1.0.0.wav",
+        "sfx/bow.release_02_v1.0.0.wav"
+      ]
+    },
+    "crossbow.release": {
+      "category": "Combat",
+      "gain": 0.83,
+      "files": [
+        "sfx/crossbow.release_01_v1.0.0.wav",
+        "sfx/crossbow.release_02_v1.0.0.wav"
+      ]
+    },
+    "projectile.land": {
+      "category": "Combat",
+      "gain": 0.83,
+      "files": [
+        "sfx/projectile.land_01_v1.0.0.wav",
+        "sfx/projectile.land_02_v1.0.0.wav"
+      ]
+    },
+    "hit.flesh": {
+      "category": "Combat",
+      "gain": 0.83,
+      "files": [
+        "sfx/hit.flesh_01_v1.0.0.wav",
+        "sfx/hit.flesh_02_v1.0.0.wav",
+        "sfx/hit.flesh_03_v1.0.0.wav"
+      ]
+    },
+    "hit.bone": {
+      "category": "Combat",
+      "gain": 0.83,
+      "files": [
+        "sfx/hit.bone_01_v1.0.0.wav",
+        "sfx/hit.bone_02_v1.0.0.wav",
+        "sfx/hit.bone_03_v1.0.0.wav"
+      ]
+    },
+    "hit.armor": {
+      "category": "Combat",
+      "gain": 0.83,
+      "files": [
+        "sfx/hit.armor_01_v1.0.0.wav",
+        "sfx/hit.armor_02_v1.0.0.wav",
+        "sfx/hit.armor_03_v1.0.0.wav"
+      ]
+    },
+    "hit.blunt": {
+      "category": "Combat",
+      "gain": 0.83,
+      "files": [
+        "sfx/hit.blunt_01_v1.0.0.wav",
+        "sfx/hit.blunt_02_v1.0.0.wav",
+        "sfx/hit.blunt_03_v1.0.0.wav"
+      ]
+    },
+    "block.shield": {
+      "category": "Combat",
+      "gain": 0.83,
+      "files": [
+        "sfx/block.shield_01_v1.0.0.wav",
+        "sfx/block.shield_02_v1.0.0.wav"
+      ]
+    },
+    "parry.steel": {
+      "category": "Combat",
+      "gain": 0.83,
+      "files": [
+        "sfx/parry.steel_01_v1.0.0.wav",
+        "sfx/parry.steel_02_v1.0.0.wav"
+      ]
+    },
+    "combat.warn": {
+      "category": "Combat",
+      "gain": 0.83,
+      "files": [
+        "sfx/combat.warn_01_v1.0.0.wav",
+        "sfx/combat.warn_02_v1.0.0.wav"
+      ]
+    },
+    "combat.blast": {
+      "category": "Combat",
+      "gain": 0.83,
+      "files": [
+        "sfx/combat.blast_01_v1.0.0.wav",
+        "sfx/combat.blast_02_v1.0.0.wav"
+      ]
+    },
+    "player.hurt": {
+      "category": "Combat",
+      "gain": 0.83,
+      "files": [
+        "sfx/player.hurt_01_v1.0.0.wav",
+        "sfx/player.hurt_02_v1.0.0.wav"
+      ]
+    },
+    "player.death": {
+      "category": "Combat",
+      "gain": 0.83,
+      "files": [
+        "sfx/player.death_01_v1.0.0.wav",
+        "sfx/player.death_02_v1.0.0.wav"
+      ]
+    },
+    "player.revive": {
+      "category": "Combat",
+      "gain": 0.83,
+      "files": [
+        "sfx/player.revive_01_v1.0.0.wav",
+        "sfx/player.revive_02_v1.0.0.wav"
+      ]
+    },
+    "step.wood": {
+      "category": "Movement",
+      "gain": 0.43,
+      "files": [
+        "sfx/step.wood_01_v1.0.0.wav",
+        "sfx/step.wood_02_v1.0.0.wav",
+        "sfx/step.wood_03_v1.0.0.wav"
+      ]
+    },
+    "step.stone": {
+      "category": "Movement",
+      "gain": 0.43,
+      "files": [
+        "sfx/step.stone_01_v1.0.0.wav",
+        "sfx/step.stone_02_v1.0.0.wav",
+        "sfx/step.stone_03_v1.0.0.wav"
+      ]
+    },
+    "step.dirt": {
+      "category": "Movement",
+      "gain": 0.43,
+      "files": [
+        "sfx/step.dirt_01_v1.0.0.wav",
+        "sfx/step.dirt_02_v1.0.0.wav",
+        "sfx/step.dirt_03_v1.0.0.wav"
+      ]
+    },
+    "step.grass": {
+      "category": "Movement",
+      "gain": 0.43,
+      "files": [
+        "sfx/step.grass_01_v1.0.0.wav",
+        "sfx/step.grass_02_v1.0.0.wav",
+        "sfx/step.grass_03_v1.0.0.wav"
+      ]
+    },
+    "step.sand": {
+      "category": "Movement",
+      "gain": 0.43,
+      "files": [
+        "sfx/step.sand_01_v1.0.0.wav",
+        "sfx/step.sand_02_v1.0.0.wav",
+        "sfx/step.sand_03_v1.0.0.wav"
+      ]
+    },
+    "step.mud": {
+      "category": "Movement",
+      "gain": 0.43,
+      "files": [
+        "sfx/step.mud_01_v1.0.0.wav",
+        "sfx/step.mud_02_v1.0.0.wav",
+        "sfx/step.mud_03_v1.0.0.wav"
+      ]
+    },
+    "step.water": {
+      "category": "Movement",
+      "gain": 0.43,
+      "files": [
+        "sfx/step.water_01_v1.0.0.wav",
+        "sfx/step.water_02_v1.0.0.wav",
+        "sfx/step.water_03_v1.0.0.wav"
+      ]
+    },
+    "rat.alert": {
+      "category": "Creatures",
+      "gain": 0.68,
+      "files": [
+        "sfx/rat.alert_01_v1.0.0.wav",
+        "sfx/rat.alert_02_v1.0.0.wav",
+        "sfx/rat.alert_03_v1.0.0.wav"
+      ]
+    },
+    "rat.attack": {
+      "category": "Creatures",
+      "gain": 0.68,
+      "files": [
+        "sfx/rat.attack_01_v1.0.0.wav",
+        "sfx/rat.attack_02_v1.0.0.wav",
+        "sfx/rat.attack_03_v1.0.0.wav"
+      ]
+    },
+    "rat.death": {
+      "category": "Creatures",
+      "gain": 0.68,
+      "files": [
+        "sfx/rat.death_01_v1.0.0.wav",
+        "sfx/rat.death_02_v1.0.0.wav",
+        "sfx/rat.death_03_v1.0.0.wav"
+      ]
+    },
+    "skeleton.alert": {
+      "category": "Creatures",
+      "gain": 0.68,
+      "files": [
+        "sfx/skeleton.alert_01_v1.0.0.wav",
+        "sfx/skeleton.alert_02_v1.0.0.wav",
+        "sfx/skeleton.alert_03_v1.0.0.wav"
+      ]
+    },
+    "skeleton.attack": {
+      "category": "Creatures",
+      "gain": 0.68,
+      "files": [
+        "sfx/skeleton.attack_01_v1.0.0.wav",
+        "sfx/skeleton.attack_02_v1.0.0.wav",
+        "sfx/skeleton.attack_03_v1.0.0.wav"
+      ]
+    },
+    "skeleton.death": {
+      "category": "Creatures",
+      "gain": 0.68,
+      "files": [
+        "sfx/skeleton.death_01_v1.0.0.wav",
+        "sfx/skeleton.death_02_v1.0.0.wav",
+        "sfx/skeleton.death_03_v1.0.0.wav"
+      ]
+    },
+    "hound.alert": {
+      "category": "Creatures",
+      "gain": 0.68,
+      "files": [
+        "sfx/hound.alert_01_v1.0.0.wav",
+        "sfx/hound.alert_02_v1.0.0.wav"
+      ]
+    },
+    "hound.attack": {
+      "category": "Creatures",
+      "gain": 0.68,
+      "files": [
+        "sfx/hound.attack_01_v1.0.0.wav",
+        "sfx/hound.attack_02_v1.0.0.wav"
+      ]
+    },
+    "boar.attack": {
+      "category": "Creatures",
+      "gain": 0.68,
+      "files": [
+        "sfx/boar.attack_01_v1.0.0.wav",
+        "sfx/boar.attack_02_v1.0.0.wav"
+      ]
+    },
+    "crab.attack": {
+      "category": "Creatures",
+      "gain": 0.68,
+      "files": [
+        "sfx/crab.attack_01_v1.0.0.wav",
+        "sfx/crab.attack_02_v1.0.0.wav"
+      ]
+    },
+    "spider.attack": {
+      "category": "Creatures",
+      "gain": 0.68,
+      "files": [
+        "sfx/spider.attack_01_v1.0.0.wav",
+        "sfx/spider.attack_02_v1.0.0.wav"
+      ]
+    },
+    "wisp.attack": {
+      "category": "Creatures",
+      "gain": 0.68,
+      "files": [
+        "sfx/wisp.attack_01_v1.0.0.wav",
+        "sfx/wisp.attack_02_v1.0.0.wav"
+      ]
+    },
+    "boss.bell": {
+      "category": "Creatures",
+      "gain": 0.68,
+      "files": [
+        "sfx/boss.bell_01_v1.0.0.wav",
+        "sfx/boss.bell_02_v1.0.0.wav"
+      ]
+    },
+    "magic.prepare": {
+      "category": "Magic",
+      "gain": 0.7,
+      "files": [
+        "sfx/magic.prepare_01_v1.0.0.wav",
+        "sfx/magic.prepare_02_v1.0.0.wav"
+      ]
+    },
+    "magic.release": {
+      "category": "Magic",
+      "gain": 0.7,
+      "files": [
+        "sfx/magic.release_01_v1.0.0.wav",
+        "sfx/magic.release_02_v1.0.0.wav"
+      ]
+    },
+    "magic.fizzle": {
+      "category": "Magic",
+      "gain": 0.7,
+      "files": [
+        "sfx/magic.fizzle_01_v1.0.0.wav",
+        "sfx/magic.fizzle_02_v1.0.0.wav"
+      ]
+    },
+    "magic.fire": {
+      "category": "Magic",
+      "gain": 0.7,
+      "files": [
+        "sfx/magic.fire_01_v1.0.0.wav",
+        "sfx/magic.fire_02_v1.0.0.wav"
+      ]
+    },
+    "magic.frost": {
+      "category": "Magic",
+      "gain": 0.7,
+      "files": [
+        "sfx/magic.frost_01_v1.0.0.wav",
+        "sfx/magic.frost_02_v1.0.0.wav"
+      ]
+    },
+    "magic.storm": {
+      "category": "Magic",
+      "gain": 0.7,
+      "files": [
+        "sfx/magic.storm_01_v1.0.0.wav",
+        "sfx/magic.storm_02_v1.0.0.wav"
+      ]
+    },
+    "magic.heal": {
+      "category": "Magic",
+      "gain": 0.7,
+      "files": [
+        "sfx/magic.heal_01_v1.0.0.wav",
+        "sfx/magic.heal_02_v1.0.0.wav"
+      ]
+    },
+    "magic.poison": {
+      "category": "Magic",
+      "gain": 0.7,
+      "files": [
+        "sfx/magic.poison_01_v1.0.0.wav",
+        "sfx/magic.poison_02_v1.0.0.wav"
+      ]
+    },
+    "magic.ward": {
+      "category": "Magic",
+      "gain": 0.7,
+      "files": [
+        "sfx/magic.ward_01_v1.0.0.wav",
+        "sfx/magic.ward_02_v1.0.0.wav"
+      ]
+    },
+    "magic.blink": {
+      "category": "Magic",
+      "gain": 0.7,
+      "files": [
+        "sfx/magic.blink_01_v1.0.0.wav",
+        "sfx/magic.blink_02_v1.0.0.wav"
+      ]
+    },
+    "magic.root": {
+      "category": "Magic",
+      "gain": 0.7,
+      "files": [
+        "sfx/magic.root_01_v1.0.0.wav",
+        "sfx/magic.root_02_v1.0.0.wav"
+      ]
+    },
+    "magic.hex": {
+      "category": "Magic",
+      "gain": 0.7,
+      "files": [
+        "sfx/magic.hex_01_v1.0.0.wav",
+        "sfx/magic.hex_02_v1.0.0.wav"
+      ]
+    },
+    "magic.summon": {
+      "category": "Magic",
+      "gain": 0.7,
+      "files": [
+        "sfx/magic.summon_01_v1.0.0.wav",
+        "sfx/magic.summon_02_v1.0.0.wav"
+      ]
+    },
+    "magic.dispel": {
+      "category": "Magic",
+      "gain": 0.7,
+      "files": [
+        "sfx/magic.dispel_01_v1.0.0.wav",
+        "sfx/magic.dispel_02_v1.0.0.wav"
+      ]
+    },
+    "gather.mine": {
+      "category": "Gathering and crafting",
+      "gain": 0.67,
+      "files": [
+        "sfx/gather.mine_01_v1.0.0.wav",
+        "sfx/gather.mine_02_v1.0.0.wav",
+        "sfx/gather.mine_03_v1.0.0.wav"
+      ]
+    },
+    "gather.chop": {
+      "category": "Gathering and crafting",
+      "gain": 0.67,
+      "files": [
+        "sfx/gather.chop_01_v1.0.0.wav",
+        "sfx/gather.chop_02_v1.0.0.wav",
+        "sfx/gather.chop_03_v1.0.0.wav"
+      ]
+    },
+    "gather.forage": {
+      "category": "Gathering and crafting",
+      "gain": 0.67,
+      "files": [
+        "sfx/gather.forage_01_v1.0.0.wav",
+        "sfx/gather.forage_02_v1.0.0.wav",
+        "sfx/gather.forage_03_v1.0.0.wav"
+      ]
+    },
+    "fish.cast": {
+      "category": "Gathering and crafting",
+      "gain": 0.67,
+      "files": [
+        "sfx/fish.cast_01_v1.0.0.wav",
+        "sfx/fish.cast_02_v1.0.0.wav"
+      ]
+    },
+    "fish.catch": {
+      "category": "Gathering and crafting",
+      "gain": 0.67,
+      "files": [
+        "sfx/fish.catch_01_v1.0.0.wav",
+        "sfx/fish.catch_02_v1.0.0.wav"
+      ]
+    },
+    "craft.smith": {
+      "category": "Gathering and crafting",
+      "gain": 0.67,
+      "files": [
+        "sfx/craft.smith_01_v1.0.0.wav",
+        "sfx/craft.smith_02_v1.0.0.wav"
+      ]
+    },
+    "craft.smelt": {
+      "category": "Gathering and crafting",
+      "gain": 0.67,
+      "files": [
+        "sfx/craft.smelt_01_v1.0.0.wav",
+        "sfx/craft.smelt_02_v1.0.0.wav"
+      ]
+    },
+    "craft.saw": {
+      "category": "Gathering and crafting",
+      "gain": 0.67,
+      "files": [
+        "sfx/craft.saw_01_v1.0.0.wav",
+        "sfx/craft.saw_02_v1.0.0.wav"
+      ]
+    },
+    "craft.fletch": {
+      "category": "Gathering and crafting",
+      "gain": 0.67,
+      "files": [
+        "sfx/craft.fletch_01_v1.0.0.wav",
+        "sfx/craft.fletch_02_v1.0.0.wav"
+      ]
+    },
+    "craft.stitch": {
+      "category": "Gathering and crafting",
+      "gain": 0.67,
+      "files": [
+        "sfx/craft.stitch_01_v1.0.0.wav",
+        "sfx/craft.stitch_02_v1.0.0.wav"
+      ]
+    },
+    "craft.alchemy": {
+      "category": "Gathering and crafting",
+      "gain": 0.67,
+      "files": [
+        "sfx/craft.alchemy_01_v1.0.0.wav",
+        "sfx/craft.alchemy_02_v1.0.0.wav"
+      ]
+    },
+    "craft.cook": {
+      "category": "Gathering and crafting",
+      "gain": 0.67,
+      "files": [
+        "sfx/craft.cook_01_v1.0.0.wav",
+        "sfx/craft.cook_02_v1.0.0.wav"
+      ]
+    },
+    "craft.tinker": {
+      "category": "Gathering and crafting",
+      "gain": 0.67,
+      "files": [
+        "sfx/craft.tinker_01_v1.0.0.wav",
+        "sfx/craft.tinker_02_v1.0.0.wav"
+      ]
+    },
+    "craft.fail": {
+      "category": "Gathering and crafting",
+      "gain": 0.67,
+      "files": [
+        "sfx/craft.fail_01_v1.0.0.wav",
+        "sfx/craft.fail_02_v1.0.0.wav"
+      ]
+    },
+    "trap.set": {
+      "category": "Gathering and crafting",
+      "gain": 0.67,
+      "files": [
+        "sfx/trap.set_01_v1.0.0.wav",
+        "sfx/trap.set_02_v1.0.0.wav"
+      ]
+    },
+    "trap.spring": {
+      "category": "Gathering and crafting",
+      "gain": 0.67,
+      "files": [
+        "sfx/trap.spring_01_v1.0.0.wav",
+        "sfx/trap.spring_02_v1.0.0.wav"
+      ]
+    },
+    "lock.pick": {
+      "category": "Gathering and crafting",
+      "gain": 0.67,
+      "files": [
+        "sfx/lock.pick_01_v1.0.0.wav",
+        "sfx/lock.pick_02_v1.0.0.wav"
+      ]
+    },
+    "skin.cut": {
+      "category": "Gathering and crafting",
+      "gain": 0.67,
+      "files": [
+        "sfx/skin.cut_01_v1.0.0.wav",
+        "sfx/skin.cut_02_v1.0.0.wav"
+      ]
+    },
+    "loot.rummage": {
+      "category": "Inventory and interface",
+      "gain": 0.4,
+      "files": [
+        "sfx/loot.rummage_01_v1.0.0.wav",
+        "sfx/loot.rummage_02_v1.0.0.wav"
+      ]
+    },
+    "loot.coin": {
+      "category": "Inventory and interface",
+      "gain": 0.4,
+      "files": [
+        "sfx/loot.coin_01_v1.0.0.wav",
+        "sfx/loot.coin_02_v1.0.0.wav"
+      ]
+    },
+    "item.equip": {
+      "category": "Inventory and interface",
+      "gain": 0.4,
+      "files": [
+        "sfx/item.equip_01_v1.0.0.wav",
+        "sfx/item.equip_02_v1.0.0.wav"
+      ]
+    },
+    "item.drink": {
+      "category": "Inventory and interface",
+      "gain": 0.4,
+      "files": [
+        "sfx/item.drink_01_v1.0.0.wav",
+        "sfx/item.drink_02_v1.0.0.wav"
+      ]
+    },
+    "item.bandage": {
+      "category": "Inventory and interface",
+      "gain": 0.4,
+      "files": [
+        "sfx/item.bandage_01_v1.0.0.wav",
+        "sfx/item.bandage_02_v1.0.0.wav"
+      ]
+    },
+    "item.eat": {
+      "category": "Inventory and interface",
+      "gain": 0.4,
+      "files": [
+        "sfx/item.eat_01_v1.0.0.wav",
+        "sfx/item.eat_02_v1.0.0.wav"
+      ]
+    },
+    "ui.open": {
+      "category": "Inventory and interface",
+      "gain": 0.4,
+      "files": [
+        "sfx/ui.open_01_v1.0.0.wav",
+        "sfx/ui.open_02_v1.0.0.wav"
+      ]
+    },
+    "ui.close": {
+      "category": "Inventory and interface",
+      "gain": 0.4,
+      "files": [
+        "sfx/ui.close_01_v1.0.0.wav",
+        "sfx/ui.close_02_v1.0.0.wav"
+      ]
+    },
+    "ui.page": {
+      "category": "Inventory and interface",
+      "gain": 0.4,
+      "files": [
+        "sfx/ui.page_01_v1.0.0.wav",
+        "sfx/ui.page_02_v1.0.0.wav"
+      ]
+    },
+    "skill.gain": {
+      "category": "Inventory and interface",
+      "gain": 0.4,
+      "files": [
+        "sfx/skill.gain_01_v1.0.0.wav",
+        "sfx/skill.gain_02_v1.0.0.wav"
+      ]
+    },
+    "quest.accept": {
+      "category": "Inventory and interface",
+      "gain": 0.4,
+      "files": [
+        "sfx/quest.accept_01_v1.0.0.wav",
+        "sfx/quest.accept_02_v1.0.0.wav"
+      ]
+    },
+    "quest.complete": {
+      "category": "Inventory and interface",
+      "gain": 0.4,
+      "files": [
+        "sfx/quest.complete_01_v1.0.0.wav",
+        "sfx/quest.complete_02_v1.0.0.wav"
+      ]
+    },
+    "bard.lullaby": {
+      "category": "Inventory and interface",
+      "gain": 0.4,
+      "files": [
+        "sfx/bard.lullaby_01_v1.0.0.wav",
+        "sfx/bard.lullaby_02_v1.0.0.wav"
+      ]
+    },
+    "bard.discord": {
+      "category": "Inventory and interface",
+      "gain": 0.4,
+      "files": [
+        "sfx/bard.discord_01_v1.0.0.wav",
+        "sfx/bard.discord_02_v1.0.0.wav"
+      ]
+    },
+    "bard.provoke": {
+      "category": "Inventory and interface",
+      "gain": 0.4,
+      "files": [
+        "sfx/bard.provoke_01_v1.0.0.wav",
+        "sfx/bard.provoke_02_v1.0.0.wav"
+      ]
+    },
+    "world.surf": {
+      "category": "World",
+      "gain": 0.3,
+      "files": [
+        "sfx/world.surf_01_v1.0.0.wav",
+        "sfx/world.surf_02_v1.0.0.wav"
+      ]
+    },
+    "world.wind": {
+      "category": "World",
+      "gain": 0.3,
+      "files": [
+        "sfx/world.wind_01_v1.0.0.wav",
+        "sfx/world.wind_02_v1.0.0.wav"
+      ]
+    },
+    "world.rain": {
+      "category": "World",
+      "gain": 0.3,
+      "files": [
+        "sfx/world.rain_01_v1.0.0.wav",
+        "sfx/world.rain_02_v1.0.0.wav"
+      ]
+    },
+    "world.hearth": {
+      "category": "World",
+      "gain": 0.3,
+      "files": [
+        "sfx/world.hearth_01_v1.0.0.wav",
+        "sfx/world.hearth_02_v1.0.0.wav"
+      ]
+    },
+    "world.gull": {
+      "category": "World",
+      "gain": 0.3,
+      "files": [
+        "sfx/world.gull_01_v1.0.0.wav",
+        "sfx/world.gull_02_v1.0.0.wav"
+      ]
+    },
+    "world.marsh": {
+      "category": "World",
+      "gain": 0.3,
+      "files": [
+        "sfx/world.marsh_01_v1.0.0.wav",
+        "sfx/world.marsh_02_v1.0.0.wav"
+      ]
+    },
+    "world.drip": {
+      "category": "World",
+      "gain": 0.3,
+      "files": [
+        "sfx/world.drip_01_v1.0.0.wav",
+        "sfx/world.drip_02_v1.0.0.wav"
+      ]
+    },
+    "world.bell": {
+      "category": "World",
+      "gain": 0.3,
+      "files": [
+        "sfx/world.bell_01_v1.0.0.wav",
+        "sfx/world.bell_02_v1.0.0.wav"
+      ]
+    },
+    "world.beacon": {
+      "category": "World",
+      "gain": 0.3,
+      "files": [
+        "sfx/world.beacon_01_v1.0.0.wav",
+        "sfx/world.beacon_02_v1.0.0.wav"
+      ]
+    }
+  },
+  "releaseVersion": "1.0.0"
+}
