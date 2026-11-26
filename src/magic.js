@@ -18,7 +18,7 @@ const tacticsOf = a => a === P ? sv('tactics') : (MON[a.type] || {}).atk || 40;
 const nameOf = a => a === P ? 'you' : a.name || (MON[a.type] || {}).n || 'it';
 const mval = () => sv('spellcraft'), eval_ = () => sv('focus');
 function knownSpells() { return MG.bookSpells(P.pack); }
-function hurt(a, amt, src, kind) { if (amt <= 0) { floater(a.x, a.y, '0', '#c8c8c8'); return; } if (a === P) damagePlayer(amt, src === P ? null : src, kind === 'spell' ? 'spell' : kind); else damageMon(a, amt, kind, src); }
+function hurt(a, amt, src, kind) { if (amt <= 0) { floater(a.x, a.y, '0', '#c8c8c8'); return; } damageActor(a, amt, kind, src); }   // the shared damage entry (src/game.js)
 function aggro(a, src) { if (a !== P && a.kind === 'mon' && alive(a) && !a.target) { a.target = src || P; a.state = 'chase'; } }
 function healActor(a, amt) { const max = a === P ? SF.maxHp(P) : a.max; const b = a.hp; a.hp = Math.min(max, a.hp + amt); FX.push({ k: 'heal', x: a.x, y: a.y, t0: GT, dur: .8 }); floater(a.x, a.y, '+' + Math.round(a.hp - b), '#7ee08a'); return a.hp - b; }
 function livingNear(x, y, r, pred) { const out = []; for (const e of ents) if (isLiving(e) && Math.hypot(e.x - x, e.y - y) <= r + 1e-6 && (!pred || pred(e))) out.push(e); return out; }

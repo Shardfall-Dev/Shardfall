@@ -43,8 +43,38 @@ const ents = [], FX = [], EFX = [], LOG = [], SKLOG = [];
 const JOY = { on: false, x0: 0, y0: 0, x: 0, y: 0, sprint: false };
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const sv = k => P.skills[k].v / 10;
-const addEnt = o => { o.id = NID++; o.speed = 0; ents.push(o); return o; };
-const rmEnt = e => { const i = ents.indexOf(e); if (i >= 0) ents.splice(i, 1); e.gone = true; };
+/* ---------- Living World Phase 1: every actor has a stable id, an archetype and a controller (src/world.js, docs/WORLD_SIMULATION_PROGRESS.md) ----------
+   WS is this world's SIM state, made at boot. Corpses and piles are world objects, not actors. Species classes are data; an unlisted creature is a monster. */
+let WS = null;
+const SPECIES_CLASS = { rat: 'animal', boar: 'animal', hound: 'animal', snapper: 'animal', wreckcrab: 'animal', spider: 'animal', giant_spider: 'animal', dire_wolf: 'animal', smuggler: 'criminal' };
+const MERCHANT_ROLES = { banker: 1, campbank: 1 };
+function archetypeOf(e) {
+  if (e === P) return 'player';
+  switch (e.kind) {
+    case 'npc': return e.role === 'guard' ? 'guard' : MERCHANT_ROLES[e.role] || SHOPS[e.role] ? 'merchant' : 'civilian';
+    case 'ally': return 'hireling';
+    case 'pet': return e.summon || !e.type ? 'summon' : 'pet';
+    case 'mon': return SPECIES_CLASS[e.type] || 'monster';
+  }
+  return null;
+}
+function idKey(e, a) {
+  if (a === 'player') return { id: 'player:' + (e.id || 'p1') };
+  if (a === 'hireling') return { prefix: 'npc', name: e.aid || e.name };
+  if (e.kind === 'npc') return { prefix: 'npc', name: e.name };
+  return { prefix: (e.kind === 'pet' ? (a === 'summon' ? 'summon' : 'pet') : 'mon') + ':' + (e.type || 'x') };
+}
+/* give an entity its id and controller; re-derive the controller when it changes kind (a tamed creature keeps its id) */
+function simAdopt(e) {
+  if (!WS || !e || e.gone) return null; const a = archetypeOf(e); if (!a) return null;
+  if (!e.actorId) { WS.adopt(e, a, idKey(e, a)); simEmit('ActorSpawned', { actor: e.actorId, archetype: a, species: e.type || e.role || null, x: e.x, y: e.y }); }
+  else if (e.archetype !== a) { e.archetype = a; e.ctrl = SIM.controllerFor(a); }
+  return e.ctrl;
+}
+function simEmit(type, d) { if (!WS) return null; try { return WS.bus.emit(type, d); } catch (err) { console.error(err); return null; } }
+const aidOf = e => e ? e === P ? (P.actorId || 'player') : e.actorId || null : null;
+const addEnt = o => { o.id = NID++; o.speed = 0; ents.push(o); simAdopt(o); return o; };
+const rmEnt = e => { const i = ents.indexOf(e); if (i >= 0) ents.splice(i, 1); e.gone = true; if (WS && e.actorId && WS.reg.get(e.actorId) === e) { WS.drop(e); simEmit('ActorRemoved', { actor: e.actorId, dead: !!e.dead }); } };
 const alive = e => e && !e.gone && !e.dead;
 function relColor(e) { if (e === P || e.kind === 'npc' || e.kind === 'pet' || e.kind === 'ally') return '#5aa8ff'; if (e.kind === 'mon') return MON[e.type].boss ? '#ff9a40' : '#c0c0c0'; return '#d8d0c0'; }
 
@@ -227,7 +257,7 @@ function onPlayerMoved(m) {
 function damagePlayer(amt, src, kind, hx) {
   if (P.ghost || amt <= 0) return; P.lastCombat = GT; P.lastHit = GT;
   if (P.veil && P.veil.until > GT && kind === 'phys') { const a = Math.min(P.veil.left, amt.raw || 0); P.veil.left -= a; }
-  P.hp -= amt; floater(P.x, P.y, '-' + amt, '#ff6a5a'); hitSound(P, kind, src, hx, P.hp <= 0);
+  P.hp -= amt; simEmit('ActorDamaged', { actor: aidOf(P), source: aidOf(src), amount: amt, kind: kind || 'phys', x: P.x, y: P.y }); floater(P.x, P.y, '-' + amt, '#ff6a5a'); hitSound(P, kind, src, hx, P.hp <= 0);
   if (P.prep) interruptPrep(kind === 'poison' ? 'Poison breaks your concentration.' : 'Your preparation is interrupted!');
   if (P.rooted > GT) P.rooted = 0;
   if (P.bandage && kind !== 'poison') slipBandage(src);                               // a blow makes the healer's fingers slip; the timer runs on
@@ -239,6 +269,8 @@ function damagePlayer(amt, src, kind, hx) {
   if (P.hp <= 0) playerDies(src);
 }
 function playerDies(src) {
+  if (P.ghost) return;                                                                            // death resolves exactly once
+  simEmit('ActorKilled', { actor: aidOf(P), killer: aidOf(src), x: P.x, y: P.y });
   P.hp = 0; P.ghost = true; P.ghostAt = GT; P.armed = false; P.sel = null; P.prep = null; P.held = null; P.task = null; if (P.bandage) { P.bandDone = P.bandage.id; P.bandage = null; } P.hidden = false; P.poison = null; P.meditating = null; AIM = null; P.batch = null; if (PANEL === 'craft') closePanel();
   const protectedRoad = protAt(P.x, P.y);
   if (!protectedRoad) { const corpse = SF.deathTransaction(P, GT, { x: P.x, y: P.y });
@@ -308,6 +340,8 @@ function swingSound(a, w) {
 /* a blow that does no harm still makes a sound: a shield parry or armor that takes it all */
 function noHarmSound(t, parried) { const ev = parried ? 'block.shield' : 'hit.armor'; if (t === P) snd(ev, { gain: .5, key: 'impP' }); else sndAt(ev, t, { gain: .5, key: 'imp' + t.id }); }
 const wardSound = t => { if (sndOnce('veil' + (t.id || 'P'), .6)) { if (t === P) snd('magic.ward', { gain: .6 }); else sndAt('magic.ward', t, { gain: .6 }); } };
+/* the shared damage entry: a swing, a shot, a spell or a creature's blow reaches any actor (player, hireling, creature, pet) through here */
+function damageActor(t, amt, kind, src, hx) { if (t === P) return damagePlayer(amt, src === P ? null : src, kind, hx); if (isAlly(t)) return damageAlly(t, amt, src, kind, hx); return damageMon(t, amt, kind, src, hx); }
 /* one landed blow. A = attacker view (taken at the swing or the release), t = recipient. Returns the stage record. */
 function applyBlow(A, t, opt) {
   opt = opt || {}; if (!fighterAlive(t)) return null; const a = A.a, D = fighter(t);
@@ -326,7 +360,7 @@ function applyBlow(A, t, opt) {
   m.raw = raw;
   if (m.final <= 0) { floater(t.x, t.y, m.parried ? 'parried' : 'absorbed', '#c8c8c8'); noHarmSound(t, m.parried); return m; }
   const hx = { w: A.w, area: !!opt.area, blocked: !!m.parried };
-  if (t === P) damagePlayer(m.final, a === P ? null : a, 'phys', hx); else if (isAlly(t)) damageAlly(t, m.final, a, 'phys', hx); else damageMon(t, m.final, 'phys', a, hx);
+  damageActor(t, m.final, 'phys', a, hx);
   if (!A.player && a.kind === 'mon') { const d = MON[a.type]; if (d && d.poison && R() < d.poison[1] && !(t === P && P.poisonImmune > GT)) applyPoison(t, d.poison[0]); }
   return m;
 }
@@ -395,7 +429,7 @@ function damageMon(m, amt, kind, src, hx) {
   if (isAlly(m)) return damageAlly(m, amt, src, kind, hx);
   if (!alive(m)) return; src = src || P; m.hitT = GT;
   if (m.ward > 0 && kind !== 'poison') { const a = Math.min(m.ward, amt); m.ward -= a; amt -= a; floater(m.x, m.y, 'ward ' + a, '#e8d090'); if (m.ward <= 0) floater(m.x, m.y, 'ward broken', '#e8d090'); if (amt <= 0) { if (sndOnce('ward' + m.id, .6)) sndAt('magic.ward', m, { gain: .6 }); return; } }
-  m.hp -= amt; floater(m.x, m.y, String(amt), kind === 'spell' ? '#c8a0ff' : kind === 'poison' ? '#7be07b' : '#ffd27a'); hitSound(m, kind, src, hx, m.hp <= 0); if (src === P || (src && (src.kind === 'pet' || src.kind === 'ally'))) P.lastCombat = GT;
+  m.hp -= amt; simEmit('ActorDamaged', { actor: aidOf(m), source: aidOf(src), amount: amt, kind: kind || 'phys', x: m.x, y: m.y }); floater(m.x, m.y, String(amt), kind === 'spell' ? '#c8a0ff' : kind === 'poison' ? '#7be07b' : '#ffd27a'); hitSound(m, kind, src, hx, m.hp <= 0); if (src === P || (src && (src.kind === 'pet' || src.kind === 'ally'))) P.lastCombat = GT;
   m.pacified = 0; if (m.rooted > GT) m.rooted = 0;
   if (m.hidden) m.hidden = false;
   if (!m.target || m.target === P && src && (src.kind === 'pet' || src.kind === 'ally') && R() < .3 || (m.provoked && m.provoked < GT)) { m.target = src.kind ? src : P; m.provoked = 0; m.state = m.state === 'idle' || m.state === 'return' ? 'chase' : m.state; }
@@ -403,6 +437,8 @@ function damageMon(m, amt, kind, src, hx) {
 }
 
 function killMon(m, src) {
+  if (m._killed) return; m._killed = true;                                                       // death resolves exactly once: one corpse, one loot roll
+  simEmit('ActorKilled', { actor: aidOf(m), killer: aidOf(src), species: m.type || null, x: m.x, y: m.y });
   if (CRE[m.type] && SFXA.has(CRE[m.type] + '.death')) sndAt(CRE[m.type] + '.death', m, { prio: 4 });
   m.dead = true; rmEnt(m); if (m.sp) m.sp.n--; const d = MON[m.type];
   if (m.kind === 'pet') { log((m.name || d.n) + ' has died.', '#ff6a5a'); return; }
@@ -474,12 +510,14 @@ function makeAlly(sv0) {
 SF.ALLY_GHOST_WAIT = 180;
 const allyOf = () => ents.find(e => isAlly(e) && !e.gone);
 function damageAlly(a, amt, src, kind, hx) {
-  if (!isAlly(a) || a.ghost || amt <= 0) return; a.hp -= amt; a.lastHit = GT; a.lastCombat = GT;
+  if (!isAlly(a) || a.ghost || amt <= 0) return; a.hp -= amt; a.lastHit = GT; a.lastCombat = GT; simEmit('ActorDamaged', { actor: aidOf(a), source: aidOf(src), amount: amt, kind: kind || 'phys', x: a.x, y: a.y });
   floater(a.x, a.y, '-' + amt, kind === 'poison' ? '#7be07b' : '#ff8a6a'); hitSound(a, kind, src, hx, a.hp <= 0);
   if (src && src.kind === 'mon' && alive(src) && !a.foe) a.foe = src;
   if (a.hp <= 0) allyDies(a, src);
 }
 function allyDies(a, src) {
+  if (a.ghost) return;                                                                            // death resolves exactly once
+  simEmit('ActorKilled', { actor: aidOf(a), killer: aidOf(src), x: a.x, y: a.y });
   a.hp = 0; a.ghost = true; a.ghostAt = GT; a.poison = null; a.foe = null; a.reviveOffer = null;
   const body = SF.deathTransaction(a, GT, { x: a.x, y: a.y }); body.owner = a.aid;
   addEnt({ kind: 'corpse', allyBody: a.aid, name: a.name + "'s body", x: a.x, y: a.y, cont: body, expires: body.expires });
@@ -720,9 +758,9 @@ function finishGather(n) {
   if (sk === 'fishing') { const rod = findTool('rod'); if (!rod) return log('You need a fishing rod.', '#ffb070'); if (spendTool(rod)) log('Your fishing rod snaps.', '#ff6a5a'); }
   gain(sk, diff, { target: 'node:' + n.x + ',' + n.y });
   if (R() >= SF.opposed(sv(sk), diff)) { log({ woodcutting: 'You chop but get nothing usable.', mining: 'You break loose rock but no ore.', foraging: 'You find nothing worth taking.', fishing: 'Nothing bites.' }[sk]); if (sk === 'foraging') sndAt('gather.forage', { x: n.x + .5, y: n.y + .5 }); return again(); }
-  if (sk === 'fishing') { give('fish', 1, tier ? { q: tier } : null); log('You land a brine perch.'); snd('fish.catch', { key: 'P' }); return again(); }
+  if (sk === 'fishing') { give('fish', 1, tier ? { q: tier } : null); simEmit('ResourceGathered', { actor: aidOf(P), skill: sk, item: 'fish', qty: 1, x: n.x, y: n.y }); log('You land a brine perch.'); snd('fish.catch', { key: 'P' }); return again(); }
   const st = nodeStock(n.x, n.y); st.n--; if (st.n <= 0) st.t = GT + 300;
-  const out = NODE_OUT[n.t]; const q = sk === 'foraging' ? 1 + (tier >= 2 ? 1 : 0) : 1; give(out, q, tier ? { q: tier } : null);
+  const out = NODE_OUT[n.t]; const q = sk === 'foraging' ? 1 + (tier >= 2 ? 1 : 0) : 1; give(out, q, tier ? { q: tier } : null); simEmit('ResourceGathered', { actor: aidOf(P), skill: sk, item: out, qty: q, node: n.y * W + n.x, x: n.x, y: n.y });
   if (sk === 'mining' && R() < .12) give('ironshard', 2);
   log(`You gather ${q} ${SF.ITEMS[out].n.toLowerCase()}${tier ? ' (grade ' + (tier + 1) + ')' : ''}.`); sndAt('gather.forage', { x: n.x + .5, y: n.y + .5 });
   if (st.n <= 0) { log('The ' + n.name + ' is exhausted.'); return; }
@@ -784,17 +822,22 @@ function update(dt) {
     if (!inCombat() && !P.poison) P.hp = Math.min(SF.maxHp(P), P.hp + (P.fed > GT ? 1 : .1) * dt);
     if (P.poison && GT >= P.poison.next) { P.poison.next = GT + SF.POISON_GAP; damagePlayer(SF.POISON[P.poison.tier], null, 'poison'); if (P.poison && --P.poison.ticks <= 0) P.poison = null; }
   }
-  for (const e of ents.slice()) {
-    if (e.gone) continue;
-    if (e.kind === 'mon') { if (e.stam !== undefined && GT - (e.hitT || -9) > .75) e.stam = Math.min(monT2A(MON[e.type]).dex, e.stam + 3 * dt); const s0 = e.state; aiMon(e, dt); if (e.state !== s0) monSound(e, s0); if (e.poison && GT >= e.poison.next) { e.poison.next = GT + SF.POISON_GAP; damageMon(e, SF.POISON[e.poison.tier], 'poison'); if (e.poison && --e.poison.ticks <= 0) e.poison = null; } }
-    else if (e.kind === 'corpse' && GT > e.expires) { if (e.mine) log('Your body has crumbled to dust, and everything on it is gone.', '#ff6a5a'); rmEnt(e); if (P.lootOpen === e) { closePanel(); P.lootOpen = null; } }
-    else if (e.kind === 'pet') petTick(e, dt);
-    else if (e.kind === 'ally') allyTick(e, dt);
+  for (const e of ents.slice()) {                                    // every actor is driven by its controller; corpses are objects that decay
+    if (e.gone || e === P) continue;
+    if (e.kind === 'corpse') { if (GT > e.expires) { if (e.mine) log('Your body has crumbled to dust, and everything on it is gone.', '#ff6a5a'); rmEnt(e); if (P.lootOpen === e) { closePanel(); P.lootOpen = null; } } continue; }
+    const tick = CONTROL[WS ? simAdopt(e) : SIM.controllerFor(archetypeOf(e))]; if (tick) tick(e, dt);
   }
   sndTick();
   if (GT - spawnT > 1) { spawnT = GT; spawnTick(); }
   if (GT - saveT > 15) { saveT = GT; if (!save() && !P._saveWarn) { P._saveWarn = true; log('Saving failed (browser storage full?). Your last saved game is still safe.', '#ff9a6a'); } }
 }
+/* controllers (master spec §3). The player's controller is the input code above (playerMove, attackTick, prepTick); townsfolk,
+   merchants and guards have no controller tick yet and stand at their posts (Living World Phase D gives them routines). */
+function monsterTick(e, dt) {
+  if (e.stam !== undefined && GT - (e.hitT || -9) > .75) e.stam = Math.min(monT2A(MON[e.type]).dex, e.stam + 3 * dt); const s0 = e.state; aiMon(e, dt); if (e.state !== s0) monSound(e, s0);
+  if (e.poison && GT >= e.poison.next) { e.poison.next = GT + SF.POISON_GAP; damageMon(e, SF.POISON[e.poison.tier], 'poison'); if (e.poison && --e.poison.ticks <= 0) e.poison = null; }
+}
+const CONTROL = { MonsterAI: monsterTick, AnimalAI: monsterTick, CriminalAI: monsterTick, PetAI: (e, dt) => petTick(e, dt), SummonAI: (e, dt) => petTick(e, dt), HirelingAI: (e, dt) => allyTick(e, dt) };
 function petTick(p, dt) {
   if (p.summon) return summonTick(p, dt);
   if (p.until && GT > p.until) { rmEnt(p); log('The Reedling sinks back into the reeds.'); return; }
@@ -960,9 +1003,10 @@ function genDungeon(r, carve) {
   link(360, 172, e1[0], e1[1]); link(e1[0], e1[1], 360, 172); link(432, 216, e2[0], e2[1]); link(e2[0], e2[1], 432, 216);
   link(d1[0], d1[1], u2[0], u2[1]); link(u2[0], u2[1], d1[0], d1[1]); link(d2[0], d2[1], u3[0], u3[1]); link(u3[0], u3[1], d2[0], d2[1]);
   const mk = (o, type, max, extra) => SPAWNS.push(Object.assign({ type, x: o.cx + .5, y: o.cy + .5, r: Math.min(o.w, o.h) / 2 - 1, max, n: 0, next: 0 }, extra || {}));
-  L1.forEach((o, i) => { if (i === 0 || i === L1.length - 1) return; mk(o, pick(['spider', 'smuggler', 'skeleton', 'skeleton']), 2); if (Math.random() < .5) placeChest(o.x + 2, o.y + o.h - 2, i % 2 ? 1 : 0); });
-  L2.forEach((o, i) => { if (i === 0) return; mk(o, pick(['wisp', 'sentinel', 'skeleton']), 2); if (Math.random() < .5) placeChest(o.x + 2, o.y + o.h - 2, 1); });
-  L3.forEach((o, i) => { if (i === 0) return; if (o.boss) { mk(o, 'bellkeeper', 1, { r: 1, delay: 600, boss: true }); placeChest(o.x + 2, o.y + 2, 2); placeChest(o.x + o.w - 3, o.y + 2, 2); return; } mk(o, pick(['sentinel', 'captain', 'wisp']), i % 3 === 0 ? 1 : 2); if (Math.random() < .5) placeChest(o.x + 2, o.y + o.h - 2, 2); });
+  const rc = mulberry(2027), rpick = a => a[Math.floor(rc() * a.length)];   // dungeon spawn types and chests: their own seeded stream (Living World Phase 1), the same in every session; the map stream r is untouched
+  L1.forEach((o, i) => { if (i === 0 || i === L1.length - 1) return; mk(o, rpick(['spider', 'smuggler', 'skeleton', 'skeleton']), 2); if (rc() < .5) placeChest(o.x + 2, o.y + o.h - 2, i % 2 ? 1 : 0); });
+  L2.forEach((o, i) => { if (i === 0) return; mk(o, rpick(['wisp', 'sentinel', 'skeleton']), 2); if (rc() < .5) placeChest(o.x + 2, o.y + o.h - 2, 1); });
+  L3.forEach((o, i) => { if (i === 0) return; if (o.boss) { mk(o, 'bellkeeper', 1, { r: 1, delay: 600, boss: true }); placeChest(o.x + 2, o.y + 2, 2); placeChest(o.x + o.w - 3, o.y + 2, 2); return; } mk(o, rpick(['sentinel', 'captain', 'wisp']), i % 3 === 0 ? 1 : 2); if (rc() < .5) placeChest(o.x + 2, o.y + o.h - 2, 2); });
 }
 function lpath(x0, y0, x1, y1) { const out = []; let x = x0, y = y0; while (x !== x1) { out.push([x, y]); x += Math.sign(x1 - x); } while (y !== y1) { out.push([x, y]); y += Math.sign(y1 - y); } out.push([x, y]); return out; }
 
@@ -1971,7 +2015,7 @@ function finishStroke(n) {
     st.n--; if (st.n <= 0) st.t = GT + nodeRegion(n.x, n.y).refill;
     log(`You ${sk === 'mining' ? 'break loose' : 'fell'} ${q} ${SF.ITEMS[id].n.toLowerCase()}${mat !== SF.commonOf(sk) ? '!' : '.'}`, mat !== SF.commonOf(sk) ? '#ffe08a' : undefined);
     if (sk === 'mining' && R() < .12) { const r2 = SF.addItem(P.pack, SF.newItem('ironshard', 2), cap()); if (r2.ok) log('Two iron shards come away with it.'); else log('Two iron shards fell away: no room.', '#a8a8a8'); }
-    questEvent({ type: 'harvest', skill: sk, mat, qty: q, quay: isQuayNode(n.x, n.y) });
+    questEvent({ type: 'harvest', skill: sk, mat, qty: q, quay: isQuayNode(n.x, n.y) }); simEmit('ResourceGathered', { actor: aidOf(P), skill: sk, item: id, qty: q, node: n.y * W + n.x, x: n.x, y: n.y });
   } else log({ woodcutting: 'You chop but get nothing usable.', mining: 'You break loose rock but no ore.' }[sk]);
   sndAt(sk === 'mining' ? 'gather.mine' : 'gather.chop', { x: n.x + .5, y: n.y + .5 }); gain(sk, gdiff, { target: 'node:' + n.x + ',' + n.y });
   if (tl.it && spendTool(tl.it)) log('Your ' + SF.ITEMS[tl.id].n.toLowerCase() + ' breaks.', '#ff6a5a');
@@ -2183,7 +2227,8 @@ function finishCraft(t) {
   if (tool.it && spendTool(tool.it)) log('Your ' + SF.ITEMS[r.tool].n.toLowerCase() + ' wear out and break.', '#ff6a5a');
   if (res.success) { const it = res.items[0]; b.made++;
     log(`You make ${it.qty > 1 ? it.qty + ' × ' : ''}${SF.itemName(it).toLowerCase()}${res.exceptional ? ' — exceptional work!' : ''}.`, res.exceptional ? '#ffe08a' : '#e8e2d2');
-    questEvent({ type: recipeCat(r) === 'Smelt' ? 'smelt' : 'make', rid: r.id, out: r.out, mat: SF.matOf(it), qty: it.qty, exceptional: res.exceptional }); }
+    questEvent({ type: recipeCat(r) === 'Smelt' ? 'smelt' : 'make', rid: r.id, out: r.out, mat: SF.matOf(it), qty: it.qty, exceptional: res.exceptional });
+    simEmit('ItemCrafted', { actor: aidOf(P), recipe: r.id, item: it.id, qty: it.qty, uid: it.uid, exceptional: !!res.exceptional }); }
   else log('You fail and lose ' + res.lost.map(l => l.n + ' ' + SF.ITEMS[l.id].n.toLowerCase()).join(', ') + '.', '#ffb070');
   b.left--; renderPanel();
   if (b.left > 0) at(.25, () => { if (P.batch && P.batch.token === b.token && !P.ghost) { const p2 = SF.craftPlan(P, P.pack, r, t.mat); if (!p2.ok) { log('Batch stopped: ' + p2.reason + '.', '#ffb070'); P.batch = null; return; } nextAttempt(); } });
@@ -2215,6 +2260,9 @@ function migrateSave(s, raw) {
     s.nodes = (s.nodes || []).map(n => [re(n[0])].concat(n.slice(1)));
     const sv = s.char.cx && s.char.cx.survey; if (sv) { const o = {}; for (const k in sv) o[re(k)] = sv[k]; s.char.cx.survey = o; }
     s.v = 4;
+  }
+  if (s.v < 5) {   // v0.21 Living World Phase 1: additive. `sim` (world seed, actor-id counter) starts fresh; nothing existing changes, so no snapshot is needed
+    s.sim = s.sim || null; s.v = 5;
   }
   return s;
 }
@@ -2290,7 +2338,7 @@ function save() {
     const pets = ents.filter(e => e.kind === 'pet' && e.type && !e.summon && !e.gone && e.hp > 0).map(e => ({ type: e.type, hp: e.hp, order: e.order === 'stay' ? 'stay' : 'follow', slots: e.slots, name: e.name, dx: e.x - P.x, dy: e.y - P.y }));
     const nodes = []; for (const [k, o] of RES) nodes.push([k, o.gen || 1, o.spec || 0, o.n, o.max || 0, Math.round(o.t * 10) / 10]);
     const ally = allySave(); if (ally) { [ally.equip.weapon, ally.equip.shield, ally.equip.armor].forEach(scan); ally.pack.forEach(scan); if (ally.body) ally.body.items.forEach(scan); }
-    localStorage.setItem(SAVEKEY, JSON.stringify({ v: 4, char: c, corpses, pets, nodes, ally, uid: maxUid + 1, gt: GT, savedAt: Date.now() }));
+    localStorage.setItem(SAVEKEY, JSON.stringify({ v: 5, char: c, corpses, pets, nodes, ally, sim: WS ? WS.save() : null, uid: maxUid + 1, gt: GT, savedAt: Date.now() }));
     return true;
   } catch (e) { return false; }
 }
@@ -2337,6 +2385,7 @@ function boot(saved, fresh) {
     if (P.ghost && !Number.isFinite(c.ghostAt)) P.ghostAt = GT - 12; }
   else { P = newChar(fresh); starterKit(); }
   P.cx = Object.assign({ survey: {}, pins: [], track: null, mark: false, doors: {} }, P.cx || {}); P.batch = null; applyDoorState();
+  WS = SIM.create({ clock: () => GT, saved: saved && saved.sim, onError: e => console.error(e) }); simAdopt(P);   // actor ids continue from the save
   ents.unshift(P); P.sect = P.sect || 0; P.drawn = false; P.sw = SF.newSwing(); P.movedAt = -99; while (P.hotbar.length < 9) P.hotbar.push(null); Q(); populate(); seedTraps();
   { const al = makeAlly(saved && saved.ally); const bd = saved && saved.ally && saved.ally.body; if (bd && bd.left > 0) { const cont = SF.newContainer('corpse', al.aid); cont.items = bd.items; cont.diedAt = GT - (bd.diedAgo ?? 999); cont.expires = GT + bd.left; addEnt({ kind: 'corpse', allyBody: al.aid, name: al.name + "'s body", x: bd.x, y: bd.y, cont, expires: GT + bd.left }); } }
   P.bandage = null; if (saved) bandageLoad(saved.char.bandage);          // an application in flight resumes once, never twice
@@ -2358,7 +2407,7 @@ loadScout(SCOUT_SRC); renderCC(); resize(); requestAnimationFrame(loop);
 function spawnMon(type, dx = 3, dy = 0) { const d = MON[type]; if (!d) return null; let x = P.x + dx, y = P.y + dy;
   for (let r = 0; r < 6 && BLK[tAt(Math.floor(x), Math.floor(y))]; r += .5) for (let a = 0; a < 8; a++) { const nx = P.x + dx + Math.cos(a * Math.PI / 4) * r, ny = P.y + dy + Math.sin(a * Math.PI / 4) * r; if (!BLK[tAt(Math.floor(nx), Math.floor(ny))]) { x = nx; y = ny; break; } }
   return addEnt({ kind: 'mon', type, name: d.n, x, y, hp: d.hp, max: d.hp, state: 'idle', home: { x, y }, sect: 0, ward: 0 }); }
-window.__SF = { LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
+window.__SF = { get WS() { return WS; }, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
 
 }
 </script>
