@@ -18,12 +18,12 @@ SF.carryKg = c => 22 + 0.33 * c.str;
 SF.SLOTS = 45;
 SF.WALK = 4.1; SF.SPRINT = 5.3; SF.SPRINT_DRAIN = 7; SF.STAM_REGEN = 5; SF.STAM_REGEN_COMBAT = 3; SF.STAM_DELAY = 0.75;
 
-/* ---------------- skills (42) ---------------- */
-// [key, name, group, implemented in this build]
+/* ---------------- skills (41) ---------------- */
+// [key, name, group, implemented in this build]. Combat keys follow UO Second Age (issue #3); old saves migrate once (SF.migrateCombatSkills).
 SF.SKILLS = [
- ['blades','Blades','combat',1],['polearms','Polearms','combat',1],['hammers','Hammers','combat',1],['knives','Knives','combat',1],
- ['archery','Archery','combat',1],['brawling','Brawling','combat',1],['tactics','Tactics','combat',1],['anatomy','Anatomy','combat',1],
- ['shieldwork','Shieldwork','combat',1],['medicine','Field Medicine','support',1],['spellcraft','Spellcraft','magic',1],['focus','Spell Focus','magic',1],
+ ['swordsmanship','Swordsmanship','combat',1],['macefighting','Mace Fighting','combat',1],['fencing','Fencing','combat',1],['archery','Archery','combat',1],
+ ['wrestling','Wrestling','combat',1],['tactics','Tactics','combat',1],['anatomy','Anatomy','combat',1],['parrying','Parrying','combat',1],
+ ['healing','Healing','support',1],['spellcraft','Spellcraft','magic',1],['focus','Spell Focus','magic',1],
  ['wardcraft','Wardcraft','magic',1],['meditation','Meditation','magic',1],['alchemy','Alchemy','craft',1],['venomcraft','Venomcraft','stealth',1],
  ['concealment','Concealment','stealth',1],['shadowstep','Shadowstep','stealth',1],['search','Search','stealth',1],['tracking','Tracking','wild',1],
  ['pickpocketing','Pickpocketing','stealth',1],['lockwork','Lockwork','stealth',1],['trapcraft','Trapcraft','stealth',1],['taming','Taming','wild',1],
@@ -32,6 +32,16 @@ SF.SKILLS = [
  ['foraging','Foraging','gather',1],['skinning','Skinning','gather',1],['fishing','Fishing','gather',1],['smithing','Smithing','craft',1],
  ['carpentry','Carpentry','craft',1],['tailoring','Tailoring','craft',1],['fletching','Fletching','craft',1],['engineering','Engineering','craft',1],
  ['cooking','Cooking','craft',1],['appraisal','Appraisal','craft',1]];
+SF.SKILL_TIP = {
+  swordsmanship: 'Hit chance with swords, axes, the glaive and the skinning knife. Also your defence while one is in hand.',
+  macefighting: 'Hit chance with maces, war hammers, staves and the war axe. Mace and war hammer hits drain 3–5 stamina and wear the armor they strike.',
+  fencing: 'Hit chance with daggers, kryss and spears. Also your defence while one is in hand.',
+  archery: 'Hit chance with bows (arrows) and crossbows (bolts). Stand still to aim; the shot lands a second later.',
+  wrestling: 'Unarmed attack and unarmed defence.',
+  tactics: 'Weapon damage: 50% of the rolled damage at 0, 150% at 100. Does not change hit chance.',
+  anatomy: 'Adds up to 20% weapon damage and raises bandage healing. Use it on a living target to judge strength and dexterity (and stamina above 80).',
+  parrying: 'With a shield: half your Parrying as a percent chance to block part of a physical hit.',
+  healing: 'First Aid with bandages: heal wounds; cure poison at 60 Healing and 60 Anatomy; resurrect another player at 80 and 80.' };
 SF.SKILL = {}; for (const [k, n, g, live] of SF.SKILLS) SF.SKILL[k] = { k, n, g, live: !!live };
 
 SF.newSkills = () => { const s = {}; for (const [k] of SF.SKILLS) s[k] = { v: 0, lock: 'raise' }; return s; };
@@ -85,32 +95,158 @@ SF.tryGain = (ch, key, diff, ctx) => {
 };
 SF.opposed = (skill, diff) => clamp(0.10, 0.95, 0.55 + (skill - diff) / 125);
 
-/* ---------------- combat (§6) ---------------- */
+/* ---------------- combat: UO Second Age (T2A) reconstruction, issue #3 ----------------
+   Sources (see docs/combat/STATUS.md): wiki.uosecondage.com Weapons, Category:Weapon_Skills, Tactics, Parrying, Healing;
+   forums.uosecondage.com threads on swing timing (t=42668, t=13143), damage order (t=42652), archery (t=24145, t=2152).
+   Every value marked "Shardfall choice" is a tuning decision where the references are silent or disagree. */
+SF.TICK = .25; SF.SWING_MIN = 1.25; SF.SWING_MAX = 10;
+SF.MELEE_REACH = 1.5;            // one UO tile including diagonals (1 tile = 1 world metre, as in docs/magery/spells.json) plus slack
+SF.ARCHERY = { range: 10, aim: .5, flight: 1, drift: .3 };   // range 10 tiles; aim and drift: Shardfall choice; 1 s delayed damage (UOSA)
+// weapon profiles. dice [count, sides, bonus]; speed = the UOSA "speed #"; str = STR requirement; hp = reference durability;
+// fam = the animation set the sprite sheet already has; mace = bashing weapon (stamina drain and armor wear)
 SF.WEAPONS = {
-  dagger:   { fam: 'Dagger',   skill: 'knives',   dmg: [8, 13],  reach: 1.25, wind: .17, rec: .85 },
-  sword:    { fam: 'Sword',    skill: 'blades',   dmg: [13, 20], reach: 1.60, wind: .23, rec: 1.20 },
-  hammer:   { fam: 'Hammer',   skill: 'hammers',  dmg: [15, 23], reach: 1.50, wind: .28, rec: 1.34 },
-  glaive:   { fam: 'Glaive',   skill: 'polearms', dmg: [19, 29], reach: 2.15, wind: .31, rec: 1.75, two: true },
-  shortbow: { fam: 'Shortbow', skill: 'archery',  dmg: [13, 20], reach: 10,   wind: .38, rec: 1.45, two: true, ammo: 'arrow', proj: 22 },
-  crossbow: { fam: 'Crossbow', skill: 'archery',  dmg: [20, 28], reach: 12,   wind: .48, rec: 2.05, two: true, ammo: 'bolt', proj: 22, rootWind: true },
-  unarmed:  { fam: 'Unarmed',  skill: 'brawling', dmg: [4, 8],   reach: 1.15, wind: .18, rec: .95 }
-};
-SF.ARMOR = { none: 0, cloth: 6, leather: 20, chain: 35, plate: 50 };
+  sword:         { n: 'Longsword',      fam: 'Sword',    skill: 'swordsmanship', dice: [2, 15, 3], speed: 35, str: 25, hp: 90 },
+  glaive:        { n: 'Halberd',        fam: 'Glaive',   skill: 'swordsmanship', dice: [2, 23, 3], speed: 25, str: 45, hp: 80, two: true },
+  battleaxe:     { n: 'Battle Axe',     fam: 'Glaive',   skill: 'swordsmanship', dice: [2, 17, 4], speed: 30, str: 40, hp: 80, two: true },
+  hatchet:       { n: 'Hatchet',        fam: 'Sword',    skill: 'swordsmanship', dice: [1, 16, 1], speed: 40, str: 15, hp: 80, two: true },
+  knife:         { n: 'Skinning Knife', fam: 'Dagger',   skill: 'swordsmanship', dice: [1, 10, 0], speed: 40, str: 5,  hp: 40 },
+  pickaxe:       { n: 'Pickaxe',        fam: 'Hammer',   skill: 'swordsmanship', dice: [1, 15, 0], speed: 35, str: 25, hp: 60 },
+  hammer:        { n: 'War Hammer',     fam: 'Hammer',   skill: 'macefighting',  dice: [7, 5, 1],  speed: 31, str: 40, hp: 110, two: true, mace: true },
+  mace:          { n: 'Mace',           fam: 'Hammer',   skill: 'macefighting',  dice: [6, 5, 2],  speed: 30, str: 20, hp: 70, mace: true },
+  waraxe:        { n: 'War Axe',        fam: 'Sword',    skill: 'macefighting',  dice: [6, 4, 3],  speed: 40, str: 35, hp: 80 },
+  dagger:        { n: 'Dagger',         fam: 'Dagger',   skill: 'fencing',       dice: [3, 5, 0],  speed: 55, str: 1,  hp: 50 },
+  kryss:         { n: 'Kryss',          fam: 'Dagger',   skill: 'fencing',       dice: [1, 26, 2], speed: 53, str: 10, hp: 90 },
+  spear:         { n: 'Spear',          fam: 'Glaive',   skill: 'fencing',       dice: [2, 18, 0], speed: 46, str: 30, hp: 80, two: true },
+  shortbow:      { n: 'Bow',            fam: 'Shortbow', skill: 'archery',       dice: [4, 9, 5],  speed: 20, str: 20, hp: 60, two: true, ammo: 'arrow' },
+  crossbow:      { n: 'Crossbow',       fam: 'Crossbow', skill: 'archery',       dice: [5, 8, 3],  speed: 18, str: 30, hp: 80, two: true, ammo: 'bolt' },
+  heavycrossbow: { n: 'Heavy Crossbow', fam: 'Crossbow', skill: 'archery',       dice: [5, 10, 6], speed: 10, str: 40, hp: 100, two: true, ammo: 'bolt' },
+  unarmed:       { n: 'Fists',          fam: 'Unarmed',  skill: 'wrestling',     dice: [1, 8, 0],  speed: 50, str: 0 } };
+for (const k in SF.WEAPONS) { const w = SF.WEAPONS[k]; w.id = k; w.reach = w.ammo ? SF.ARCHERY.range : SF.MELEE_REACH; w.dmg = [w.dice[0] + w.dice[2], w.dice[0] * w.dice[1] + w.dice[2]]; if (w.ammo) w.proj = SF.ARCHERY.range / SF.ARCHERY.flight; }
+SF.WEAPON_SKILLS = ['swordsmanship', 'macefighting', 'fencing', 'archery', 'wrestling'];
+// armor rating of the one body piece Shardfall has (UO body pieces: leather 13, chainmail 28, platemail 40); buckler AR 7
+SF.ARMOR_AR = { none: 0, cloth: 3, leather: 13, chain: 28, plate: 40 };
+SF.SHIELD_AR = { buckler: 7 };
+SF.ARMOR = SF.ARMOR_AR;
 SF.ARMOR_SPEED = { plate: .06, chain: .03 };
 SF.ARMOR_MANA = { plate: .30, chain: .15 };
-SF.accuracy = (atk, def) => clamp(0.15, 0.85, 0.50 + (atk - def) / 200);
-SF.blockChance = (shieldwork, braced) => braced ? Math.min(.44, clamp(0, .32, shieldwork / 320) + .12) : clamp(0, .32, shieldwork / 320);
-SF.BLOCK_REDUCE = .65; SF.BLOCK_STAM = 4; SF.BLOCK_ARC = 100;
-SF.physDamage = (base, o) => {
-  const raw = base * (.65 + .005 * (o.tactics || 0)) * (1 + .0015 * (o.anatomy || 0)) * (1 + .0012 * (o.str || 0)) * (1 - (o.armor || 0) / ((o.armor || 0) + 90));
-  return Math.max(1, roundHalfUp(raw));
+SF.SWAP_TIME = .25;             // presentation: stowing a drawn weapon before a cast
+SF.BRACE_PARRY = .12;            // Shardfall's Braced Guard: +12 points of parry chance for 0.8 s (not in T2A)
+
+/* hit chance (Category:Weapon_Skills): (attack + 50) / (2 × (defence + 50)), clamped to [0, 1]. Tactics, Anatomy and armor never enter it. */
+SF.hitChance = (atk, def) => clamp(0, 1, (atk + 50) / (2 * (def + 50)));
+/* swing delay: 15000 / ((stamina + 100) × speed) s, floored to the 0.25 s tick, within 1.25–10 s */
+SF.swingDelay = (stam, speed) => clamp(SF.SWING_MIN, SF.SWING_MAX, Math.floor(15000 / ((Math.max(0, stam) + 100) * speed) / SF.TICK) * SF.TICK);
+SF.rollDice = (d, rng) => { let t = d[2] || 0; for (let i = 0; i < d[0]; i++) t += 1 + Math.floor(rng() * d[1]); return t; };
+/* % of rolled damage dealt: 0.50 + Tactics/100 (Tactics page: Tactics + 50 %) + Anatomy/500 (0–20 %) + STR/500 (0–20 %) */
+SF.damageScale = o => .5 + clamp(0, 100, o.tactics || 0) / 100 + clamp(0, 100, o.anatomy || 0) / 500 + clamp(0, 100, o.str || 0) / 500;
+SF.QUALITY_DMG = { exceptional: 4, low: -4 };                      // Weapons page: exceptional listed+4, below average listed−4
+SF.wearFactor = (cond, maxc) => cond === undefined ? 1 : clamp(0, 1, .5 + .5 * cond / (maxc || 100));   // 100 % condition → 100 %, 1 % → ~50 %
+SF.parryChance = (parry, braced) => clamp(0, 1, parry / 200 + (braced ? SF.BRACE_PARRY : 0));          // Parrying page: skill / 2 %
+SF.absorbRoll = (ar, rng) => ar <= 0 ? 0 : Math.ceil(ar / 2) + Math.floor(rng() * (ar - Math.ceil(ar / 2) + 1));   // 50–100 % of AR
+/* stage 1: what the swing carries before any defence. o = {dice | range [lo, hi], roll, quality, cond, maxc, tactics, anatomy, str, scale} */
+SF.rawDamage = (o, rng) => {
+  const roll = o.roll !== undefined ? o.roll : o.range ? o.range[0] + Math.floor(rng() * (o.range[1] - o.range[0] + 1)) : SF.rollDice(o.dice, rng);
+  const base = roll + (SF.QUALITY_DMG[o.quality] || 0);
+  const scale = o.scale !== undefined ? o.scale : SF.damageScale(o);
+  const wear = SF.wearFactor(o.cond, o.maxc);
+  return { roll, base, scale, wear, value: Math.max(0, base) * scale * wear };
 };
-SF.recovery = (base, dex, stamFrac) => base * clamp(.65, 1.15, 1.13 - .003 * dex - .10 * stamFrac);
-SF.SWAP_TIME = .25;
-SF.bandageTime = dex => clamp(2.6, 5.1, 5.1 - .025 * dex);
-SF.bandageHeal = (med, ana) => Math.floor(9 + .26 * med + .075 * ana);
-SF.BANDAGE_PRESSURE = .25; SF.BANDAGE_PRESSURE_MAX = .75; SF.BANDAGE_RANGE = 1.5; SF.BANDAGE_REPEAT = 5;
-SF.bandageCure = (med, ana) => med >= 55 && ana >= 40;
+/* stage 2: defence, each step once, in the reference order (t=42652): shield parry → armor absorb → halve for a player recipient → round.
+   d = {parry (skill), braced, shieldAR, armorAR, player (bool), mace (bool)} */
+SF.mitigate = (value, d, rng) => {
+  const r = { before: value, parried: false, shield: 0, armor: 0, armorWear: 0, halved: false };
+  let v = value;
+  if (d.shieldAR > 0) { r.parryChance = SF.parryChance(d.parry || 0, d.braced); if (rng() < r.parryChance) { r.parried = true; r.shield = Math.min(v, SF.absorbRoll(d.shieldAR, rng)); v -= r.shield; } }
+  if (d.armorAR > 0 && v > 0) { r.armor = Math.min(v, SF.absorbRoll(d.armorAR, rng)); v -= r.armor; if (d.mace) r.armorWear = roundHalfUp(r.armor / 2); }
+  if (d.player) { v /= 2; r.halved = true; }
+  r.final = Math.max(0, roundHalfUp(v)); return r;
+};
+SF.MACE_STAM = [3, 5];
+
+/* the swing timer: one readiness state per fighter. The timer runs from the last swing (or equip restart) against the delay of the weapon
+   in hand now, at current stamina. Once it completes the swing is ready and stays ready (a held swing survives unequipping, a new
+   target or a held spell). Equipping while not ready restarts the timer for the new weapon: no fresh swing per equip, but a ready
+   swing carries over (T2A weapon cycling). */
+SF.newSwing = () => ({ t: -1e9, ready: true });
+SF.swingTick = (st, now, stam, w) => { if (!st.ready && now - st.t >= SF.swingDelay(stam, w.speed) - 1e-9) st.ready = true; return st.ready; };
+SF.swingSpend = (st, now) => { st.t = now; st.ready = false; };
+SF.swingEquip = (st, now, stam, w) => { if (!SF.swingTick(st, now, stam, w)) st.t = now; return st.ready; };
+SF.swingLeft = (st, now, stam, w) => st.ready ? 0 : Math.max(0, SF.swingDelay(stam, w.speed) - (now - st.t));
+
+/* First Aid (Healing page): delays self/other, thresholds, heal range. Success, slips and the curves above the thresholds are noted per value. */
+SF.FIRST_AID = { range: 2, time: { heal: [15, 5], cure: [18, 6], res: [0, 10] }, cureMin: 60, resMin: 80, slipHp: 4, slipChance: .02 };
+SF.firstAidKind = p => p.ghost ? 'res' : p.poisoned ? 'cure' : p.hp < p.max ? 'heal' : null;
+SF.firstAidTime = (kind, self) => SF.FIRST_AID.time[kind][self ? 0 : 1];
+SF.healRange = (heal, ana) => [Math.floor(3 + ana / 5 + heal / 5), Math.floor(10 + ana / 5 + heal / 2)];
+SF.healChance = (heal, slips) => clamp(0, 1, (heal + 10) / 100 - SF.FIRST_AID.slipChance * (slips || 0));    // never fails from 90 with no slips (UOSA forum); Shardfall choice
+SF.cureChance = (heal, ana, slips) => heal < SF.FIRST_AID.cureMin || ana < SF.FIRST_AID.cureMin ? 0 : clamp(0, 1, .80 + (Math.min(heal, ana) - 60) / 200 - SF.FIRST_AID.slipChance * (slips || 0));   // 80 % at 60/60 (Healing page); rise to 100 % at 100: Shardfall choice
+SF.resChance = (heal, ana, slips) => heal < SF.FIRST_AID.resMin || ana < SF.FIRST_AID.resMin ? 0 : clamp(0, 1, .25 + .02 * (Math.min(heal, ana) - 80) - SF.FIRST_AID.slipChance * (slips || 0));   // 25 % at 80/80 (Healing page); 65 % at 100: Shardfall choice
+/* validate a treatment before a bandage is spent. h = healer {self, dist}, p = patient state {ghost, poisoned, hp, max, isPlayer, pet} */
+SF.firstAidCheck = (p, o) => {
+  if (!p) return { ok: false, reason: 'Choose a patient first.' };
+  if (p.pet) return { ok: false, reason: 'Pets are treated with Veterinary (Treat pet).' };
+  if (p.ghost && o.self) return { ok: false, reason: 'You cannot resurrect yourself.' };
+  if (p.ghost && !p.isPlayer) return { ok: false, reason: 'Only a player ghost can be brought back with bandages.' };
+  const kind = SF.firstAidKind(p); if (!kind) return { ok: false, reason: o.self ? 'You are not hurt.' : 'Your patient is not hurt.' };
+  if (!o.self && o.dist > SF.FIRST_AID.range) return { ok: false, reason: `Stand within ${SF.FIRST_AID.range} m of your patient.` };
+  if (o.bandages <= 0) return { ok: false, reason: 'You have no bandages.' };
+  if (o.busy) return { ok: false, reason: 'You are already applying a bandage.' };
+  return { ok: true, kind, time: SF.firstAidTime(kind, o.self) };
+};
+/* resolve one finished application. o = {kind, heal, ana, slips, missing}. Draw order: success roll, then amount. */
+SF.firstAidResolve = (o, rng) => {
+  const s = o.slips || 0, r = { kind: o.kind, slips: s };
+  if (o.kind === 'heal') {
+    r.chance = SF.healChance(o.heal, s); r.range = SF.healRange(o.heal, o.ana);
+    if (rng() >= r.chance) { r.success = false; r.amount = 0; r.note = 'failed'; return r; }
+    r.roll = r.range[0] + Math.floor(rng() * (r.range[1] - r.range[0] + 1));
+    let a = r.roll - SF.FIRST_AID.slipHp * s; r.note = s ? 'slipped' : 'healed'; if (a < 1) { a = 1; r.note = 'barely'; }
+    r.amount = Math.min(a, Math.max(0, Math.ceil(o.missing - 1e-9))); r.success = true; return r;   // whole HP; the patient's maximum still caps it
+  }
+  if (o.kind === 'cure') { r.chance = SF.cureChance(o.heal, o.ana, s); if (!r.chance) { r.success = false; r.note = 'unskilled'; return r; } r.success = rng() < r.chance; r.note = r.success ? 'cured' : 'cure_failed'; return r; }
+  r.chance = SF.resChance(o.heal, o.ana, s); if (!r.chance) { r.success = false; r.note = 'unskilled'; return r; }
+  r.success = rng() < r.chance; r.note = r.success ? 'resurrected' : 'res_failed'; return r;
+};
+
+/* active Anatomy: a coarse read that sharpens with skill; stamina shows from 80 */
+SF.anatomyRead = (skill, t) => {
+  const w = Math.max(5, Math.round(40 - skill * .35)), band = v => { const lo = clamp(0, 100, Math.floor(v / w) * w); return [lo, Math.min(100, lo + w)]; };
+  const word = (v, a) => a[Math.min(a.length - 1, Math.floor(clamp(0, 99.9, v) / (100 / a.length)))];
+  return { str: band(t.str), dex: band(t.dex), strWord: word(t.str, ['frail', 'slight', 'of ordinary strength', 'strong', 'very strong', 'mighty']), dexWord: word(t.dex, ['sluggish', 'clumsy', 'of ordinary agility', 'quick', 'very agile', 'blindingly fast']), stam: skill >= 80 ? [Math.round(t.stam), Math.round(t.maxStam)] : null };
+};
+
+/* ---------- save migration: combat skill keys (Blades → Swordsmanship, …), once ---------- */
+SF.COMBAT_MIGRATION = 1;
+SF.LEGACY_SKILL = { blades: 'swordsmanship', hammers: 'macefighting', knives: 'fencing', brawling: 'wrestling', medicine: 'healing', shieldwork: 'parrying' };
+SF.LEGACY_POLEARMS = ['glaive'];          // the only legacy polearm item; it maps to the halberd (Swordsmanship)
+SF.migrateCombatSkills = c => {
+  if (!c || !c.skills || (c.combatMig || 0) >= SF.COMBAT_MIGRATION) return { changed: false };
+  const sk = c.skills, before = Object.values(sk).reduce((a, s) => a + (s.v || 0), 0), out = { changed: true, moved: [], displaced: 0, collisions: [] };
+  const put = (from, to) => {
+    const s = sk[from]; if (!s) return; delete sk[from];
+    const cur = sk[to]; out.moved.push(from + '→' + to);
+    if (!cur) { sk[to] = { v: s.v || 0, lock: s.lock || 'raise' }; return; }
+    const lo = Math.min(s.v || 0, cur.v || 0); out.collisions.push({ to, kept: Math.max(s.v || 0, cur.v || 0), displaced: lo, from });
+    if ((s.v || 0) > (cur.v || 0)) sk[to] = { v: s.v, lock: s.lock || 'raise' };
+    out.displaced += lo;
+  };
+  for (const k in SF.LEGACY_SKILL) put(k, SF.LEGACY_SKILL[k]);
+  if (sk.polearms) { const w = c.equip && c.equip.weapon, wid = w && SF.LEGACY_POLEARMS.includes(w.id) ? SF.ITEMS[w.id].wpn : 'glaive'; out.polearmsTo = SF.WEAPONS[wid].skill; put('polearms', out.polearmsTo); }
+  for (const [k] of SF.SKILLS) if (!sk[k]) sk[k] = { v: 0, lock: 'raise' };
+  c.skillPool = (c.skillPool || 0) + out.displaced;
+  if (c.gainLog) { const g = {}; for (const key in c.gainLog) { const i = key.indexOf('|'), sk0 = i < 0 ? key : key.slice(0, i), nk = (SF.LEGACY_SKILL[sk0] || (sk0 === 'polearms' ? out.polearmsTo || 'swordsmanship' : sk0)) + (i < 0 ? '' : key.slice(i)); g[nk] = (g[nk] || []).concat(c.gainLog[key]); } c.gainLog = g; }
+  if (Array.isArray(c.lowerRank)) c.lowerRank = [...new Set(c.lowerRank.map(k => SF.LEGACY_SKILL[k] || (k === 'polearms' ? out.polearmsTo : k)))];
+  c.combatMig = SF.COMBAT_MIGRATION;
+  out.conserved = Object.values(sk).reduce((a, s) => a + (s.v || 0), 0) + out.displaced === before;
+  return out;
+};
+/* spend reform points from the pool on one skill: never past 100.0 or the 700.0 total */
+SF.assignPool = (c, key, tenths) => {
+  const s = c.skills[key]; if (!s || !(c.skillPool > 0)) return 0;
+  const n = Math.max(0, Math.min(tenths, c.skillPool, SF.SKILL_MAX - s.v, SF.SKILL_CAP - SF.totalSkill(c)));
+  s.v += n; c.skillPool -= n; return n;
+};
+
 SF.POISON = { 1: 2, 2: 3, 3: 4 }; SF.POISON_TICKS = 4; SF.POISON_GAP = 2;
 SF.CONSUMABLES = {
   draught:  { n: 'Healing draught', heal: 24, cd: 16, fam: 'heal' },
@@ -184,9 +320,9 @@ SF.ITEMS = {
   cinder:     { n: 'Cinder flask', kg: .4, stack: 1, cat: 'potion', use: 'consume' },
   arrow:      { n: 'Arrow', kg: .01, stack: 1, cat: 'ammo' },
   bolt:       { n: 'Bolt', kg: .02, stack: 1, cat: 'ammo' },
-  hatchet:    { n: 'Hatchet', kg: 1.5, cat: 'tool', tool: 'woodcutting' },
-  pickaxe:    { n: 'Pickaxe', kg: 2.5, cat: 'tool', tool: 'mining' },
-  knife:      { n: 'Skinning knife', kg: .3, cat: 'tool', tool: 'skinning' },
+  hatchet:    { n: 'Hatchet', kg: 1.5, cat: 'tool', tool: 'woodcutting', slot: 'weapon', wpn: 'hatchet' },
+  pickaxe:    { n: 'Pickaxe', kg: 2.5, cat: 'tool', tool: 'mining', slot: 'weapon', wpn: 'pickaxe' },
+  knife:      { n: 'Skinning knife', kg: .3, cat: 'tool', tool: 'skinning', slot: 'weapon', wpn: 'knife' },
   rod:        { n: 'Fishing rod', kg: 1, cat: 'tool', tool: 'fishing' },
   tongs:      { n: 'Smith tongs', kg: 1, cat: 'tool', tool: 'smithing' },
   sewkit:     { n: 'Sewing kit', kg: .3, cat: 'tool', tool: 'tailoring' },
@@ -196,6 +332,12 @@ SF.ITEMS = {
   glaive:     { n: 'Glaive', kg: 4, cat: 'weapon', slot: 'weapon', wpn: 'glaive' },
   shortbow:   { n: 'Shortbow', kg: 1, cat: 'weapon', slot: 'weapon', wpn: 'shortbow' },
   crossbow:   { n: 'Crossbow', kg: 3.5, cat: 'weapon', slot: 'weapon', wpn: 'crossbow' },
+  heavycrossbow: { n: 'Heavy crossbow', kg: 4.5, cat: 'weapon', slot: 'weapon', wpn: 'heavycrossbow' },
+  battleaxe:  { n: 'Battle axe', kg: 4, cat: 'weapon', slot: 'weapon', wpn: 'battleaxe' },
+  mace:       { n: 'Mace', kg: 3, cat: 'weapon', slot: 'weapon', wpn: 'mace' },
+  waraxe:     { n: 'War axe', kg: 3.3, cat: 'weapon', slot: 'weapon', wpn: 'waraxe' },
+  kryss:      { n: 'Kryss', kg: 1, cat: 'weapon', slot: 'weapon', wpn: 'kryss' },
+  spear:      { n: 'Spear', kg: 3.5, cat: 'weapon', slot: 'weapon', wpn: 'spear' },
   buckler:    { n: 'Pine buckler', kg: 2, cat: 'shield', slot: 'shield' },
   clothvest:  { n: 'Cloth gambeson', kg: 1.5, cat: 'armor', slot: 'armor', armor: 'cloth' },
   leather:    { n: 'Leather armor', kg: 6, cat: 'armor', slot: 'armor', armor: 'leather' },
@@ -212,7 +354,7 @@ SF.ITEMS = {
 for (const k in SF.ITEMS) { SF.ITEMS[k].id = k; if (SF.ITEMS[k].trade === undefined) SF.ITEMS[k].trade = true; }
 SF.PRICES = { pine: 3, ore: 4, ironbar: 16, ironshard: 1, hide: 4, sinew: 2, strap: 3, cloth: 2, meat: 2, cookedmeat: 6, fish: 3, cookedfish: 7, vial: 3,
   reedash: 2, shelldust: 2, marshroot: 3, lanternoil: 3, blacksalt: 4, bandage: 2, draught: 25, stamtonic: 18, antidote: 15, manatonic: 22, cinder: 30, arrow: 1, bolt: 1,
-  hatchet: 20, pickaxe: 24, knife: 8, rod: 12, tongs: 15, sewkit: 6, dagger: 30, sword: 70, hammer: 75, glaive: 110, shortbow: 60, crossbow: 95, buckler: 40,
+  hatchet: 20, pickaxe: 24, knife: 8, rod: 12, tongs: 15, sewkit: 6, dagger: 30, sword: 70, hammer: 75, glaive: 110, shortbow: 60, crossbow: 95, heavycrossbow: 140, battleaxe: 85, mace: 60, waraxe: 75, kryss: 70, spear: 65, buckler: 40,
   clothvest: 30, leather: 90, chain: 220, plate: 420, lockpick: 4, trapkit: 20, repairkit: 30, lute: 40, venom: 22, bellshard: 45, silk: 6 };
 
 let UID = 1;
@@ -344,7 +486,7 @@ Object.assign(SF.ITEMS, {
   hinge: { id: 'hinge', n: 'Hinge', base: 'hinge', kg: .3, stack: 1, cat: 'fitting', matItem: 'metal', trade: true } });
 Object.assign(SF.PRICES, { rivet: 1, nail: 1, hinge: 4 });
 // metal-primary equipment: a neutral base name; legacy pieces with no recorded metal are iron
-for (const [id, base] of [['dagger', 'dagger'], ['sword', 'Quay sword'], ['hammer', 'war hammer'], ['glaive', 'glaive'], ['chain', 'chain armor'], ['plate', 'plate armor']]) Object.assign(SF.ITEMS[id], { base, prim: 'metal' });
+for (const [id, base] of [['dagger', 'dagger'], ['sword', 'Quay sword'], ['hammer', 'war hammer'], ['glaive', 'glaive'], ['battleaxe', 'battle axe'], ['mace', 'mace'], ['waraxe', 'war axe'], ['kryss', 'kryss'], ['spear', 'spear'], ['chain', 'chain armor'], ['plate', 'plate armor']]) Object.assign(SF.ITEMS[id], { base, prim: 'metal' });
 SF.matOf = it => { if (!it) return null; const d = SF.ITEMS[it.id]; return it.material || d.mat || (d.prim === 'metal' ? 'iron' : null); };
 SF.matName = m => SF.METAL[m] ? SF.METAL[m].n : SF.WOOD[m] ? SF.WOOD[m].short : '';
 SF.itemName = it => { const d = SF.ITEMS[it.id]; if (!d.base) return d.n; const m = SF.matOf(it); const s = (m ? SF.matName(m) + ' ' : '') + d.base; return s[0].toUpperCase() + s.slice(1); };
@@ -473,6 +615,8 @@ SF.CHEST_DIFF = [25, 55, 80]; SF.LOCK_TIME = 2;
 SF.TRAP = { place: 1.5, arm: 1, life: 180, dmg: 6, slow: .25, slowFor: 2, max: 2, spacing: 4 };
 SF.TAME = { time: 4, range: 3, slots: 2 };
 SF.VET = { range: 1.5, time: 3, heal: v => 10 + .35 * v };
+SF.weaponOf = it => SF.WEAPONS[it && SF.ITEMS[it.id] && SF.ITEMS[it.id].wpn] || null;
+SF.weaponSkillName = it => { const w = SF.weaponOf(it); return w ? SF.SKILL[w.skill].n : ''; };
 SF.BARD = { prep: 1.25, cd: 8, shared: 2, range: 8, lullaby: 5, discord: .15, discordFor: 8, provoke: 8 };
 SF.SEARCH = { wind: .8, cd: 5, radius: s => 4 + 4 * s / 100 };
 SF.SHADOW_STEPS = s => 2 + Math.floor(s / 20);
@@ -481,7 +625,7 @@ SF.venomTier = s => s >= 80 ? 3 : s >= 55 ? 2 : s >= 30 ? 1 : 0;
 SF.VENOM_CHARGES = 5;
 // §9 condition and repair: each repair restores to max minus 3% of the original maximum; below 40% replace
 SF.WEARABLE = id => ['weapon', 'shield', 'armor'].includes(SF.ITEMS[id].cat) && SF.ITEMS[id].trade;
-SF.repairSkill = id => { const d = SF.ITEMS[id]; if (d.wpn === 'shortbow' || d.wpn === 'crossbow' || id === 'buckler') return 'carpentry'; if (d.armor === 'cloth' || d.armor === 'leather') return 'tailoring'; return 'smithing'; };
+SF.repairSkill = id => { const d = SF.ITEMS[id]; if (d.wpn === 'shortbow' || d.wpn === 'crossbow' || d.wpn === 'heavycrossbow' || id === 'buckler') return 'carpentry'; if (d.armor === 'cloth' || d.armor === 'leather') return 'tailoring'; return 'smithing'; };
 SF.trainCost = (skill, to) => Math.max(0, Math.round((to * to - skill * skill) * 0.6));
 SF.statTrainCost = n => n * 25;
 

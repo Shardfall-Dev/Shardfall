@@ -8,7 +8,8 @@ const FIELDS = [], GATES = [], RESOLVED = new Set();
 let CASTID = 0;
 
 /* ---------- actors: one view of the player, pets, summons and creatures ---------- */
-const isLiving = a => a && (a === P ? !P.ghost : alive(a) && (a.kind === 'mon' || a.kind === 'pet'));
+const isLiving = a => a && (a === P ? !P.ghost : alive(a) && (a.kind === 'mon' || a.kind === 'pet' || (a.kind === 'ally' && !a.ghost)));
+const isPlayerGhost = e => (e.kind === 'player' || e.kind === 'ally') && e.ghost;
 const mgOf = a => a.mg || (a.mg = {});
 const MON_R = m => { const d = MON[m.type]; return d && d.wardcraft !== undefined ? d.wardcraft : cl(Math.round((d ? d.diff : 30) - 15), 0, 100); };   // tuning: creature Wardcraft
 const rOf = a => a === P ? sv('wardcraft') : a.summon ? 30 : MON_R(a);
@@ -22,7 +23,7 @@ function aggro(a, src) { if (a !== P && a.kind === 'mon' && alive(a) && !a.targe
 function healActor(a, amt) { const max = a === P ? SF.maxHp(P) : a.max; const b = a.hp; a.hp = Math.min(max, a.hp + amt); FX.push({ k: 'heal', x: a.x, y: a.y, t0: GT, dur: .8 }); floater(a.x, a.y, '+' + Math.round(a.hp - b), '#7ee08a'); return a.hp - b; }
 function livingNear(x, y, r, pred) { const out = []; for (const e of ents) if (isLiving(e) && Math.hypot(e.x - x, e.y - y) <= r + 1e-6 && (!pred || pred(e))) out.push(e); return out; }
 function standable(x, y) { const tx = Math.floor(x), ty = Math.floor(y); if (x < 0 || y < 0 || BLK[tAt(tx, ty)] || [T.WA, T.BR].includes(tAt(tx, ty))) return false; return canStand(P, x, y) && !fieldBlocks(x, y); }
-function occupied(x, y, except) { return ents.some(e => e !== except && !e.gone && (e.kind === 'mon' || e.kind === 'pet' || e.kind === 'npc' || e === P) && !e.dead && Math.hypot(e.x - x, e.y - y) < .55); }
+function occupied(x, y, except) { return ents.some(e => e !== except && !e.gone && (e.kind === 'mon' || e.kind === 'pet' || e.kind === 'npc' || e.kind === 'ally' || e === P) && !e.dead && Math.hypot(e.x - x, e.y - y) < .55); }
 
 /* ---------- prepare ---------- */
 function castSlot(id, opt) {
@@ -100,7 +101,7 @@ function heldTap(hits, w) {
   if (!P.held) return false; const sp = P.held.sp;
   const nearSelf = Math.hypot(w.x - P.x, w.y - P.y) < .7;
   if (sp.tgt === 'living' || sp.tgt === 'friend' || sp.tgt === 'summon' || sp.tgt === 'ghost') {
-    const t = hits.find(e => sp.tgt === 'summon' ? e.summon : sp.tgt === 'ghost' ? e.kind === 'player' && e.ghost : isLiving(e)) || ((sp.tgt === 'friend' || sp.tgt === 'living') && nearSelf ? P : null);
+    const t = hits.find(e => sp.tgt === 'summon' ? e.summon : sp.tgt === 'ghost' ? isPlayerGhost(e) : isLiving(e)) || ((sp.tgt === 'friend' || sp.tgt === 'living') && nearSelf ? P : null);
     if (t) { releaseHeld(t); return true; }
     log(`${sp.n} needs ${TGT_TEXT[sp.tgt]}. The spell is still held.`, '#ffb070'); return true;
   }
@@ -119,7 +120,7 @@ function releaseHeld(t, extra) {
     case 'living': if (!isLiving(t)) return rej(`${sp.n} needs ${TGT_TEXT.living}.`); break;
     case 'friend': if (!isLiving(t)) return rej(`${sp.n} needs ${TGT_TEXT.friend}.`); break;
     case 'summon': if (!t.summon || !alive(t)) return rej('Only a summoned creature can be banished.'); break;
-    case 'ghost': if (!(t.kind === 'player' && t.ghost)) return rej('No ghost is offering to return.'); break;
+    case 'ghost': if (!isPlayerGhost(t)) return rej('No ghost is offering to return.'); break;
     case 'anchor': { if (isPt) { const e = livingNear(t.x, t.y, .7).sort((a, b) => Math.hypot(a.x - t.x, a.y - t.y) - Math.hypot(b.x - t.x, b.y - t.y))[0]; target = e ? { x: e.x, y: e.y, anchor: e } : { x: t.x, y: t.y }; } else target = { x: t.x, y: t.y, anchor: t }; break; }
     case 'rune': if (!t.rune) return rej('Choose one of your runes.'); break;
     default: break;
@@ -404,13 +405,13 @@ function summonTick(p, dt) {
   else if (s.ranged && dd <= rng && los(p, t)) { p.ready = GT + s.ranged[2]; const from = { x: p.x, y: p.y }; EFX.push({ k: 'proj', x: from.x, y: from.y, tx: t.x, ty: t.y, t0: GT, t1: GT + .3, col: s.col || '#c8e0ff', big: 1, at: GT + .3, fn: () => summonRanged(p, t) }); }
 }
 const ACC = 60;                                                                     // tuning: summon attack skill for the NPC hit roll
-function summonMelee(p, t) {
-  const s = p.summon; const def = t === P ? defRating() : (MON[t.type] || { def: 30 }).def; if (R() >= SF.accuracy(ACC, def)) { floater(t.x, t.y, 'miss', '#c8c8c8'); return; }
-  const raw = rnd(s.melee[0], s.melee[1]); const arm = t === P ? armorVal() : (MON[t.type] || { armor: 10 }).armor; const dmg = Math.max(1, Math.round(raw * (1 - arm / (arm + 90))));
-  hurt(t, dmg, p, 'phys'); if (s.id === 'magery.58' && R() < .25) applyPoison(t, 2);
+function summonMelee(p, t) {                                                          // a physical blow: the shared resolver (src/game.js)
+  const s = p.summon; if (!fighterAlive(t)) return; const A = fighter(p), D = fighter(t);
+  if (R() >= SF.hitChance(A.atk, D.def)) { missFx(t, p); return; }
+  const m = applyBlow(A, t); if (m && m.final > 0 && s.id === 'magery.58' && R() < .25) applyPoison(t, 2);
 }
 function summonRanged(p, t) {
-  if (!isLiving(t)) return; const s = p.summon; const def = t === P ? defRating() : (MON[t.type] || { def: 30 }).def; if (R() >= SF.accuracy(ACC, def)) { floater(t.x, t.y, 'miss', '#c8c8c8'); return; }
+  if (!isLiving(t)) return; const s = p.summon; if (R() >= SF.hitChance(ACC, fighter(t).def)) { floater(t.x, t.y, 'miss', '#c8c8c8'); return; }   // the hit roll; the bolt itself is spell damage
   const r = MG.resolveHit({ mode: 'half_only', base: rnd(s.ranged[0], s.ranged[1]), circle: s.circle, M: s.M, E: 0, R: rOf(t) }, R); hurt(t, r.applied, p, 'spell');
 }
 

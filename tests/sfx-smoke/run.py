@@ -88,7 +88,7 @@ with sync_playwright() as pw:
     check('the closed leaf stops the player', yb < door['y'] - .2 and J(page, f"!{D}.open"), round(yb, 3))
     page.keyboard.press('e'); page.wait_for_timeout(500)
     tp(page, door['x'] + .5, door['y']); clear(page); page.keyboard.press('e'); page.wait_for_timeout(150)
-    check('refuses to close on an actor in the doorway', J(page, f"{D}.open") and not played(page), played(page))
+    check('refuses to close on an actor in the doorway', J(page, f"{D}.open") and not [e for e in played(page) if not e.startswith('world.')], played(page))   # random ambience may land here
     tp(page, door['x'] + .5, door['y'] + 1.1); page.wait_for_timeout(500); page.keyboard.press('e'); page.wait_for_timeout(100); J(page, "__SF.save()")
     saved = J(page, "JSON.parse(localStorage.getItem('shardfall.save.v1')).char.cx.doors")
     check('door state stored by location in the save', saved == {f"{door['x']},{door['y']}": 0}, saved)
@@ -116,7 +116,7 @@ with sync_playwright() as pw:
     check('standing idle: no footsteps', not [e for e in played(page) if e.startswith('step')], played(page))
 
     # ---------- combat ----------
-    J(page, """(() => { const S = __SF, P = S.P, SF = S.SF; P.equip.weapon = SF.newItem('sword', 1); P.skills.blades.v = 1000; P.skills.tactics.v = 1000; P.drawn = false; P.hp = 999; })()""")
+    J(page, """(() => { const S = __SF, P = S.P, SF = S.SF; P.equip.weapon = SF.newItem('sword', 1); P.skills.swordsmanship.v = 1000; P.skills.tactics.v = 1000; P.drawn = false; P.hp = 999; })()""")
     def purge(*keep): J(page, "ks => { for (const e of __SF.ents) if (e.kind === 'mon' && !ks.includes(e.id)) e.gone = true; for (let i = __SF.ents.length - 1; i >= 0; i--) if (__SF.ents[i].gone) __SF.ents.splice(i, 1); }", list(keep))
     def spawn(t, x, y, extra=''):
         return J(page, f"""(() => {{ const S = __SF, d = S.MON['{t}']; const m = S.addEnt({{ kind: 'mon', type: '{t}', name: d.n, x: {x}, y: {y}, hp: d.hp, max: d.hp, state: 'idle', home: {{ x: {x}, y: {y} }}, sect: 0, ward: 0, purse: 0 }}); {extra}; return m.id; }})()""")
@@ -125,7 +125,7 @@ with sync_playwright() as pw:
     tp(page, 300.5, 296.5); page.wait_for_timeout(300)
     purge(); clear(page); rid = spawn('rat', 301.5, 296.5, "m.rooted = __SF.GT + 999")
     page.wait_for_timeout(1200)
-    J(page, "__SF.setRng(() => .999)")
+    J(page, "__SF.setRng(() => .999); __SF.P.skills.swordsmanship.v = 500")   # T2A hit chance caps at 100 %: at 100.0 vs a rat every swing lands, so whiff at 50.0
     R = f"__SF.ents.find(e => e.id === {rid})"
     J(page, f"(() => {{ __SF.P.sel = {R}; __SF.toggleArm(); }})()"); page.wait_for_timeout(900); J(page, "__SF.P.armed = false")
     pl = played(page)
@@ -133,7 +133,7 @@ with sync_playwright() as pw:
     check('a whiff: draw, then the swing alone (no impact)', 'weapon.draw' in pl and 'swing.sword' in pl and not [e for e in pl if e.startswith('hit.')], pl)
     tele = J(page, "window.__tries.filter(e => /attack|warn/.test(e))")
     check('rat telegraph plays its attack cue (distinct from the strike)', 'rat.attack' in pl, tele)
-    J(page, "__SF.setRng(() => 0)"); page.wait_for_timeout(1500); clear(page)
+    J(page, "__SF.setRng(() => 0); __SF.P.skills.swordsmanship.v = 1000"); page.wait_for_timeout(1500); clear(page)
     J(page, f"(() => {{ const m = {R}; m.hp = 1; __SF.P.sel = m; __SF.toggleArm(); }})()"); page.wait_for_timeout(1000); J(page, "__SF.P.armed = false")
     pl = played(page)
     check('killing a rat: swing, flesh impact, species death', 'swing.sword' in pl and 'hit.flesh' in pl and 'rat.death' in pl and 'hit.bone' not in pl, pl)
@@ -150,13 +150,13 @@ with sync_playwright() as pw:
     pl = played(page)
     check('striking a skeleton: hit.bone and skeleton.death (not flesh)', 'hit.bone' in pl and 'skeleton.death' in pl and 'hit.flesh' not in pl, pl)
     # ranged
-    purge(); bid = spawn('boar', 306.5, 296.5, "m.rooted = __SF.GT + 999; m.pacified = __SF.GT + 999")
-    J(page, f"""(() => {{ const S = __SF, P = S.P, SF = S.SF; P.equip.weapon = SF.newItem('shortbow', 1); SF.addItem(P.pack, SF.newItem('arrow', 20)); P.skills.archery.v = 1000; P.drawn = false; const m = S.ents.find(e => e.id === {bid}); m.hp = 999; P.sel = m; S.toggleArm(); }})()""")
-    page.wait_for_timeout(250); clear(page); page.wait_for_timeout(1000); J(page, "__SF.P.armed = false"); page.wait_for_timeout(300)
+    purge(); bid = spawn('boar', 306.5, 296.5, "m.rooted = __SF.GT + 999; m.pacified = __SF.GT + 999"); clear(page)
+    J(page, f"""(() => {{ const S = __SF, P = S.P, SF = S.SF; P.equip.weapon = SF.newItem('shortbow', 1); SF.addItem(P.pack, SF.newItem('arrow', 20)); P.skills.archery.v = 1000; P.drawn = false; S.weaponChanged(); P.sw.ready = true; P.movedAt = -99; const m = S.ents.find(e => e.id === {bid}); m.hp = 999; P.sel = m; S.toggleArm(); }})()""")   # T2A archery: a ready swing, standing still, the arrow lands 1 s after release
+    page.wait_for_timeout(1750); J(page, "__SF.P.armed = false"); page.wait_for_timeout(300)
     pl = played(page)
     check('shooting from range: bow.release at the shot, flesh impact on arrival', 'bow.release' in pl and 'hit.flesh' in pl and pl.index('bow.release') < pl.index('hit.flesh') and not [e for e in pl if e.startswith('swing')], pl)
     # spell kill
-    J(page, f"""(() => {{ const S = __SF, P = S.P, SF = S.SF, MG = SF.MAGERY; P.skills.spellcraft.v = 1000; P.skills.focus.v = 1000; P.mana = 999; if (!SF.count(P.pack, 'spellbook')) SF.addItem(P.pack, SF.newItem('spellbook', 1)); SF.addItem(P.pack, SF.newItem('scroll.18', 1)); MG.learn(P.pack, 'scroll.18'); for (const r of SF.SPELL['magery.18'].regs) SF.addItem(P.pack, SF.newItem(r, 30)); const m = S.ents.find(e => e.id === {bid}); m.hp = 2; m.pacified = S.GT + 999; P.sel = m; P.spellReadyAt = 0; }})()"""); purge(bid)
+    J(page, f"""(() => {{ const S = __SF, P = S.P, SF = S.SF, MG = SF.MAGERY; P.skills.spellcraft.v = 1000; P.skills.focus.v = 1000; P.mana = 999; if (!SF.count(P.pack, 'spellbook')) SF.addItem(P.pack, SF.newItem('spellbook', 1)); SF.addItem(P.pack, SF.newItem('scroll.18', 1)); MG.learn(P.pack, 'scroll.18'); for (const r of SF.SPELL['magery.18'].regs) SF.addItem(P.pack, SF.newItem(r, 30)); const m = S.ents.find(e => e.id === {bid}); m.hp = 2; m.pacified = S.GT + 999; m.state = 'idle'; m.target = null; P.sel = m; P.spellReadyAt = 0; }})()"""); purge(bid)
     clear(page); J(page, "__SF.castSlot('magery.18')"); page.wait_for_timeout(2600)
     held = J(page, "!!__SF.P.held"); pl1 = [e for e in played(page) if e.startswith('magic.')]
     J(page, "__SF.castSlot('magery.18')"); page.wait_for_timeout(1500); pl = [e for e in played(page) if e.startswith('magic.') or e.startswith('hit.')]

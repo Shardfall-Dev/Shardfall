@@ -9,8 +9,8 @@ Object.assign(MON, {
   spider:    { n: 'mire spider', col: '#2a2630', size: .95, h: 30, hp: 40, atk: 55, def: 50, dmg: [5, 8], reach: 1.2, tele: .5, rec: 1.1, speed: 4.3, aggro: 7, leash: 20, armor: 8, diff: 55, poison: [1, .35], tame: 80, strong: 1, bite: .5, loot: { silk: [2, 4], marshroot: [0, 2] }, skin: { sinew: [1, 2] } },
   smuggler:  { n: 'brine smuggler', scout: '#6a2a2a', size: 1, h: 66, hp: 60, atk: 55, def: 55, dmg: [7, 11], reach: 1.3, tele: .35, rec: .95, speed: 4.2, aggro: 7, leash: 22, armor: 20, diff: 55, hideChance: .5, purse: [10, 30], loot: { gold: [8, 25], bandage: [0, 3], lockpick: [0, 2], arrow: [0, 8] } },
   wisp:      { n: 'ash wisp', col: '#ff8a30', size: .8, h: 40, hp: 30, atk: 60, def: 45, dmg: [9, 13], reach: 7, tele: .8, rec: 1.6, speed: 3.4, aggro: 9, leash: 18, armor: 0, diff: 60, ranged: 1, keep: 4, loot: { reedash: [2, 4], lanternoil: [1, 2] } },
-  sentinel:  { n: 'bell sentinel', col: '#7a6a48', size: 1.3, h: 70, hp: 120, atk: 65, def: 70, dmg: [12, 18], reach: 1.6, tele: 1.1, rec: 2.2, speed: 3.2, aggro: 6, leash: 16, armor: 40, diff: 75, ward: 20, loot: { ironbar: [1, 3], bellshard: [0, 1], gold: [10, 30] } },
-  captain:   { n: 'drowned captain', scout: '#1e4a5a', size: 1.1, h: 70, hp: 160, atk: 75, def: 75, dmg: [14, 20], reach: 1.6, tele: .6, rec: 1.3, speed: 4.0, aggro: 8, leash: 20, armor: 25, diff: 85, loot: { gold: [60, 120], bellshard: [1, 2], draught: [0, 2] }, rare: [['chain', .25], ['glaive', .2], ['crossbow', .15]] },
+  sentinel:  { n: 'bell sentinel', col: '#7a6a48', size: 1.3, h: 70, hp: 120, atk: 65, def: 70, dmg: [12, 18], reach: 1.6, tele: 1.1, rec: 2.2, speed: 3.2, aggro: 6, leash: 16, armor: 40, diff: 75, ward: 20, loot: { ironbar: [1, 3], bellshard: [0, 1], gold: [10, 30] }, rare: [['mace', .2], ['waraxe', .1]] },
+  captain:   { n: 'drowned captain', scout: '#1e4a5a', size: 1.1, h: 70, hp: 160, atk: 75, def: 75, dmg: [14, 20], reach: 1.6, tele: .6, rec: 1.3, speed: 4.0, aggro: 8, leash: 20, armor: 25, diff: 85, loot: { gold: [60, 120], bellshard: [1, 2], draught: [0, 2] }, rare: [['chain', .25], ['glaive', .2], ['crossbow', .15], ['heavycrossbow', .1]] },
   bellkeeper:{ n: 'the Bellkeeper', col: '#8a6a30', size: 2.2, h: 120, hp: 450, atk: 80, def: 80, dmg: [18, 26], reach: 2.6, tele: 1.4, rec: 2.0, speed: 2.6, aggro: 12, leash: 14, armor: 35, diff: 95, boss: 1, aoe: 2.6, ward: 40, wardEvery: 20, ranged2: { dmg: [12, 18], range: 9, tele: 1.0 }, loot: { gold: [300, 500], bellshard: [3, 6], blacksalt: [4, 8] }, rare: [['plate', .5], ['glaive', .3]] } });
 /* Bestiary v1 creatures (art: src/bestiary-art.js). Stats are provisional placeholders on the existing tiers; spawn placement and balance are separate work, so none are in SPAWNS yet. h = sprite height in px. */
 Object.assign(MON, {
@@ -46,7 +46,7 @@ const sv = k => P.skills[k].v / 10;
 const addEnt = o => { o.id = NID++; o.speed = 0; ents.push(o); return o; };
 const rmEnt = e => { const i = ents.indexOf(e); if (i >= 0) ents.splice(i, 1); e.gone = true; };
 const alive = e => e && !e.gone && !e.dead;
-function relColor(e) { if (e === P || e.kind === 'npc' || e.kind === 'pet') return '#5aa8ff'; if (e.kind === 'mon') return MON[e.type].boss ? '#ff9a40' : '#c0c0c0'; return '#d8d0c0'; }
+function relColor(e) { if (e === P || e.kind === 'npc' || e.kind === 'pet' || e.kind === 'ally') return '#5aa8ff'; if (e.kind === 'mon') return MON[e.type].boss ? '#ff9a40' : '#c0c0c0'; return '#d8d0c0'; }
 
 /* ---------- log ---------- */
 function log(t, c, kind) { LOG.push({ t, c: c || '#e8e2d2', at: GT, kind: kind || 'sys' }); if (LOG.length > 300) LOG.shift(); renderLog(); }
@@ -160,30 +160,26 @@ function sndTick() {
 
 /* ---------- player ---------- */
 function newChar(o) {
-  const c = { kind: 'player', pid: 'p1', name: o.name, x: 92.5, y: 304.5, sect: 0, str: o.str, dex: o.dex, int: o.int, skills: SF.newSkills(), pack: SF.newContainer('pack', 'p1'), bank: SF.newContainer('bank', 'p1'), equip: { weapon: null, shield: null, armor: null }, look: o.look || {}, bound: 'quay', freeLessons: 2, hotbar: [null, null, null, null] };
+  const c = { kind: 'player', pid: 'p1', name: o.name, x: 92.5, y: 304.5, sect: 0, str: o.str, dex: o.dex, int: o.int, skills: SF.newSkills(), pack: SF.newContainer('pack', 'p1'), bank: SF.newContainer('bank', 'p1'), equip: { weapon: null, shield: null, armor: null }, look: o.look || {}, bound: 'quay', freeLessons: 2, hotbar: [null, null, null, null], sw: SF.newSwing(), combatMig: SF.COMBAT_MIGRATION };
   c.id = 'p1'; for (const [k, v] of Object.entries(o.skills)) c.skills[k].v = v * 10;
   c.hp = SF.maxHp(c); c.stam = SF.maxStam(c); c.mana = SF.maxMana(c); return c;
 }
 function starterKit() {
   const add = (id, q) => SF.addItem(P.pack, SF.newItem(id, q));
   add('journal', 1); P.equip.armor = SF.newItem('clothvest', 1); add('gold', 150); add('bandage', 12); add('cookedmeat', 3);
-  const top = ['polearms', 'knives', 'blades', 'hammers', 'archery'].sort((a, b) => P.skills[b].v - P.skills[a].v)[0];
-  const w = { polearms: 'glaive', knives: 'dagger', blades: 'sword', hammers: 'hammer', archery: 'shortbow' }[top];
+  const top = ['swordsmanship', 'fencing', 'macefighting', 'archery'].sort((a, b) => P.skills[b].v - P.skills[a].v)[0];
+  const w = { swordsmanship: P.skills.parrying.v > 0 || P.str < SF.WEAPONS.glaive.str ? 'sword' : 'glaive', fencing: 'dagger', macefighting: 'mace', archery: 'shortbow' }[top];
   if (P.skills[top].v > 0) { P.equip.weapon = SF.newItem(w, 1); if (w === 'shortbow') add('arrow', 80); } else add('dagger', 1);
-  if (P.skills.shieldwork.v > 0 && !(P.equip.weapon && SF.WEAPONS[SF.ITEMS[P.equip.weapon.id].wpn].two)) P.equip.shield = SF.newItem('buckler', 1);
+  if (P.skills.parrying.v > 0 && !(P.equip.weapon && SF.weaponOf(P.equip.weapon).two)) P.equip.shield = SF.newItem('buckler', 1);
   for (const [k, tool] of [['woodcutting', 'hatchet'], ['mining', 'pickaxe'], ['skinning', 'knife'], ['fishing', 'rod'], ['smithing', 'tongs'], ['tailoring', 'sewkit'], ['carpentry', 'knife'], ['fletching', 'knife']]) if (P.skills[k].v > 0 && !SF.count(P.pack, tool)) add(tool, 1);
   if (P.skills.spellcraft.v > 0) mageryStarter(add);
   if (P.skills.alchemy.v > 0) add('vial', 6);
-  P.hotbar = [{ k: 'item', id: 'bandage' }, P.skills.spellcraft.v > 0 ? { k: 'spell', id: 'magery.04' } : { k: 'item', id: 'draught' }, P.skills.spellcraft.v > 0 ? { k: 'spell', id: 'magery.05' } : P.skills.concealment.v > 0 ? { k: 'act', id: 'hide' } : { k: 'act', id: 'track' }, { k: 'act', id: 'meditate' }];
+  P.hotbar = [{ k: 'item', id: 'bandage' }, P.skills.spellcraft.v > 0 ? { k: 'spell', id: 'magery.04' } : { k: 'item', id: 'draught' }, P.skills.spellcraft.v > 0 ? { k: 'spell', id: 'magery.05' } : P.skills.concealment.v > 0 ? { k: 'act', id: 'hide' } : { k: 'act', id: 'track' }, { k: 'act', id: 'meditate' }, { k: 'act', id: 'bandother' }];
 }
 const cap = () => ({ slots: SF.SLOTS, kg: SF.carryKg(P) });
 const packKg = () => SF.containerKg(P.pack) + Object.values(P.equip).filter(Boolean).reduce((a, it) => a + SF.itemKg(it), 0);
 const overweight = () => packKg() > SF.carryKg(P) + 1e-9;
-const wDef = () => { const it = P.equip.weapon; if (it && it.cond !== undefined && it.cond <= 0) return SF.WEAPONS.unarmed; return SF.WEAPONS[it ? SF.ITEMS[it.id].wpn : 'unarmed']; };
 function wear(it, amt) { if (!it || !SF.WEARABLE(it.id)) return; if (it.cond === undefined) { it.cond = 100; it.maxc = 100; } const before = it.cond; it.cond = Math.max(0, it.cond - amt); const lim = .2 * (it.maxc || 100); if (before >= lim && it.cond < lim) log(SF.itemName(it) + ' is badly worn (−15%). Repair it soon.', '#ffb070'); if (before > 0 && it.cond <= 0) log(SF.itemName(it) + ' has broken and gives no benefit.', '#ff6a5a'); }
-const armorType = () => P.equip.armor ? (SF.ITEMS[P.equip.armor.id].armor || 'none') : 'none';
-const armorVal = () => magicArmor(P) + armorBase(); const armorBase = () => { const it = P.equip.armor; return Math.round((SF.ARMOR[armorType()] || 0) * SF.condFactor(it && it.cond, it && it.maxc)); };
-const defRating = () => P.skills[wDef().skill].v / 10;
 const inCombat = () => GT - (P.lastCombat || -99) < 6;
 function give(id, q, extra) { const r = SF.addItem(P.pack, SF.newItem(id, q, extra), cap()); if (!r.ok) { log('Your pack is full: ' + r.reason + '. ' + SF.ITEMS[id].n + ' left on the ground.', '#ffb070'); dropPile(SF.newItem(id, q, extra)); } return r.ok; }
 function dropPile(it) { let c = ents.find(e => e.kind === 'corpse' && e.pile && Math.hypot(e.x - P.x, e.y - P.y) < 1); if (!c) { const cont = SF.newContainer('pile'); c = addEnt({ kind: 'corpse', pile: true, name: 'dropped items', x: P.x, y: P.y, cont, expires: GT + 600 }); } c.cont.items.push(it); }
@@ -197,13 +193,12 @@ function playerMove(dt) {
   if (JOY.on && !P.dead) { const jx = JOY.x - JOY.x0, jy = JOY.y - JOY.y0, m = Math.hypot(jx, jy); if (m > 10) { const tx = jx / HW + jy / HH, ty = jy / HH - jx / HW, tm = Math.hypot(tx, ty); vx = tx / tm; vy = ty / tm; want = Math.min(1, m / 56); JOY.sprint = !!P.sprintOn || (SETTINGS.stickSprint && m > 70); } }
   else if (KEYS.any) { const sx = (KEYS.r ? 1 : 0) - (KEYS.l ? 1 : 0), sy = (KEYS.d ? 1 : 0) - (KEYS.u ? 1 : 0); if (sx || sy) { const tx = sx / HW + sy / HH, ty = sy / HH - sx / HW, tm = Math.hypot(tx, ty); vx = tx / tm; vy = ty / tm; want = 1; JOY.sprint = !!KEYS.shift || !!P.sprintOn; } }
   let sprint = JOY.sprint && want > 0 && !P.ghost;
-  if (sprint && (P.stam <= 0 || overweight() || P.prep || (P.swing && wDef().proj))) sprint = false;
+  if (sprint && (P.stam <= 0 || overweight() || P.prep)) sprint = false;
   if (P.hidden && sprint) reveal('You sprint and are revealed.');
   let sp = (sprint ? SF.SPRINT : SF.WALK) * (want > .25 ? 1 : .6) * MOVE_SCALE;
   sp *= 1 - (SF.ARMOR_SPEED[armorType()] || 0);
   if (tAt(Math.floor(P.x), Math.floor(P.y)) === T.SH) sp *= .8;
   if (P.prep && P.prep.sp.walk) sp = Math.min(sp, SF.WALK * MOVE_SCALE * P.prep.sp.walk);
-  if (P.swing && wDef().proj) sp = wDef().rootWind ? 0 : Math.min(sp, SF.WALK * MOVE_SCALE * .55);
   if (P.rooted > GT) sp = 0; if (P.slowUntil > GT) sp *= 1 - SF.TRAP.slow;
   if (P.opening) sp = 0;
   const dx = vx * sp * dt, dy = vy * sp * dt; const moved = (dx || dy) ? moveBy(P, dx, dy) : 0;
@@ -213,6 +208,7 @@ function playerMove(dt) {
 }
 function onPlayerMoved(m) {
   stepSound(m);
+  P.movedAt = GT;                                                                     // archery: the shot needs SF.ARCHERY.aim s standing still
   if (P.meditating) { P.meditating = null; log('You stop meditating.'); }
   if (P.prep && !P.prep.sp.walk && Math.hypot(P.x - P.prep.x0, P.y - P.prep.y0) > SF.PREP_DRIFT) interruptPrep('You moved and lost your spell preparation.');
   if (P.task && P.task.still && Math.hypot(P.x - P.task.x0, P.y - P.task.y0) > .5) { log(P.task.label + ' interrupted by movement.'); P.task = null; }
@@ -229,16 +225,16 @@ function damagePlayer(amt, src, kind, hx) {
   P.hp -= amt; floater(P.x, P.y, '-' + amt, '#ff6a5a'); hitSound(P, kind, src, hx, P.hp <= 0);
   if (P.prep) interruptPrep(kind === 'poison' ? 'Poison breaks your concentration.' : 'Your preparation is interrupted!');
   if (P.rooted > GT) P.rooted = 0;
+  if (P.bandage && kind !== 'poison') slipBandage(src);                               // a blow makes the healer's fingers slip; the timer runs on
   if (P.task && P.task.kind === 'vet' && kind !== 'poison') { P.task.t1 += .25; }
-  else if (P.task && P.task.kind === 'bandage' && kind !== 'poison') { const add = Math.min(SF.BANDAGE_PRESSURE, SF.BANDAGE_PRESSURE_MAX - P.task.pressure); if (add > 0) { P.task.pressure += add; P.task.t1 += add; } }
-  else if (P.task && P.task.kind !== 'bandage' && P.task.kind !== 'vet') { log(P.task.label + ' interrupted.'); P.task = null; }
+  else if (P.task && P.task.kind !== 'vet') { log(P.task.label + ' interrupted.'); P.task = null; }
   if (P.meditating) { P.meditating = null; log('Your meditation is broken.'); }
   if (P.batch || PANEL === 'craft') stopBatch(P.batch ? 'Combat stops your work.' : '');
   if (P.hidden && src && dist(src, P) <= 1) reveal('You are discovered!');
   if (P.hp <= 0) playerDies(src);
 }
 function playerDies(src) {
-  P.hp = 0; P.ghost = true; P.ghostAt = GT; P.armed = false; P.sel = null; P.prep = null; P.held = null; P.swing = null; P.task = null; P.hidden = false; P.poison = null; P.meditating = null; AIM = null; P.batch = null; if (PANEL === 'craft') closePanel();
+  P.hp = 0; P.ghost = true; P.ghostAt = GT; P.armed = false; P.sel = null; P.prep = null; P.held = null; P.task = null; if (P.bandage) { P.bandDone = P.bandage.id; P.bandage = null; } P.hidden = false; P.poison = null; P.meditating = null; AIM = null; P.batch = null; if (PANEL === 'craft') closePanel();
   const protectedRoad = protAt(P.x, P.y);
   if (!protectedRoad) { const corpse = SF.deathTransaction(P, GT, { x: P.x, y: P.y });
   addEnt({ kind: 'corpse', mine: true, name: 'your body', x: P.x, y: P.y, cont: corpse, expires: corpse.expires }); }
@@ -251,6 +247,115 @@ function resurrect(where) {
   if (!P.ghost) return; if (where) { P.x = where.x; P.y = where.y + 1.2; }
   P.ghost = false; P.hp = Math.ceil(SF.maxHp(P) * .25); P.stam = Math.ceil(SF.maxStam(P) * .2); P.mana = Math.ceil(SF.maxMana(P) * .2);
   FX.push({ k: 'ring', x: P.x, y: P.y, c: '#fff2b0', t0: GT, dur: .8 }); log('You are restored to life at 25% health. Your body still holds your belongings.', '#ffe08a'); snd('player.revive'); save(); refreshHud();
+}
+
+/* ---------- physical combat: one resolver for every swing and shot (UO Second Age rules, issue #3) ----------
+   Touch, keyboard, auto-attack, the ally, pets, summons and creatures all go through swingAt / strikeOne → applyBlow.
+   The rules (hit chance, dice, damage stages, swing timer, archery) live in src/rules.js; this block adapts them to actors. */
+const isAlly = e => !!e && e.kind === 'ally';
+const isPlayerLike = e => e === P || isAlly(e);
+const fighterAlive = e => !!e && (e === P ? !P.ghost : isAlly(e) ? !e.ghost && !e.gone : alive(e));
+const skOf = (a, k) => a === P ? sv(k) : a.skills && a.skills[k] ? a.skills[k].v / 10 : 0;
+let SHOTID = 0;
+/* creature numbers the T2A rules need: natural armor rating, strength and dexterity (tuning, see docs/combat/STATUS.md) */
+function monT2A(d) { if (!d._t2a) d._t2a = { ar: d.ar !== undefined ? d.ar : Math.round((d.armor || 0) * .4), str: d.str || cl(d.hp, 10, 100), dex: d.dex || cl(Math.round((d.speed || 3) * 20), 10, 100) }; return d._t2a; }
+function weaponOfActor(a) {
+  const it = a.equip && a.equip.weapon; if (!it) return SF.WEAPONS.unarmed;
+  if (it.cond !== undefined && it.cond <= 0) return SF.WEAPONS.unarmed;                // a broken weapon fights as fists
+  return SF.weaponOf(it) || SF.WEAPONS.unarmed;
+}
+const wDef = () => weaponOfActor(P);
+const weaponLabel = a => { const w = weaponOfActor(a), it = a.equip && a.equip.weapon; return w === SF.WEAPONS.unarmed ? (it ? SF.itemName(it) + ' (broken)' : 'Fists') : SF.itemName(it); };
+/* everything a blow needs from one side, read fresh for every swing */
+function fighter(a) {
+  if (isPlayerLike(a)) {
+    const w = weaponOfActor(a), it = w === SF.WEAPONS.unarmed ? null : a.equip.weapon, arm = a.equip.armor, sh = a.equip.shield;
+    const at = arm ? (SF.ITEMS[arm.id].armor || 'none') : 'none';
+    return { a, player: true, w, it, atk: skOf(a, w.skill), def: skOf(a, w.skill), tactics: skOf(a, 'tactics'), anatomy: skOf(a, 'anatomy'), str: a.str,
+      armorAR: Math.round((SF.ARMOR_AR[at] || 0) * SF.wearFactor(arm && arm.cond, arm && arm.maxc)) + magicArmor(a), armorItem: arm,
+      shieldAR: sh ? Math.round((SF.SHIELD_AR[sh.id] || 7) * SF.wearFactor(sh.cond, sh.maxc)) : 0, shieldItem: sh, parry: skOf(a, 'parrying'), braced: a.braced > GT,
+      diff: Math.max(10, Math.round(skOf(a, w.skill))) };
+  }
+  if (a.summon) { const s = a.summon; return { a, player: false, w: { id: 'summon', reach: (s.melee && s.melee[3]) || 1.3 }, atk: ACC, def: 30, range: s.melee ? [s.melee[0], s.melee[1]] : [1, 2], scale: 1, armorAR: 0, shieldAR: 0, diff: 40 }; }
+  const d = MON[a.type] || { def: 30, atk: 50, armor: 10, dmg: [4, 7], reach: 1.1, diff: 30, hp: 30 }, x = monT2A(d);
+  return { a, player: false, w: { id: 'natural', reach: d.reach }, atk: (d.atk || 40) + (a.kind === 'mon' ? monAcc(a) : 0), def: d.def || 30, range: d.dmg, scale: 1,
+    armorAR: Math.round(x.ar * (a.discordUntil > GT ? 1 - SF.BARD.discord : 1)) + magicArmor(a), shieldAR: 0, diff: d.diff || 30 };
+}
+const armorVal = () => fighter(P).armorAR;
+const armorType = () => P.equip.armor ? (SF.ITEMS[P.equip.armor.id].armor || 'none') : 'none';
+const defRating = () => sv(wDef().skill);
+function stamOf(a) { return a === P || isAlly(a) ? a.stam : a.stam !== undefined ? a.stam : monT2A(MON[a.type] || {}).dex; }
+function drainStam(a, n) { if (a === P || isAlly(a)) a.stam = Math.max(0, a.stam - n); else if (a.type) { const x = monT2A(MON[a.type]); a.stam = Math.max(0, (a.stam !== undefined ? a.stam : x.dex) - n); } }
+/* legality is checked before anything is spent: a bad target, range or sight never costs a swing or an arrow */
+function legalAttack(a, t, w) {
+  if (!fighterAlive(a)) return 'You cannot fight now.'; if (!fighterAlive(t) || t === a) return 'No valid target.';
+  if (t.hidden && t !== P) return 'You cannot see it.';
+  if (dist(a, t) > w.reach + .05) return 'Out of reach.'; if (!los(a, t)) return 'No line of sight.';
+  return null;
+}
+function provoke(t, a) { if (t.kind !== 'mon' || !alive(t)) return; t.lastHitBy = a; if (!t.target) { t.target = a; if (t.state === 'idle') t.state = 'chase'; } t.hidden = false; }
+function missFx(t, a) { floater(t.x, t.y, t === P ? 'dodge' : 'miss', '#c8c8c8'); }   // a whiff: the swing sound alone
+/* sound for a swing or a release, at the attacker; misses get this alone, impacts come from hitSound */
+function swingSound(a, w) {
+  const ev = w.ammo ? (w.ammo === 'bolt' ? 'crossbow.release' : 'bow.release') : 'swing.' + (w.fam || 'Unarmed').toLowerCase();
+  if (!SFXA.has(ev)) return; if (a === P) snd(ev, { key: 'P' }); else sndAt(ev, a, { key: 'sw' + a.id });
+}
+/* a blow that does no harm still makes a sound: a shield parry or armor that takes it all */
+function noHarmSound(t, parried) { const ev = parried ? 'block.shield' : 'hit.armor'; if (t === P) snd(ev, { gain: .5, key: 'impP' }); else sndAt(ev, t, { gain: .5, key: 'imp' + t.id }); }
+const wardSound = t => { if (sndOnce('veil' + (t.id || 'P'), .6)) { if (t === P) snd('magic.ward', { gain: .6 }); else sndAt('magic.ward', t, { gain: .6 }); } };
+/* one landed blow. A = attacker view (taken at the swing or the release), t = recipient. Returns the stage record. */
+function applyBlow(A, t, opt) {
+  opt = opt || {}; if (!fighterAlive(t)) return null; const a = A.a, D = fighter(t);
+  const raw = SF.rawDamage(A.player ? { dice: A.w.dice, quality: A.it && A.it.quality, cond: A.it && A.it.cond, maxc: A.it && A.it.maxc, tactics: A.tactics, anatomy: A.anatomy, str: A.str } : { range: A.range, scale: A.scale }, R);
+  let v = raw.value;
+  if (!A.player && a.kind === 'mon') { v = monRaw(a, v); if (a.hexUntil > GT) v *= .88; }   // strength hex/boon and Dampening Hex on the striker
+  if (t === P && !opt.ranged && a !== P) { v = meleeWard(a, v); if (v <= 0) { wardSound(t); return { raw, final: 0, warded: true }; } }   // Rebounding Armor
+  if (t === P && P.veil && P.veil.until > GT && P.veil.left > 0) { const s = Math.min(P.veil.left, v); P.veil.left -= s; v -= s; if (s) floater(P.x, P.y, 'veil ' + Math.round(s), '#c8b890'); if (v <= 0) { wardSound(t); return { raw, final: 0, warded: true }; } }
+  const m = SF.mitigate(v, { parry: D.parry, braced: D.braced, shieldAR: D.shieldAR, armorAR: D.armorAR, player: D.player, mace: !!(A.w && A.w.mace) }, R);
+  // side effects, each once: parry check and shield wear, armor wear (mace: half what it absorbed), weapon wear, stamina drain, gains
+  if (D.shieldAR > 0) { if (t === P) gain('parrying', A.diff); if (m.parried) { wear(D.shieldItem, .3); floater(t.x, t.y, 'parry', '#cfe8ff'); } }
+  if (D.armorItem) { if (A.w && A.w.mace) { if (m.armorWear > 0) wear(D.armorItem, m.armorWear); } else wear(D.armorItem, .2); }
+  if (A.w && A.w.mace) drainStam(t, rnd(SF.MACE_STAM[0], SF.MACE_STAM[1]));
+  if (a === P) { gain('tactics', D.diff); gain('anatomy', D.diff); if (A.it && A.w.hp) wear(A.it, 25 / A.w.hp);
+    const it = A.it; if (it && it.venom && it.venom.charges > 0 && !A.w.ammo) { it.venom.charges--; applyPoison(t, it.venom.tier); if (!it.venom.charges) { delete it.venom; log('The venom on your weapon is spent.'); } } }
+  m.raw = raw;
+  if (m.final <= 0) { floater(t.x, t.y, m.parried ? 'parried' : 'absorbed', '#c8c8c8'); noHarmSound(t, m.parried); return m; }
+  const hx = { w: A.w, area: !!opt.area, blocked: !!m.parried };
+  if (t === P) damagePlayer(m.final, a === P ? null : a, 'phys', hx); else if (isAlly(t)) damageAlly(t, m.final, a, 'phys', hx); else damageMon(t, m.final, 'phys', a, hx);
+  if (!A.player && a.kind === 'mon') { const d = MON[a.type]; if (d && d.poison && R() < d.poison[1] && !(t === P && P.poisonImmune > GT)) applyPoison(t, d.poison[0]); }
+  return m;
+}
+/* a ready, legal swing (or bow release) by the player or the ally. Returns false when nothing was spent. */
+function swingAt(a, t) {
+  const w = weaponOfActor(a); if (!a.sw || !a.sw.ready) return false;
+  if (legalAttack(a, t, w)) return false;
+  if (w.ammo) {
+    if (GT - (a.movedAt || -99) < SF.ARCHERY.aim) return false;                         // stop to aim: the timer ran while moving, the shot waits
+    const pack = a.pack; if (!SF.count(pack, w.ammo)) { if (a === P && (!P.ammoWarn || GT > P.ammoWarn)) { P.ammoWarn = GT + 3; log('You have no ' + w.ammo + 's.', '#ffb070'); } return false; }
+    SF.removeQty(pack, w.ammo, 1);                                                     // exactly one projectile per release, hit or miss
+  }
+  if (a === P && P.hidden) reveal('You attack and are revealed.');
+  if (a === P && !P.drawn && !w.ammo && w.fam !== 'Unarmed') snd('weapon.draw', { key: 'Pdraw', gain: .7 });
+  SF.swingSpend(a.sw, GT); a.lastCombat = GT; if (a === P) { P.lastCombat = GT; P.drawn = true; P.drawing = 0; }
+  faceToward(a, t.x, t.y); const A = fighter(a), D = fighter(t);
+  const chance = SF.hitChance(A.atk, D.def), hit = R() < chance;
+  if (a === P) gain(w.skill, D.diff);                                                   // a legitimate attempt
+  if (a === P) { playOnce((w.fam || 'Unarmed') + '_Attack', 0); P.lunge = .001; } else a.lunge = .001;
+  provoke(t, a); swingSound(a, w);
+  if (w.ammo) { const s = { id: ++SHOTID, a, t, w, A, hit, x0: a.x, y0: a.y, at: GT + SF.ARCHERY.flight }; a.shots = (a.shots || 0) + 1;
+    EFX.push({ k: 'proj', x: a.x, y: a.y, tx: t.x, ty: t.y, t0: GT, t1: s.at, col: '#e8dcc0', at: s.at, fn: () => arrowLands(s) }); return true; }
+  FX.push({ k: 'slash', x: t.x, y: t.y, t0: GT, dur: .2 });
+  if (hit) applyBlow(A, t); else missFx(t, a);
+  return true;
+}
+/* the arrow lands one second after release: the archer must not have moved, the target must still be alive, in range and in sight */
+function arrowLands(s) {
+  const a = s.a, t = s.t; a.shots = Math.max(0, (a.shots || 1) - 1);
+  if (!fighterAlive(t)) { if (a === P) log('Your target fell before the shot landed.', '#a8a8a8'); return; }
+  if (Math.hypot(a.x - s.x0, a.y - s.y0) > SF.ARCHERY.drift) { floater(t.x, t.y, 'wide', '#c8c8c8'); if (a === P) log('You moved while the shot was in the air; it goes wide.', '#a8a8a8'); return; }
+  if (dist(a, t) > s.w.reach + .5 || !los(a, t)) { floater(t.x, t.y, 'blocked', '#c8c8c8'); if (a === P) log('Your shot is blocked.', '#a8a8a8'); return; }
+  if (!s.hit) return missFx(t, a);
+  applyBlow(s.A, t, { ranged: true });
 }
 
 /* ---------- player attack (armed basic attack: never moves, never acquires) ---------- */
@@ -267,58 +372,28 @@ function toggleArm() {
   if (P.armed) { P.armed = false; log('Attack disarmed.'); return; }
   const t = autoTarget();
   if (!t) { log('No creature in sight to attack.', '#ffb070'); return; }
-  P.armed = true; log('Attack armed on ' + t.name + '.'); if (P.hidden) { /* reveal happens on attack */ }
+  P.armed = true; log('Attack armed on ' + t.name + '.');
 }
 /* presentation-only one-shot clip; simulation timing stays authoritative */
 function playOnce(clip, contactIn) { P.once = { clip, t0: GT, tc: GT + (contactIn || 0) }; }
-function drawWeapon() { if (P.drawn || P.drawing) return; if (wDef().fam !== 'Unarmed') snd('weapon.draw', { key: 'P' }); P.drawing = GT + SF.SWAP_TIME; P.readyAt = Math.max(P.readyAt || 0, GT + SF.SWAP_TIME); }
 function stowWeapon() { if (!P.drawn) return 0; if (wDef().fam !== 'Unarmed') snd('weapon.stow', { key: 'P' }); P.drawn = false; P.drawing = 0; return SF.SWAP_TIME; }
+function weaponChanged() { SF.swingEquip(P.sw, GT, P.stam, wDef()); P.drawn = false; }
 function attackTick() {
-  if (P.drawing && GT >= P.drawing) { P.drawing = 0; P.drawn = true; }
-  if (P.swing && GT >= P.swing.t1) resolveSwing();
+  SF.swingTick(P.sw, GT, P.stam, wDef());
   if (!P.armed || P.ghost) return; const t = P.sel;
-  if (!alive(t) || t.kind !== 'mon' || t.hidden) { P.armed = false; return; }
-  if (P.prep || P.swing || P.opening) return;
-  if (!P.drawn) { drawWeapon(); return; }
-  if (GT < (P.readyAt || 0)) return;
-  const w = wDef(), d = dist(P, t);
-  if (d > w.reach || !los(P, t)) return;
-  if (w.ammo && !SF.count(P.pack, w.ammo)) { if (!P.ammoWarn || GT > P.ammoWarn) { P.ammoWarn = GT + 3; log('You have no ' + w.ammo + 's.', '#ffb070'); } return; }
-  if (P.hidden) reveal('You attack and are revealed.');
-  P.swing = { t0: GT, t1: GT + w.wind, t: t, w }; faceToward(P, t.x, t.y); P.lunge = 0; playOnce((w.fam || 'Unarmed') + '_Attack', w.wind); swingSound(P.swing);
-}
-function resolveSwing() {
-  const s = P.swing; P.swing = null; s.resolved = true; const w = s.w, t = s.t; P.lastCombat = GT;
-  const stamFrac = P.stam / Math.max(1, SF.maxStam(P));
-  P.readyAt = GT + SF.recovery(w.rec, P.dex, stamFrac);
-  if (!alive(t)) return;
-  const d = dist(P, t);
-  if (d > w.reach + .2 || !los(P, t)) { log('Your attack falls short.', '#a8a8a8'); return; }
-  const acc = SF.accuracy(sv(w.skill), MON[t.type].def); const hit = R() < acc;
-  gain(w.skill, MON[t.type].diff);
-  if (w.ammo) { SF.removeQty(P.pack, w.ammo, 1); snd(w.ammo === 'bolt' ? 'crossbow.release' : 'bow.release', { key: 'P' }); const tt = d / w.proj; EFX.push({ k: 'proj', x: P.x, y: P.y, tx: t.x, ty: t.y, t0: GT, t1: GT + tt, col: '#e8dcc0', at: GT + tt, fn: () => landHit(t, w, hit) }); return; }
-  P.lunge = .001; FX.push({ k: 'slash', x: t.x, y: t.y, t0: GT, dur: .2 }); landHit(t, w, hit);
-  if (!hit && w === SF.WEAPONS.dagger && sv('knives') >= 45) P.readyAt -= .15;
-}
-function landHit(t, w, hit) {
-  if (!alive(t)) return; t.lastHitBy = P; if (!t.target) { t.target = P; if (t.state === 'idle') t.state = 'chase'; } t.hidden = false;
-  if (!hit) { floater(t.x, t.y, 'miss', '#c8c8c8'); return; }   // a whiff: the swing alone
-  const it = P.equip.weapon, base = rnd(w.dmg[0], w.dmg[1]) * SF.condFactor(it && it.cond, it && it.maxc) * (it && it.quality === 'exceptional' ? 1.04 : 1);
-  const armor = MON[t.type].armor * (t.discordUntil > GT ? 1 - SF.BARD.discord : 1);
-  const dmg = SF.physDamage(base, { tactics: sv('tactics'), anatomy: sv('anatomy'), str: P.str, armor });
-  gain('tactics', MON[t.type].diff); gain('anatomy', MON[t.type].diff); wear(it, .25);
-  if (it && it.venom && it.venom.charges > 0 && !w.ammo) { it.venom.charges--; if (!t.poison || t.poison.tier <= it.venom.tier) { t.poison = { tier: it.venom.tier, ticks: SF.POISON_TICKS, next: GT + SF.POISON_GAP }; floater(t.x, t.y, 'envenomed', '#7be07b'); } if (!it.venom.charges) { delete it.venom; log('The venom on your weapon is spent.'); } }
-  if (w === SF.WEAPONS.hammer && sv('hammers') >= 45 && GT > (t.hamAt || 0)) { t.hamAt = GT + 3; t.slowUntil = GT + 1.5; floater(t.x, t.y, 'staggered', '#e8d090'); }
-  damageMon(t, dmg, 'phys', P, { w });
+  if (!fighterAlive(t) || t.kind !== 'mon' || t.hidden) { P.armed = false; return; }
+  if (P.prep || P.opening || P.braced > GT) return;
+  swingAt(P, t);
 }
 
 function damageMon(m, amt, kind, src, hx) {
+  if (isAlly(m)) return damageAlly(m, amt, src, kind, hx);
   if (!alive(m)) return; src = src || P; m.hitT = GT;
   if (m.ward > 0 && kind !== 'poison') { const a = Math.min(m.ward, amt); m.ward -= a; amt -= a; floater(m.x, m.y, 'ward ' + a, '#e8d090'); if (m.ward <= 0) floater(m.x, m.y, 'ward broken', '#e8d090'); if (amt <= 0) { if (sndOnce('ward' + m.id, .6)) sndAt('magic.ward', m, { gain: .6 }); return; } }
-  m.hp -= amt; floater(m.x, m.y, String(amt), kind === 'spell' ? '#c8a0ff' : kind === 'poison' ? '#7be07b' : '#ffd27a'); hitSound(m, kind, src, hx, m.hp <= 0); if (src === P || (src && src.kind === 'pet')) P.lastCombat = GT;
+  m.hp -= amt; floater(m.x, m.y, String(amt), kind === 'spell' ? '#c8a0ff' : kind === 'poison' ? '#7be07b' : '#ffd27a'); hitSound(m, kind, src, hx, m.hp <= 0); if (src === P || (src && (src.kind === 'pet' || src.kind === 'ally'))) P.lastCombat = GT;
   m.pacified = 0; if (m.rooted > GT) m.rooted = 0;
   if (m.hidden) m.hidden = false;
-  if (!m.target || m.target === P && src && src.kind === 'pet' && R() < .3 || (m.provoked && m.provoked < GT)) { m.target = src.kind ? src : P; m.provoked = 0; m.state = m.state === 'idle' || m.state === 'return' ? 'chase' : m.state; }
+  if (!m.target || m.target === P && src && (src.kind === 'pet' || src.kind === 'ally') && R() < .3 || (m.provoked && m.provoked < GT)) { m.target = src.kind ? src : P; m.provoked = 0; m.state = m.state === 'idle' || m.state === 'return' ? 'chase' : m.state; }
   if (m.hp <= 0) killMon(m, src);
 }
 
@@ -339,7 +414,7 @@ function killMon(m, src) {
 /* ---------- monsters: telegraph → committed strike → recovery ---------- */
 function aiMon(m, dt) {
   const d = MON[m.type]; m.speed = 0; let t = m.target;
-  if (t && (t.gone || t.dead || (t === P && (P.ghost || P.hidden)) || (m.provoked && GT > m.provoked && t.kind === 'mon'))) { m.target = t = null; m.provoked = 0; if (m.state !== 'idle') m.state = 'return'; }
+  if (t && (t.gone || t.dead || t.ghost || (t === P && (P.ghost || P.hidden)) || (m.provoked && GT > m.provoked && t.kind === 'mon'))) { m.target = t = null; m.provoked = 0; if (m.state !== 'idle') m.state = 'return'; }
   const seeP = () => !P.ghost && !P.hidden && !(m.pacified > GT) && (!protAt(P.x, P.y) || m.quest) && dist(m, P) < d.aggro && los(m, P);
   const home = Math.hypot(m.x - m.home.x, m.y - m.home.y);
   const step = (tx, ty, spd, away) => { if (m.rooted > GT) return; let dx = tx - m.x, dy = ty - m.y; if (away) { dx = -dx; dy = -dy; } const l = Math.hypot(dx, dy); if (l < .05) return; const s = Math.min(l, spd * MOVE_SCALE * (m.slowUntil > GT ? .75 : 1) * dt); const mv = moveBy(m, dx / l * s, dy / l * s); if (mv < s * .3) moveBy(m, -dy / l * s, dx / l * s); m.speed = mv / dt; updateFacing(m, dx, dy); };
@@ -358,7 +433,7 @@ function aiMon(m, dt) {
     } break;
     case 'tele': { const tt = m.mode === 'r2' ? d.ranged2.tele : d.tele; if (t && m.mode !== 'aoe') faceToward(m, t.x, t.y); if (m.atkSt !== m.st) { m.atkSt = m.st; m.atkRow = m.sect || 0; } if (GT - m.st >= tt) { m.state = 'strike'; m.st = GT; m.impactT = GT; monStrike(m, t); } } break;
     case 'strike': if (GT - m.st > .15) { m.state = 'rec'; m.st = GT; } break;
-    case 'rec': if (GT - m.st >= d.rec) m.state = m.target ? 'chase' : 'return'; break;
+    case 'rec': if (GT - m.st >= d.rec * (monT2A(d).dex + 100) / (stamOf(m) + 100)) m.state = m.target ? 'chase' : 'return'; break;   // a winded creature recovers slower (same stamina term as the swing formula)
     case 'return': step(m.home.x, m.home.y, d.speed); m.hp = Math.min(m.max, m.hp + m.max * .15 * dt); if (home < 1.2) { m.state = 'idle'; m.hp = m.max; if (d.hideChance && R() < d.hideChance) m.hidden = true; } if (seeP() && home < d.leash * .6) { m.target = P; m.state = 'chase'; } break;
   }
   for (const o of ents) if (o !== m && (o.kind === 'mon' || o.kind === 'pet') && !o.gone) { const dx = m.x - o.x, dy = m.y - o.y, l = Math.hypot(dx, dy); if (l > 0 && l < .7) moveBy(m, dx / l * .02, dy / l * .02); }
@@ -367,27 +442,87 @@ function aiMon(m, dt) {
 /* resolve a committed creature attack against whatever it targets: the player, a pet, or a provoked creature */
 function monStrike(m, t) {
   const d = MON[m.type]; if (!t || t.gone || t.dead) return;
-  if (m.mode === 'aoe') { FX.push({ k: 'boom', x: m.x, y: m.y, r: d.aoe, t0: GT, dur: .5 }); sndAt('combat.blast', m); for (const v of [P, ...ents.filter(e => e.kind === 'pet')]) { if (v === P && (P.ghost || P.hidden)) continue; if (Math.hypot(v.x - m.x, v.y - m.y) <= d.aoe) strikeOne(m, v, d.dmg, false, true); } return; }
+  if (m.mode === 'aoe') { FX.push({ k: 'boom', x: m.x, y: m.y, r: d.aoe, t0: GT, dur: .5 }); sndAt('combat.blast', m); for (const v of [P, ...ents.filter(e => e.kind === 'pet' || (isAlly(e) && !e.ghost))]) { if (v === P && (P.ghost || P.hidden)) continue; if (Math.hypot(v.x - m.x, v.y - m.y) <= d.aoe) strikeOne(m, v, d.dmg, false, true); } return; }
   if (m.mode === 'shot' || m.mode === 'r2') { const r = m.mode === 'r2' ? d.ranged2 : d; if (m.mode === 'r2') m.r2At = GT + 5; const aim = m.aim, tt = Math.hypot(aim.x - m.x, aim.y - m.y) / 14; EFX.push({ k: 'proj', x: m.x, y: m.y, tx: aim.x, ty: aim.y, t0: GT, t1: GT + tt, col: d.boss ? '#ffd070' : '#ff8a30', big: 1, at: GT + tt, fn: () => { if (alive(m) || true) { const hitT = Math.hypot(t.x - aim.x, t.y - aim.y) < 1.1 && !(t === P && (P.ghost || P.hidden)); if (hitT) strikeOne(m, t, r.dmg, true); else floater(aim.x, aim.y, 'dodged', '#c8c8c8'); } } }); return; }
   const dd = dist(m, t); if (dd > d.reach + .35 || !los(m, t)) return;
   strikeOne(m, t, d.dmg);
 }
 function strikeOne(m, t, dmgR, ranged, area) {
-  const d = MON[m.type];
-  if (t.kind === 'mon' || t.kind === 'pet') { const td = MON[t.type] || { def: 30, armor: 10 }; if (R() >= SF.accuracy(d.atk, td.def)) { floater(t.x, t.y, 'miss', '#c8c8c8'); return; } damageMon(t, Math.max(1, Math.round(rnd(dmgR[0], dmgR[1]) * (1 - td.armor / (td.armor + 90)))), 'phys', m, area ? { area: 1 } : null); return; }
-  if (P.ghost || P.hidden) return;
-  if (R() >= SF.accuracy(d.atk + monAcc(m), defRating())) { floater(P.x, P.y, 'dodge', '#c8c8c8'); return; }
-  let raw = monRaw(m, rnd(dmgR[0], dmgR[1])); if (m.hexUntil > GT) raw *= .88; if (!ranged) { raw = meleeWard(m, raw); if (raw <= 0) { if (sndOnce('veil', .6)) snd('magic.ward', { gain: .6 }); return; } }
-  if (P.veil && P.veil.until > GT && P.veil.left > 0) { const a = Math.min(P.veil.left, raw); P.veil.left -= a; raw -= a; if (a) floater(P.x, P.y, 'veil ' + Math.round(a), '#c8b890'); if (raw <= 0) { if (sndOnce('veil', .6)) snd('magic.ward', { gain: .6 }); return; } }
-  const av = armorVal(); let dmg = Math.round(raw * (1 - av / (av + 90))), blocked = false;
-  if (P.equip.armor) wear(P.equip.armor, .2);
-  if (P.equip.shield && frontArc(P, m) && !ranged) { const bc = SF.blockChance(sv('shieldwork'), P.braced > GT); gain('shieldwork', d.diff); if (R() < bc) { blocked = true; dmg = Math.round(dmg * (1 - SF.BLOCK_REDUCE)); P.stam = Math.max(0, P.stam - SF.BLOCK_STAM); wear(P.equip.shield, .3); floater(P.x, P.y, 'block', '#cfe8ff'); } }
-  if (dmg <= 0) { floater(P.x, P.y, 'absorbed', '#c8c8c8'); snd(blocked ? 'block.shield' : 'hit.armor', { gain: .5, key: 'impP' }); return; }
-  damagePlayer(dmg, m, 'phys', { blocked, area });
-  if (d.poison && R() < d.poison[1] && !(P.poisonImmune > GT)) { if (!P.poison || P.poison.tier <= d.poison[0]) { P.poison = { tier: d.poison[0], ticks: SF.POISON_TICKS, next: GT + SF.POISON_GAP }; log('You are poisoned!', '#7be07b'); } }
+  if (!fighterAlive(t) || (t === P && P.hidden)) return;
+  const A = fighter(m); if (dmgR) A.range = dmgR;
+  const D = fighter(t);
+  if (R() >= SF.hitChance(A.atk, D.def)) { missFx(t, m); return; }
+  applyBlow(A, t, { ranged: !!ranged, area: !!area });
 }
 
-function frontArc(a, b) { const fa = SECT_ANG[a.sect || 0]; const sx = (b.x - a.x) - (b.y - a.y), sy = ((b.x - a.x) + (b.y - a.y)) * .5; let ang = Math.atan2(sy, sx) * 180 / Math.PI; return angDiff(ang, fa) <= SF.BLOCK_ARC / 2; }
+/* ---------- the ally: Wren, a quay sellsword. A local combatant fixture that fights with the same rules, can be bandaged, dies to a ghost and returns ---------- */
+const ALLY_POST = { x: 97.5, y: 308.5 };
+function makeAlly(sv0) {
+  const a = addEnt({ kind: 'ally', aid: 'wren', name: 'Wren', x: ALLY_POST.x, y: ALLY_POST.y, sect: 2, str: 60, dex: 55, int: 30, skills: SF.newSkills(), pack: SF.newContainer('pack', 'wren'), order: 'wait', sw: SF.newSwing() });
+  for (const [k, v] of [['swordsmanship', 55], ['tactics', 55], ['anatomy', 40], ['parrying', 40], ['wrestling', 30]]) a.skills[k].v = v * 10;
+  a.equip = { weapon: SF.newItem('sword', 1, { cond: 100, maxc: 100, omax: 100 }), shield: SF.newItem('buckler', 1, { cond: 100, maxc: 100, omax: 100 }), armor: SF.newItem('leather', 1, { cond: 100, maxc: 100, omax: 100 }) };
+  a.max = SF.maxHp(a); a.hp = Math.round(a.max * .55); a.stam = a.dex;          // she starts nursing a wound
+  if (sv0) { for (const k of ['x', 'y', 'hp', 'stam', 'ghost', 'ghostAt', 'order', 'poison', 'skills']) if (sv0[k] !== undefined) a[k] = sv0[k]; if (sv0.equip) a.equip = sv0.equip; if (sv0.pack) a.pack.items = sv0.pack; if (a.ghost && Number.isFinite(sv0.ghostLeft)) a.ghostAt = GT - (SF.ALLY_GHOST_WAIT - sv0.ghostLeft); }
+  if (!canStand(a, a.x, a.y)) { a.x = ALLY_POST.x; a.y = ALLY_POST.y; }
+  return a;
+}
+SF.ALLY_GHOST_WAIT = 180;
+const allyOf = () => ents.find(e => isAlly(e) && !e.gone);
+function damageAlly(a, amt, src, kind, hx) {
+  if (!isAlly(a) || a.ghost || amt <= 0) return; a.hp -= amt; a.lastHit = GT; a.lastCombat = GT;
+  floater(a.x, a.y, '-' + amt, kind === 'poison' ? '#7be07b' : '#ff8a6a'); hitSound(a, kind, src, hx, a.hp <= 0);
+  if (src && src.kind === 'mon' && alive(src) && !a.foe) a.foe = src;
+  if (a.hp <= 0) allyDies(a, src);
+}
+function allyDies(a, src) {
+  a.hp = 0; a.ghost = true; a.ghostAt = GT; a.poison = null; a.foe = null; a.reviveOffer = null;
+  const body = SF.deathTransaction(a, GT, { x: a.x, y: a.y }); body.owner = a.aid;
+  addEnt({ kind: 'corpse', allyBody: a.aid, name: a.name + "'s body", x: a.x, y: a.y, cont: body, expires: body.expires });
+  for (const e of ents) if (e.target === a) { e.target = null; if (e.kind === 'mon') e.state = 'return'; }
+  log(`${a.name} has fallen${src && src.name ? ' to a ' + src.name : ''}. Her ghost waits by her body; bandages (Healing and Anatomy 80) or a resurrection spell can bring her back.`, '#ff8a6a'); sndAt('player.death', a, { gain: .8 });
+}
+/* back to life at 25 % health (the shared resurrection rule); the owner takes her gear back from her own body if it is in reach */
+function allyResurrect(a, how, where) {
+  if (!a.ghost) return; if (where) { a.x = where.x; a.y = where.y; }
+  a.ghost = false; a.hp = Math.ceil(a.max * .25); a.stam = Math.ceil(a.dex * .2); a.reviveOffer = null;
+  allyReclaim(a, 3);
+  FX.push({ k: 'ring', x: a.x, y: a.y, c: '#fff2b0', t0: GT, dur: .8 }); log(`${a.name} returns to life (${how}).`, '#ffe08a'); sndAt('player.revive', a);
+}
+function allyReclaim(a, reach) {
+  const body = ents.find(e => e.allyBody === a.aid && !e.gone); if (!body || dist(body, a) > reach) return !!body;
+  for (const it of body.cont.items.slice()) { const s = SF.ITEMS[it.id].slot; if (s && (!a.equip[s] || a.equip[s].id === 'garment')) { if (a.equip[s]) a.pack.items.push(a.equip[s]); a.equip[s] = it; } else a.pack.items.push(it); }
+  body.cont.items = []; rmEnt(body); if (P.lootOpen === body) { closePanel(); P.lootOpen = null; } say(a, 'Got my gear back.'); return false;
+}
+function allyStep(a, tx, ty, dt) { const dx = tx - a.x, dy = ty - a.y, l = Math.hypot(dx, dy); if (l < .05) { a.speed = 0; return; } const s = Math.min(l, SF.WALK * MOVE_SCALE * dt), mv = moveBy(a, dx / l * s, dy / l * s); if (mv < s * .3) moveBy(a, -dy / l * s, dx / l * s); a.speed = mv / Math.max(dt, 1e-6); if (mv > 0) a.movedAt = GT; updateFacing(a, dx, dy); }
+function allyTick(a, dt) {
+  if (a.lunge) { a.lunge += dt / .2; if (a.lunge >= 1) a.lunge = 0; }
+  if (a.ghost) { a.speed = 0;
+    if (a.reviveOffer && a.reviveOffer.until > GT) return allyResurrect(a, 'a resurrection spell');
+    if (GT - a.ghostAt > SF.ALLY_GHOST_WAIT) { const h = ents.find(e => e.kind === 'npc' && e.role === 'healer'); allyResurrect(a, 'restored by ' + (h ? h.name : 'a healer'), h ? { x: h.x + .8, y: h.y + .8 } : ALLY_POST); a.order = 'wait'; }
+    return; }
+  if (a.poison && GT >= a.poison.next) { a.poison.next = GT + SF.POISON_GAP; damageAlly(a, SF.POISON[a.poison.tier], null, 'poison'); if (a.poison && --a.poison.ticks <= 0) a.poison = null; if (a.ghost) return; }
+  const fight = GT - (a.lastCombat || -99) < 6;
+  if (GT - (a.lastHit || -99) > .75) a.stam = Math.min(a.dex, a.stam + (fight ? SF.STAM_REGEN_COMBAT : SF.STAM_REGEN) * dt);
+  if (!fight && !a.poison) a.hp = Math.min(a.max, a.hp + .1 * dt);
+  SF.swingTick(a.sw, GT, a.stam, weaponOfActor(a));
+  // choose a foe: whatever she is already fighting, else (following) your armed target or anything after you or her
+  let t = a.foe && alive(a.foe) && a.foe.kind === 'mon' && !a.foe.hidden && dist(a, a.foe) < 14 ? a.foe : null;
+  if (!t && a.order === 'follow') { if (P.armed && P.sel && P.sel.kind === 'mon' && alive(P.sel) && dist(P.sel, a) < 10) t = P.sel;
+    else t = ents.filter(e => e.kind === 'mon' && alive(e) && !e.hidden && (e.target === P || e.target === a) && dist(e, a) < 8).sort((x, y) => dist(x, a) - dist(y, a))[0] || null; }
+  if (!t && a.order === 'wait') t = ents.filter(e => e.kind === 'mon' && alive(e) && e.target === a && dist(e, a) < 6)[0] || null;
+  a.foe = t;
+  if (!t) { const b = ents.find(e => e.allyBody === a.aid && !e.gone); if (b) { if (dist(a, b) > 1.2) allyStep(a, b.x, b.y, dt); else allyReclaim(a, 1.5); return; } }
+  if (t) { const w = weaponOfActor(a); if (dist(a, t) > w.reach * .9 || !los(a, t)) allyStep(a, t.x, t.y, dt); else { a.speed = 0; faceToward(a, t.x, t.y); swingAt(a, t); } return; }
+  if (a.order === 'follow' && !P.ghost) { if (dist(a, P) > 1.8) allyStep(a, P.x - .9, P.y + .9, dt); else a.speed = 0; if (dist(a, P) > 30) { a.x = P.x - .8; a.y = P.y + .8; } }
+  else if (a.order === 'wait' && a.home && Math.hypot(a.home.x - a.x, a.home.y - a.y) > .6) allyStep(a, a.home.x, a.home.y, dt); else a.speed = 0;
+}
+function allyCommand(c) {
+  const a = P.sel && isAlly(P.sel) ? P.sel : allyOf(); if (!a || a.ghost) return;
+  if (c === 'follow') { a.order = 'follow'; say(a, 'Right behind you.'); }
+  else { a.order = 'wait'; a.home = { x: a.x, y: a.y }; a.foe = null; say(a, 'I will hold here.'); }
+}
+function allySave() { const a = allyOf(); if (!a) return null; return { x: a.x, y: a.y, hp: a.hp, stam: a.stam, ghost: !!a.ghost, ghostLeft: a.ghost ? Math.max(0, SF.ALLY_GHOST_WAIT - (GT - a.ghostAt)) : undefined, order: a.order, poison: a.poison || null, skills: a.skills, equip: a.equip, pack: a.pack.items,
+  body: (() => { const b = ents.find(e => e.allyBody === a.aid && !e.gone); return b ? { x: b.x, y: b.y, items: b.cont.items, left: b.expires - GT, diedAgo: GT - b.cont.diedAt } : null; })() }; }
 function spawnTick() {
   for (const s of SPAWNS) {
     if (s.n >= s.max || GT < s.next) continue; s.next = GT + (s.delay || 6 + R() * 6);
@@ -404,19 +539,83 @@ function spawnTick() {
 /* ---------- magic: prepare → hold → release lives in src/magic.js (castSlot, prepTick, releaseHeld, interruptPrep, TIMERS/at) ---------- */
 
 /* ---------- abilities: bandage, consumables, hide, track, meditate ---------- */
-function useBandage(t) {
-  t = t || P; if (P.ghost) return; if (!SF.count(P.pack, 'bandage')) return log('You have no bandages.', '#ffb070');
-  if (P.task && P.task.kind === 'bandage') return log('You are already bandaging.');
-  if (GT < (P.patientUntil || 0)) return log('That patient needs a moment before another bandage.');
-  if (P.hp >= SF.maxHp(P) && !P.poison) return log('You are not hurt.');
-  SF.removeQty(P.pack, 'bandage', 1); snd('item.bandage', { key: 'P' }); const dur = SF.bandageTime(P.dex);
-  P.task = { kind: 'bandage', label: 'Bandaging', t0: GT, t1: GT + dur, pressure: 0, target: P };
+/* ---------- First Aid: Healing with bandages (UO Second Age delays and thresholds, issue #3) ----------
+   One application at a time, linked to its healer and patient from the first tap to completion. The bandage is spent only after
+   validation; completion re-checks life state and reach and never pays out a different treatment. Damage to the healer slips. */
+const FA_WORD = { heal: 'bandage', cure: 'cure', res: 'resurrection' };
+function patientState(e) {
+  if (e === P) return { ghost: !!P.ghost, poisoned: !!P.poison, hp: P.hp, max: SF.maxHp(P), isPlayer: true };
+  if (isAlly(e) && !e.gone) return { ghost: !!e.ghost, poisoned: !!e.poison, hp: e.hp, max: e.max, isPlayer: true };
+  if (e && e.kind === 'pet') return { pet: true };
+  return null;
 }
-function finishBandage() {
-  const med = sv('medicine'), ana = sv('anatomy'), base = SF.bandageHeal(med, ana); let amt = base;
-  if (P.poison) { if (SF.bandageCure(med, ana)) { P.poison = null; amt = Math.floor(base * .25); log('You cure the poison.', '#7ee08a'); } else amt = Math.floor(base * .35); }
-  const b = P.hp; P.hp = Math.min(SF.maxHp(P), P.hp + amt); floater(P.x, P.y, '+' + Math.round(P.hp - b), '#7ee08a'); FX.push({ k: 'heal', x: P.x, y: P.y, t0: GT, dur: .8 });
-  P.patientUntil = GT + SF.BANDAGE_REPEAT; if (P.hp - b > 0 || amt > 0) { gain('medicine', 30); gain('anatomy', 30); }
+const patientName = e => e === P ? 'yourself' : e.name;
+function firstAid(e) {
+  if (P.ghost) return log('Ghosts cannot apply bandages.', '#ffb070');
+  e = e || P; const self = e === P, st = patientState(e);
+  if (!st) return log('Bandages treat you, an ally or a player ghost. Select one first.', '#ffb070');
+  const c = SF.firstAidCheck(st, { self, dist: self ? 0 : dist(P, e), bandages: SF.count(P.pack, 'bandage'), busy: !!P.bandage });
+  if (!c.ok) return log(c.reason, '#ffb070');
+  if (!self && !los(P, e)) return log('You cannot reach your patient from here.', '#ffb070');
+  SF.removeQty(P.pack, 'bandage', 1); snd('item.bandage', { key: 'P' }); P.bandSeq = (P.bandSeq || 0) + 1;
+  P.bandage = { id: P.bandSeq, e, kind: c.kind, self, t0: GT, t1: GT + c.time, slips: 0 };
+  log(`You begin applying a ${FA_WORD[c.kind]} to ${patientName(e)} (${c.time} s).`, '#9fe0a8');
+  save();
+}
+function firstAidOther() {
+  const s = P.sel; if (s && s !== P && patientState(s)) return firstAid(s);
+  const near = ents.filter(e => isAlly(e) && !e.gone && dist(e, P) <= SF.FIRST_AID.range).sort((a, b) => dist(a, P) - dist(b, P))[0];
+  if (near) { P.sel = near; return firstAid(near); }
+  log('Tap an ally or a player ghost, then press Bandage other.', '#ffb070');
+}
+function slipBandage(src) { if (!P.bandage) return; P.bandage.slips++; floater(P.x, P.y, 'fingers slip', '#ffcf7a'); if (P.bandage.slips === 1) log('Your fingers slip!', '#ffcf7a'); }
+function finishFirstAid() {
+  const b = P.bandage; P.bandage = null; P.bandDone = b.id; const e = b.e, who = patientName(e);
+  const st = e && !e.gone ? patientState(e) : null;
+  const out = (m, c) => { log(m, c || '#ffb070'); save(); return m; };
+  if (!st) return out('Your patient is gone; the bandage is wasted.');
+  if (!b.self && (dist(P, e) > SF.FIRST_AID.range || !los(P, e))) { floater(P.x, P.y, 'out of reach', '#ffb070'); return out(`${cap1(who)} moved out of reach; the ${FA_WORD[b.kind]} is wasted.`); }
+  const now = SF.firstAidKind(st);
+  if (now !== b.kind) return out(b.kind === 'res' ? `${cap1(who)} is no longer a ghost.` : now === 'res' ? `${cap1(who)} died before you finished.` : now === 'cure' ? `${cap1(who)} was poisoned before you finished; this bandage was for wounds.` : now === 'heal' ? `The poison is already gone; this bandage was for poison.` : `${cap1(who)} no longer needs treatment.`);
+  const heal = sv('healing'), ana = sv('anatomy');
+  const r = SF.firstAidResolve({ kind: b.kind, heal, ana, slips: b.slips, missing: st.max - st.hp }, R);
+  if (r.chance > 0 && r.chance < 1) { gain('healing', heal + 5); gain('anatomy', ana + 5); }    // a sure or impossible treatment teaches nothing
+  const sl = b.slips ? ` (${b.slips} slip${b.slips > 1 ? 's' : ''})` : '';
+  if (b.kind === 'heal') {
+    if (!r.success) { floater(e.x, e.y, 'no effect', '#c8c8c8'); return out(`You fail to stop the bleeding${sl}.`); }
+    e.hp = Math.min(st.max, e.hp + r.amount); floater(e.x, e.y, '+' + r.amount, '#7ee08a'); FX.push({ k: 'heal', x: e.x, y: e.y, t0: GT, dur: .8 });
+    return out(r.note === 'barely' ? `You apply the bandage, but it barely helps${sl}.` : `You heal ${who === 'yourself' ? 'yourself' : who} for ${r.amount} HP${sl}.`, '#7ee08a');
+  }
+  if (b.kind === 'cure') {
+    if (r.note === 'unskilled') return out('Curing poison needs 60 Healing and 60 Anatomy. The bandage does nothing.');
+    if (!r.success) { floater(e.x, e.y, 'cure fails', '#c8c8c8'); return out(`You fail to cure the poison${sl}.`); }
+    e.poison = null; if (e === P) P.poisonImmune = GT + 1; floater(e.x, e.y, 'cured', '#7ee08a'); return out(`You cure ${who === 'yourself' ? 'yourself' : who} of poison${sl}.`, '#7ee08a');
+  }
+  if (r.note === 'unskilled') return out('Resurrection needs 80 Healing and 80 Anatomy. The ghost stays a ghost.');
+  if (!r.success) { floater(e.x, e.y, 'fails', '#c8c8c8'); return out(`You fail to bring ${who} back${sl}.`); }
+  allyResurrect(e, 'your bandages'); save(); return 'res';
+}
+function bandageTick() {
+  const b = P.bandage; if (!b) return;
+  if (P.ghost) { P.bandage = null; return; }
+  if (GT >= b.t1) finishFirstAid();
+}
+/* persisted with the save so a reload can neither lose nor repeat an application */
+function bandageSave() { const b = P.bandage; if (!b) return null; return { id: b.id, pid: b.self ? 'P' : b.e.aid, kind: b.kind, self: b.self, left: Math.max(0, b.t1 - GT), dur: b.t1 - b.t0, slips: b.slips }; }
+function bandageLoad(s) {
+  if (!s || s.id <= (P.bandDone || 0)) return;                                       // already completed before this save: never twice
+  const e = s.pid === 'P' ? P : ents.find(x => isAlly(x) && x.aid === s.pid); if (!e) { P.bandDone = s.id; return; }
+  P.bandage = { id: s.id, e, kind: s.kind, self: s.self, t0: GT - (s.dur - s.left), t1: GT + s.left, slips: s.slips || 0 };
+}
+/* active Anatomy: a read of a living target's strength and dexterity, and stamina from 80 */
+function anatomyCheck() {
+  const t = P.sel; if (!t || !(t === P || fighterAlive(t)) || !(t === P || t.kind === 'mon' || t.kind === 'pet' || isAlly(t))) return log('Select a living creature or person for Anatomy.', '#ffb070');
+  if (t !== P && (dist(t, P) > 8 || !los(P, t))) return log('Move closer to study them.', '#ffb070');
+  const d = t.type ? MON[t.type] : null, x = d ? monT2A(d) : null;
+  const tv = t === P || isAlly(t) ? { str: t.str, dex: t.dex, stam: t.stam, maxStam: t.dex } : { str: x.str, dex: x.dex, stam: stamOf(t), maxStam: x.dex };
+  const ana = sv('anatomy'); gain('anatomy', d ? d.diff : 40, { target: 'ana:' + (t === P ? 'P' : t.id) });
+  const r = SF.anatomyRead(ana, tv);
+  log(`${t === P ? 'You look' : cap1(t.name || 'it') + ' looks'} ${r.strWord} (STR ${r.str[0]}–${r.str[1]}) and ${r.dexWord} (DEX ${r.dex[0]}–${r.dex[1]})${r.stam ? `, stamina ${r.stam[0]}/${r.stam[1]}` : ''}.`, '#e8d8b0');
 }
 function useConsumable(id) {
   const c = SF.CONSUMABLES[id]; if (P.ghost) return; if (!SF.count(P.pack, id)) return log('You have no ' + SF.ITEMS[id].n.toLowerCase() + '.', '#ffb070');
@@ -464,10 +663,10 @@ function useSlot(i) {
   const s = P.hotbar[i]; if (!s) { openPanel('bag'); return; }
   if (s.k === 'spell') return castSlot(s.id);
   if (s.k === 'act' && ABIL[s.id]) return ABIL[s.id].fn();
-  if (s.k === 'act') return ({ hide, track, meditate, brace: () => { if (!P.equip.shield) return log('You need a shield.'); if (sv('shieldwork') < 50) return log('Braced Guard needs Shieldwork 50.'); if (P.stam < 6) return log('Too tired.'); P.stam -= 6; P.braced = GT + .8; P.readyAt = Math.max(P.readyAt || 0, GT + .8); } }[s.id] || (() => { }))();
-  if (s.k === 'item') { if (s.id === 'bandage') return useBandage(); if (SF.CONSUMABLES[s.id]) return useConsumable(s.id); if (SF.ITEMS[s.id].use === 'eat') return eat(s.id); }
+  if (s.k === 'act') return ({ hide, track, meditate, brace: () => { if (!P.equip.shield) return log('You need a shield.'); if (sv('parrying') < 50) return log('Braced Guard needs Parrying 50.'); if (P.stam < 6) return log('Too tired.'); P.stam -= 6; P.braced = GT + .8; } }[s.id] || (() => { }))();
+  if (s.k === 'item') { if (s.id === 'bandage') return firstAid(P); if (SF.CONSUMABLES[s.id]) return useConsumable(s.id); if (SF.ITEMS[s.id].use === 'eat') return eat(s.id); }
 }
-function slotLabel(s) { if (!s) return ['+', 'empty']; if (s.k === 'spell') return [SF.SPELL[s.id].n, SF.SPELL[s.id].mp + ' mp']; if (s.k === 'act') return [ABIL[s.id] ? ABIL[s.id].n : { hide: 'Hide', track: 'Track', meditate: 'Meditate', brace: 'Brace' }[s.id], ABIL[s.id] && ABIL[s.id].cd && P.cdA && P.cdA[s.id] > GT ? Math.ceil(P.cdA[s.id] - GT) + 's' : '']; return [SF.ITEMS[s.id].n.replace('Healing draught', 'Draught'), '×' + SF.count(P.pack, s.id)]; }
+function slotLabel(s) { if (!s) return ['+', 'empty']; if (s.k === 'spell') return [SF.SPELL[s.id].n, SF.SPELL[s.id].mp + ' mp']; if (s.k === 'act') return [ABIL[s.id] ? ABIL[s.id].n : { hide: 'Hide', track: 'Track', meditate: 'Meditate', brace: 'Brace' }[s.id], ABIL[s.id] && ABIL[s.id].cd && P.cdA && P.cdA[s.id] > GT ? Math.ceil(P.cdA[s.id] - GT) + 's' : '']; return [s.id === 'bandage' ? 'Bandage self' : SF.ITEMS[s.id].n.replace('Healing draught', 'Draught'), '×' + SF.count(P.pack, s.id)]; }
 
 /* ---------- world interaction: gather, skin, fish, loot, NPCs, shrines, stations ---------- */
 function nodeAt(x, y) { const t = tAt(x, y); return NODE[t] ? { kind: 'node', x, y, t, skill: NODE[t], name: NODE_NAME[t] } : null; }
@@ -512,7 +711,7 @@ function startGather(n) {
 function finishGather(n) {
   if (n.skill === 'mining' || n.skill === 'woodcutting') return finishStroke(n);
   const sk = n.skill, tier = sk === 'fishing' ? (Math.hypot(n.x - 92, n.y - 300) < 120 ? 0 : 1) : nodeTier(n.x, n.y), diff = SF.NODE_TIER_DIFF[tier];
-  if (sk === 'fishing') { const rod = SF.findTool(P.pack, 'rod'); if (!rod) return log('You need a fishing rod.', '#ffb070'); if (SF.spendTool(P.pack, rod)) log('Your fishing rod snaps.', '#ff6a5a'); }
+  if (sk === 'fishing') { const rod = findTool('rod'); if (!rod) return log('You need a fishing rod.', '#ffb070'); if (spendTool(rod)) log('Your fishing rod snaps.', '#ff6a5a'); }
   gain(sk, diff, { target: 'node:' + n.x + ',' + n.y });
   if (R() >= SF.opposed(sv(sk), diff)) { log({ woodcutting: 'You chop but get nothing usable.', mining: 'You break loose rock but no ore.', foraging: 'You find nothing worth taking.', fishing: 'Nothing bites.' }[sk]); if (sk === 'foraging') sndAt('gather.forage', { x: n.x + .5, y: n.y + .5 }); return again(); }
   if (sk === 'fishing') { give('fish', 1, tier ? { q: tier } : null); log('You land a brine perch.'); snd('fish.catch', { key: 'P' }); return again(); }
@@ -525,7 +724,7 @@ function finishGather(n) {
   function again() { at(.15, () => { if (!P.task && !P.ghost && P.sel === n && Math.hypot(n.x + .5 - P.x, n.y + .5 - P.y) <= (sk === 'fishing' ? 8 : 2) && !overweight() && P.speed < .1) startGather(n); }); }
 }
 function skin(c) {
-  if (!SF.count(P.pack, 'knife')) return log('You need a skinning knife.', '#ffb070'); if (c.skinned) return log('Already skinned.');
+  if (!findTool('knife') && !SF.count(P.pack, 'knife')) return log('You need a skinning knife.', '#ffb070'); if (c.skinned) return log('Already skinned.');
   P.task = { kind: 'skin', corpse: c, label: 'Skinning', t0: GT, t1: GT + SF.GATHER_TIME.skinning, still: true, x0: P.x, y0: P.y };
 }
 function finishSkin(c) {
@@ -552,7 +751,7 @@ function populate() {
   const c = ZONES.camp; npc('healer', 'Old Fenna, camp healer', c.cx + 2.5, c.cy + 1.5); npc('campbank', 'Crow, camp strongbox', c.cx - 3.5, c.cy - 3.5); npc('outlaw', 'Mags, fence', c.cx + 3.5, c.cy - 3.5);
   for (let i = 0; i < 12; i++) { for (const s of SPAWNS) s.next = 0; spawnTick(); }
 }
-const SHOPS = { provisioner: ['hatchet', 'pickaxe', 'knife', 'rod', 'tongs', 'sewkit', 'cloth', 'vial', 'bandage', 'lanternoil', 'cookedmeat', 'clothvest', 'lute', 'lockpick', 'repairkit'], smith: ['dagger', 'sword', 'hammer', 'glaive', 'ironbar', 'leather', 'chain', 'plate', 'buckler'], workshop: ['shortbow', 'crossbow', 'arrow', 'bolt', 'pine', 'buckler', 'strap', 'trapkit', 'repairkit'], apothecary: ['reedash', 'shelldust', 'marshroot', 'lanternoil', 'blacksalt', 'vial', 'draught', 'antidote', 'manatonic', 'stamtonic', 'cinder'], outlaw: ['bandage', 'draught', 'arrow', 'cookedmeat', 'cloth', 'vial', 'reedash', 'marshroot', 'knife', 'dagger', 'lockpick', 'venom', 'trapkit'] };
+const SHOPS = { provisioner: ['hatchet', 'pickaxe', 'knife', 'rod', 'tongs', 'sewkit', 'cloth', 'vial', 'bandage', 'lanternoil', 'cookedmeat', 'clothvest', 'lute', 'lockpick', 'repairkit'], smith: ['dagger', 'kryss', 'spear', 'sword', 'battleaxe', 'glaive', 'mace', 'waraxe', 'hammer', 'ironbar', 'leather', 'chain', 'plate', 'buckler'], workshop: ['shortbow', 'crossbow', 'heavycrossbow', 'arrow', 'bolt', 'pine', 'buckler', 'strap', 'trapkit', 'repairkit'], apothecary: ['reedash', 'shelldust', 'marshroot', 'lanternoil', 'blacksalt', 'vial', 'draught', 'antidote', 'manatonic', 'stamtonic', 'cinder'], outlaw: ['bandage', 'draught', 'arrow', 'cookedmeat', 'cloth', 'vial', 'reedash', 'marshroot', 'knife', 'dagger', 'lockpick', 'venom', 'trapkit'] };
 
 /* ---------- main tick ---------- */
 let spawnT = 0, saveT = 0;
@@ -565,8 +764,8 @@ function update(dt) {
   magicTick(dt);
   playerMove(dt); if (P.lunge) { P.lunge += dt / .2; if (P.lunge >= 1) P.lunge = 0; }
   if (!P.ghost) {
-    attackTick(); prepTick();
-    if (P.task && GT >= P.task.t1) { const t = P.task; P.task = null; ({ bandage: finishBandage, hide: finishHide, gather: () => finishGather(t.node), skin: () => finishSkin(t.corpse), craft: () => finishCraft(t), ...TASKS }[t.kind] || (() => { }))(t); }
+    attackTick(); prepTick(); bandageTick();
+    if (P.task && GT >= P.task.t1) { const t = P.task; P.task = null; ({ hide: finishHide, gather: () => finishGather(t.node), skin: () => finishSkin(t.corpse), craft: () => finishCraft(t), ...TASKS }[t.kind] || (() => { }))(t); }
     worldTick(dt); questTick();
     // stamina
     const sMax = SF.maxStam(P); if (GT - (P.lastDrain || -9) > SF.STAM_DELAY) P.stam = Math.min(sMax, P.stam + (inCombat() ? SF.STAM_REGEN_COMBAT : SF.STAM_REGEN) * dt);
@@ -579,9 +778,10 @@ function update(dt) {
   }
   for (const e of ents.slice()) {
     if (e.gone) continue;
-    if (e.kind === 'mon') { const s0 = e.state; aiMon(e, dt); if (e.state !== s0) monSound(e, s0); if (e.poison && GT >= e.poison.next) { e.poison.next = GT + SF.POISON_GAP; damageMon(e, SF.POISON[e.poison.tier], 'poison'); if (e.poison && --e.poison.ticks <= 0) e.poison = null; } }
+    if (e.kind === 'mon') { if (e.stam !== undefined && GT - (e.hitT || -9) > .75) e.stam = Math.min(monT2A(MON[e.type]).dex, e.stam + 3 * dt); const s0 = e.state; aiMon(e, dt); if (e.state !== s0) monSound(e, s0); if (e.poison && GT >= e.poison.next) { e.poison.next = GT + SF.POISON_GAP; damageMon(e, SF.POISON[e.poison.tier], 'poison'); if (e.poison && --e.poison.ticks <= 0) e.poison = null; } }
     else if (e.kind === 'corpse' && GT > e.expires) { if (e.mine) log('Your body has crumbled to dust, and everything on it is gone.', '#ff6a5a'); rmEnt(e); if (P.lootOpen === e) { closePanel(); P.lootOpen = null; } }
     else if (e.kind === 'pet') petTick(e, dt);
+    else if (e.kind === 'ally') allyTick(e, dt);
   }
   sndTick();
   if (GT - spawnT > 1) { spawnT = GT; spawnTick(); }
@@ -597,7 +797,7 @@ function petTick(p, dt) {
     if (!t && far > 24) { p.x = P.x - .8; p.y = P.y + .8; }
     if (dd > (t ? d.reach * .9 : .8)) { const s = Math.min(dd, d.speed * MOVE_SCALE * dt); moveBy(p, (goal.x - p.x) / dd * s, (goal.y - p.y) / dd * s); p.speed = s / dt; updateFacing(p, goal.x - p.x, goal.y - p.y); } else p.speed = 0; }
   else p.speed = 0;
-  if (t && dist(p, t) <= d.reach + .2 && GT > (p.ready || 0)) { p.ready = GT + d.rec + .4; p.state = 'strike'; at(.15, () => p.state = ''); const td = MON[t.type]; if (R() < SF.accuracy(d.atk, td.def)) damageMon(t, Math.max(1, Math.round(rnd(d.dmg[0], d.dmg[1]) * (1 - td.armor * (t.discordUntil > GT ? .85 : 1) / (td.armor + 90)))), 'phys', p); else floater(t.x, t.y, 'miss', '#c8c8c8'); }
+  if (t && dist(p, t) <= d.reach + .2 && los(p, t) && GT > (p.ready || 0)) { p.ready = GT + d.rec + .4; p.state = 'strike'; at(.15, () => p.state = ''); strikeOne(p, t); }
   if (p.hp < p.max && !inCombat()) p.hp = Math.min(p.max, p.hp + .5 * dt);
 }
 
@@ -882,6 +1082,8 @@ function selMon(range, needAware) {
   const m = P.sel; if (range && dist(m, P) > range) { log('Move within ' + range + ' m.', '#ffb070'); return null; } if (!los(P, m)) { log('No line of sight.', '#ffb070'); return null; } return m;
 }
 const ABIL = {
+  bandother: { n: 'Bandage other', fn: () => firstAidOther() },
+  anatomy: { n: 'Anatomy', cd: 1, fn: () => { if (cdReady('anatomy', 1)) anatomyCheck(); } },
   search: { n: 'Search', cd: SF.SEARCH.cd, fn: () => { if (P.ghost || !cdReady('search', SF.SEARCH.cd)) return; P.task = { kind: 'search', label: 'Searching', t0: GT, t1: GT + SF.SEARCH.wind, still: true, x0: P.x, y0: P.y }; } },
   tame: { n: 'Tame', fn: () => { const m = selMon(SF.TAME.range); if (!m) return; const d = MON[m.type]; if (!d.tame || d.boss || d.scout) return log('That creature cannot be tamed.', '#ffb070'); if (sv('taming') < d.tame - 40) return log(`You have no chance with a ${d.n} (difficulty ${d.tame}).`, '#ffb070'); P.task = { kind: 'tame', m, label: 'Taming ' + d.n, t0: GT, t1: GT + SF.TAME.time, still: true, x0: P.x, y0: P.y }; say(P, pick(['Easy now...', 'Steady, steady.', 'Nobody will hurt you.'])); } },
   vet: { n: 'Treat pet', fn: () => { const p = P.sel && P.sel.kind === 'pet' ? P.sel : ents.find(e => e.kind === 'pet' && !e.gone && dist(e, P) <= SF.VET.range); if (!p || !p.type) return log('Select one of your tamed pets.', '#ffb070'); if (dist(p, P) > SF.VET.range) return log('Stand within 1.5 m of your pet.'); if (!SF.count(P.pack, 'bandage')) return log('You need a bandage.', '#ffb070'); if (p.hp >= p.max) return log('Your pet is not hurt.'); SF.removeQty(P.pack, 'bandage', 1); P.task = { kind: 'vet', p, label: 'Treating ' + p.name, t0: GT, t1: GT + SF.VET.time }; } },
@@ -889,7 +1091,7 @@ const ABIL = {
   discord: { n: 'Discord', cd: SF.BARD.cd, fn: () => bard('discord') },
   provoke: { n: 'Provoke', cd: SF.BARD.cd, fn: () => bard('provocation') },
   pick: { n: 'Pickpocket', fn: () => { const m = P.sel; if (!m || m.kind !== 'mon' || !MON[m.type].purse) return log('Select an unaware smuggler to pick their pocket.', '#ffb070'); if (dist(m, P) > SF.PICK_RANGE) return log('Get within 1.5 m.', '#ffb070'); if (m.target === P) return log('They are watching you too closely.', '#ffb070'); m.pickCd = m.pickCd || 0; if (GT < m.pickCd) return log('Wait before trying that pocket again.'); m.pickCd = GT + SF.PICK_COOLDOWN; P.task = { kind: 'pick', m, label: 'Pickpocketing', t0: GT, t1: GT + SF.PICK_TIME, still: true, x0: P.x, y0: P.y }; } },
-  coat: { n: 'Coat weapon', fn: () => { const w = P.equip.weapon; if (!w || wDef().ammo || wDef() === SF.WEAPONS.unarmed) return log('Equip a melee weapon to coat.', '#ffb070'); if (!SF.count(P.pack, 'venom')) return log('You need a mire venom vial (craft one at an alchemy still).', '#ffb070'); const tier = SF.venomTier(sv('venomcraft')); if (!tier) return log('Coating needs Venomcraft 30.', '#ffb070'); P.task = { kind: 'coat', label: 'Coating', t0: GT, t1: GT + 1, still: true, x0: P.x, y0: P.y }; } },
+  coat: { n: 'Coat weapon', fn: () => { const w = P.equip.weapon; if (!w || wDef().ammo || wDef() === SF.WEAPONS.unarmed) return log('Equip a melee weapon to coat.', '#ffb070'); if (wDef().skill === 'macefighting') return log('Mace Fighting weapons cannot carry poison.', '#ffb070'); if (!SF.count(P.pack, 'venom')) return log('You need a mire venom vial (craft one at an alchemy still).', '#ffb070'); const tier = SF.venomTier(sv('venomcraft')); if (!tier) return log('Coating needs Venomcraft 30.', '#ffb070'); P.task = { kind: 'coat', label: 'Coating', t0: GT, t1: GT + 1, still: true, x0: P.x, y0: P.y }; } },
   trap: { n: 'Set snare', fn: () => { if (!SF.count(P.pack, 'trapkit')) return log('You need a snare kit.', '#ffb070'); if (TRAPS.filter(t => t.owner === 'P').length >= SF.TRAP.max) return log('You already have two snares set.', '#ffb070'); if (TRAPS.some(t => Math.hypot(t.x - P.x, t.y - P.y) < SF.TRAP.spacing)) return log('Snares must be at least 4 m apart.', '#ffb070'); P.task = { kind: 'trap', label: 'Setting snare', t0: GT, t1: GT + SF.TRAP.place, still: true, x0: P.x, y0: P.y }; } } };
 function bard(skill) {
   const id = { lullaby: 'lullaby', discord: 'discord', provocation: 'provoke' }[skill];
@@ -936,7 +1138,7 @@ const TASKS = {
 function chestLoot(tier) { const c = SF.newContainer('chest'); const add = (id, a, b) => { const q = rnd(a, b); if (q > 0) c.items.push(SF.newItem(id, q, SF.WEARABLE(id) ? { cond: rnd(70, 100), maxc: 100 } : null)); };
   if (tier === 0) { add('gold', 15, 40); add('bandage', 2, 5); add(pick(Object.values(SF.REAGENT)), 2, 5); }
   if (tier === 1) { add('gold', 40, 90); add('draught', 0, 1); add('ironbar', 1, 2); add('lockpick', 1, 3); add(pick(Object.values(SF.REAGENT)), 3, 6); }
-  if (tier === 2) { add('gold', 100, 200); add('bellshard', 1, 2); add('draught', 1, 2); if (R() < .35) add(pick(['chain', 'glaive', 'crossbow', 'leather']), 1, 1); }
+  if (tier === 2) { add('gold', 100, 200); add('bellshard', 1, 2); add('draught', 1, 2); if (R() < .35) add(pick(['chain', 'glaive', 'crossbow', 'leather', 'kryss', 'battleaxe', 'spear']), 1, 1); }
   return c; }
 /* fresh: the lid actually opens; otherwise this only reopens the loot panel of an open chest (UI only) */
 function openChest(c, fresh) { springRuneTrap(c, false); P.lootOpen = { kind: 'chest', x: c.x + .5, y: c.y + .5, cont: c.cont, name: 'chest', expires: c.refill }; openPanel('loot'); if (fresh) sndAt('chest.open', P.lootOpen, { delay: .3 }); else snd('ui.open'); }
@@ -1028,6 +1230,8 @@ SF.ITEMS.wick = { n: 'Dry wick', kg: .05, stack: 1, cat: 'quest' };
 MON.wreckcrab = { n: 'wreck crab', col: '#c0502a', size: .9, h: 28, hp: 34, atk: 35, def: 30, dmg: [3, 6], reach: 1.2, tele: .6, rec: 1.4, speed: 2.4, aggro: 6, leash: 9, armor: 15, diff: 30, loot: { shelldust: [1, 2], gold: [2, 6] }, skin: { meat: [1, 1] } };
 MON.skeleton = { n: 'drowned skeleton', col: '#c8b890', size: 1, h: 60, hp: 55, atk: 58, def: 50, dmg: [7, 11], reach: 1.3, tele: .5, rec: 1.1, speed: 3.6, aggro: 7, leash: 18, armor: 12, diff: 55, loot: { gold: [4, 16], bellshard: [0, 1] } };
 SPAWNS.push({ type: 'skeleton', x: 540, y: 330, r: 11, max: 3, n: 0, next: 0 });
+// T2A halves damage to players at the end of a blow; creature damage ranges double so PvE threat stays near v0.16 (tuning)
+for (const k in MON) { const d = MON[k]; if (d._x2) continue; d._x2 = 1; d.dmg = d.dmg.map(v => v * 2); if (d.ranged2) d.ranged2.dmg = d.ranged2.dmg.map(v => v * 2); }
 const Q = () => P.quest || (P.quest = { beacon: 0 });
 const hasWick = () => SF.count(P.pack, 'wick') > 0;
 const crabAlive = () => ents.find(e => e.kind === 'mon' && e.quest && !e.gone && e.hp > 0);
@@ -1352,6 +1556,7 @@ function drawEnt(e) {
   if (P.sel === e && !P.ghost) { g.strokeStyle = relColor(e); g.lineWidth = 2; g.beginPath(); g.ellipse(x, y, 20 * big, 10 * big, 0, 0, 7); g.stroke(); }
   if (e.kind === 'player' && drawForm(g, e, x, y)) { }
   else if (e.kind === 'player') drawScout(g, e, x, y, P.ghost ? 'ghost' : (P.look.cloak || null));
+  else if (e.kind === 'ally') { if (e.ghost) g.globalAlpha = .75; drawScout(g, e, x, y, e.ghost ? 'ghost' : '#2f7a46'); }
   else if (e.kind === 'npc') drawScout(g, e, x, y, NPC_COL[e.role] || '#5a5a5a');
   else if (e.kind === 'mon' && MON[e.type].scout) drawScout(g, e, x, y, MON[e.type].scout);
   else if ((e.kind === 'mon' || (e.kind === 'pet' && e.type)) && BESTIARY.src[e.type]) { drawBestiary(g, e, x, y); }
@@ -1429,8 +1634,8 @@ function drawOverlay(camX, camY) {
     if (e.gone || e === P || e.hidden) continue; const isC = e.kind === 'corpse';
     const hgt = isC ? 18 : e.type && MON[e.type] ? MON[e.type].h : 74; const [x, top] = S(e.x, e.y); const yy = top - hgt / CAM.f * 1 - 6;
     if (x < -150 || x > VW + 150 || yy < -40 || yy > VH + 40) continue;
-    const show = e === P.sel || e.kind === 'npc' && Math.hypot(e.x - P.x, e.y - P.y) < 7 || (isC && e.mine);
-    if ((e.kind === 'mon' || e.kind === 'pet') && e.hp < e.max) { const w = 34, f = cl(e.hp / e.max, 0, 1); g.fillStyle = '#000'; g.fillRect(x - w / 2 - 1, yy - 1, w + 2, 6); g.fillStyle = f > .5 ? '#5fd068' : f > .25 ? '#f0c040' : '#f04848'; g.fillRect(x - w / 2, yy, w * f, 4); }
+    const show = e === P.sel || (e.kind === 'npc' || e.kind === 'ally') && Math.hypot(e.x - P.x, e.y - P.y) < 7 || (isC && (e.mine || e.allyBody));
+    if ((e.kind === 'mon' || e.kind === 'pet' || (e.kind === 'ally' && !e.ghost)) && e.hp < e.max) { const w = 34, f = cl(e.hp / e.max, 0, 1); g.fillStyle = '#000'; g.fillRect(x - w / 2 - 1, yy - 1, w + 2, 6); g.fillStyle = f > .5 ? '#5fd068' : f > .25 ? '#f0c040' : '#f04848'; g.fillRect(x - w / 2, yy, w * f, 4); }
     if (e.kind === 'mon' && e.state === 'tele') { g.font = `bold 18px ${PXF}`; g.lineWidth = 3; g.strokeStyle = '#000'; g.strokeText('!', x, yy - 8); g.fillStyle = '#ff5040'; g.fillText('!', x, yy - 8); }
     if (show) { g.font = `13px ${PXF}`; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,10,.9)'; const nm = e.name; g.strokeText(nm, x, yy - (e.kind === 'mon' && e.state === 'tele' ? 26 : 6)); g.fillStyle = isC ? '#d8d0c0' : relColor(e); g.fillText(nm, x, yy - (e.kind === 'mon' && e.state === 'tele' ? 26 : 6)); }
     if (e.say && e.say.until > GT) { g.font = `13px ${PXF}`; const ty = yy - 24; const tw = g.measureText(e.say.t).width + 12; g.fillStyle = 'rgba(14,20,36,.88)'; g.fillRect(x - tw / 2, ty - 13, tw, 18); g.strokeStyle = '#c8a860'; g.lineWidth = 1; g.strokeRect(x - tw / 2 + .5, ty - 12.5, tw - 1, 17); g.fillStyle = '#f2ecdc'; g.fillText(e.say.t, x, ty); }
@@ -1444,7 +1649,8 @@ function drawOverlay(camX, camY) {
   let row = 0;
   if (P.prep) bar((P.prep.sp.legacy ? 'Preparing ' : '“' + P.prep.sp.chant + '” · ') + P.prep.sp.n, (GT - P.prep.t0) / (P.prep.t1 - P.prep.t0), '#b070ff', row++);
   if (P.held) bar('Holding ' + P.held.sp.n + ' · tap slot to release', 1, '#ffd060', row++);
-  if (P.swing) bar('Wind-up', (GT - P.swing.t0) / (P.swing.t1 - P.swing.t0), '#ff8060', row++);
+  if (P.bandage) { const b = P.bandage; bar(`${{ heal: 'Bandaging', cure: 'Curing', res: 'Resurrecting' }[b.kind]} ${b.self ? 'self' : b.e.name} · ${Math.max(0, b.t1 - GT).toFixed(1)} s${b.slips ? ' · slips ' + b.slips : ''}`, (GT - b.t0) / (b.t1 - b.t0), '#7ee08a', row++); }
+  { const w = wDef(); if (P.armed && w.ammo && !P.ghost) { const left = SF.swingLeft(P.sw, GT, P.stam, w), still = GT - (P.movedAt || -99); bar(left > 0 ? `Reloading ${left.toFixed(1)} s` : still < SF.ARCHERY.aim ? 'Stop to aim' : 'Aimed', left > 0 ? 1 - left / SF.swingDelay(P.stam, w.speed) : Math.min(1, still / SF.ARCHERY.aim), '#ffb060', row++); } }
   if (P.task) bar(P.task.label, (GT - P.task.t0) / (P.task.t1 - P.task.t0), '#6ec6ff', row++);
   if (P.ghost) { g.fillStyle = 'rgba(40,50,80,.28)'; g.fillRect(0, 0, VW, VH); const r = nearestRes(); if (r) { const [tx, ty] = S(r.x, r.y); const d = Math.round(Math.hypot(r.x - P.x, r.y - P.y)); const a = Math.atan2(ty - py, tx - px); const rad = Math.min(VW, VH) * .32, cx = VW / 2 + Math.cos(a) * rad, cy = VH / 2 + Math.sin(a) * rad; const on = tx > 30 && tx < VW - 30 && ty > 60 && ty < VH - 60;
       if (on) { g.save(); g.translate(tx, ty - 90 - 6 * Math.sin(GT * 5)); g.fillStyle = '#f0c94a'; g.strokeStyle = '#000'; g.lineWidth = 2; g.beginPath(); g.moveTo(0, 14); g.lineTo(-11, -2); g.lineTo(-4, -2); g.lineTo(-4, -14); g.lineTo(4, -14); g.lineTo(4, -2); g.lineTo(11, -2); g.closePath(); g.fill(); g.stroke(); g.restore(); }
@@ -1458,7 +1664,7 @@ function buildMini() { const c = document.createElement('canvas'); c.width = W; 
 function drawMini() {
   if (!miniCtx || !P) return; const s = 180, sc = 2.2, g = miniCtx; g.save(); g.clearRect(0, 0, s, s); g.beginPath(); g.arc(s / 2, s / 2, s / 2, 0, 7); g.clip(); g.fillStyle = '#0a1a30'; g.fillRect(0, 0, s, s); g.imageSmoothingEnabled = false;
   g.translate(s / 2, s / 2); g.rotate(Math.PI / 4); g.scale(sc, sc); g.drawImage(miniImg, -P.x, -P.y);
-  if (!P.ghost) for (const e of ents) { if (e.gone || e === P || e.hidden) continue; if (e.kind !== 'mon' && e.kind !== 'npc' && !(e.kind === 'corpse' && e.mine)) continue; const dx = e.x - P.x, dy = e.y - P.y; if (Math.abs(dx) > 45 || Math.abs(dy) > 45) continue; g.fillStyle = e.kind === 'corpse' ? '#f0c94a' : relColor(e); g.fillRect(dx - 1, dy - 1, 2, 2); }
+  if (!P.ghost) for (const e of ents) { if (e.gone || e === P || e.hidden) continue; if (e.kind !== 'mon' && e.kind !== 'npc' && e.kind !== 'ally' && !(e.kind === 'corpse' && e.mine)) continue; const dx = e.x - P.x, dy = e.y - P.y; if (Math.abs(dx) > 45 || Math.abs(dy) > 45) continue; g.fillStyle = e.kind === 'corpse' ? '#f0c94a' : relColor(e); g.fillRect(dx - 1, dy - 1, 2, 2); }
   for (const sh of SHRINES) { g.fillStyle = '#ffd678'; g.fillRect(sh.x - P.x - 2, sh.y - P.y - 2, 4, 4); }
   g.restore(); g.fillStyle = '#fff'; g.fillRect(s / 2 - 3, s / 2 - 3, 6, 6); g.strokeStyle = '#c8a860'; g.lineWidth = 3; g.beginPath(); g.arc(s / 2, s / 2, s / 2 - 1.5, 0, 7); g.stroke();
 }
@@ -1475,12 +1681,12 @@ function bar(id, v, m, lbl) { const el = $(id); el.querySelector('i').style.widt
 function refreshHud() {
   if (!P) return; bar('#hp', P.hp, SF.maxHp(P), 'HP'); bar('#sp', P.stam, SF.maxStam(P), 'ST'); bar('#mp', P.mana, SF.maxMana(P), 'MP');
   $('#pname').textContent = P.name + (P.ghost ? ' · ghost' : '');
-  const chips = []; if (P.hidden) chips.push(`hidden ${Math.max(0, P.stepBudget)} steps`); if (P.poison) chips.push('poisoned'); if (P.meditating) chips.push('meditating'); if (P.veil && P.veil.until > GT && P.veil.left > 0) chips.push('stoneveil ' + Math.round(P.veil.left)); if (P.fed > GT) chips.push('fed'); if (overweight()) chips.push('overweight'); if (inCombat() && !P.ghost) chips.push('in combat'); if (!P.ghost) chips.push(...magicChips());
+  const chips = []; if (P.hidden) chips.push(`hidden ${Math.max(0, P.stepBudget)} steps`); if (P.poison) chips.push('poisoned'); if (P.skillPool > 0) chips.push(f1(P.skillPool) + ' skill points to place'); if (P.meditating) chips.push('meditating'); if (P.veil && P.veil.until > GT && P.veil.left > 0) chips.push('stoneveil ' + Math.round(P.veil.left)); if (P.fed > GT) chips.push('fed'); if (overweight()) chips.push('overweight'); if (inCombat() && !P.ghost) chips.push('in combat'); if (!P.ghost) chips.push(...magicChips());
   $('#chips').textContent = chips.join(' · ');
   $('#zone').textContent = ZONE_NAME[zoneAt(Math.floor(P.x), Math.floor(P.y))] || '';
   const h = hourOfDay(); $('#clock').textContent = String(Math.floor(h)).padStart(2, '0') + ':' + String(Math.floor(h % 1 * 60)).padStart(2, '0');
   const sb = $('#b-run'); sb.classList.toggle('on', !!P.sprintOn); sb.textContent = P.sprintOn ? 'Sprint on' : 'Sprint';
-  const ab = $('#b-atk'); ab.classList.toggle('on', !!P.armed); ab.querySelector('b').textContent = P.armed ? 'Armed' : 'Attack'; ab.querySelector('small').textContent = wDef().fam + (P.drawn ? '' : ' · stowed');
+  const ab = $('#b-atk'); ab.classList.toggle('on', !!P.armed); ab.querySelector('b').textContent = P.armed ? 'Armed' : 'Attack'; { const w = wDef(), left = SF.swingLeft(P.sw, GT, P.stam, w); ab.querySelector('small').textContent = weaponLabel(P) + (left > 0 ? ' · ' + left.toFixed(1) + ' s' : ' · ready'); }
   P.hbPage = P.hbPage || 0; $('#b-page').textContent = 'Bar ' + (P.hbPage + 1) + '/3';
   document.querySelectorAll('.slot').forEach((b, i0) => { const i = i0 + P.hbPage * 3; const s = P.hotbar[i]; const [a, c] = slotLabel(s); b.querySelector('b').textContent = a; b.querySelector('small').textContent = c; const held = s && s.k === 'spell' && P.held && P.held.sp.id === s.id, prep = s && s.k === 'spell' && P.prep && P.prep.sp.id === s.id; b.classList.toggle('held', !!held); b.classList.toggle('prep', !!prep); let cd = 0; if (s && s.k === 'item' && SF.CONSUMABLES[s.id] && P.cd) cd = Math.max(0, (P.cd[SF.CONSUMABLES[s.id].fam] || 0) - GT); b.querySelector('em').textContent = cd ? Math.ceil(cd) : ''; }); magicSlots();
   const g = $('#ghost'); g.hidden = !P.ghost;
@@ -1493,10 +1699,12 @@ function refreshHud() {
 }
 function renderTarget() {
   const el = $('#tgt'), t = P.sel; if (!t || t.gone || P.ghost) { el.hidden = true; return; } el.hidden = false; let body = '', btns = '';
-  if (t === P) { body = `<b>${esc(P.name)}</b> <span class="note">self · heals and bandages land here</span>`; }
+  if (t === P) { body = `<b>${esc(P.name)}</b> <span class="note">self · heals and bandages land here</span>`; btns = btn('useitem', 'Bandage self', { id: 'bandage' }) + btn('abil', 'Anatomy', { id: 'anatomy' }); }
+  else if (t.kind === 'ally') { const f = t.ghost ? 0 : cl(t.hp / t.max, 0, 1); body = `<span class="badge neu">●</span><b>${esc(t.name)}</b> <span class="note">${t.ghost ? 'ghost · waiting to be resurrected' : (t.poison ? 'poisoned · ' : '') + Math.ceil(t.hp) + '/' + t.max + ' HP · ' + (t.order === 'follow' ? 'following' : 'holding')} · ${dist(t, P).toFixed(1)} m</span>${t.ghost ? '' : `<div class="bar sm"><i style="width:${f * 100}%;background:${f > .5 ? '#5fd068' : '#f0c040'}"></i></div>`}`;
+    btns = btn('bandother', t.ghost ? 'Bandage: resurrect ' + esc(t.name) : t.poison ? 'Bandage: cure ' + esc(t.name) : 'Bandage ' + esc(t.name), {}, 'ac') + (t.ghost ? '' : btn('allycmd', t.order === 'follow' ? 'Hold here' : 'Follow me', { c: t.order === 'follow' ? 'wait' : 'follow' }) + btn('abil', 'Anatomy', { id: 'anatomy' })); }
   else if (t.kind === 'mon') { const f = cl(t.hp / t.max, 0, 1), d = MON[t.type]; const st = { idle: 'calm', chase: 'hostile', tele: 'winding up!', strike: 'striking', rec: 'recovering', return: 'leashing back' }[t.state];
     body = `<span class="badge att" title="attackable">◆</span><b>${esc(t.name)}</b> <span class="note">${st} · ${dist(t, P).toFixed(1)} m</span><div class="bar sm"><i style="width:${f * 100}%;background:${f > .5 ? '#5fd068' : f > .25 ? '#f0c040' : '#f04848'}"></i></div>`;
-    const d2 = MON[t.type]; if (ents.some(e => e.kind === 'pet' && !e.gone)) btns += btn('petcmd', 'Pets attack', { c: 'attack' }, 'on'); if (d2.tame && !d2.boss) btns += btn('abil', 'Tame', { id: 'tame' }); if (SF.count(P.pack, 'lute') && !d2.boss) btns += btn('abil', 'Lullaby', { id: 'lullaby' }) + btn('abil', 'Discord', { id: 'discord' }) + btn('abil', 'Provoke', { id: 'provoke' }); if (d2.purse && t.target !== P) btns += btn('abil', 'Pickpocket', { id: 'pick' }); if (t.ward > 0) body += ` <span class="note">ward ${t.ward}</span>`; }
+    const d2 = MON[t.type]; if (ents.some(e => e.kind === 'pet' && !e.gone)) btns += btn('petcmd', 'Pets attack', { c: 'attack' }, 'on'); if (d2.tame && !d2.boss) btns += btn('abil', 'Tame', { id: 'tame' }); if (SF.count(P.pack, 'lute') && !d2.boss) btns += btn('abil', 'Lullaby', { id: 'lullaby' }) + btn('abil', 'Discord', { id: 'discord' }) + btn('abil', 'Provoke', { id: 'provoke' }); if (d2.purse && t.target !== P) btns += btn('abil', 'Pickpocket', { id: 'pick' }); btns += btn('abil', 'Anatomy', { id: 'anatomy' }); if (t.ward > 0) body += ` <span class="note">ward ${t.ward}</span>`; }
   else if (t.kind === 'pet') { const f = cl(t.hp / t.max, 0, 1); body = `<span class="badge neu">●</span><b>${esc(t.name)}</b> <span class="note">${t.order} · ${t.slots || 1} slot${(t.slots || 1) > 1 ? 's' : ''}</span><div class="bar sm"><i style="width:${f * 100}%;background:#5fd068"></i></div>`; btns = btn('petcmd', 'Follow', { c: 'follow' }) + btn('petcmd', 'Stay', { c: 'stay' }) + (t.type ? btn('abil', 'Treat', { id: 'vet' }) : '') + btn('petcmd', 'Dismiss', { c: 'dismiss' }); }
   else if (t.kind === 'npc') { body = `<span class="badge neu" title="neutral">●</span><b>${esc(t.name)}</b>`; btns = `<button class="btn sm ac" data-a="interact">Talk</button>`; }
   else if (t.kind === 'corpse') { const ls = t.cont ? SF.lootStatus(t.cont, P.id, GT) : { label: '' }; body = `<b>${esc(t.name)}</b> <span class="note">${t.mine ? ls.label + ' · ' : ''}${t.cont ? t.cont.items.length + ' stacks' : ''} · ${dist(t, P).toFixed(1)} m</span>`; btns = `<button class="btn sm ac" data-a="interact">Open</button>${t.mon && !t.skinned ? '<button class="btn sm" data-a="skin">Skin</button>' : ''}`; }
@@ -1513,7 +1721,7 @@ addEventListener('blur', resetInput);
 function openPanel(k, tab) { resetInput(); PANEL = k; PTAB = tab || null; renderPanel(true); }
 function closePanel() { PANEL = null; const el = $('#panel'); el.hidden = true; el._h = ''; if (P) P.lootOpen = null; }
 const btn = (a, label, data, cls) => `<button class="btn sm ${cls || ''}" data-a="${a}"${Object.entries(data || {}).map(([k, v]) => ` data-${k}="${esc(v)}"`).join('')}>${label}</button>`;
-const iname = it => (it.qty > 1 ? it.qty + ' × ' : '') + SF.itemName(it) + (it.q ? ` (grade ${it.q + 1})` : '') + (it.quality === 'exceptional' ? ' · exceptional' : '') + (it.maker ? ` · by ${it.maker}` : '') + (SF.WORK_TOOLS[it.id] && !SF.ITEMS[it.id].stack ? ` · ${SF.toolUses(it)} uses` : '') + (it.cond !== undefined && SF.WEARABLE(it.id) ? ` · ${Math.round(it.cond)}/${it.maxc || 100}${it.cond <= 0 ? ' broken' : it.cond < .2 * (it.maxc || 100) ? ' worn' : ''}` : '') + (it.venom ? ` · venom ×${it.venom.charges}` : '');
+const iname = it => (it.qty > 1 ? it.qty + ' × ' : '') + SF.itemName(it) + (it.q ? ` (grade ${it.q + 1})` : '') + (it.quality === 'exceptional' ? ' · exceptional' : '') + (it.maker ? ` · by ${it.maker}` : '') + (SF.WORK_TOOLS[it.id] && !SF.ITEMS[it.id].stack ? ` · ${SF.toolUses(it)} uses` : '') + (it.cond !== undefined && SF.WEARABLE(it.id) ? ` · ${Math.round(it.cond)}/${it.maxc || 100}${it.cond <= 0 ? ' broken' : it.cond < .2 * (it.maxc || 100) ? ' worn' : ''}` : '') + (it.venom ? ` · venom ×${it.venom.charges}` : '') + (SF.weaponOf(it) ? ` · ${SF.weaponSkillName(it)}` : '');
 function renderPanel(top) {
   if (!PANEL || !P) return; const el = $('#panel'); const r = PANELS[PANEL] && PANELS[PANEL](); if (!r) { closePanel(); return; }
   const html = `<div class="ph"><b>${esc(r[0])}</b><button class="x" data-a="close" aria-label="Close">×</button></div><div class="pb">${r[1]}</div>`; if (!top && el._h === html && !el.hidden) return;
@@ -1525,7 +1733,7 @@ const bagSymbols = { weapon:'⚔', shield:'⛨', armor:'♜', coin:'◉', ore:'�
 function bagStats(it) {
   const def = SF.ITEMS[it.id], weapon = SF.WEAPONS[def.wpn];
   const lines = [iname(it), cap1(def.cat || 'item') + ' · ' + SF.itemKg(it).toFixed(2) + ' kg'];
-  if (weapon) lines.push('Base damage ' + weapon.dmg.join('–') + ' · Reach ' + weapon.reach + ' m');
+  if (weapon) { lines.push('Base damage ' + weapon.dmg.join('–') + ' · Reach ' + weapon.reach + ' m'); lines.push(SF.SKILL[weapon.skill].n + ' · speed ' + weapon.speed + ' · STR ' + weapon.str + (weapon.two ? ' · two-handed' : '')); }
   if (def.armor && SF.ARMOR[def.armor] !== undefined) lines.push('Base armor ' + SF.ARMOR[def.armor]);
   if (!def.trade) lines.push('Protected');
   return lines.map(line => '<span>' + esc(line) + '</span>').join('');
@@ -1563,9 +1771,11 @@ function bagPanel() {
 function bagActions(it) {
   const d = SF.ITEMS[it.id]; let a = '';
   if (d.slot) a += btn('equip', 'Equip', { u: it.uid });
-  if (d.use === 'consume' || d.use === 'bandage') a += btn('useitem', 'Use', { id: it.id });
+  if (d.use === 'consume') a += btn('useitem', 'Use', { id: it.id });
+  if (d.use === 'bandage') a += btn('useitem', 'Bandage self', { id: it.id }) + btn('bandother', 'Bandage other', {});
   if (d.use === 'eat') a += btn('useitem', 'Eat', { id: it.id });
   if (d.use || SF.CONSUMABLES[it.id]) a += btn('assign', 'Slot', { k: 'item', id: it.id });
+  if (d.use === 'bandage') a += btn('assign', 'Slot other', { k: 'act', id: 'bandother' });
   if (SF.WEARABLE(it.id) && (it.cond !== undefined && it.cond < (it.maxc || 100))) a += btn('repair', 'Repair', { u: it.uid });
   a += magicItemActions(it);
   a += btn('appraise', 'Appraise', { u: it.uid });
@@ -1578,11 +1788,12 @@ const PANELS = {
     for (const s of ['weapon', 'shield', 'armor']) { const it = P.equip[s]; h += `<div class="row"><span class="v" style="width:4.5em">${s}</span><span class="nm">${it ? esc(iname(it)) : '<span class="note">empty</span>'}</span>${it && SF.WEARABLE(it.id) && it.cond !== undefined && it.cond < (it.maxc || 100) ? btn('repair', 'Repair', { u: it.uid }) : ''}${it && SF.ITEMS[it.id].trade ? btn('uneq', 'Remove', { s }) : ''}</div>`; }
     return ['Character', h + '<p class="note">Stats do not grow by use. Buy points from Master Vey (up to 225 total).</p>']; },
   skills: () => { let h = `<div class="note">Total ${f1(SF.totalSkill(P))} / 700.0 · ▲ raise · ■ hold · ▼ lower (gives points when you hit the cap)</div>`;
-    for (const [k, n, g, live] of SF.SKILLS) { const s = P.skills[k]; const lk = s.lock === 'raise' ? '▲' : s.lock === 'hold' ? '■' : '▼'; h += `<div class="row ${live ? '' : 'na'}"><span class="nm">${n}${live ? '' : ' <span class="note">later milestone</span>'}</span><span class="v">${f1(s.v)}</span>${btn('lock', lk, { k })}</div>`; }
+    if (P.skillPool > 0) h += `<div class="sec">Combat reform</div><p class="note">${f1(P.skillPool)} trained points from skills that merged in the combat reform are waiting. Tap +1.0 on a skill to place them (never past 100.0 or the 700.0 total).</p>`;
+    for (const [k, n, g, live] of SF.SKILLS) { const s = P.skills[k]; const lk = s.lock === 'raise' ? '▲' : s.lock === 'hold' ? '■' : '▼'; const tip = SF.SKILL_TIP[k]; h += `<div class="row ${live ? '' : 'na'}"${tip ? ` title="${esc(tip)}"` : ''}><span class="nm">${n}${live ? '' : ' <span class="note">later milestone</span>'}${tip ? `<br><span class="note">${esc(tip)}</span>` : ''}</span><span class="v">${f1(s.v)}</span>${P.skillPool > 0 && s.v < SF.SKILL_MAX ? btn('pool', '+1.0', { k }) : ''}${btn('lock', lk, { k })}</div>`; }
     h += '<div class="sec">Recent skill checks</div>' + (SKLOG.slice(-14).reverse().map(l => `<div class="note">${SF.SKILL[l.k].n}: ${esc(l.r)}</div>`).join('') || '<p class="note">None yet.</p>');
     return ['Skills', h]; },
   spells: () => spellbookPanel(),
-  abilities: () => ['Abilities', `<p class="note">Use now or put an action on a hotbar slot (two bars of four).</p>` + [['hide', 'Hide (Concealment)'], ['track', 'Track (Tracking)'], ['meditate', 'Meditate'], ['brace', 'Braced Guard (Shieldwork 50)'], ['search', 'Search (finds hidden foes and snares)'], ['tame', 'Tame (Taming)'], ['vet', 'Treat pet (Veterinary)'], ['lullaby', 'Lullaby (needs a lute)'], ['discord', 'Discord (needs a lute)'], ['provoke', 'Provoke (needs a lute)'], ['pick', 'Pickpocket a smuggler'], ['coat', 'Coat weapon with venom (Venomcraft 30)'], ['trap', 'Set a snare (Trapcraft)']].map(([id, n]) => `<div class="row"><span class="nm">${n}</span>${ABIL[id] ? btn('abil', 'Use', { id }) : ''}${btn('assign', 'Slot', { k: 'act', id })}</div>`).join('')],
+  abilities: () => ['Abilities', `<p class="note">Use now or put an action on a hotbar slot (two bars of four).</p>` + [['bandother', 'Bandage other (Healing: an ally or a player ghost)'], ['anatomy', 'Anatomy (judge a living target)'], ['hide', 'Hide (Concealment)'], ['track', 'Track (Tracking)'], ['meditate', 'Meditate'], ['brace', 'Braced Guard (Parrying 50)'], ['search', 'Search (finds hidden foes and snares)'], ['tame', 'Tame (Taming)'], ['vet', 'Treat pet (Veterinary)'], ['lullaby', 'Lullaby (needs a lute)'], ['discord', 'Discord (needs a lute)'], ['provoke', 'Provoke (needs a lute)'], ['pick', 'Pickpocket a smuggler'], ['coat', 'Coat weapon with venom (Venomcraft 30)'], ['trap', 'Set a snare (Trapcraft)']].map(([id, n]) => `<div class="row"><span class="nm">${n}</span>${ABIL[id] ? btn('abil', 'Use', { id }) : ''}${btn('assign', 'Slot', { k: 'act', id })}</div>`).join('')],
   assign: () => ['Choose a slot', `<p class="note">Assign ${esc(ASSIGN.k === 'spell' ? SF.SPELL[ASSIGN.id].n : ASSIGN.k === 'item' ? SF.ITEMS[ASSIGN.id].n : (ABIL[ASSIGN.id] ? ABIL[ASSIGN.id].n : ASSIGN.id))} to:</p><div class="grid2">${P.hotbar.map((_, i) => btn('setslot', 'Bar ' + (1 + Math.floor(i / 3)) + ' · ' + (i % 3 + 1) + ': ' + esc(slotLabel(P.hotbar[i])[0]), { i })).join('')}</div>`],
   loot: () => { const c = P.lootOpen; if (!c || c.gone) return null; const ls = c.cont ? SF.lootStatus(c.cont, P.id, GT) : { label: '' }; let h = `<div class="note">${c.mine ? 'Your body · ' : ''}${esc(ls.label || '')} · crumbles in ${Math.ceil((c.expires - GT) / 60)} min · pack ${P.pack.items.length}/${SF.SLOTS}, ${packKg().toFixed(1)}/${SF.carryKg(P).toFixed(1)} kg</div>`;
     if (!c.cont.items.length) h += '<p class="note">Empty.</p>'; else h += btn('takeall', 'Take all', {}, 'ac');
@@ -1606,7 +1817,7 @@ const PANELS = {
   picker: () => ['Which one?', PICK.map((e, i) => `<div class="row"><span class="nm">${esc(e.name)}</span><span class="v">${dist(e, P).toFixed(1)} m</span>${btn('pick', 'Select', { i })}</div>`).join('')],
   menu: () => ['Menu', `<div class="grid2">${btn('open', 'Abilities', { p: 'abilities' })}${btn('open', 'Log', { p: 'log' })}${btn('zoom', 'Zoom ×' + ZOOM)}${btn('mirror', SETTINGS.mirror ? 'Right-handed layout' : 'Left-handed layout')}${btn('sprintt', SETTINGS.stickSprint ? 'Stick sprint: on (push far)' : 'Stick sprint: off (button only)')}${btn('mute', muted ? 'Sound off' : 'Sound on')}${btn('music', SFXA.musicOn ? 'Music on' : 'Music off')}${btn('savenow', 'Save now')}${btn('open', 'How to play', { p: 'help' })}</div><p class="note" style="margin-top:12px">Shardfall web slice · offline M1. ${btn('wipe', 'Delete character', {}, 'on')}</p>`],
   quest: () => questPanel(), journal: () => journalPanel(),
-  help: () => ['How to play', `<p><b>Move</b> with the floating stick on the left. Press <b>Sprint</b> to run faster; it drains 7 stamina a second and switches off when you run out. Tapping the world never moves you.</p><p><b>Target</b> by tapping a creature, person, corpse or resource, or press <b>Target</b> to cycle nearby creatures. Tap your portrait to target yourself.</p><p><b>Attack</b> arms your basic attack on the selected creature; with nothing selected it picks the nearest creature you can see. Enemy spells do the same. You swing whenever it is in reach and your weapon is ready. It never chases, picks targets, casts or loots for you. <b>Cancel</b> disarms and stops actions.</p><p><b>Spells</b>: tap a spell slot to prepare (stand still), it is then held for 3 s; tap a target or tap the slot again to release. Ground spells need a tap on the ground. Casting stows your weapon.</p><p><b>Interact</b> gathers, opens bodies and chests, disarms revealed snares, talks and uses stations in reach. Stairs in the Sunken Bell ruin and the north Ashfen hatch lead down three levels to the Bellkeeper.</p><p><b>Menu → Abilities</b> holds Search, Tame, pet care, bard songs, pickpocketing, venom and snares. <b>Bar</b> cycles through three pages of three slots.</p><p><b>Death</b> in the wilderness leaves tradeable gear on your body for 12 minutes. On protected roads you keep your gear. Walk to a shrine or healer, or wait 12 s to return to your bound shrine. Bank what you cannot afford to lose.</p><p><b>Crafting</b>: Interact at the forge, anvil, bench, still or fire. Pick a category, then a recipe: the detail shows every input, the metal, your odds and what a failure costs before you commit. Mining and smithing mentors stand by the public forge.</p><p><b>Skills</b> rise 0.1 at a time from real use against suitable difficulty, to 100 each and 700 total.</p><p class="note">Keyboard: WASD/arrows move, Shift sprints, Space attack, E interact, 1–3 current bar slots, Tab target, Esc cancel.</p>`] };
+  help: () => ['How to play', `<p><b>Move</b> with the floating stick on the left. Press <b>Sprint</b> to run faster; it drains 7 stamina a second and switches off when you run out. Tapping the world never moves you.</p><p><b>Target</b> by tapping a creature, person, corpse or resource, or press <b>Target</b> to cycle nearby creatures. Tap your portrait to target yourself.</p><p><b>Attack</b> arms your basic attack on the selected creature; with nothing selected it picks the nearest creature you can see. Enemy spells do the same. You swing whenever it is in reach and your weapon is ready. It never chases, picks targets, casts or loots for you. <b>Cancel</b> disarms and stops actions.</p><p><b>Combat</b> follows the Second Age rules: your weapon skill against the defender's sets the hit chance; Tactics, Anatomy and Strength set the damage; armor absorbs part of each blow; a shield parries with half your Parrying as a percent. Swing speed comes from the weapon and your current stamina. Bows and crossbows reload while you move, but you must stand still to aim, and the shot lands a second later.</p><p><b>First Aid</b>: the bandage slot treats you (15 s; poison 18 s). Tap an ally or a ghost and press <b>Bandage</b> to treat them (5 s; poison 6 s; resurrection 10 s at 80 Healing and Anatomy). Being hit makes your fingers slip and the bandage heal less. Wren, a sellsword by the plaza, will follow you if asked.</p><p><b>Spells</b>: tap a spell slot to prepare (stand still), it is then held for 3 s; tap a target or tap the slot again to release. Ground spells need a tap on the ground. Casting stows your weapon.</p><p><b>Interact</b> gathers, opens bodies and chests, disarms revealed snares, talks and uses stations in reach. Stairs in the Sunken Bell ruin and the north Ashfen hatch lead down three levels to the Bellkeeper.</p><p><b>Menu → Abilities</b> holds Search, Tame, pet care, bard songs, pickpocketing, venom and snares. <b>Bar</b> cycles through three pages of three slots.</p><p><b>Death</b> in the wilderness leaves tradeable gear on your body for 12 minutes. On protected roads you keep your gear. Walk to a shrine or healer, or wait 12 s to return to your bound shrine. Bank what you cannot afford to lose.</p><p><b>Crafting</b>: Interact at the forge, anvil, bench, still or fire. Pick a category, then a recipe: the detail shows every input, the metal, your odds and what a failure costs before you commit. Mining and smithing mentors stand by the public forge.</p><p><b>Skills</b> rise 0.1 at a time from real use against suitable difficulty, to 100 each and 700 total.</p><p class="note">Keyboard: WASD/arrows move, Shift sprints, Space attack, E interact, B bandage self, 1–3 current bar slots, Tab target, Esc cancel.</p>`] };
 let PICK = [];
 function uiOpen(k) { openPanel(k); snd('ui.open'); }   // deliberate panel changes only, never on re-render
 
@@ -1621,14 +1832,15 @@ const ACT = {
   qaccept: () => { if (Q().beacon !== 0) return; Q().beacon = 1; snd('quest.accept'); SF.addItem(P.pack, SF.newItem('wick', 1)); log('Quest accepted: A Light for the Quay. You receive a dry wick.', '#ffe08a'); say(P.talkTo || QW(), 'Lantern Road, north. Stick to the road.'); closePanel(); save(); },
   qwick: () => { if (Q().beacon !== 1 || hasWick()) return; SF.addItem(P.pack, SF.newItem('wick', 1)); log('The Quaywarden hands you another wick.', '#ffe08a'); closePanel(); save(); },
   qturn: () => { if (Q().beacon !== 2) return; Q().beacon = 3; snd('quest.complete'); SF.addItem(P.pack, SF.newItem('bandage', 5)); SF.addItem(P.pack, SF.newItem('gold', 40)); log('Quest complete: A Light for the Quay. +5 bandages, +40 gold.', '#7ee08a'); log('Brine Road runs east to the gate. Past the gate pillars, full-loot wilderness rules begin.', '#ffb070'); closePanel(); save(); },
-  atk: toggleArm, interact, cancel: () => { P.armed = false; if (P.prep || P.held) cancelCast(); AIM = null; P.batch = null; if (P.task) { log(P.task.label + ' cancelled.'); P.task = null; } P.meditating = null; },
+  atk: toggleArm, interact, bandother: () => firstAidOther(), allycmd: d => allyCommand(d.c),
+  pool: d => { const n = SF.assignPool(P, d.k, 10); if (n) { log(`${SF.SKILL[d.k].n} +${f1(n)} from the combat reform (${f1(P.skillPool)} left).`, '#7fd4ff'); save(); } else log('That skill or your total is at its cap.', '#ffb070'); renderPanel(); }, cancel: () => { P.armed = false; if (P.prep || P.held) cancelCast(); AIM = null; P.batch = null; if (P.task) { log(P.task.label + ' cancelled.'); P.task = null; } P.meditating = null; },
   cycle: () => { const L = ents.filter(e => e.kind === 'mon' && alive(e) && dist(e, P) < 16 && los(P, e)).sort((a, b) => dist(a, P) - dist(b, P)); if (!L.length) return log('No creatures in sight.'); const i = L.indexOf(P.sel); P.sel = L[(i + 1) % L.length]; },
   slot: d => useSlot(+d.i + (P.hbPage || 0) * 3), page: () => { P.hbPage = ((P.hbPage || 0) + 1) % 3; },
   abil: d => { ABIL[d.id].fn(); }, petcmd: d => petCommand(d.c), appraise: d => { const it = findU(P.pack, d.u); if (!it) return; closePanel(); P.task = { kind: 'appraise', item: it, label: 'Appraising', t0: GT, t1: GT + SF.APPRAISE_TIME, still: true, x0: P.x, y0: P.y }; },
   repair: d => { const it = findU(P.pack, d.u) || Object.values(P.equip).find(e => e && e.uid === +d.u); if (!it) return; const k = SF.repairSkill(it.id); const st = nearestStation(k === 'smithing' ? ['anvil', 'forge'] : ['bench']); if (!st) return log(k === 'smithing' ? 'Repair metal at the smithy anvil.' : 'Repair this at a workbench.', '#ffb070'); if (!SF.count(P.pack, 'repairkit')) return log('You need a repair kit.', '#ffb070'); const rp = SF.repairPlan(it); if (!rp.ok) return log(cap1(rp.reason), '#ffb070'); P.task = { kind: 'repair', item: it, label: 'Repairing', t0: GT, t1: GT + SF.CRAFT_TIME, still: true, x0: P.x, y0: P.y }; }, self: () => { P.sel = P; if (P.held && SF.SPELL[P.held.sp.id].t === 'ally') releaseHeld(P); },
   desel: () => { P.sel = null; P.armed = false; }, ghostret: () => { if (GT - P.ghostAt >= 12) { const s = SHRINES.find(z => z.id === P.bound); resurrect({ x: s.x + .5, y: s.y + .5 }); } },
-  equip: d => { const it = findU(P.pack, d.u); if (!it) return; const def = SF.ITEMS[it.id]; const slot = def.slot; if (slot === 'shield' && P.equip.weapon && SF.WEAPONS[SF.ITEMS[P.equip.weapon.id].wpn].two) unequipTo('weapon'); if (slot === 'weapon' && SF.WEAPONS[def.wpn].two && P.equip.shield) unequipTo('shield'); if (P.equip[slot]) unequipTo(slot); P.pack.items.splice(P.pack.items.indexOf(it), 1); P.equip[slot] = it; snd('item.equip'); if (slot === 'weapon') { P.drawn = false; P.readyAt = Math.max(P.readyAt || 0, GT + SF.SWAP_TIME); } renderPanel(); },
-  uneq: d => { unequipTo(d.s); renderPanel(); }, useitem: d => { const def = SF.ITEMS[d.id]; if (d.id === 'bandage') useBandage(); else if (def.use === 'eat') eat(d.id); else useConsumable(d.id); renderPanel(); },
+  equip: d => { const it = findU(P.pack, d.u); if (!it) return; const def = SF.ITEMS[it.id]; const slot = def.slot; const nw = slot === 'weapon' ? SF.WEAPONS[def.wpn] : null; if (nw && P.str < nw.str) return log(`You are not strong enough to wield that (${nw.n} needs ${nw.str} Strength).`, '#ffb070'); if (slot === 'shield' && P.equip.weapon && (SF.weaponOf(P.equip.weapon) || {}).two) unequipTo('weapon'); if (nw && nw.two && P.equip.shield) unequipTo('shield'); if (P.equip[slot]) unequipTo(slot); P.pack.items.splice(P.pack.items.indexOf(it), 1); P.pack.ver++; P.equip[slot] = it; snd('item.equip'); if (slot === 'weapon') weaponChanged(); renderPanel(); },
+  uneq: d => { unequipTo(d.s); renderPanel(); }, useitem: d => { const def = SF.ITEMS[d.id]; if (d.id === 'bandage') firstAid(P); else if (def.use === 'eat') eat(d.id); else useConsumable(d.id); renderPanel(); },
   drop: d => { const it = findU(P.pack, d.u); if (!it) return; P.pack.items.splice(P.pack.items.indexOf(it), 1); dropPile(it); renderPanel(); },
   assign: d => { ASSIGN = { k: d.k, id: d.id }; openPanel('assign'); }, setslot: d => { P.hotbar[+d.i] = ASSIGN; closePanel(); },
   lock: d => { const s = P.skills[d.k]; s.lock = s.lock === 'raise' ? 'hold' : s.lock === 'hold' ? 'lower' : 'raise'; renderPanel(); },
@@ -1638,7 +1850,7 @@ const ACT = {
   skin: () => { const c = P.lootOpen || P.sel; if (c && c.mon && dist(c, P) <= 2) skin(c); else log('Stand by the remains.'); },
   depgold: () => { let g = 0; for (const it of P.pack.items.filter(i => i.id === 'gold')) if (SF.transfer(P.pack, P.bank, it.uid, it.qty).ok) g++; if (g) snd('loot.coin'); save(); renderPanel(); },
   dep: d => { const it = findU(P.pack, d.u); if (it) SF.transfer(P.pack, P.bank, it.uid, it.qty); save(); renderPanel(); },
-  depeq: d => { const it = P.equip[d.s]; if (!it) return; P.equip[d.s] = null; SF.addItem(P.bank, it); if (d.s === 'weapon') P.drawn = false; save(); renderPanel(); },
+  depeq: d => { const it = P.equip[d.s]; if (!it) return; P.equip[d.s] = null; SF.addItem(P.bank, it); if (d.s === 'weapon') weaponChanged(); save(); renderPanel(); },
   wd: d => { const it = findU(P.bank, d.u); if (!it) return; const r = SF.transfer(P.bank, P.pack, it.uid, it.qty, { cap: cap() }); if (!r.ok) log(r.reason, '#ffb070'); save(); renderPanel(); },
   tab: d => { PTAB = d.t; renderPanel(true); snd('ui.page'); },
   buy: d => { const p = SF.PRICES[d.id] * +d.n; if (SF.count(P.pack, 'gold') < p) return log('Not enough gold.', '#ffb070'); const it = SF.newItem(d.id, +d.n, SF.ITEMS[d.id].stack ? null : SF.WEARABLE(d.id) ? { cond: 100, maxc: 100, omax: 100, origin: 'npc' } : { cond: 100 }); const r = SF.addItem(P.pack, it, cap()); if (!r.ok) return log(r.reason, '#ffb070'); SF.removeQty(P.pack, 'gold', p); snd('loot.coin'); renderPanel(); },
@@ -1698,9 +1910,12 @@ function nodeNote(n) {
   return (sv0 ? `${st.n}/${st.max} strokes` : SF.stockLabel(st.n, st.max)) + (st.n <= 0 ? ` · refills in ${Math.max(1, Math.ceil((st.t - GT) / 60))} min` : '');
 }
 /* tool or a guild loan at the marked Quay faces */
+/* a work tool in the pack or in your hand (a hatchet can be wielded and still chop) */
+function findTool(id) { const it = SF.findTool(P.pack, id); if (it) return it; const w = P.equip.weapon; return w && w.id === id && SF.toolUses(w) > 0 ? w : null; }
+function spendTool(it) { if (P.equip.weapon === it) { it.uses = SF.toolUses(it) - 1; if (it.uses <= 0) { P.equip.weapon = null; weaponChanged(); return true; } return false; } return SF.spendTool(P.pack, it); }
 function gatherTool(n) {
   const id = { woodcutting: 'hatchet', mining: 'pickaxe', fishing: 'rod' }[n.skill]; if (!id) return { ok: true };
-  const it = SF.findTool(P.pack, id); if (it) return { ok: true, it, id };
+  const it = findTool(id); if (it) return { ok: true, it, id };
   if (n.skill === 'mining' && isQuayNode(n.x, n.y) && pickLoan()) return { ok: true, loan: 'Dena\'s pick', id };
   return { ok: false, id };
 }
@@ -1725,7 +1940,7 @@ function finishStroke(n) {
     questEvent({ type: 'harvest', skill: sk, mat, qty: q, quay: isQuayNode(n.x, n.y) });
   } else log({ woodcutting: 'You chop but get nothing usable.', mining: 'You break loose rock but no ore.' }[sk]);
   sndAt(sk === 'mining' ? 'gather.mine' : 'gather.chop', { x: n.x + .5, y: n.y + .5 }); gain(sk, gdiff, { target: 'node:' + n.x + ',' + n.y });
-  if (tl.it && SF.spendTool(P.pack, tl.it)) log('Your ' + SF.ITEMS[tl.id].n.toLowerCase() + ' breaks.', '#ff6a5a');
+  if (tl.it && spendTool(tl.it)) log('Your ' + SF.ITEMS[tl.id].n.toLowerCase() + ' breaks.', '#ff6a5a');
   if (st.n <= 0) { log('The ' + nm + ' is exhausted.'); return; }
   at(.15, () => { if (!P.task && !P.ghost && P.sel === n && Math.hypot(n.x + .5 - P.x, n.y + .5 - P.y) <= 2 && !overweight() && P.speed < .1) startGather(n); });
 }
@@ -1827,7 +2042,7 @@ function guildPanel() {
   return [n.name, h];
 }
 function npcTip(id) {
-  if (id === 'M1') return SF.findTool(P.pack, 'pickaxe') ? 'The marked faces are just west of here.' : 'No pick? Use mine at the marked faces just west of here.';
+  if (id === 'M1') return findTool('pickaxe') ? 'The marked faces are just west of here.' : 'No pick? Use mine at the marked faces just west of here.';
   if (id === 'S1') { const i = gqStep(id); return i === 0 ? '“Harl sells bars for 16 gold, or Dena will show you the quarry.”' : i === 1 ? '“Stand between the forge and my anvil. Mind your bar — a bad strike wastes it.”' : '“Four, and the rest are yours.”'; }
   return '';
 }
@@ -1862,7 +2077,7 @@ function openCraft(k) { CUI = { st: k, cat: null, rid: null, mat: null, n: 10, x
 function craftList() { return SF.RECIPES.filter(r => FAMILY[CUI.st].includes(r.station)); }
 function toolState(r, stn) {
   if (!r.tool) return { ok: true, t: '' };
-  const it = SF.findTool(P.pack, r.tool); if (it) return { ok: true, it, t: `${SF.ITEMS[r.tool].n} · ${SF.toolUses(it)} uses left` };
+  const it = findTool(r.tool); if (it) return { ok: true, it, t: `${SF.ITEMS[r.tool].n} · ${SF.toolUses(it)} uses left` };
   if (r.tool === 'tongs' && gq('S1').s === 'active') return { ok: !!tongsLoan(stn), loan: true, t: tongsLoan(stn) ? 'Mara lends her tongs at this anvil' : 'Mara lends tongs only at her anvil' };
   return { ok: false, t: `Needs ${SF.ITEMS[r.tool].n.toLowerCase()} (Gus sells them)` };
 }
@@ -1931,7 +2146,7 @@ function finishCraft(t) {
   if (!res.ok) { P.batch = null; log('Stopped: ' + res.reason + '.', '#ffb070'); renderPanel(); return; }
   craftSound(r, res.success);
   gain(r.skill, p.diff, { recipe: r.id });
-  if (tool.it && SF.spendTool(P.pack, tool.it)) log('Your ' + SF.ITEMS[r.tool].n.toLowerCase() + ' wear out and break.', '#ff6a5a');
+  if (tool.it && spendTool(tool.it)) log('Your ' + SF.ITEMS[r.tool].n.toLowerCase() + ' wear out and break.', '#ff6a5a');
   if (res.success) { const it = res.items[0]; b.made++;
     log(`You make ${it.qty > 1 ? it.qty + ' × ' : ''}${SF.itemName(it).toLowerCase()}${res.exceptional ? ' — exceptional work!' : ''}.`, res.exceptional ? '#ffe08a' : '#e8e2d2');
     questEvent({ type: recipeCat(r) === 'Smelt' ? 'smelt' : 'make', rid: r.id, out: r.out, mat: SF.matOf(it), qty: it.qty, exceptional: res.exceptional }); }
@@ -1953,7 +2168,17 @@ PANELS.craft = craftPanel; PANELS.guild = guildPanel;
 
 /* ---------- save migration v1 → v2 (§10): additive, backed up once ---------- */
 function migrateSave(s, raw) {
-  if (!s || s.v >= 2) return s;
+  if (!s) return s;
+  if (s.v < 2) migrateV2(s, raw);
+  if (s.v < 3) {   // combat reform (issue #3): skill keys, displaced points, a pre-migration snapshot — once
+    try { if (raw && !localStorage.getItem(SAVEKEY + '.precombat')) localStorage.setItem(SAVEKEY + '.precombat', raw); } catch (e) { }
+    const r = SF.migrateCombatSkills(s.char); s.char.hotbar = s.char.hotbar || [];
+    if (!s.char.hotbar.some(h => h && h.k === 'act' && h.id === 'bandother')) { const i = s.char.hotbar.findIndex((h, k) => !h && k > 0); if (i >= 0) s.char.hotbar[i] = { k: 'act', id: 'bandother' }; else if (s.char.hotbar.length < 9) s.char.hotbar.push({ k: 'act', id: 'bandother' }); }
+    s.combatReform = r; s.v = 3;
+  }
+  return s;
+}
+function migrateV2(s, raw) {
   const walk = fn => { const c = s.char; for (const k of ['pack', 'bank']) if (c[k]) c[k].items.forEach(fn); for (const k in c.equip || {}) if (c.equip[k]) fn(c.equip[k]); for (const co of s.corpses || []) co.items.forEach(fn); };
   walk(it => {
     const d = SF.ITEMS[it.id]; if (!d) return;
@@ -1963,7 +2188,6 @@ function migrateSave(s, raw) {
   s.char.quest = s.char.quest || { beacon: 0 }; s.char.quest.guild = s.char.quest.guild || {};
   s.char.cx = s.char.cx || {}; s.v = 2;
   try { if (raw && !localStorage.getItem(SAVEKEY + '.backup')) localStorage.setItem(SAVEKEY + '.backup', raw); } catch (e) { }
-  return s;
 }
 
 function petCommand(c) {
@@ -1974,7 +2198,7 @@ function petCommand(c) {
     const strong = (p.slots || 1) > 1, ch = p.type ? cl(.6 + sv('beasthandling') / 200 - (strong ? .2 : 0), .3, .98) : 1; if (p.type) gain('beasthandling', strong ? 55 : 30);
     if (R() > ch) { log(p.name + ' ignores you.'); continue; } p.order = c; p.tgt = tgt; }
   say(P, c === 'attack' ? 'Attack!' : c === 'follow' ? 'Heel.' : 'Stay.'); }
-function unequipTo(s) { const it = P.equip[s]; if (!it) return; P.equip[s] = null; if (!SF.addItem(P.pack, it).ok) dropPile(it); if (s === 'weapon') P.drawn = false; }
+function unequipTo(s) { const it = P.equip[s]; if (!it) return; P.equip[s] = null; if (!SF.addItem(P.pack, it).ok) dropPile(it); if (s === 'weapon') weaponChanged(); }
 document.addEventListener('click', ev => { const b = ev.target.closest('[data-a]'); if (!b) return; const f = ACT[b.dataset.a]; if (f && P) { ev.preventDefault(); try { f(b.dataset, b); } catch (e) { console.error(e); } refreshHud(); } });
 
 /* ---------- touch / mouse input ---------- */
@@ -2009,7 +2233,7 @@ addEventListener('keydown', e => { if (!P || e.target.matches('input,select,text
   if (SCREEN || PANEL) {
     if (e.key === 'Escape') { e.preventDefault(); if (SCREEN) closeScreen(); else closePanel(); snd('ui.close'); refreshHud(); }
     return;
-  } if (KM[e.key]) { KEYS[KM[e.key]] = 1; KEYS.any = 1; e.preventDefault(); } if (e.key === 'Shift') KEYS.shift = 1; if (e.key === ' ') { toggleArm(); e.preventDefault(); } if (e.key === 'e' || e.key === 'E') interact(); if (/^[1-3]$/.test(e.key)) ACT.slot({ i: +e.key - 1 }); if (e.key === 'Tab') { ACT.cycle(); e.preventDefault(); } if (e.key === 'Escape') { ACT.cancel(); closePanel(); } refreshHud(); });
+  } if (KM[e.key]) { KEYS[KM[e.key]] = 1; KEYS.any = 1; e.preventDefault(); } if (e.key === 'Shift') KEYS.shift = 1; if (e.key === ' ') { toggleArm(); e.preventDefault(); } if (e.key === 'e' || e.key === 'E') interact(); if (e.key === 'b' || e.key === 'B') firstAid(P); if (/^[1-3]$/.test(e.key)) ACT.slot({ i: +e.key - 1 }); if (e.key === 'Tab') { ACT.cycle(); e.preventDefault(); } if (e.key === 'Escape') { ACT.cancel(); closePanel(); } refreshHud(); });
 addEventListener('keyup', e => { if (KM[e.key]) KEYS[KM[e.key]] = 0; if (e.key === 'Shift') KEYS.shift = 0; KEYS.any = KEYS.u || KEYS.d || KEYS.l || KEYS.r; });
 addEventListener('resize', () => { resize(); if (SCREEN === 'map') { sizeMap(); mapFit(); drawMap(); } if (P && VH > VW && !ROTOK) $('#rot').hidden = false; else $('#rot').hidden = true; });
 
@@ -2018,13 +2242,15 @@ let deletingSave = false;
 const SAVEKEY = 'shardfall.save.v1';
 function save() {
   if (!P || deletingSave) return false; try {
-    const c = {}; for (const k of ['name', 'x', 'y', 'str', 'dex', 'int', 'hp', 'stam', 'mana', 'skills', 'pack', 'bank', 'equip', 'look', 'bound', 'quest', 'freeLessons', 'hotbar', 'ghost', 'ghostAt', 'gainLog', 'recipeN', 'cx']) c[k] = P[k];
+    const c = {}; for (const k of ['name', 'x', 'y', 'str', 'dex', 'int', 'hp', 'stam', 'mana', 'skills', 'pack', 'bank', 'equip', 'look', 'bound', 'quest', 'freeLessons', 'hotbar', 'ghost', 'ghostAt', 'gainLog', 'recipeN', 'cx', 'skillPool', 'combatMig', 'bandSeq', 'bandDone', 'lowerRank']) c[k] = P[k];
+    c.bandage = bandageSave();
     if (P.base) Object.assign(c, P.base); c.magery = { mig: (P.mg && P.mg.mig) || 0 };
     const corpses = ents.filter(e => e.mine && !e.gone).map(e => ({ x: e.x, y: e.y, items: e.cont.items, left: e.expires - GT, diedAgo: GT - e.cont.diedAt }));
     let maxUid = 0; const scan = it => { if (it && it.uid > maxUid) maxUid = it.uid; }; P.pack.items.forEach(scan); P.bank.items.forEach(scan); Object.values(P.equip).forEach(scan); corpses.forEach(c2 => c2.items.forEach(scan));
     const pets = ents.filter(e => e.kind === 'pet' && e.type && !e.summon && !e.gone && e.hp > 0).map(e => ({ type: e.type, hp: e.hp, order: e.order === 'stay' ? 'stay' : 'follow', slots: e.slots, name: e.name, dx: e.x - P.x, dy: e.y - P.y }));
     const nodes = []; for (const [k, o] of RES) nodes.push([k, o.gen || 1, o.spec || 0, o.n, o.max || 0, Math.round(o.t * 10) / 10]);
-    localStorage.setItem(SAVEKEY, JSON.stringify({ v: 2, char: c, corpses, pets, nodes, uid: maxUid + 1, gt: GT, savedAt: Date.now() }));
+    const ally = allySave(); if (ally) { [ally.equip.weapon, ally.equip.shield, ally.equip.armor].forEach(scan); ally.pack.forEach(scan); if (ally.body) ally.body.items.forEach(scan); }
+    localStorage.setItem(SAVEKEY, JSON.stringify({ v: 3, char: c, corpses, pets, nodes, ally, uid: maxUid + 1, gt: GT, savedAt: Date.now() }));
     return true;
   } catch (e) { return false; }
 }
@@ -2032,10 +2258,11 @@ function loadSave() { try { const s = localStorage.getItem(SAVEKEY); return s ? 
 
 /* ---------- boot & creation ---------- */
 const PROFILES = {
-  'Glaive hybrid': { s: [55, 45, 50], k: { polearms: 50, spellcraft: 30, tactics: 20 }, ideal: 'Polearms, Tactics, Spellcraft, Spell Focus, Wardcraft, Meditation, Brawling' },
-  'Venom skirmisher': { s: [50, 60, 40], k: { knives: 50, tactics: 30, medicine: 20 }, ideal: 'Knives, Tactics, Anatomy, Field Medicine, Wardcraft, Venomcraft, Concealment' },
-  'Group healer': { s: [40, 40, 70], k: { spellcraft: 50, medicine: 30, meditation: 20 }, ideal: 'Spellcraft, Spell Focus, Wardcraft, Meditation, Brawling, Field Medicine, Anatomy' },
-  'Archer scout': { s: [45, 65, 40], k: { archery: 50, tactics: 30, concealment: 20 }, ideal: 'Archery, Tactics, Anatomy, Field Medicine, Tracking, Concealment, Shadowstep' },
+  'Glaive hybrid': { s: [55, 45, 50], k: { swordsmanship: 50, spellcraft: 30, tactics: 20 }, ideal: 'Swordsmanship, Tactics, Spellcraft, Spell Focus, Wardcraft, Meditation, Wrestling' },
+  'Venom skirmisher': { s: [50, 60, 40], k: { fencing: 50, tactics: 30, healing: 20 }, ideal: 'Fencing, Tactics, Anatomy, Healing, Wardcraft, Venomcraft, Concealment' },
+  'Group healer': { s: [40, 40, 70], k: { spellcraft: 50, healing: 30, meditation: 20 }, ideal: 'Spellcraft, Spell Focus, Wardcraft, Meditation, Wrestling, Healing, Anatomy' },
+  'Archer scout': { s: [45, 65, 40], k: { archery: 50, tactics: 30, concealment: 20 }, ideal: 'Archery, Tactics, Anatomy, Healing, Tracking, Concealment, Shadowstep' },
+  'Mace dexer': { s: [60, 60, 30], k: { macefighting: 50, tactics: 30, healing: 20 }, ideal: 'Mace Fighting, Tactics, Anatomy, Healing, Parrying, Wardcraft, Wrestling' },
   'Merchant smith': { s: [60, 50, 40], k: { mining: 40, smithing: 40, woodcutting: 20 }, ideal: 'Mining, Smithing, Engineering, Carpentry, Woodcutting, Appraisal, Tailoring' } };
 let CC = { name: '', prof: 'Glaive hybrid', s: [55, 45, 50], k: Object.entries(PROFILES['Glaive hybrid'].k), cloak: '' };
 const CLOAKS = ['', '#8a2a2a', '#2a3a8a', '#5a2a6a', '#3a3a3a', '#8a6a2a'];
@@ -2070,13 +2297,17 @@ function boot(saved, fresh) {
     if (P.ghost && !Number.isFinite(c.ghostAt)) P.ghostAt = GT - 12; }
   else { P = newChar(fresh); starterKit(); }
   P.cx = Object.assign({ survey: {}, pins: [], track: null, mark: false, doors: {} }, P.cx || {}); P.batch = null; applyDoorState();
-  ents.unshift(P); P.sect = P.sect || 0; P.drawn = false; P.readyAt = 0; while (P.hotbar.length < 9) P.hotbar.push(null); Q(); populate(); seedTraps();
+  ents.unshift(P); P.sect = P.sect || 0; P.drawn = false; P.sw = SF.newSwing(); P.movedAt = -99; while (P.hotbar.length < 9) P.hotbar.push(null); Q(); populate(); seedTraps();
+  { const al = makeAlly(saved && saved.ally); const bd = saved && saved.ally && saved.ally.body; if (bd && bd.left > 0) { const cont = SF.newContainer('corpse', al.aid); cont.items = bd.items; cont.diedAt = GT - (bd.diedAgo ?? 999); cont.expires = GT + bd.left; addEnt({ kind: 'corpse', allyBody: al.aid, name: al.name + "'s body", x: bd.x, y: bd.y, cont, expires: GT + bd.left }); } }
+  P.bandage = null; if (saved) bandageLoad(saved.char.bandage);          // an application in flight resumes once, never twice
   if (saved) for (const pt of saved.pets || []) { const d = MON[pt.type]; if (!d) continue; const near = Math.hypot(pt.dx || 0, pt.dy || 0) < 12; addEnt({ kind: 'pet', type: pt.type, name: pt.name || 'your ' + d.n, x: P.x + (near ? pt.dx : 1), y: P.y + (near ? pt.dy : 0), hp: Math.min(pt.hp, d.hp), max: d.hp, state: '', home: { x: P.x, y: P.y }, sect: 0, ward: 0, order: pt.order, slots: pt.slots || 1, target: null }); }
   mageryBoot(saved);
   $('#cc').hidden = true; document.body.classList.toggle('mirror', SETTINGS.mirror);
   log('Welcome to Saltmarsh Quay, ' + P.name + '. Bank what you cannot afford to lose.', '#ffe08a');
   log('Left stick moves; the Sprint button runs. Tap to target. Attack arms your swings. Interact gathers, loots and talks.', '#b6a68a');
   if (P.ghost) log('You are a ghost. Follow the golden arrow to a shrine or healer.', '#ff6a5a');
+  if (saved && saved.combatReform && saved.combatReform.changed) { log('The combat skills now follow the Second Age: Swordsmanship, Mace Fighting, Fencing, Archery, Wrestling, Parrying and Healing. Your trained points moved with them.', '#ffe08a'); if (P.skillPool > 0) log(`${f1(P.skillPool)} points from merged skills wait on your Skills page.`, '#ffe08a'); }
+  if (!saved) log('Wren, a quay sellsword, nurses a wound by the plaza. Tap her to bandage her or ask her to follow you.', '#b6a68a');
   if (VH > VW) $('#rot').hidden = false; save(); refreshHud();
 }
 let last = performance.now(), hudT = 0;
@@ -2087,7 +2318,7 @@ loadScout(SCOUT_SRC); renderCC(); resize(); requestAnimationFrame(loop);
 function spawnMon(type, dx = 3, dy = 0) { const d = MON[type]; if (!d) return null; let x = P.x + dx, y = P.y + dy;
   for (let r = 0; r < 6 && BLK[tAt(Math.floor(x), Math.floor(y))]; r += .5) for (let a = 0; a < 8; a++) { const nx = P.x + dx + Math.cos(a * Math.PI / 4) * r, ny = P.y + dy + Math.sin(a * Math.PI / 4) * r; if (!BLK[tAt(Math.floor(nx), Math.floor(ny))]) { x = nx; y = ny; break; } }
   return addEnt({ kind: 'mon', type, name: d.n, x, y, hp: d.hp, max: d.hp, state: 'idle', home: { x, y }, sect: 0, ward: 0 }); }
-window.__SF = { LOG, spawnMon, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY };
+window.__SF = { LOG, spawnMon, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
 
 }
 </script>

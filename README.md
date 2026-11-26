@@ -13,7 +13,7 @@ Progress saves to the browser's local storage.
 ## Layout
 
 - `src/head.html` — page markup and CSS (HUD, panels).
-- `src/rules.js` — the pure rules module (`SF`): items, skills, recipes, materials, crafting and repair math. No DOM.
+- `src/rules.js` — the pure rules module (`SF`): items, skills, recipes, materials, crafting and repair math, and the Second Age combat and First Aid rules. No DOM.
 - `src/magery.js` — the Magery rules module (`SF.MAGERY`): the 64 spells (data from `docs/magery/spells.json`), success, resistance, damage, statuses, save migration. No DOM.
 - `src/audio.js` — the Web Audio player for the sound pack (`SFXA`).
 - `assets/audio/` — sound pack v1.0.0: `manifest.json` and mono WAV takes (the masters).
@@ -23,16 +23,19 @@ Progress saves to the browser's local storage.
 - `src/magery-art.js` — the 64 spell signs as one embedded atlas.
 - `src/bestiary-art.js` — the 11 bestiary v1 sheets and their manifest, embedded (generated: `python3 tools/embed_bestiary.py` reads `assets/bestiary/Shardfall_Bestiary_v1.0.0.zip`).
 - `src/magic.js` — casting in the world: prepare → hold → release, targets, effects, fields, runes, summons, spellbook panel, hotbar signs.
-- `src/game.js` — the game: world generation, rendering, input, NPCs, quests, crafting UI, save/load.
+- `src/game.js` — the game: world generation, rendering, input, NPCs, quests, crafting UI, save/load, and the one physical-combat resolver every swing goes through.
 - `build.sh` — joins the parts into the game: `./build.sh 0.19` → `Shardfall_v0.19.html` (web build, 5.8 MB); `./build.sh 0.19 --offline` → `Shardfall_v0.19_offline.html` (22 MB, every sound inside, not committed). Needs `python3`.
 - `Shardfall_v0.19.html` — the current built game.
 - `.github/workflows/pages.yml` — publishes the newest build to GitHub Pages as `index.html`, with the audio beside it.
 - `docs/Shardfall_Audio.md` — what plays when, the audio pipeline and sound-release versioning.
 - `docs/Shardfall_Crafting_Guide.md` — the crafting design guide the build follows.
+- `docs/combat/STATUS.md` — combat and First Aid: the rules, the weapon table, the save migration, sources and every approximation.
 - `docs/magery/` — the Magery kit: brief (`Magery_Brief.txt`), illustrated book (`Shardfall_Spellbook.html`, `Spellbook.md`), `spells.json`, reference math, and `STATUS.md` (what is in, what differs, what is left).
 - `tests/rules.test.js` — deterministic rules tests: `node tests/rules.test.js Shardfall_v0.19.html`
 - `tests/magery.test.js` — Magery rules tests: `node tests/magery.test.js Shardfall_v0.19.html`
+- `tests/combat.test.js` — combat and First Aid rules tests: `node tests/combat.test.js Shardfall_v0.19.html`
 - `tests/magery-smoke/run.py` — in-browser Magery scenarios (Playwright + Chrome): `python3 tests/magery-smoke/run.py Shardfall_v0.19.html`
+- `tests/combat-smoke/run.py` — in-browser combat, archery, First Aid, reload, old-save and phone play-test scenarios: `python3 tests/combat-smoke/run.py Shardfall_v0.19.html` (screenshots in `$COMBAT_SHOTS`, default `/tmp/combat-shots`)
 - `tests/backpack-smoke/run.py` — in-browser backpack checks (saved character, three sorts, desktop hover, phone tap, actions after sorting): `python3 tests/backpack-smoke/run.py Shardfall_v0.19.html`
 - `tests/sfx-smoke/run.py` — browser checks for sound, music, doors and footsteps (Playwright + Chrome; serves the web build on a local port): `python3 tests/sfx-smoke/run.py "$PWD/Shardfall_v0.19.html"`
 - `tests/bestiary-smoke/run.py` — bestiary checks in the built game (sheets load, pixel-exact cells, 8 facings, walk / wind-up / impact against the player; preview screenshots when the pack is extracted): `python3 tests/bestiary-smoke/run.py Shardfall_v0.19.html [chrome] [screenshot-dir]`
@@ -41,7 +44,8 @@ Progress saves to the browser's local storage.
 
 - One build with every finished feature branch: sound pack v1.0.0 (#2), online web build and area music (#8), audio handoff (#7), bestiary v1 art and creatures (#4, #6) and the graphical backpack (#5).
 - Opened straight from disk, the game no longer tries to download sound (browsers refuse it and logged an error for every take); serve the folder or use the online link for sound.
-- Not in yet: the T2A physical combat and First Aid rework (`feature/t2a-combat-first-aid`) — it rewrites the swing code the sound pack hooks into and has no pull request yet.
+- Second Age combat and First Aid (#9) is in. The sound pack is rewired to the new resolver: a swing or release sound on every attempt (yours, Wren's), one impact per landed blow (flesh, bone, armor, blunt for maces and fists, shield on a parry), a shield or armor sound when a blow is fully absorbed, the ward sound when a spell soaks it, and the bandage sound when an application starts. Wren's hits, fall and return have sound too.
+- The backpack card now names the weapon's skill, speed, Strength and hands, and bandages offer Bandage self, Bandage other and Slot other.
 
 ## v0.18 — online play and music
 
@@ -61,6 +65,15 @@ Progress saves to the browser's local storage.
 - Sprites follow the existing combat states: neutral when standing, the walk cycle while moving, the wind-up pose for the whole telegraph and the impact pose on the strike resolution, then recover. Facing is locked from the telegraph to the end of the swing.
 - Sheets are drawn untouched (no outline, tint or alpha cut), so the Lich Lord's turquoise rim and gold glints show as painted.
 - Not yet: spawn placement, balance (stats are provisional placeholders), dedicated death art. Corpses use the standard bones. To see one, run `__SF.spawnMon('lich_lord')` in the browser console.
+
+## v0.18c — Second Age combat and First Aid (built in parallel, #9)
+- Combat skills are now Swordsmanship, Mace Fighting, Fencing, Archery, Wrestling, Parrying and Healing. Each weapon uses its UO profile: real dice, speed, STR, hands; the pack names its skill.
+- Hit chance is your weapon skill against the defender's; Tactics, Anatomy and Strength set damage; armor absorbs part of each blow; a shield parries at half your Parrying; player recipients take half. Maces and war hammers drain stamina and wear armor.
+- Swing speed comes from the weapon and your current stamina (quarter-second ticks, 1.25–10 s). One swing timer: a ready swing survives a target change, an unequip or a held spell; equipping during recovery restarts it.
+- Bows and crossbows reload while you move but need you to stand still to aim; one arrow or bolt per release; the shot lands a second later.
+- First Aid: bandage yourself (15 s; poison 18 s) or another (5 s; poison 6 s; resurrection 10 s). Cure at 60/60, resurrect at 80/80. Blows make your fingers slip. The application is saved with the game.
+- Wren, a sellsword at the plaza, follows you on request, fights by the same rules, and can be bandaged or brought back from a ghost.
+- Old saves migrate once (snapshot in `shardfall.save.v1.precombat`); merged points wait on the Skills page. Details: `docs/combat/STATUS.md`.
 
 ## v0.16 — Cancel cast
 
