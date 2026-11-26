@@ -1355,10 +1355,61 @@ function renderPanel(top) {
   const html = `<div class="ph"><b>${esc(r[0])}</b><button class="x" data-a="close" aria-label="Close">×</button></div><div class="pb">${r[1]}</div>`; if (!top && el._h === html && !el.hidden) return;
   const sb = el.querySelector('.pb'); const st = sb && !top ? sb.scrollTop : 0; el.innerHTML = html; el._h = html; el.hidden = false; el.querySelector('.pb').scrollTop = st;
 }
+let bagSort = 'Category', bagUid = null;
+const bagSymbols = { weapon:'⚔', shield:'⛨', armor:'♜', coin:'◉', ore:'◆', metal:'▰', timber:'▥', reagent:'✧', potion:'⚗', tool:'⚒', food:'❧', medic:'✚', ammo:'➶', cloth:'▧' };
+
+function bagStats(it) {
+  const def = SF.ITEMS[it.id], weapon = SF.WEAPONS[def.wpn];
+  const lines = [iname(it), cap1(def.cat || 'item') + ' · ' + SF.itemKg(it).toFixed(2) + ' kg'];
+  if (weapon) lines.push('Base damage ' + weapon.dmg.join('–') + ' · Reach ' + weapon.reach + ' m');
+  if (def.armor && SF.ARMOR[def.armor] !== undefined) lines.push('Base armor ' + SF.ARMOR[def.armor]);
+  if (!def.trade) lines.push('Protected');
+  return lines.map(line => '<span>' + esc(line) + '</span>').join('');
+}
+
+function bagPanel() {
+  const items = P.pack.items.slice();
+  const category = it => SF.ITEMS[it.id].cat || 'other';
+  items.sort((a,b) => {
+    if (bagSort === 'Category') {
+      const byType = category(a).localeCompare(category(b));
+      if (byType) return byType;
+    }
+    if (bagSort === 'Quantity' && a.qty !== b.qty) return b.qty - a.qty;
+    return SF.itemName(a).localeCompare(SF.itemName(b)) || a.uid - b.uid;
+  });
+  const kg = packKg(), max = SF.carryKg(P);
+  let h = '<div class="note">' + items.length + '/' + SF.SLOTS + ' stacks · ' + kg.toFixed(1) + '/' + max.toFixed(1) + ' kg · ' + SF.count(P.pack,'gold') + ' gold' + (kg > max ? ' · overweight: walk only' : '') + '</div>';
+  h += '<div class="bagsorts">Sort ' + ['Category','Name','Quantity'].map(s => btn('bagsort',s,{s},s === bagSort ? 'on' : '')).join('') + '</div>';
+  const selected = findU(P.pack, bagUid);
+  if (selected) h += '<div class="bagcard">' + bagStats(selected) + '<div>' + bagActions(selected) + '</div></div>';
+  let group;
+  h += '<div class="baggrid">';
+  for (const it of items) {
+    const cat = category(it);
+    if (bagSort === 'Category' && group !== cat) {
+      group = cat;
+      h += '<b class="baggroup">' + esc(cap1(cat)) + '</b>';
+    }
+    h += '<button class="bagcell" data-a="baginspect" data-u="' + it.uid + '" aria-pressed="' + (selected === it) + '"><i aria-hidden="true">' + (bagSymbols[cat] || '◇') + '</i><small>' + esc(SF.itemName(it)) + '</small>' + (it.qty > 1 ? '<strong>' + it.qty + '</strong>' : '') + '<span class="bagtip" role="tooltip">' + bagStats(it) + '</span></button>';
+  }
+  return ['Backpack', h + (items.length ? '' : 'Your backpack is empty.') + '</div>'];
+}
+
+function bagActions(it) {
+  const d = SF.ITEMS[it.id]; let a = '';
+  if (d.slot) a += btn('equip', 'Equip', { u: it.uid });
+  if (d.use === 'consume' || d.use === 'bandage') a += btn('useitem', 'Use', { id: it.id });
+  if (d.use === 'eat') a += btn('useitem', 'Eat', { id: it.id });
+  if (d.use || SF.CONSUMABLES[it.id]) a += btn('assign', 'Slot', { k: 'item', id: it.id });
+  if (SF.WEARABLE(it.id) && (it.cond !== undefined && it.cond < (it.maxc || 100))) a += btn('repair', 'Repair', { u: it.uid });
+  a += magicItemActions(it);
+  a += btn('appraise', 'Appraise', { u: it.uid });
+  if (d.trade) a += btn('drop', 'Drop', { u: it.uid });
+  return a;
+}
 const PANELS = {
-  bag: () => { const kg = packKg(), mk = SF.carryKg(P); let h = `<div class="note">${P.pack.items.length}/${SF.SLOTS} stacks · ${kg.toFixed(1)}/${mk.toFixed(1)} kg ${kg > mk ? '<b class="warn">overweight: walk only</b>' : ''} · ${SF.count(P.pack, 'gold')} gold</div>`;
-    for (const it of P.pack.items) { const d = SF.ITEMS[it.id]; let a = ''; if (d.slot) a += btn('equip', 'Equip', { u: it.uid }); if (d.use === 'consume' || d.use === 'bandage') a += btn('useitem', 'Use', { id: it.id }); if (d.use === 'eat') a += btn('useitem', 'Eat', { id: it.id }); if (d.use || SF.CONSUMABLES[it.id]) a += btn('assign', 'Slot', { k: 'item', id: it.id }); if (SF.WEARABLE(it.id) && (it.cond !== undefined && it.cond < (it.maxc || 100))) a += btn('repair', 'Repair', { u: it.uid }); a += magicItemActions(it); a += btn('appraise', 'Appraise', { u: it.uid }); if (d.trade) a += btn('drop', 'Drop', { u: it.uid }); h += `<div class="row"><span class="nm">${esc(iname(it))}${d.trade ? '' : ' <span class="note">protected</span>'}</span><span class="v">${SF.itemKg(it).toFixed(2)} kg</span>${a}</div>`; }
-    return ['Pack', h]; },
+  bag: bagPanel,
   gear: () => { const t = (k, n) => `<span>${n}</span><span>${P[k]}</span>`; let h = `<div class="kv">${t('str', 'Strength')}${t('dex', 'Dexterity')}${t('int', 'Intellect')}<span>Stat total</span><span>${P.str + P.dex + P.int} / 225</span><span>Health</span><span>${Math.floor(P.hp)} / ${SF.maxHp(P)}</span><span>Stamina</span><span>${Math.floor(P.stam)} / ${SF.maxStam(P)}</span><span>Mana</span><span>${Math.floor(P.mana)} / ${SF.maxMana(P)}</span><span>Armor</span><span>${armorVal()} (${armorType()})</span><span>Weapon</span><span>${wDef().fam} · ${wDef().dmg.join('–')} · reach ${wDef().reach} m · recovery ${SF.recovery(wDef().rec, P.dex, P.stam / SF.maxStam(P)).toFixed(2)} s</span><span>Bound shrine</span><span>${SHRINES.find(s => s.id === P.bound).n}</span><span>Skills</span><span>${f1(SF.totalSkill(P))} / 700.0</span></div><div class="sec">Equipped</div>`;
     for (const s of ['weapon', 'shield', 'armor']) { const it = P.equip[s]; h += `<div class="row"><span class="v" style="width:4.5em">${s}</span><span class="nm">${it ? esc(iname(it)) : '<span class="note">empty</span>'}</span>${it && SF.WEARABLE(it.id) && it.cond !== undefined && it.cond < (it.maxc || 100) ? btn('repair', 'Repair', { u: it.uid }) : ''}${it && SF.ITEMS[it.id].trade ? btn('uneq', 'Remove', { s }) : ''}</div>`; }
     return ['Character', h + '<p class="note">Stats do not grow by use. Buy points from Master Vey (up to 225 total).</p>']; },
@@ -1397,6 +1448,8 @@ let PICK = [];
 /* ---------- actions ---------- */
 const findU = (c, u) => c.items.find(it => it.uid === +u);
 const ACT = {
+  bagsort: d => { bagSort = d.s; renderPanel(); },
+  baginspect: d => { bagUid = bagUid === d.u ? null : d.u; renderPanel(); },
   close: closePanel, open: d => openPanel(d.p), bag: () => openPanel('bag'), gear: () => openPanel('gear'), skills: () => openPanel('skills'), spells: () => openPanel('spells'), menu: () => openPanel('menu'), logp: () => openPanel('log'),
   hudmenu: () => openScreen('menu'), map: () => openScreen('map'), scrclose: closeScreen, mapfit: () => { mapFit(); drawMap(); }, journal: () => { closeScreen(); openPanel('journal'); },
   mgo: d => { closeScreen(); ACT[d.p](); },
