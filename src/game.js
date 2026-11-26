@@ -780,7 +780,7 @@ function openCorpse(c) {
   if (P.ghost) return; if (dist(c, P) > 2) return log('Move within 2 m.'); if (!los(P, c)) return log('No line of sight.');
   P.opening = GT + .35; at(.35, () => { P.opening = 0; if (!c.gone && dist(c, P) <= 3) { P.lootOpen = c; openPanel('loot'); sndAt('loot.rummage', c); } });
 }
-function talk(n) { if (annTalk(n)) return; if (n.role === 'assay' || n.role === 'qsmith') { if (P.ghost) return; P.talkTo = n; return openPanel('guild'); } if (n.role === 'quaywarden') { if (P.ghost) return resurrect(); P.talkTo = n; return openPanel('quest'); } if (n.role === 'healer' || n.role === 'guard') { if (P.ghost) return resurrect(); say(n, n.role === 'guard' ? 'Keep the peace inside the Quay.' : 'Rest easy. Bind at the shrine if you travel.'); return; } P.talkTo = n; openPanel(n.role === 'banker' || n.role === 'campbank' ? 'bank' : n.role === 'trainer' ? 'trainer' : 'shop'); }
+function talk(n) { if (n.dev) return say(n, n.nav && n.nav.state === 'moving' ? 'On my way to ' + (n.nav.goal.name || 'somewhere') + '.' : 'Just passing through.'); if (annTalk(n)) return; if (n.role === 'assay' || n.role === 'qsmith') { if (P.ghost) return; P.talkTo = n; return openPanel('guild'); } if (n.role === 'quaywarden') { if (P.ghost) return resurrect(); P.talkTo = n; return openPanel('quest'); } if (n.role === 'healer' || n.role === 'guard') { if (P.ghost) return resurrect(); say(n, n.role === 'guard' ? 'Keep the peace inside the Quay.' : 'Rest easy. Bind at the shrine if you travel.'); return; } P.talkTo = n; openPanel(n.role === 'banker' || n.role === 'campbank' ? 'bank' : n.role === 'trainer' ? 'trainer' : 'shop'); }
 
 /* ---------- world population ---------- */
 function populate() {
@@ -822,11 +822,13 @@ function update(dt) {
     if (!inCombat() && !P.poison) P.hp = Math.min(SF.maxHp(P), P.hp + (P.fed > GT ? 1 : .1) * dt);
     if (P.poison && GT >= P.poison.next) { P.poison.next = GT + SF.POISON_GAP; damagePlayer(SF.POISON[P.poison.tier], null, 'poison'); if (P.poison && --P.poison.ticks <= 0) P.poison = null; }
   }
+  navTick(); const aiT0 = DEV.on ? performance.now() : 0;
   for (const e of ents.slice()) {                                    // every actor is driven by its controller; corpses are objects that decay
     if (e.gone || e === P) continue;
     if (e.kind === 'corpse') { if (GT > e.expires) { if (e.mine) log('Your body has crumbled to dust, and everything on it is gone.', '#ff6a5a'); rmEnt(e); if (P.lootOpen === e) { closePanel(); P.lootOpen = null; } } continue; }
     const tick = CONTROL[WS ? simAdopt(e) : SIM.controllerFor(archetypeOf(e))]; if (tick) tick(e, dt);
   }
+  if (DEV.on) DEV.aiMs = DEV.aiMs * .95 + (performance.now() - aiT0) * .05;
   sndTick();
   if (GT - spawnT > 1) { spawnT = GT; spawnTick(); }
   if (GT - saveT > 15) { saveT = GT; if (!save() && !P._saveWarn) { P._saveWarn = true; log('Saving failed (browser storage full?). Your last saved game is still safe.', '#ff9a6a'); } }
@@ -837,7 +839,7 @@ function monsterTick(e, dt) {
   if (e.stam !== undefined && GT - (e.hitT || -9) > .75) e.stam = Math.min(monT2A(MON[e.type]).dex, e.stam + 3 * dt); const s0 = e.state; aiMon(e, dt); if (e.state !== s0) monSound(e, s0);
   if (e.poison && GT >= e.poison.next) { e.poison.next = GT + SF.POISON_GAP; damageMon(e, SF.POISON[e.poison.tier], 'poison'); if (e.poison && --e.poison.ticks <= 0) e.poison = null; }
 }
-const CONTROL = { MonsterAI: monsterTick, AnimalAI: monsterTick, CriminalAI: monsterTick, PetAI: (e, dt) => petTick(e, dt), SummonAI: (e, dt) => petTick(e, dt), HirelingAI: (e, dt) => allyTick(e, dt) };
+const CONTROL = { CivilianAI: (e, dt) => townTick(e, dt), MerchantAI: (e, dt) => townTick(e, dt), GuardAI: (e, dt) => townTick(e, dt), MonsterAI: monsterTick, AnimalAI: monsterTick, CriminalAI: monsterTick, PetAI: (e, dt) => petTick(e, dt), SummonAI: (e, dt) => petTick(e, dt), HirelingAI: (e, dt) => allyTick(e, dt) };
 function petTick(p, dt) {
   if (p.summon) return summonTick(p, dt);
   if (p.until && GT > p.until) { rmEnt(p); log('The Reedling sinks back into the reeds.'); return; }
@@ -1039,7 +1041,7 @@ function regDoor(x, y, leaf, mat) {
   for (let ty = Math.floor(d.col[1] - .5); ty <= Math.floor(d.col[3] + .5); ty++) for (let tx = Math.floor(d.col[0] - .5); tx <= Math.floor(d.col[2] + .5); tx++) { const k = ty * W + tx; let a = DOORK.get(k); if (!a) DOORK.set(k, a = []); a.push(d); }
   DOORS.push(d); return d;
 }
-function setDoor(d, open) { d.open = open; d.leaf.id = open ? d.openId : 'door_closed_x'; if (P && P.cx) { P.cx.doors = P.cx.doors || {}; if (open) delete P.cx.doors[d.key]; else P.cx.doors[d.key] = 0; } }
+function setDoor(d, open) { if (d.open !== open) NAV.epoch++; d.open = open; d.leaf.id = open ? d.openId : 'door_closed_x'; if (P && P.cx) { P.cx.doors = P.cx.doors || {}; if (open) delete P.cx.doors[d.key]; else P.cx.doors[d.key] = 0; } }
 function applyDoorState() { const st = (P.cx && P.cx.doors) || {}; for (const d of DOORS) setDoor(d, st[d.key] !== 0); }
 const doorDist = d => Math.hypot(d.x + .5 - P.x, d.y - P.y);
 function nearDoor(r) { let best = null, bd = r || 1.6; for (const d of DOORS) { const dd = doorDist(d); if (dd < bd) { bd = dd; best = d; } } return best; }
@@ -1588,7 +1590,7 @@ function beastSprite(e) {
   const c = document.createElement('canvas'); c.width = dm[0]; c.height = dm[1]; const g = c.getContext('2d'); g.translate(dm[2], dm[3]); g.scale(face * 1.25, 1.25); beastArt(g, e.type, fr, atk);
   s = outlined(pixelize(c)); s.ox = dm[2] + 1; s.oy = dm[3] + 1; SPR.set(k, s); return s;
 }
-const NPC_COL = { assay: '#4a6a7a', qsmith: '#7a3a22', banker: '#2a3a8a', smith: '#6a4a2a', trainer: '#8a2a2a', workshop: '#6a6a2a', apothecary: '#5a2a6a', provisioner: '#8a6a2a', guard: '#5a5a62', healer: '#d8d0c0', outlaw: '#3a2a22' };
+const NPC_COL = { traveller: '#3a6a5a', assay: '#4a6a7a', qsmith: '#7a3a22', banker: '#2a3a8a', smith: '#6a4a2a', trainer: '#8a2a2a', workshop: '#6a6a2a', apothecary: '#5a2a6a', provisioner: '#8a6a2a', guard: '#5a5a62', healer: '#d8d0c0', outlaw: '#3a2a22' };
 /* ---- 8-direction creature sheets: rows S,SW,W,NW,N,NE,E,SE; cols 0-3 walk, 4 wind-up, 5 strike, 6 hit, 7 dead ---- */
 const MSI = {}; for (const k in MON_SHEETS) { const im = new Image(); im.onload = () => { MSI[k] = im; }; im.src = MON_SHEETS[k].src; }
 function sheetFrame(e) {
@@ -1674,8 +1676,8 @@ function drawEffects() {
     if (f.k === 'bolt') { g.strokeStyle = `rgba(200,230,255,${1 - p})`; g.lineWidth = 2; g.beginPath(); let x = X, y = Y - 160; g.moveTo(x, y); while (y < Y - 8) { x += rnd(-8, 8); y += 18; g.lineTo(x, y); } g.stroke(); }
   }
 }
-function hourOfDay() { return (GT / 60 + 9) % 24; }
-function darkness() { if (nightSight()) return 0; if (P && levelAt(Math.floor(P.x), Math.floor(P.y))) return .8; const h = hourOfDay(); let d = 0; if (h >= 20 || h < 5) d = .6; else if (h >= 18) d = (h - 18) / 2 * .6; else if (h < 7) d = (7 - h) / 2 * .6; return d; }
+function hourOfDay() { return WS ? WS.clock.hourAt(GT) : (GT / 60 + 9) % 24; }   // the world clock (src/world.js, src/living.js)
+function darkness() { return lightNow().dark; }   // kept for callers; the light model is lightNow() in src/living.js
 const PXF = '"Pixelify Sans", ui-monospace, monospace';
 function render() {
   if (!P) return; const LW = LB.width, LH = LB.height, vw = LW, vh = LH;
@@ -1690,10 +1692,7 @@ function render() {
   for (const e of ents) { if (e.kind === 'corpse' || e.gone) continue; if (e.hidden && e !== P) continue; const X = SX(e.x, e.y), Y = SY(e.x, e.y); if (X < camX - 100 || X > camX + vw + 100 || Y < camY - 20 || Y > camY + vh + 120) continue; vis.push({ d: e.x + e.y, e }); }
   vis.sort((a, b) => a.d - b.d); for (const v of vis) { if (v.e) drawEnt(v.e); else if (v.p) drawPiece(ctx, v.p); else { const kit = ENVOK && !inDun; if (kit && v.t === T.TR && inFront(v.x, v.y)) ctx.globalAlpha = .45; if (!(kit && envTall(ctx, v.t, v.x, v.y))) drawTall(v.t, v.x, v.y); ctx.globalAlpha = 1; } }
   drawEffects();
-  const dk = darkness(); if (dk > .02) { lctx.globalCompositeOperation = 'source-over'; lctx.clearRect(0, 0, LW, LH); lctx.fillStyle = `rgba(8,12,40,${dk})`; lctx.fillRect(0, 0, LW, LH); lctx.globalCompositeOperation = 'destination-out';
-    const hole = (wx, wy, r) => { const X = SX(wx, wy) - camX, Y = SY(wx, wy) - 24 - camY, RR = r * HW * 1.25; if (X < -RR || Y < -RR || X > LW + RR || Y > LH + RR) return; const gr = lctx.createRadialGradient(X, Y, RR * .15, X, Y, RR); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(.6, 'rgba(0,0,0,.6)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); lctx.fillStyle = gr; lctx.fillRect(X - RR, Y - RR, RR * 2, RR * 2); };
-    hole(P.x, P.y, 4.5); for (const l of LIGHTS) hole(l.x + .5, l.y + .5, l.r); for (const f of FX) if (f.k === 'boom') hole(f.x, f.y, 3);
-    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(lc, 0, 0); }
+  drawLight(LW, LH, camX, camY); devDraw(camX, camY);
   mctx.setTransform(1, 0, 0, 1, 0, 0); mctx.imageSmoothingEnabled = false; mctx.drawImage(LB, 0, 0, LW * DP, LH * DP);
   drawOverlay(camX, camY);
 }
@@ -1762,7 +1761,7 @@ function refreshHud() {
   const chips = []; if (P.hidden) chips.push(`hidden ${Math.max(0, P.stepBudget)} steps`); if (P.poison) chips.push('poisoned'); if (P.skillPool > 0) chips.push(f1(P.skillPool) + ' skill points to place'); if (P.meditating) chips.push('meditating'); if (P.veil && P.veil.until > GT && P.veil.left > 0) chips.push('stoneveil ' + Math.round(P.veil.left)); if (P.fed > GT) chips.push('fed'); if (overweight()) chips.push('overweight'); if (inCombat() && !P.ghost) chips.push('in combat'); if (!P.ghost) chips.push(...magicChips());
   $('#chips').textContent = chips.join(' · ');
   $('#zone').textContent = ZONE_NAME[zoneAt(Math.floor(P.x), Math.floor(P.y))] || '';
-  const h = hourOfDay(); $('#clock').textContent = String(Math.floor(h)).padStart(2, '0') + ':' + String(Math.floor(h % 1 * 60)).padStart(2, '0');
+  { const ck = $('#clock'); ck.textContent = clockText(); ck.title = PERIOD_NAME[SIM.periodOf(hourOfDay())] + ' · day ' + (WS ? WS.clock.dayAt(GT) : 1); }
   const sb = $('#b-run'); sb.classList.toggle('on', !!P.sprintOn); sb.textContent = P.sprintOn ? 'Sprint on' : 'Sprint';
   const ab = $('#b-atk'); ab.classList.toggle('on', !!P.armed); ab.querySelector('b').textContent = P.armed ? 'Armed' : 'Attack'; { const w = wDef(), left = SF.swingLeft(P.sw, GT, P.stam, w); ab.querySelector('small').textContent = weaponLabel(P) + (left > 0 ? ' · ' + left.toFixed(1) + ' s' : ' · ready'); }
   P.hbPage = P.hbPage || 0; $('#b-page').textContent = 'Bar ' + (P.hbPage + 1) + '/3';
@@ -2339,8 +2338,8 @@ function save() {
     const nodes = []; for (const [k, o] of RES) nodes.push([k, o.gen || 1, o.spec || 0, o.n, o.max || 0, Math.round(o.t * 10) / 10]);
     const ally = allySave(); if (ally) { [ally.equip.weapon, ally.equip.shield, ally.equip.armor].forEach(scan); ally.pack.forEach(scan); if (ally.body) ally.body.items.forEach(scan); }
     localStorage.setItem(SAVEKEY, JSON.stringify({ v: 5, char: c, corpses, pets, nodes, ally, sim: WS ? WS.save() : null, uid: maxUid + 1, gt: GT, savedAt: Date.now() }));
-    return true;
-  } catch (e) { return false; }
+    DEV.lastSave = { ok: true, at: GT }; return true;
+  } catch (e) { DEV.lastSave = { ok: false, at: GT }; return false; }
 }
 function loadSave() { try { const s = localStorage.getItem(SAVEKEY); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
 
@@ -2386,6 +2385,8 @@ function boot(saved, fresh) {
   else { P = newChar(fresh); starterKit(); }
   P.cx = Object.assign({ survey: {}, pins: [], track: null, mark: false, doors: {} }, P.cx || {}); P.batch = null; applyDoorState();
   WS = SIM.create({ clock: () => GT, saved: saved && saved.sim, onError: e => console.error(e) }); simAdopt(P);   // actor ids continue from the save
+  if (saved && !(saved.sim && saved.sim.clock)) WS.clock.setHour(GT, (GT / 60 + 9) % 24);   // older saves keep the hour they were at; from now on a day lasts 120 minutes
+  NAV.walk = null; NAV.edge = null; NAV.graph = null; devInit();
   ents.unshift(P); P.sect = P.sect || 0; P.drawn = false; P.sw = SF.newSwing(); P.movedAt = -99; while (P.hotbar.length < 9) P.hotbar.push(null); Q(); populate(); seedTraps();
   { const al = makeAlly(saved && saved.ally); const bd = saved && saved.ally && saved.ally.body; if (bd && bd.left > 0) { const cont = SF.newContainer('corpse', al.aid); cont.items = bd.items; cont.diedAt = GT - (bd.diedAgo ?? 999); cont.expires = GT + bd.left; addEnt({ kind: 'corpse', allyBody: al.aid, name: al.name + "'s body", x: bd.x, y: bd.y, cont, expires: GT + bd.left }); } }
   P.bandage = null; if (saved) bandageLoad(saved.char.bandage);          // an application in flight resumes once, never twice
@@ -2400,14 +2401,14 @@ function boot(saved, fresh) {
   if (VH > VW) $('#rot').hidden = false; save(); refreshHud();
 }
 let last = performance.now(), hudT = 0;
-function loop(t) { const dt = Math.min(.1, (t - last) / 1000); last = t; try { update(dt); render(); if (P && t - hudT > 120) { hudT = t; refreshHud(); drawMini(); if (PANEL === 'loot' || PANEL === 'shop') renderPanel(); renderLog(); } } catch (e) { console.error(e); } requestAnimationFrame(loop); }
-addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+function loop(t) { const dt = Math.min(.5, (t - last) / 1000); last = t; try { if (!SIMPAUSE) { const r = STEPPER.advance(dt, s => { simStep(s); DEV.steps++; }); ALPHA = r.alpha; } if (DEV.on) devFrame(dt); renderInterp(); if (DEV.open && t - (DEV.panelT || 0) > 300) { DEV.panelT = t; devRender(); } if (P && t - hudT > 120) { hudT = t; refreshHud(); drawMini(); if (PANEL === 'loot' || PANEL === 'shop') renderPanel(); renderLog(); } } catch (e) { console.error(e); } requestAnimationFrame(loop); }
+addEventListener('visibilitychange', () => { if (document.hidden) save(); else { last = performance.now(); STEPPER.reset(); } });   // the world pauses while the game is hidden
 loadScout(SCOUT_SRC); renderCC(); resize(); requestAnimationFrame(loop);
 /* dev/test hook: put a creature beside the player, e.g. __SF.spawnMon('lich_lord'). Not used by normal play. */
 function spawnMon(type, dx = 3, dy = 0) { const d = MON[type]; if (!d) return null; let x = P.x + dx, y = P.y + dy;
   for (let r = 0; r < 6 && BLK[tAt(Math.floor(x), Math.floor(y))]; r += .5) for (let a = 0; a < 8; a++) { const nx = P.x + dx + Math.cos(a * Math.PI / 4) * r, ny = P.y + dy + Math.sin(a * Math.PI / 4) * r; if (!BLK[tAt(Math.floor(nx), Math.floor(ny))]) { x = nx; y = ny; break; } }
   return addEnt({ kind: 'mon', type, name: d.n, x, y, hp: d.hp, max: d.hp, state: 'idle', home: { x, y }, sect: 0, ward: 0 }); }
-window.__SF = { get WS() { return WS; }, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
+window.__SF = { get WS() { return WS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
 
 }
 </script>
