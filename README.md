@@ -4,7 +4,11 @@ A T2A-era Ultima Online-style 2.5D isometric sandbox RPG for phones, built as a 
 
 ## Play
 
-Open `Shardfall_v0.17.html` in a browser (phone or desktop). Everything — code, art and sound — is inside that one file, so it plays offline. Progress saves to the browser's local storage.
+**Online:** every merge to `main` publishes the newest build on GitHub Pages (`.github/workflows/pages.yml`; one-time setup: Settings → Pages → Source: GitHub Actions. Pages on a private repository needs a paid GitHub plan, and the site itself is public): `https://shardfall-dev.github.io/Shardfall/`. On iPhone, Share → Add to Home Screen gives it an app icon.
+
+**On your computer:** run `python3 -m http.server` in this folder and open `http://localhost:8000/Shardfall_v0.18.html`. The game loads its sound and music from `assets/audio/web/`, so it needs to be served like this; opened straight from disk it plays silently. For a single file that plays from disk with sound effects, build `./build.sh 0.18 --offline`.
+
+Progress saves to the browser's local storage.
 
 ## Layout
 
@@ -12,20 +16,28 @@ Open `Shardfall_v0.17.html` in a browser (phone or desktop). Everything — code
 - `src/rules.js` — the pure rules module (`SF`): items, skills, recipes, materials, crafting and repair math. No DOM.
 - `src/magery.js` — the Magery rules module (`SF.MAGERY`): the 64 spells (data from `docs/magery/spells.json`), success, resistance, damage, statuses, save migration. No DOM.
 - `src/audio.js` — the Web Audio player for the sound pack (`SFXA`).
-- `assets/audio/` — sound pack v1.0.0: `manifest.json` and mono WAV takes. `tools/embed_audio.py` embeds them at build time.
+- `assets/audio/` — sound pack v1.0.0: `manifest.json` and mono WAV takes (the masters).
+- `assets/audio/web/` — the small AAC copies the game loads (sound 2.1 MB, music 4.9 MB), made by `tools/encode_web_audio.sh` (needs ffmpeg). Re-run it after changing a sound.
+- `assets/music/v1.0.0/` — the Saltmarsh soundtrack: five MIDI sources, MP3 renders and `soundtrack.json`.
 - `src/assets.js` — embedded sprite sheets and art (data URIs; large, not meant for hand-editing).
 - `src/magery-art.js` — the 64 spell signs as one embedded atlas.
 - `src/magic.js` — casting in the world: prepare → hold → release, targets, effects, fields, runes, summons, spellbook panel, hotbar signs.
 - `src/game.js` — the game: world generation, rendering, input, NPCs, quests, crafting UI, save/load.
-- `build.sh` — embeds the sound pack and joins the parts into one playable file: `./build.sh 0.17` → `Shardfall_v0.17.html` (needs `python3`).
-- `Shardfall_v0.17.html` — the current built game.
+- `build.sh` — joins the parts into the game: `./build.sh 0.18` → `Shardfall_v0.18.html` (web build, 3.7 MB); `./build.sh 0.18 --offline` → `Shardfall_v0.18_offline.html` (22 MB, every sound inside, not committed). Needs `python3`.
+- `Shardfall_v0.18.html` — the current built game.
+- `.github/workflows/pages.yml` — publishes the newest build to GitHub Pages as `index.html`, with the audio beside it.
 - `docs/Shardfall_Audio.md` — what plays when, the audio pipeline and sound-release versioning.
 - `docs/Shardfall_Crafting_Guide.md` — the crafting design guide the build follows.
 - `docs/magery/` — the Magery kit: brief (`Magery_Brief.txt`), illustrated book (`Shardfall_Spellbook.html`, `Spellbook.md`), `spells.json`, reference math, and `STATUS.md` (what is in, what differs, what is left).
-- `tests/rules.test.js` — deterministic rules tests: `node tests/rules.test.js Shardfall_v0.17.html`
-- `tests/magery.test.js` — Magery rules tests: `node tests/magery.test.js Shardfall_v0.17.html`
-- `tests/magery-smoke/run.py` — in-browser Magery scenarios (Playwright + Chrome): `python3 tests/magery-smoke/run.py Shardfall_v0.17.html`
-- `tests/sfx-smoke/run.py` — offline browser checks for sound, doors and footsteps (Playwright + Chrome): `python3 tests/sfx-smoke/run.py "$PWD/Shardfall_v0.17.html"`
+- `tests/rules.test.js` — deterministic rules tests: `node tests/rules.test.js Shardfall_v0.18.html`
+- `tests/magery.test.js` — Magery rules tests: `node tests/magery.test.js Shardfall_v0.18.html`
+- `tests/magery-smoke/run.py` — in-browser Magery scenarios (Playwright + Chrome): `python3 tests/magery-smoke/run.py Shardfall_v0.18.html`
+- `tests/sfx-smoke/run.py` — browser checks for sound, music, doors and footsteps (Playwright + Chrome; serves the web build on a local port): `python3 tests/sfx-smoke/run.py "$PWD/Shardfall_v0.18.html"`
+
+## v0.18 — online play and music
+
+- The game is now a small web page (3.7 MB instead of 22 MB) published on GitHub Pages. Sounds are separate small files (2.1 MB in all instead of 14 MB) that download quietly after the first tap.
+- Music: the five Saltmarsh tracks play by area — town, shore, road, marsh, ruins — with a soft crossfade. Each track downloads only when you first reach its area. Menu → **Music on/off**, remembered.
 
 ## v0.17 — sound pack v1.0.0
 

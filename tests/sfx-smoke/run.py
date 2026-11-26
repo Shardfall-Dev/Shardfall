@@ -1,9 +1,19 @@
-"""Offline browser smoke test for the sound integration (headless Chrome via Playwright, network off).
-Usage: python3 tests/sfx-smoke/run.py "$PWD/Shardfall_v0.17.html"   (needs: pip install playwright; a Chrome at /usr/bin/google-chrome)"""
-import json, sys
+"""Browser smoke test for the sound integration (headless Chrome via Playwright).
+Usage: python3 tests/sfx-smoke/run.py "$PWD/Shardfall_v0.18.html"   (needs: pip install playwright; a Chrome at /usr/bin/google-chrome)
+The offline build (…_offline.html, sounds embedded) runs from disk with the network off. The web build loads its
+sounds from assets/audio/web/, so it is served from the file's folder on a local port instead, as GitHub Pages would."""
+import functools, http.server, json, os, sys, threading
 from playwright.sync_api import sync_playwright
 
-HTML = 'file://' + sys.argv[1]
+_path = os.path.abspath(sys.argv[1])
+with open(_path, encoding='utf-8') as _f: OFFLINE = 'var SFX_DATA' in _f.read()
+if OFFLINE: HTML = 'file://' + _path
+else:
+    class _Quiet(http.server.SimpleHTTPRequestHandler):
+        def log_message(self, *a): pass
+    _h = functools.partial(_Quiet, directory=os.path.dirname(_path))
+    _srv = http.server.ThreadingHTTPServer(('127.0.0.1', 0), _h); threading.Thread(target=_srv.serve_forever, daemon=True).start()
+    HTML = 'http://127.0.0.1:%d/%s' % (_srv.server_address[1], os.path.basename(_path))
 RESULTS = []
 def check(name, ok, detail=''):
     RESULTS.append((name, bool(ok))); print(('PASS ' if ok else 'FAIL ') + name + (('  ' + json.dumps(detail, default=str)[:400]) if detail != '' else ''), flush=True)
@@ -33,7 +43,7 @@ with sync_playwright() as pw:
     br = pw.chromium.launch(executable_path='/usr/bin/google-chrome', args=['--mute-audio'])
 
     # ---------- mobile: first gesture is a HUD tap ----------
-    ctx = br.new_context(viewport={'width': 844, 'height': 390}, has_touch=True, is_mobile=True, device_scale_factor=2); ctx.set_offline(True)
+    ctx = br.new_context(viewport={'width': 844, 'height': 390}, has_touch=True, is_mobile=True, device_scale_factor=2); ctx.set_offline(OFFLINE)
     page = ctx.new_page(); errs = []; page.on('pageerror', lambda e: errs.append(str(e)))
     page.goto(HTML); page.wait_for_selector('#ccn')
     st0 = J(page, "SFXA.ctx ? SFXA.ctx.state : 'none'")
@@ -47,7 +57,7 @@ with sync_playwright() as pw:
     check('no page errors on mobile', not errs, errs[:3]); ctx.close()
 
     # ---------- desktop, keyboard-only ----------
-    ctx = br.new_context(viewport={'width': 1280, 'height': 720}); ctx.set_offline(True)
+    ctx = br.new_context(viewport={'width': 1280, 'height': 720}); ctx.set_offline(OFFLINE)
     page = ctx.new_page(); errs = []; page.on('pageerror', lambda e: errs.append(str(e)))
     create(page, 'Keya', keyboard=True); page.wait_for_timeout(300)
     check('keyboard-only startup unlocks audio', J(page, "SFXA.ctx && SFXA.ctx.state") == 'running', J(page, "SFXA.ctx && SFXA.ctx.state"))
@@ -187,7 +197,7 @@ with sync_playwright() as pw:
 
     # ---------- starter quest ----------
     clear(page); J(page, "(() => { const S = __SF; S.Q.beacon = 0; S.ACT.qaccept(); S.Q.beacon = 2; S.ACT.qturn(); })()"); page.wait_for_timeout(200)
-    check('starter quest: accept and reward cues on the stage changes', played(page) == ['quest.accept', 'quest.complete'], played(page))
+    check('starter quest: accept and reward cues on the stage changes', [e for e in played(page) if not e.startswith('world.')] == ['quest.accept', 'quest.complete'], played(page))   # random ambience may fall in the window
 
     # ---------- concurrency, concealment, zone change ----------
     clear(page); J(page, "(() => { for (let i = 0; i < 30; i++) SFXA.play('hit.flesh', { key: 'x' + i }); })()"); vs = J(page, "SFXA.stats.voices")
@@ -214,6 +224,20 @@ with sync_playwright() as pw:
     J(page, "(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => false }); document.dispatchEvent(new Event('visibilitychange')); })()")
     page.wait_for_timeout(400); page.mouse.click(5, 5); page.wait_for_timeout(300); fgs = J(page, "SFXA.ctx.state")
     check('backgrounding suspends and drops pending; foreground resumes', bg == ['suspended', 0, True] and fgs == 'running', [bg, fgs])
+    # ---------- music: one track per area, crossfaded, can be switched off ----------
+    if OFFLINE:   # the offline file has no soundtrack to fetch: it must stay quiet without errors
+        page.wait_for_timeout(1500); check('offline build: no music, no errors', J(page, "SFXA.musicNow") is None)
+    else:
+        tp(page, 92.5, 304.5); page.wait_for_function("SFXA.musicNow === '01-saltmarsh-home'", timeout=15000)
+        check('music: the Quay plays Saltmarsh Home', J(page, "SFXA.musicNow") == '01-saltmarsh-home')
+        far = J(page, """(() => { const S = __SF; for (let y = 120; y < 480; y += 4) for (let x = 380; x < 500; x += 4) if (S.zoneAt(x, y) === 'ashfen' && !S.blockedAt?.(x + .5, y + .5)) return [x + .5, y + .5]; return null; })()""")
+        tp(page, far[0], far[1]); page.wait_for_timeout(1500)
+        held = J(page, "SFXA.musicNow")
+        page.wait_for_function("SFXA.musicNow === '03-mist-on-the-causeway'", timeout=15000)
+        check('music: the marsh switches to Mist on the Causeway after a short stay', held == '01-saltmarsh-home', held)
+        J(page, "__SF.ACT.music()"); page.wait_for_timeout(200)
+        check('music: menu toggle turns it off and remembers', J(page, "[SFXA.musicNow, JSON.parse(localStorage.getItem('shardfall.settings')).music]") == [None, False])
+        J(page, "__SF.ACT.music()"); page.wait_for_function("SFXA.musicNow === '03-mist-on-the-causeway'", timeout=15000)
     check('no page errors on desktop', not errs, errs[:3])
 
     # ---------- older save without door state ----------
