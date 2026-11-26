@@ -12,6 +12,19 @@ Object.assign(MON, {
   sentinel:  { n: 'bell sentinel', col: '#7a6a48', size: 1.3, h: 70, hp: 120, atk: 65, def: 70, dmg: [12, 18], reach: 1.6, tele: 1.1, rec: 2.2, speed: 3.2, aggro: 6, leash: 16, armor: 40, diff: 75, ward: 20, loot: { ironbar: [1, 3], bellshard: [0, 1], gold: [10, 30] } },
   captain:   { n: 'drowned captain', scout: '#1e4a5a', size: 1.1, h: 70, hp: 160, atk: 75, def: 75, dmg: [14, 20], reach: 1.6, tele: .6, rec: 1.3, speed: 4.0, aggro: 8, leash: 20, armor: 25, diff: 85, loot: { gold: [60, 120], bellshard: [1, 2], draught: [0, 2] }, rare: [['chain', .25], ['glaive', .2], ['crossbow', .15]] },
   bellkeeper:{ n: 'the Bellkeeper', col: '#8a6a30', size: 2.2, h: 120, hp: 450, atk: 80, def: 80, dmg: [18, 26], reach: 2.6, tele: 1.4, rec: 2.0, speed: 2.6, aggro: 12, leash: 14, armor: 35, diff: 95, boss: 1, aoe: 2.6, ward: 40, wardEvery: 20, ranged2: { dmg: [12, 18], range: 9, tele: 1.0 }, loot: { gold: [300, 500], bellshard: [3, 6], blacksalt: [4, 8] }, rare: [['plate', .5], ['glaive', .3]] } });
+/* Bestiary v1 creatures (art: src/bestiary-art.js). Stats are provisional placeholders on the existing tiers; spawn placement and balance are separate work, so none are in SPAWNS yet. h = sprite height in px. */
+Object.assign(MON, {
+  slime:           { n: 'bog slime',       size: .8,  h: 42,  hp: 35,  atk: 35, def: 25, dmg: [4, 7],   reach: 1.1, tele: .7,  rec: 1.4, speed: 2.2, aggro: 5,  leash: 14, armor: 2,  diff: 30, poison: [1, .25], loot: { gold: [0, 6], marshroot: [0, 2] } },
+  dire_wolf:       { n: 'dire wolf',       size: 1.05, h: 70, hp: 70,  atk: 65, def: 60, dmg: [8, 12],  reach: 1.3, tele: .45, rec: 1.1, speed: 4.8, aggro: 10, leash: 26, armor: 12, diff: 65, loot: { gold: [0, 6] }, skin: { hide: [2, 3], sinew: [2, 2], meat: [2, 2] } },
+  giant_spider:    { n: 'giant spider',    size: 1.2, h: 66,  hp: 75,  atk: 62, def: 55, dmg: [8, 12],  reach: 1.3, tele: .55, rec: 1.2, speed: 4.2, aggro: 7,  leash: 20, armor: 12, diff: 65, poison: [2, .35], loot: { silk: [3, 6] }, skin: { sinew: [1, 2] } },
+  orc:             { n: 'orc',             size: 1.05, h: 82, hp: 80,  atk: 60, def: 55, dmg: [9, 14],  reach: 1.4, tele: .6,  rec: 1.3, speed: 4.0, aggro: 8,  leash: 22, armor: 22, diff: 60, loot: { gold: [10, 30], bandage: [0, 2] } },
+  lizardman:       { n: 'lizardman',       size: 1,   h: 92,  hp: 75,  atk: 62, def: 60, dmg: [8, 13],  reach: 1.6, tele: .55, rec: 1.2, speed: 4.3, aggro: 8,  leash: 22, armor: 18, diff: 60, loot: { gold: [8, 24] }, skin: { hide: [2, 3] } },
+  harpy:           { n: 'harpy',           size: 1.05, h: 84, hp: 65,  atk: 60, def: 62, dmg: [7, 11],  reach: 1.3, tele: .5,  rec: 1.1, speed: 4.8, aggro: 9,  leash: 24, armor: 8,  diff: 60, loot: { gold: [5, 20] }, skin: { meat: [1, 2] } },
+  gargoyle:        { n: 'gargoyle',        size: 1.2, h: 78,  hp: 110, atk: 68, def: 68, dmg: [11, 16], reach: 1.4, tele: .75, rec: 1.6, speed: 3.8, aggro: 8,  leash: 18, armor: 36, diff: 72, loot: { gold: [20, 50], ironbar: [0, 2] } },
+  troll:           { n: 'troll',           size: 1.4, h: 96,  hp: 160, atk: 70, def: 60, dmg: [14, 20], reach: 1.6, tele: .9,  rec: 1.8, speed: 3.6, aggro: 7,  leash: 18, armor: 24, diff: 78, loot: { gold: [25, 60] }, skin: { hide: [4, 5], meat: [3, 4] } },
+  ettin:           { n: 'ettin',           size: 1.5, h: 94,  hp: 190, atk: 72, def: 62, dmg: [15, 22], reach: 1.7, tele: 1.0, rec: 2.0, speed: 3.4, aggro: 7,  leash: 18, armor: 26, diff: 80, loot: { gold: [30, 70] } },
+  earth_elemental: { n: 'earth elemental', size: 1.5, h: 100, hp: 220, atk: 70, def: 70, dmg: [14, 21], reach: 1.6, tele: 1.1, rec: 2.1, speed: 2.6, aggro: 6,  leash: 14, armor: 45, diff: 82, loot: { gold: [10, 40], ironbar: [1, 4] } },
+  lich_lord:       { n: 'the Lich Lord',   size: 1.6, h: 106, hp: 520, atk: 85, def: 82, dmg: [16, 24], reach: 1.8, tele: 1.0, rec: 1.7, speed: 3.0, aggro: 12, leash: 16, armor: 30, diff: 95, boss: 1, fallLine: 'The cold light leaves its eyes.', ranged2: { dmg: [13, 19], range: 9, tele: 1.0 }, loot: { gold: [300, 500], bellshard: [2, 4], blacksalt: [3, 6] }, rare: [['plate', .4]] } });
 const SPAWNS = [
   { type: 'rat', x: 80, y: 246, r: 18, max: 5 }, { type: 'rat', x: 80, y: 356, r: 18, max: 5 }, { type: 'rat', x: 150, y: 300, r: 16, max: 4 },
   { type: 'boar', x: 215, y: 300, r: 42, max: 9 }, { type: 'boar', x: 290, y: 250, r: 40, max: 7 }, { type: 'boar', x: 300, y: 350, r: 36, max: 6 },
@@ -224,7 +237,7 @@ function killMon(m, src) {
   const corpse = addEnt({ kind: 'corpse', mon: m.type, sect: m.sect || 0, t0: GT, name: d.n + ' remains', x: m.x, y: m.y, cont, expires: GT + (d.boss ? 600 : 240), skinned: !d.skin });
   if (corpse && (P.sel === m || src === P)) { P.sel = corpse; if (!P.lootHinted) { P.lootHinted = true; log('Tap the bones (or press Interact) beside them to loot.', '#ffe08a'); } }
   for (const e of ents) if (e.target === m) { e.target = null; if (e.kind === 'mon') e.state = 'return'; }
-  if (P.sel === m) { P.sel = null; P.armed = false; } log((d.boss ? 'You have felled ' : 'You slay the ') + d.n + '.', '#ffe08a'); if (d.boss) { say(P, 'The bell falls silent.'); }
+  if (P.sel === m) { P.sel = null; P.armed = false; } log((d.boss ? 'You have felled ' : 'You slay the ') + d.n + '.', '#ffe08a'); if (d.boss) { say(P, d.fallLine || 'The bell falls silent.'); }
 }
 
 /* ---------- monsters: telegraph → committed strike → recovery ---------- */
@@ -247,7 +260,7 @@ function aiMon(m, dt) {
       if (dd <= d.reach * .92 && (!d.ranged || los(m, t))) { m.state = 'tele'; m.st = GT; m.mode = d.aoe ? 'aoe' : d.ranged ? 'shot' : 'melee'; m.aim = { x: t.x, y: t.y }; faceToward(m, t.x, t.y); sfx('tele'); }
       else step(t.x, t.y, d.speed);
     } break;
-    case 'tele': { const tt = m.mode === 'r2' ? d.ranged2.tele : d.tele; if (t && m.mode !== 'aoe') faceToward(m, t.x, t.y); if (GT - m.st >= tt) { m.state = 'strike'; m.st = GT; monStrike(m, t); } } break;
+    case 'tele': { const tt = m.mode === 'r2' ? d.ranged2.tele : d.tele; if (t && m.mode !== 'aoe') faceToward(m, t.x, t.y); if (m.atkSt !== m.st) { m.atkSt = m.st; m.atkRow = m.sect || 0; } if (GT - m.st >= tt) { m.state = 'strike'; m.st = GT; m.impactT = GT; monStrike(m, t); } } break;
     case 'strike': if (GT - m.st > .15) { m.state = 'rec'; m.st = GT; } break;
     case 'rec': if (GT - m.st >= d.rec) m.state = m.target ? 'chase' : 'return'; break;
     case 'return': step(m.home.x, m.home.y, d.speed); m.hp = Math.min(m.max, m.hp + m.max * .15 * dt); if (home < 1.2) { m.state = 'idle'; m.hp = m.max; if (d.hideChance && R() < d.hideChance) m.hidden = true; } if (seeP() && home < d.leash * .6) { m.target = P; m.state = 'chase'; } break;
@@ -753,7 +766,7 @@ function bard(skill) {
   const id = { lullaby: 'lullaby', discord: 'discord', provocation: 'provoke' }[skill];
   if (!SF.count(P.pack, 'lute')) return log('You need an instrument (a reed lute from the provisioner).', '#ffb070');
   if (GT < (P.bardReady || 0)) return log('Your hands are still recovering from the last song.');
-  const m = selMon(SF.BARD.range); if (!m) return; if (MON[m.type].boss) return log('The Bellkeeper cannot be swayed by music.', '#ffb070');
+  const m = selMon(SF.BARD.range); if (!m) return; if (MON[m.type].boss) return log(cap1(MON[m.type].n) + ' cannot be swayed by music.', '#ffb070');
   if (skill === 'provocation' && !ents.some(o => o.kind === 'mon' && o !== m && alive(o) && dist(o, m) < 8 && !MON[o.type].boss)) return log('There is no other creature near it to provoke against.', '#ffb070');
   if (!cdReady(id, SF.BARD.cd)) return; P.bardReady = GT + SF.BARD.shared;
   P.task = { kind: 'bard', skill, m, label: SF.SKILL[skill].n, t0: GT, t1: GT + SF.BARD.prep };
@@ -1178,6 +1191,24 @@ function sheetFrame(e) {
   if (e.hitT && GT - e.hitT < .16) return 6; if (e.speed > .3) return Math.floor(GT * 9 + e.id) % 4; return 0;
 }
 function drawSheet(g, type, row, col, x, y) { const im = MSI[type], m = MON_SHEETS[type]; if (!im) return false; g.imageSmoothingEnabled = false; g.drawImage(im, col * m.cw, (row || 0) * m.ch, m.cw, m.ch, Math.round(x - m.fx), Math.round(y - m.fy + 2), m.cw, m.ch); return true; }
+/* ---- Bestiary v1 sheets (src/bestiary-art.js): 160 px cells, rows S..SE, cols stepA, neutral, stepB, wind-up, impact; pivot from the manifest.
+   Poses follow the simulation: 'tele' shows wind-up, the strike event (impactT) starts the impact → recover timing, movement plays the walk cycle.
+   Facing is latched for the whole attack. Drawn unprocessed (no outline, tint or alpha threshold) so baked rims and glints survive. ---- */
+const BSI = {}; for (const k in BESTIARY.src) { const im = new Image(); im.onload = () => { BSI[k] = im; }; im.onerror = () => console.warn('bestiary sheet failed to load:', k); im.src = BESTIARY.src[k]; }
+const BA = BESTIARY.animations, BWALK = BA.walk.durationMs.reduce((a, b) => a + b, 0);
+function bestiaryPose(e) {
+  const atk = BA.attack, ci = atk.contactIndex, row = e.sect || 0;
+  if (e.state === 'tele') return { row: e.atkSt === e.st ? e.atkRow : row, col: atk.frames[ci - 1], ph: 'windup' };
+  if (e.impactT != null) { let ms = (GT - e.impactT) * 1000; for (let i = ci; i < atk.frames.length; i++) { if (ms < atk.durationMs[i]) return { row: e.atkRow ?? row, col: atk.frames[i], ph: i === ci ? 'impact' : 'recover' }; ms -= atk.durationMs[i]; } }
+  if (e.speed > .3) { let ms = (GT * 1000 + (e.id || 0) * 37) % BWALK; for (let i = 0; i < BA.walk.frames.length; i++) { if (ms < BA.walk.durationMs[i]) return { row, col: BA.walk.frames[i], ph: 'walk' }; ms -= BA.walk.durationMs[i]; } }
+  return { row, col: BA.idle.frames[0], ph: 'idle' };
+}
+function drawBestiary(g, e, x, y) {
+  const im = BSI[e.type]; if (!im) return false; const F = BESTIARY.frame, s = MON[e.type].artScale || 1, p = bestiaryPose(e); e.pose = p;
+  g.imageSmoothingEnabled = false; g.drawImage(im, p.col * F.width, p.row * F.height, F.width, F.height, Math.round(x - F.pivot[0] * s), Math.round(y - F.pivot[1] * s), Math.round(F.width * s), Math.round(F.height * s));
+  if (e.rooted > GT) { g.fillStyle = 'rgba(120,90,50,.6)'; g.fillRect(x - 12, y - 4, 24, 4); }
+  return true;
+}
 function drawEnt(e) {
   const x = SX(e.x, e.y), y = SY(e.x, e.y), g = ctx; g.save();
   if (e.hidden && e === P) g.globalAlpha = .45;
@@ -1193,6 +1224,7 @@ function drawEnt(e) {
   else if (e.kind === 'player') drawScout(g, e, x, y, P.ghost ? 'ghost' : (P.look.cloak || null));
   else if (e.kind === 'npc') drawScout(g, e, x, y, NPC_COL[e.role] || '#5a5a5a');
   else if (e.kind === 'mon' && MON[e.type].scout) drawScout(g, e, x, y, MON[e.type].scout);
+  else if ((e.kind === 'mon' || (e.kind === 'pet' && e.type)) && BESTIARY.src[e.type]) { drawBestiary(g, e, x, y); }
   else if ((e.kind === 'mon' || (e.kind === 'pet' && e.type)) && MSI[e.type]) { drawSheet(g, e.type, e.sect, sheetFrame(e), x, y); }
   else if (e.kind === 'mon' || (e.kind === 'pet' && e.type)) { const s = beastSprite(e); g.imageSmoothingEnabled = false; g.drawImage(s, Math.round(x - s.ox), Math.round(y - s.oy)); if (e.rooted > GT) { g.fillStyle = 'rgba(120,90,50,.6)'; g.fillRect(x - 12, y - 4, 24, 4); } }
   else if (e.summon) drawSummon(g, e, x, y);
@@ -1865,7 +1897,11 @@ let last = performance.now(), hudT = 0;
 function loop(t) { const dt = Math.min(.1, (t - last) / 1000); last = t; try { update(dt); render(); if (P && t - hudT > 120) { hudT = t; refreshHud(); drawMini(); if (PANEL === 'loot' || PANEL === 'shop') renderPanel(); renderLog(); } } catch (e) { console.error(e); } requestAnimationFrame(loop); }
 addEventListener('visibilitychange', () => { if (document.hidden) save(); });
 loadScout(SCOUT_SRC); renderCC(); resize(); requestAnimationFrame(loop);
-window.__SF = { LOG, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer };
+/* dev/test hook: put a creature beside the player, e.g. __SF.spawnMon('lich_lord'). Not used by normal play. */
+function spawnMon(type, dx = 3, dy = 0) { const d = MON[type]; if (!d) return null; let x = P.x + dx, y = P.y + dy;
+  for (let r = 0; r < 6 && BLK[tAt(Math.floor(x), Math.floor(y))]; r += .5) for (let a = 0; a < 8; a++) { const nx = P.x + dx + Math.cos(a * Math.PI / 4) * r, ny = P.y + dy + Math.sin(a * Math.PI / 4) * r; if (!BLK[tAt(Math.floor(nx), Math.floor(ny))]) { x = nx; y = ny; break; } }
+  return addEnt({ kind: 'mon', type, name: d.n, x, y, hp: d.hp, max: d.hp, state: 'idle', home: { x, y }, sect: 0, ward: 0 }); }
+window.__SF = { LOG, spawnMon, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer };
 
 }
 </script>
