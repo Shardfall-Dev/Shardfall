@@ -6,7 +6,7 @@ A T2A-era Ultima Online-style 2.5D isometric sandbox RPG for phones, built as a 
 
 **Online:** every merge to `main` publishes the newest build on GitHub Pages (`.github/workflows/pages.yml`; one-time setup: Settings → Pages → Source: GitHub Actions. Pages on a private repository needs a paid GitHub plan, and the site itself is public): `https://shardfall-dev.github.io/Shardfall/`. On iPhone, Share → Add to Home Screen gives it an app icon.
 
-**On your computer:** run `python3 -m http.server` in this folder and open `http://localhost:8000/Shardfall_v0.20.html`. The game loads its sound and music from `assets/audio/web/`, so it needs to be served like this; opened straight from disk it plays silently. For a single file that plays from disk with sound effects, build `./build.sh 0.20 --offline`.
+**On your computer:** run `python3 -m http.server` in this folder and open `http://localhost:8000/Shardfall_v0.21.html`. The game loads its sound and music from `assets/audio/web/`, so it needs to be served like this; opened straight from disk it plays silently. For a single file that plays from disk with sound effects, build `./build.sh 0.21 --offline`.
 
 Progress saves to the browser's local storage.
 
@@ -24,23 +24,39 @@ Progress saves to the browser's local storage.
 - `src/bestiary-art.js` — the 11 bestiary v1 sheets and their manifest, embedded (generated: `python3 tools/embed_bestiary.py` reads `assets/bestiary/Shardfall_Bestiary_v1.0.0.zip`).
 - `src/magic.js` — casting in the world: prepare → hold → release, targets, effects, fields, runes, summons, spellbook panel, hotbar signs.
 - `src/anniabreen.js` — Anniabreen v1.0: the mainland, Vespar's river islands, Skara Bryn and Moonglen; towns, roads, the Mynoc mine, landmark art, ferries, boats, the public moongates and their map symbols.
+- `src/world.js` — the world simulation core (`SIM`): stable actor ids, archetypes and controllers, the structured event log and seeded streams. No DOM; tested in node like the rules.
 - `src/game.js` — the game: world generation, rendering, input, NPCs, quests, crafting UI, save/load, and the one physical-combat resolver every swing goes through.
-- `build.sh` — joins the parts into the game: `./build.sh 0.20` → `Shardfall_v0.20.html` (web build, 5.8 MB); `./build.sh 0.20 --offline` → `Shardfall_v0.20_offline.html` (22 MB, every sound inside, not committed). Needs `python3`.
-- `Shardfall_v0.20.html` — the current built game.
+- `build.sh` — joins the parts into the game: `./build.sh 0.21` → `Shardfall_v0.21.html` (web build, 5.9 MB); `./build.sh 0.21 --offline` → `Shardfall_v0.21_offline.html` (22 MB, every sound inside, not committed). Needs `python3`.
+- `Shardfall_v0.21.html` — the current built game.
 - `.github/workflows/pages.yml` — publishes the newest build to GitHub Pages as `index.html`, with the audio beside it.
+- `docs/WORLD_SIMULATION_MASTER.md` — the Living World master roadmap (the full specification). `docs/WORLD_SIMULATION_PROGRESS.md` — what is built, phase by phase, the audit matrix, asset gaps and the next task.
 - `docs/Shardfall_Audio.md` — what plays when, the audio pipeline and sound-release versioning.
 - `docs/Shardfall_Crafting_Guide.md` — the crafting design guide the build follows.
 - `docs/combat/STATUS.md` — combat and First Aid: the rules, the weapon table, the save migration, sources and every approximation.
 - `docs/magery/` — the Magery kit: brief (`Magery_Brief.txt`), illustrated book (`Shardfall_Spellbook.html`, `Spellbook.md`), `spells.json`, reference math, and `STATUS.md` (what is in, what differs, what is left).
-- `tests/rules.test.js` — deterministic rules tests: `node tests/rules.test.js Shardfall_v0.20.html`
-- `tests/magery.test.js` — Magery rules tests: `node tests/magery.test.js Shardfall_v0.20.html`
-- `tests/combat.test.js` — combat and First Aid rules tests: `node tests/combat.test.js Shardfall_v0.20.html`
-- `tests/magery-smoke/run.py` — in-browser Magery scenarios (Playwright + Chrome): `python3 tests/magery-smoke/run.py Shardfall_v0.20.html`
-- `tests/combat-smoke/run.py` — in-browser combat, archery, First Aid, reload, old-save and phone play-test scenarios: `python3 tests/combat-smoke/run.py Shardfall_v0.20.html` (screenshots in `$COMBAT_SHOTS`, default `/tmp/combat-shots`)
-- `tests/backpack-smoke/run.py` — in-browser backpack checks (saved character, three sorts, desktop hover, phone tap, actions after sorting): `python3 tests/backpack-smoke/run.py Shardfall_v0.20.html`
-- `tests/sfx-smoke/run.py` — browser checks for sound, music, doors and footsteps (Playwright + Chrome; serves the web build on a local port): `python3 tests/sfx-smoke/run.py "$PWD/Shardfall_v0.20.html"`
-- `tests/anniabreen-smoke/run.py` — Anniabreen walk-through (Playwright + Chrome): a scripted walker drives the joystick through the real update loop and times the routes; mine/smelt/bank, ferries, boats, moongates, doors, touch and mouse over a bridge, reload, save migration, phone map: `python3 tests/anniabreen-smoke/run.py Shardfall_v0.20.html [--shots DIR]`
-- `tests/bestiary-smoke/run.py` — bestiary checks in the built game (sheets load, pixel-exact cells, 8 facings, walk / wind-up / impact against the player; preview screenshots when the pack is extracted): `python3 tests/bestiary-smoke/run.py Shardfall_v0.20.html [chrome] [screenshot-dir]`
+- `tests/rules.test.js` — deterministic rules tests: `node tests/rules.test.js Shardfall_v0.21.html`
+- `tests/magery.test.js` — Magery rules tests: `node tests/magery.test.js Shardfall_v0.21.html`
+- `tests/combat.test.js` — combat and First Aid rules tests: `node tests/combat.test.js Shardfall_v0.21.html`
+- `tests/magery-smoke/run.py` — in-browser Magery scenarios (Playwright + Chrome): `python3 tests/magery-smoke/run.py Shardfall_v0.21.html`
+- `tests/combat-smoke/run.py` — in-browser combat, archery, First Aid, reload, old-save and phone play-test scenarios: `python3 tests/combat-smoke/run.py Shardfall_v0.21.html` (screenshots in `$COMBAT_SHOTS`, default `/tmp/combat-shots`)
+- `tests/backpack-smoke/run.py` — in-browser backpack checks (saved character, three sorts, desktop hover, phone tap, actions after sorting): `python3 tests/backpack-smoke/run.py Shardfall_v0.21.html`
+- `tests/sfx-smoke/run.py` — browser checks for sound, music, doors and footsteps (Playwright + Chrome; serves the web build on a local port): `python3 tests/sfx-smoke/run.py "$PWD/Shardfall_v0.21.html"`
+- `tests/anniabreen-smoke/run.py` — Anniabreen walk-through (Playwright + Chrome): a scripted walker drives the joystick through the real update loop and times the routes; mine/smelt/bank, ferries, boats, moongates, doors, touch and mouse over a bridge, reload, save migration, phone map: `python3 tests/anniabreen-smoke/run.py Shardfall_v0.21.html [--shots DIR]`
+- `tests/bestiary-smoke/run.py` — bestiary checks in the built game (sheets load, pixel-exact cells, 8 facings, walk / wind-up / impact against the player; preview screenshots when the pack is extracted): `python3 tests/bestiary-smoke/run.py Shardfall_v0.21.html [chrome] [screenshot-dir]`
+- `tests/world.test.js` — world simulation core tests: `node tests/world.test.js Shardfall_v0.21.html`
+- `tests/world-smoke/run.py` — Living World checks in the built game (actor ids, controllers, shared damage, death once, bounded events, save/load identity, v4 → v5 migration, seeded determinism): `python3 tests/world-smoke/run.py Shardfall_v0.21.html`
+
+## v0.21 — Living World, phase 1: actors and events
+
+The first step of the Living World roadmap (`docs/WORLD_SIMULATION_MASTER.md`, progress in `docs/WORLD_SIMULATION_PROGRESS.md`). Groundwork only: play is unchanged.
+
+- Every actor has a stable id that survives saving and loading: `player:p1`, `npc:odile-banker`, `npc:wren`, `mon:rat:42`. Creature numbers are never reused.
+- Every actor has an archetype (player, civilian, merchant, guard, hireling, criminal, monster, animal, pet, summon) and a controller. The update loop drives actors through their controllers. A tamed creature keeps its id and becomes a pet.
+- One damage entry for blows and spells, whoever deals or takes them. A creature, the player or Wren dies exactly once: one corpse, one loot roll.
+- Important actions leave structured events with simulation time and actor ids: spawn, removal, damage, death, gathering and crafting. The log holds the newest 256.
+- Dungeon chests and dungeon creature types are now the same in every session.
+- Saves move to v5, an additive `sim` block. Older saves load unchanged, and an older build still reads a v5 save.
+- New tests: `tests/world.test.js` (node) and `tests/world-smoke` (Chrome), including a seeded run that is identical step for step.
 
 ## v0.20 — Anniabreen v1.0
 
