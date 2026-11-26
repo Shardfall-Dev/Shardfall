@@ -53,7 +53,7 @@ with sync_playwright() as p:
   # v3 save migration: tile-keyed node and survey records move to the wider grid
   m = pg.evaluate('''() => { const S = __SF; const k = 281 * 600 + 74; const s = { v: 3, char: { cx: { survey: { [k]: { gen: 1, id: 'iron' } } } }, nodes: [[k, 1, 'iron', 3, 8, 0]] };
     S.migrateSave(s, null); return [s.v, s.nodes[0][0], Object.keys(s.char.cx.survey)[0], 281 * S.GW + 74]; }''')
-  check(m[0] == 4 and m[1] == m[3] and int(m[2]) == m[3], f'v3 saves migrate node and survey keys to the wider grid {m}')
+  check(m[0] >= 4 and m[1] == m[3] and int(m[2]) == m[3], f'v3 saves migrate node and survey keys to the wider grid (and on to the current version) {m}')
   if shots:
     for name, (x, y) in {'vespar_bridges': (939, 586), 'mynoc_yard': (563, 303), 'mine_chamber': (615, 214), 'skara_ferry': (184, 644), 'moonglen_court': (1265, 640), 'moonglen_gate': (1205, 607), 'forest_fork': (482, 686), 'miners_cross': (679, 398), 'observatory': (1264, 450), 'waterwheel': (731, 445)}.items():
       pg.evaluate(f'() => {{ __SF.P.x = {x} + 640.5; __SF.P.y = {y} + .5; __SF.update(.01); }}'); pg.wait_for_timeout(300); pg.screenshot(path=os.path.join(shots, name + '.png'))
