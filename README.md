@@ -4,24 +4,37 @@ A T2A-era Ultima Online-style 2.5D isometric sandbox RPG for phones, built as a 
 
 ## Play
 
-Open `Shardfall_v0.16.html` in a browser (phone or desktop). Everything — code, art and audio — is inside that one file. Progress saves to the browser's local storage.
+Open `Shardfall_v0.18.html` in a browser (phone or desktop). Everything — code, art and audio — is inside that one file. Progress saves to the browser's local storage.
 
 ## Layout
 
 - `src/head.html` — page markup and CSS (HUD, panels).
-- `src/rules.js` — the pure rules module (`SF`): items, skills, recipes, materials, crafting and repair math. No DOM.
+- `src/rules.js` — the pure rules module (`SF`): items, skills, recipes, materials, crafting and repair math, and the Second Age combat and First Aid rules. No DOM.
 - `src/magery.js` — the Magery rules module (`SF.MAGERY`): the 64 spells (data from `docs/magery/spells.json`), success, resistance, damage, statuses, save migration. No DOM.
 - `src/assets.js` — embedded sprite sheets and art (data URIs; large, not meant for hand-editing).
 - `src/magery-art.js` — the 64 spell signs as one embedded atlas.
 - `src/magic.js` — casting in the world: prepare → hold → release, targets, effects, fields, runes, summons, spellbook panel, hotbar signs.
-- `src/game.js` — the game: world generation, rendering, input, NPCs, quests, crafting UI, save/load.
-- `build.sh` — joins the parts into one playable file: `./build.sh 0.17` → `Shardfall_v0.17.html`.
-- `Shardfall_v0.16.html` — the current built game.
+- `src/game.js` — the game: world generation, rendering, input, NPCs, quests, crafting UI, save/load, and the one physical-combat resolver every swing goes through.
+- `build.sh` — joins the parts into one playable file: `./build.sh 0.18` → `Shardfall_v0.18.html`.
+- `Shardfall_v0.18.html` — the current built game.
 - `docs/Shardfall_Crafting_Guide.md` — the crafting design guide the build follows.
+- `docs/combat/STATUS.md` — combat and First Aid: the rules, the weapon table, the save migration, sources and every approximation.
 - `docs/magery/` — the Magery kit: brief (`Magery_Brief.txt`), illustrated book (`Shardfall_Spellbook.html`, `Spellbook.md`), `spells.json`, reference math, and `STATUS.md` (what is in, what differs, what is left).
-- `tests/rules.test.js` — deterministic rules tests: `node tests/rules.test.js Shardfall_v0.16.html`
-- `tests/magery.test.js` — Magery rules tests: `node tests/magery.test.js Shardfall_v0.16.html`
-- `tests/magery-smoke/run.py` — in-browser Magery scenarios (Playwright + Chrome): `python3 tests/magery-smoke/run.py Shardfall_v0.16.html`
+- `tests/rules.test.js` — deterministic rules tests: `node tests/rules.test.js Shardfall_v0.18.html`
+- `tests/magery.test.js` — Magery rules tests: `node tests/magery.test.js Shardfall_v0.18.html`
+- `tests/combat.test.js` — combat and First Aid rules tests: `node tests/combat.test.js Shardfall_v0.18.html`
+- `tests/magery-smoke/run.py` — in-browser Magery scenarios (Playwright + Chrome): `python3 tests/magery-smoke/run.py Shardfall_v0.18.html`
+- `tests/combat-smoke/run.py` — in-browser combat, archery, First Aid, reload, old-save and phone play-test scenarios: `python3 tests/combat-smoke/run.py Shardfall_v0.18.html` (screenshots in `$COMBAT_SHOTS`, default `/tmp/combat-shots`)
+
+## v0.18 — Second Age combat and First Aid
+
+- Combat skills are now Swordsmanship, Mace Fighting, Fencing, Archery, Wrestling, Parrying and Healing. Each weapon uses its UO profile: real dice, speed, STR, hands; the pack names its skill.
+- Hit chance is your weapon skill against the defender's; Tactics, Anatomy and Strength set damage; armor absorbs part of each blow; a shield parries at half your Parrying; player recipients take half. Maces and war hammers drain stamina and wear armor.
+- Swing speed comes from the weapon and your current stamina (quarter-second ticks, 1.25–10 s). One swing timer: a ready swing survives a target change, an unequip or a held spell; equipping during recovery restarts it.
+- Bows and crossbows reload while you move but need you to stand still to aim; one arrow or bolt per release; the shot lands a second later.
+- First Aid: bandage yourself (15 s; poison 18 s) or another (5 s; poison 6 s; resurrection 10 s). Cure at 60/60, resurrect at 80/80. Blows make your fingers slip. The application is saved with the game.
+- Wren, a sellsword at the plaza, follows you on request, fights by the same rules, and can be bandaged or brought back from a ghost.
+- Old saves migrate once (snapshot in `shardfall.save.v1.precombat`); merged points wait on the Skills page. Details: `docs/combat/STATUS.md`.
 
 ## v0.16 — Cancel cast
 
