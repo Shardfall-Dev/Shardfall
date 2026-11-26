@@ -42,14 +42,97 @@ function say(e, t) { e.say = { t, until: GT + 3 }; }
 function gain(key, diff, ctx) {
   const r = SF.tryGain(P, key, diff, Object.assign({ now: GT }, ctx || {}));
   SKLOG.push({ k: key, at: GT, r: r.gained ? `+0.1 → ${f1(P.skills[key].v)}` + (r.lowered ? ` (−0.1 ${SF.SKILL[r.lowered].n})` : '') : r.reason }); if (SKLOG.length > 80) SKLOG.shift();
-  if (r.gained) { log(`${SF.SKILL[key].n} +0.1 (${f1(P.skills[key].v)})`, '#7fd4ff', 'skill'); sfx('gain'); }
+  if (r.gained) { log(`${SF.SKILL[key].n} +0.1 (${f1(P.skills[key].v)})`, '#7fd4ff', 'skill'); if (GT - SND.gainAt > 1.5) { SND.gainAt = GT; snd('skill.gain'); } }
   return r;
 }
 
-/* ---------- sound ---------- */
-let AC = null, muted = false;
-function beep(f, d, type, vol, slide) { if (muted || !AC) return; try { const o = AC.createOscillator(), g = AC.createGain(); o.type = type || 'square'; o.frequency.value = f; if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, f * slide), AC.currentTime + d); g.gain.value = vol || .04; g.gain.exponentialRampToValueAtTime(.0001, AC.currentTime + d); o.connect(g); g.connect(AC.destination); o.start(); o.stop(AC.currentTime + d); } catch (e) { } }
-function sfx(k) { ({ hit: () => beep(150, .1, 'sawtooth', .06, .4), miss: () => beep(700, .06, 'triangle', .03, .4), cast: () => beep(420, .3, 'sine', .05, 2.2), fizzle: () => beep(220, .25, 'triangle', .04, .4), gain: () => { beep(880, .08, 'sine', .04); setTimeout(() => beep(1320, .1, 'sine', .04), 90); }, chop: () => beep(240, .06, 'square', .04, .6), coin: () => beep(1600, .05, 'square', .03), boom: () => beep(90, .5, 'sawtooth', .08, .3), tele: () => beep(330, .12, 'square', .03, 1.4), anvil: () => { beep(1480, .16, 'triangle', .05, .7); setTimeout(() => beep(2210, .22, 'sine', .025, .9), 40); }, die: () => beep(300, .6, 'sawtooth', .06, .2) }[k] || (() => { }))(); }
+/* ---------- sound: src/audio.js (SFXA) plays the sound pack; this section decides what plays and where ---------- */
+let AC = null, muted = false;   // AC is SFXA's shared AudioContext once a gesture unlocks it; muted persists in SETTINGS
+const SND = { gainAt: -9, hurtAt: -9, stepAcc: 0, zone: null, ambNext: 0, ambPos: null, grp: {} };
+const snd = (ev, o) => SFXA.play(ev, o);                                                     // UI and the player's own sounds: centred
+const sndAt = (ev, at, o) => SFXA.play(ev, Object.assign({ pos: { x: at.x, y: at.y }, ent: at.kind ? at : null, key: at.id }, o || {}));
+const sndOnce = (k, cd) => { if (GT < (SND.grp[k] || 0)) return false; SND.grp[k] = GT + cd; return true; };   // group cooldown
+/* a world sound is heard only near the player, never from hidden foes, other levels or rooms out of sight */
+SFXA.where = (p, e) => {
+  if (!P) return null; const d = Math.hypot(p.x - P.x, p.y - P.y);
+  if (e && e !== P && e.hidden) return null;
+  const lv = levelAt(Math.floor(P.x), Math.floor(P.y)); if (lv !== levelAt(Math.floor(p.x), Math.floor(p.y))) return null;
+  if (d > 5 && (lv || (e && e.kind === 'mon')) && !los(P, p)) return null;
+  const sx = (SX(p.x, p.y) - SX(P.x, P.y)) / CAM.f; let pan = cl(sx / Math.max(160, VW * .5), -1, 1) * .85; if (d < 2) pan *= d / 2;
+  return { d, pan };
+};
+SFXA.onUnlock(ctx => { AC = ctx; SFXA.warm(['step.stone', 'step.wood', 'step.grass', 'step.dirt', 'step.sand', 'swing.sword', 'swing.dagger', 'swing.glaive', 'swing.hammer', 'swing.unarmed', 'hit.flesh', 'hit.bone', 'door.wood.open', 'door.wood.close', 'rat.alert', 'rat.attack', 'rat.death', 'skeleton.alert', 'skeleton.attack', 'skeleton.death']); });
+const ARMORED = { snapper: 1, wreckcrab: 1, sentinel: 1, bellkeeper: 1, captain: 1 };   // shell or plate
+const CRE = { rat: 'rat', skeleton: 'skeleton', hound: 'hound', boar: 'boar', wreckcrab: 'crab', snapper: 'crab', spider: 'spider', wisp: 'wisp' };
+function hurtVoice(g) { if (GT - SND.hurtAt < .8) return; SND.hurtAt = GT; snd('player.hurt', { gain: g }); }
+/* one impact owner for every blow: hx = { w: weapon, area, quiet, blocked } */
+function hitSound(t, kind, src, hx, lethal) {
+  hx = hx || {}; const me = t === P;
+  if (kind === 'spell') { if (me && !lethal) hurtVoice(.8); return; }   // spells sound at their own effect
+  if (kind === 'poison') { if (me && !lethal) hurtVoice(.45); return; }  // a tick is not a blow
+  if (!hx.quiet && !hx.area) {
+    let ev = 'hit.flesh';
+    if (hx.blocked) ev = 'block.shield';
+    else if (me) ev = armorType() === 'chain' || armorType() === 'plate' ? 'hit.armor' : 'hit.flesh';
+    else if (t.type === 'skeleton') ev = 'hit.bone';
+    else if (ARMORED[t.type]) ev = 'hit.armor';
+    else if (hx.w && (hx.w.fam === 'Hammer' || hx.w.fam === 'Unarmed')) ev = 'hit.blunt';
+    if (me) snd(ev, { key: 'impP' }); else sndAt(ev, t, { key: 'imp' + t.id });
+  }
+  if (me && !lethal) hurtVoice(hx.area ? .8 : 1);
+}
+function swingSound(s) {
+  const fam = s.w.fam; if (s.w.ammo) return;   // bows sound at release
+  s.snd = snd('swing.' + fam.toLowerCase(), { key: 'P', peakIn: s.t1 - GT, late: .05, valid: () => P.swing === s || s.resolved });
+}
+/* creature cues: alert on entering aggro on the player, attack-specific wind-up on the telegraph */
+function monSound(m, s0) {
+  const sp = CRE[m.type], s = m.state, d = MON[m.type];
+  if ((s0 === 'idle' || s0 === 'return') && (s === 'chase' || s === 'tele') && m.target === P && sp && SFXA.has(sp + '.alert')) sndAt(sp + '.alert', m);
+  if (s === 'tele' && s0 !== 'tele') { const ev = d.boss && m.mode === 'aoe' ? 'boss.bell' : m.mode !== 'r2' && sp && SFXA.has(sp + '.attack') ? sp + '.attack' : 'combat.warn'; sndAt(ev, m); }
+}
+function surfaceStep(px, py) {
+  const x = Math.floor(px), y = Math.floor(py), t = tAt(x, y);
+  if (t === T.BR) return 'step.wood';                                    // timber boardwalk over water
+  const b = insideBuildTile(x, y); if (b && b.floor) return b.floor === 'floor_timber' ? 'step.wood' : 'step.stone';
+  if (t === T.FL) return 'step.wood'; if (t === T.CF || t === T.SD || t === T.SU) return 'step.stone';
+  const g = envGroundId(t, x, y, 0) || '';
+  return /shallow|water/.test(g) ? 'step.water' : /cobble/.test(g) ? 'step.stone' : /sand/.test(g) ? 'step.sand' : /mud/.test(g) ? 'step.mud' : /dirt/.test(g) ? 'step.dirt' : 'step.grass';
+}
+/* footfalls follow the Walk clip: two per 8-frame cycle at its speed-scaled frame rate (presentation only, not stepBudget) */
+function stepSound(m) {
+  if (P.ghost) { SND.stepAcc = 0; return; }
+  const sp = Math.max(.5, P.speed), stride = sp * 4 / (12 * Math.min(1.4, Math.max(.7, sp / 5)));
+  SND.stepAcc += m; if (SND.stepAcc < stride) return; SND.stepAcc %= stride;
+  snd(surfaceStep(P.x, P.y), { key: 'P', gain: P.hidden ? .4 : 1 });
+}
+const CRAFT_SND = { tailoring: 'craft.stitch', carpentry: 'craft.saw', fletching: 'craft.fletch', alchemy: 'craft.alchemy', venomcraft: 'craft.alchemy', cooking: 'craft.cook', engineering: 'craft.tinker', trapcraft: 'craft.tinker' };
+function craftSound(r, ok) { if (!sndOnce('craft', .5)) return; snd(!ok ? 'craft.fail' : recipeCat(r) === 'Smelt' ? 'craft.smelt' : CRAFT_SND[r.skill] || (r.station === 'anvil' ? 'craft.smith' : 'craft.saw')); }
+/* spell effects sound at the target or ground point: by spell where it has a clear voice, else by effect, else magic.release */
+const SPELL_SND = { mend: 'magic.heal', gmend: 'magic.heal', cleanse: 'magic.heal', stoneveil: 'magic.ward', step: 'magic.blink', lantern: 'magic.blink', siltbind: 'magic.root', venom: 'magic.poison', hex: 'magic.hex', unweave: 'magic.dispel', reedling: 'magic.summon', ember: 'magic.fire', cinderseal: 'magic.fire', bellfire: 'magic.fire', saltstorm: 'magic.storm', tidelance: 'magic.frost',
+  'magery.18': 'magic.fire', 'magery.28': 'magic.fire', 'magery.51': 'magic.fire', 'magery.30': 'magic.storm', 'magery.49': 'magic.storm', 'magery.55': 'magic.storm', 'magery.43': 'combat.blast', 'magery.37': 'magic.hex', 'magery.23': 'door.unlock', 'magery.14': 'magic.dispel', 'magery.24': 'magic.ward', 'magery.50': 'magic.ward' };
+const EFFECT_SND = { heal: 'magic.heal', armor_boon: 'magic.ward', area_armor_boon: 'magic.ward', melee_ward: 'magic.ward', spell_ward: 'magic.ward', movement: 'magic.blink', travel: 'magic.blink', control: 'magic.root', control_field: 'magic.root', poison: 'magic.poison', poison_field: 'magic.poison', stat_penalty: 'magic.hex', stat_penalty_area: 'magic.hex', dispel: 'magic.dispel', area_dispel: 'magic.dispel', field_removal: 'magic.dispel', summon: 'magic.summon' };
+const DELIVERED = { direct: 1, delayed_hit: 1, conditional_hit: 1, poison: 1, shared_damage: 1, area_percent_hit: 1, cleanse: 1, area_cleanse: 1 };   // these sound where and when they land
+const spellSnd = (sp, at) => sndAt(SPELL_SND[sp.id] || EFFECT_SND[sp.effect] || 'magic.release', at, { key: 'spell' });
+/* per frame: drop cancelled scheduled sounds, clear stale ones on a zone change, schedule sparse ambience */
+function sndTick() {
+  SFXA.tick(); if (!P) return;
+  const x = Math.floor(P.x), y = Math.floor(P.y), z = zoneAt(x, y);
+  if (z !== SND.zone) { if (SND.zone !== null) SFXA.cancelPending(); SND.zone = z; SND.ambNext = GT + 2; }
+  if (GT < SND.ambNext || !AC) return; const r = SFXA.rand; SND.ambNext = GT + 4 + r() * 6;
+  const near = (test, rad) => { for (let k = 0; k < 28; k++) { const a = r() * 6.283, d = 3 + r() * rad, tx = Math.floor(P.x + Math.cos(a) * d), ty = Math.floor(P.y + Math.sin(a) * d); if (test(tAt(tx, ty), tx, ty)) return { x: tx + .5, y: ty + .5 }; } return null; };
+  const still = SND.ambPos && Math.hypot(P.x - SND.ambPos.x, P.y - SND.ambPos.y) < 4, opts = [], lv = levelAt(x, y);
+  if (lv) { const p = near(t => t === T.CF, 12); if (p) opts.push(['world.drip', p, 3]); }
+  else {
+    const fire = STATIONS.find(s => (s.k === 'fire' || s.k === 'forge') && Math.hypot(s.x + .5 - P.x, s.y + .5 - P.y) < 7); if (fire) opts.push(['world.hearth', { x: fire.x + .5, y: fire.y + .5 }, 4]);
+    const wa = near(t => t === T.WA, 13); if (wa) { opts.push(['world.surf', wa, 2]); if (z === 'quay' || z === 'beacon' || z === 'wreck') opts.push(['world.gull', { x: wa.x + (r() - .5) * 6, y: wa.y + (r() - .5) * 6 }, 1]); }
+    if (z === 'ashfen' || z === 'silt' || z === 'ford' || z === 'camp') { const m = near(t => t === T.SH || t === T.RB || t === T.MR, 10); if (m) opts.push(['world.marsh', m, 2]); }
+    if (z === 'beacon' || z === 'pine') opts.push(['world.wind', { x: P.x + (r() - .5) * 8, y: P.y + (r() - .5) * 8 }, 1]);
+    if (z === 'bell' && !still) opts.push(['world.bell', { x: ZONES.bell.cx + .5, y: ZONES.bell.cy + .5 }, 1, 1]);   // landmark: not again while you stand still
+  }
+  if (!opts.length) return; let tot = 0; for (const o of opts) tot += o[2]; let k = r() * tot, o = opts[0]; for (const c of opts) { k -= c[2]; if (k <= 0) { o = c; break; } }
+  if (SFXA.play(o[0], { pos: o[1], amb: true, key: 'amb' }) && o[3]) SND.ambPos = { x: P.x, y: P.y };
+}
 
 /* ---------- player ---------- */
 function newChar(o) {
@@ -105,6 +188,7 @@ function playerMove(dt) {
   if (moved > 0) onPlayerMoved(moved);
 }
 function onPlayerMoved(m) {
+  stepSound(m);
   if (P.meditating) { P.meditating = null; log('You stop meditating.'); }
   if (P.prep && !P.prep.sp.walk && Math.hypot(P.x - P.prep.x0, P.y - P.prep.y0) > SF.PREP_DRIFT) interruptPrep('You moved and lost your spell preparation.');
   if (P.task && P.task.still && Math.hypot(P.x - P.task.x0, P.y - P.task.y0) > .5) { log(P.task.label + ' interrupted by movement.'); P.task = null; }
@@ -115,10 +199,10 @@ function onPlayerMoved(m) {
 }
 
 /* ---------- damage & death ---------- */
-function damagePlayer(amt, src, kind) {
+function damagePlayer(amt, src, kind, hx) {
   if (P.ghost || amt <= 0) return; P.lastCombat = GT; P.lastHit = GT;
   if (P.veil && P.veil.until > GT && kind === 'phys') { const a = Math.min(P.veil.left, amt.raw || 0); P.veil.left -= a; }
-  P.hp -= amt; floater(P.x, P.y, '-' + amt, '#ff6a5a'); sfx('hit');
+  P.hp -= amt; floater(P.x, P.y, '-' + amt, '#ff6a5a'); hitSound(P, kind, src, hx, P.hp <= 0);
   if (P.prep) interruptPrep(kind === 'poison' ? 'Poison breaks your concentration.' : 'Your preparation is interrupted!');
   if (P.rooted > GT) P.rooted = 0;
   if (P.task && P.task.kind === 'vet' && kind !== 'poison') { P.task.t1 += .25; }
@@ -135,14 +219,14 @@ function playerDies(src) {
   if (!protectedRoad) { const corpse = SF.deathTransaction(P, GT, { x: P.x, y: P.y });
   addEnt({ kind: 'corpse', mine: true, name: 'your body', x: P.x, y: P.y, cont: corpse, expires: corpse.expires }); }
   for (const e of ents) if (e.target === P) { e.target = null; e.state = 'return'; }
-  log(`You have died${src ? ' to a ' + (src.name || 'foe') : ''}. ${protectedRoad ? 'Your belongings stay with you on this protected road.' : 'Your tradeable belongings stay on your body for 12 minutes.'}`, '#ff6a5a'); sfx('die');
+  log(`You have died${src ? ' to a ' + (src.name || 'foe') : ''}. ${protectedRoad ? 'Your belongings stay with you on this protected road.' : 'Your tradeable belongings stay on your body for 12 minutes.'}`, '#ff6a5a'); SFXA.cancelPending(); snd('player.death');
   save(); refreshHud(); renderPanel();
 }
 function nearestRes() { let best = null, bd = 1e9; for (const s of SHRINES) { const d = Math.hypot(s.x + .5 - P.x, s.y + .5 - P.y); if (d < bd) { bd = d; best = { x: s.x + .5, y: s.y + .5, n: s.n } } } for (const e of ents) if (e.kind === 'npc' && e.role === 'healer') { const d = dist(e, P); if (d < bd) { bd = d; best = { x: e.x, y: e.y, n: 'healer' } } } return best; }
 function resurrect(where) {
   if (!P.ghost) return; if (where) { P.x = where.x; P.y = where.y + 1.2; }
   P.ghost = false; P.hp = Math.ceil(SF.maxHp(P) * .25); P.stam = Math.ceil(SF.maxStam(P) * .2); P.mana = Math.ceil(SF.maxMana(P) * .2);
-  FX.push({ k: 'ring', x: P.x, y: P.y, c: '#fff2b0', t0: GT, dur: .8 }); log('You are restored to life at 25% health. Your body still holds your belongings.', '#ffe08a'); sfx('cast'); save(); refreshHud();
+  FX.push({ k: 'ring', x: P.x, y: P.y, c: '#fff2b0', t0: GT, dur: .8 }); log('You are restored to life at 25% health. Your body still holds your belongings.', '#ffe08a'); snd('player.revive'); save(); refreshHud();
 }
 
 /* ---------- player attack (armed basic attack: never moves, never acquires) ---------- */
@@ -163,8 +247,8 @@ function toggleArm() {
 }
 /* presentation-only one-shot clip; simulation timing stays authoritative */
 function playOnce(clip, contactIn) { P.once = { clip, t0: GT, tc: GT + (contactIn || 0) }; }
-function drawWeapon() { if (P.drawn || P.drawing) return; P.drawing = GT + SF.SWAP_TIME; P.readyAt = Math.max(P.readyAt || 0, GT + SF.SWAP_TIME); }
-function stowWeapon() { if (!P.drawn) return 0; P.drawn = false; P.drawing = 0; return SF.SWAP_TIME; }
+function drawWeapon() { if (P.drawn || P.drawing) return; if (wDef().fam !== 'Unarmed') snd('weapon.draw', { key: 'P' }); P.drawing = GT + SF.SWAP_TIME; P.readyAt = Math.max(P.readyAt || 0, GT + SF.SWAP_TIME); }
+function stowWeapon() { if (!P.drawn) return 0; if (wDef().fam !== 'Unarmed') snd('weapon.stow', { key: 'P' }); P.drawn = false; P.drawing = 0; return SF.SWAP_TIME; }
 function attackTick() {
   if (P.drawing && GT >= P.drawing) { P.drawing = 0; P.drawn = true; }
   if (P.swing && GT >= P.swing.t1) resolveSwing();
@@ -177,10 +261,10 @@ function attackTick() {
   if (d > w.reach || !los(P, t)) return;
   if (w.ammo && !SF.count(P.pack, w.ammo)) { if (!P.ammoWarn || GT > P.ammoWarn) { P.ammoWarn = GT + 3; log('You have no ' + w.ammo + 's.', '#ffb070'); } return; }
   if (P.hidden) reveal('You attack and are revealed.');
-  P.swing = { t0: GT, t1: GT + w.wind, t: t, w }; faceToward(P, t.x, t.y); P.lunge = 0; playOnce((w.fam || 'Unarmed') + '_Attack', w.wind);
+  P.swing = { t0: GT, t1: GT + w.wind, t: t, w }; faceToward(P, t.x, t.y); P.lunge = 0; playOnce((w.fam || 'Unarmed') + '_Attack', w.wind); swingSound(P.swing);
 }
 function resolveSwing() {
-  const s = P.swing; P.swing = null; const w = s.w, t = s.t; P.lastCombat = GT;
+  const s = P.swing; P.swing = null; s.resolved = true; const w = s.w, t = s.t; P.lastCombat = GT;
   const stamFrac = P.stam / Math.max(1, SF.maxStam(P));
   P.readyAt = GT + SF.recovery(w.rec, P.dex, stamFrac);
   if (!alive(t)) return;
@@ -188,26 +272,26 @@ function resolveSwing() {
   if (d > w.reach + .2 || !los(P, t)) { log('Your attack falls short.', '#a8a8a8'); return; }
   const acc = SF.accuracy(sv(w.skill), MON[t.type].def); const hit = R() < acc;
   gain(w.skill, MON[t.type].diff);
-  if (w.ammo) { SF.removeQty(P.pack, w.ammo, 1); const tt = d / w.proj; EFX.push({ k: 'proj', x: P.x, y: P.y, tx: t.x, ty: t.y, t0: GT, t1: GT + tt, col: '#e8dcc0', at: GT + tt, fn: () => landHit(t, w, hit) }); return; }
+  if (w.ammo) { SF.removeQty(P.pack, w.ammo, 1); snd(w.ammo === 'bolt' ? 'crossbow.release' : 'bow.release', { key: 'P' }); const tt = d / w.proj; EFX.push({ k: 'proj', x: P.x, y: P.y, tx: t.x, ty: t.y, t0: GT, t1: GT + tt, col: '#e8dcc0', at: GT + tt, fn: () => landHit(t, w, hit) }); return; }
   P.lunge = .001; FX.push({ k: 'slash', x: t.x, y: t.y, t0: GT, dur: .2 }); landHit(t, w, hit);
   if (!hit && w === SF.WEAPONS.dagger && sv('knives') >= 45) P.readyAt -= .15;
 }
 function landHit(t, w, hit) {
   if (!alive(t)) return; t.lastHitBy = P; if (!t.target) { t.target = P; if (t.state === 'idle') t.state = 'chase'; } t.hidden = false;
-  if (!hit) { floater(t.x, t.y, 'miss', '#c8c8c8'); sfx('miss'); return; }
+  if (!hit) { floater(t.x, t.y, 'miss', '#c8c8c8'); return; }   // a whiff: the swing alone
   const it = P.equip.weapon, base = rnd(w.dmg[0], w.dmg[1]) * SF.condFactor(it && it.cond, it && it.maxc) * (it && it.quality === 'exceptional' ? 1.04 : 1);
   const armor = MON[t.type].armor * (t.discordUntil > GT ? 1 - SF.BARD.discord : 1);
   const dmg = SF.physDamage(base, { tactics: sv('tactics'), anatomy: sv('anatomy'), str: P.str, armor });
   gain('tactics', MON[t.type].diff); gain('anatomy', MON[t.type].diff); wear(it, .25);
   if (it && it.venom && it.venom.charges > 0 && !w.ammo) { it.venom.charges--; if (!t.poison || t.poison.tier <= it.venom.tier) { t.poison = { tier: it.venom.tier, ticks: SF.POISON_TICKS, next: GT + SF.POISON_GAP }; floater(t.x, t.y, 'envenomed', '#7be07b'); } if (!it.venom.charges) { delete it.venom; log('The venom on your weapon is spent.'); } }
   if (w === SF.WEAPONS.hammer && sv('hammers') >= 45 && GT > (t.hamAt || 0)) { t.hamAt = GT + 3; t.slowUntil = GT + 1.5; floater(t.x, t.y, 'staggered', '#e8d090'); }
-  damageMon(t, dmg, 'phys');
+  damageMon(t, dmg, 'phys', P, { w });
 }
 
-function damageMon(m, amt, kind, src) {
+function damageMon(m, amt, kind, src, hx) {
   if (!alive(m)) return; src = src || P; m.hitT = GT;
-  if (m.ward > 0 && kind !== 'poison') { const a = Math.min(m.ward, amt); m.ward -= a; amt -= a; floater(m.x, m.y, 'ward ' + a, '#e8d090'); if (m.ward <= 0) floater(m.x, m.y, 'ward broken', '#e8d090'); if (amt <= 0) return; }
-  m.hp -= amt; floater(m.x, m.y, String(amt), kind === 'spell' ? '#c8a0ff' : kind === 'poison' ? '#7be07b' : '#ffd27a'); sfx('hit'); if (src === P || (src && src.kind === 'pet')) P.lastCombat = GT;
+  if (m.ward > 0 && kind !== 'poison') { const a = Math.min(m.ward, amt); m.ward -= a; amt -= a; floater(m.x, m.y, 'ward ' + a, '#e8d090'); if (m.ward <= 0) floater(m.x, m.y, 'ward broken', '#e8d090'); if (amt <= 0) { if (sndOnce('ward' + m.id, .6)) sndAt('magic.ward', m, { gain: .6 }); return; } }
+  m.hp -= amt; floater(m.x, m.y, String(amt), kind === 'spell' ? '#c8a0ff' : kind === 'poison' ? '#7be07b' : '#ffd27a'); hitSound(m, kind, src, hx, m.hp <= 0); if (src === P || (src && src.kind === 'pet')) P.lastCombat = GT;
   m.pacified = 0; if (m.rooted > GT) m.rooted = 0;
   if (m.hidden) m.hidden = false;
   if (!m.target || m.target === P && src && src.kind === 'pet' && R() < .3 || (m.provoked && m.provoked < GT)) { m.target = src.kind ? src : P; m.provoked = 0; m.state = m.state === 'idle' || m.state === 'return' ? 'chase' : m.state; }
@@ -215,6 +299,7 @@ function damageMon(m, amt, kind, src) {
 }
 
 function killMon(m, src) {
+  if (CRE[m.type] && SFXA.has(CRE[m.type] + '.death')) sndAt(CRE[m.type] + '.death', m, { prio: 4 });
   m.dead = true; rmEnt(m); if (m.sp) m.sp.n--; const d = MON[m.type];
   if (m.kind === 'pet') { log((m.name || d.n) + ' has died.', '#ff6a5a'); return; }
   if (m.quest) questCrabKilled();
@@ -243,8 +328,8 @@ function aiMon(m, dt) {
       if (!t || home > d.leash || (t === P && !(dist(m, P) < d.leash && los(m, P)))) { m.state = 'return'; m.target = null; break; }
       const dd = dist(m, t); const far = d.ranged2 && dd > d.reach + .5 && dd <= d.ranged2.range;
       if (d.ranged && dd < (d.keep || 0) - .5) { step(t.x, t.y, d.speed, true); break; }
-      if (far && GT > (m.r2At || 0) && los(m, t)) { m.state = 'tele'; m.st = GT; m.mode = 'r2'; m.aim = { x: t.x, y: t.y }; faceToward(m, t.x, t.y); sfx('tele'); break; }
-      if (dd <= d.reach * .92 && (!d.ranged || los(m, t))) { m.state = 'tele'; m.st = GT; m.mode = d.aoe ? 'aoe' : d.ranged ? 'shot' : 'melee'; m.aim = { x: t.x, y: t.y }; faceToward(m, t.x, t.y); sfx('tele'); }
+      if (far && GT > (m.r2At || 0) && los(m, t)) { m.state = 'tele'; m.st = GT; m.mode = 'r2'; m.aim = { x: t.x, y: t.y }; faceToward(m, t.x, t.y); break; }
+      if (dd <= d.reach * .92 && (!d.ranged || los(m, t))) { m.state = 'tele'; m.st = GT; m.mode = d.aoe ? 'aoe' : d.ranged ? 'shot' : 'melee'; m.aim = { x: t.x, y: t.y }; faceToward(m, t.x, t.y); }
       else step(t.x, t.y, d.speed);
     } break;
     case 'tele': { const tt = m.mode === 'r2' ? d.ranged2.tele : d.tele; if (t && m.mode !== 'aoe') faceToward(m, t.x, t.y); if (GT - m.st >= tt) { m.state = 'strike'; m.st = GT; monStrike(m, t); } } break;
@@ -258,23 +343,23 @@ function aiMon(m, dt) {
 /* resolve a committed creature attack against whatever it targets: the player, a pet, or a provoked creature */
 function monStrike(m, t) {
   const d = MON[m.type]; if (!t || t.gone || t.dead) return;
-  if (m.mode === 'aoe') { FX.push({ k: 'boom', x: m.x, y: m.y, r: d.aoe, t0: GT, dur: .5 }); sfx('boom'); for (const v of [P, ...ents.filter(e => e.kind === 'pet')]) { if (v === P && (P.ghost || P.hidden)) continue; if (Math.hypot(v.x - m.x, v.y - m.y) <= d.aoe) strikeOne(m, v, d.dmg); } return; }
+  if (m.mode === 'aoe') { FX.push({ k: 'boom', x: m.x, y: m.y, r: d.aoe, t0: GT, dur: .5 }); sndAt('combat.blast', m); for (const v of [P, ...ents.filter(e => e.kind === 'pet')]) { if (v === P && (P.ghost || P.hidden)) continue; if (Math.hypot(v.x - m.x, v.y - m.y) <= d.aoe) strikeOne(m, v, d.dmg, false, true); } return; }
   if (m.mode === 'shot' || m.mode === 'r2') { const r = m.mode === 'r2' ? d.ranged2 : d; if (m.mode === 'r2') m.r2At = GT + 5; const aim = m.aim, tt = Math.hypot(aim.x - m.x, aim.y - m.y) / 14; EFX.push({ k: 'proj', x: m.x, y: m.y, tx: aim.x, ty: aim.y, t0: GT, t1: GT + tt, col: d.boss ? '#ffd070' : '#ff8a30', big: 1, at: GT + tt, fn: () => { if (alive(m) || true) { const hitT = Math.hypot(t.x - aim.x, t.y - aim.y) < 1.1 && !(t === P && (P.ghost || P.hidden)); if (hitT) strikeOne(m, t, r.dmg, true); else floater(aim.x, aim.y, 'dodged', '#c8c8c8'); } } }); return; }
   const dd = dist(m, t); if (dd > d.reach + .35 || !los(m, t)) return;
   strikeOne(m, t, d.dmg);
 }
-function strikeOne(m, t, dmgR, ranged) {
+function strikeOne(m, t, dmgR, ranged, area) {
   const d = MON[m.type];
-  if (t.kind === 'mon' || t.kind === 'pet') { const td = MON[t.type] || { def: 30, armor: 10 }; if (R() >= SF.accuracy(d.atk, td.def)) { floater(t.x, t.y, 'miss', '#c8c8c8'); return; } damageMon(t, Math.max(1, Math.round(rnd(dmgR[0], dmgR[1]) * (1 - td.armor / (td.armor + 90)))), 'phys', m); return; }
+  if (t.kind === 'mon' || t.kind === 'pet') { const td = MON[t.type] || { def: 30, armor: 10 }; if (R() >= SF.accuracy(d.atk, td.def)) { floater(t.x, t.y, 'miss', '#c8c8c8'); return; } damageMon(t, Math.max(1, Math.round(rnd(dmgR[0], dmgR[1]) * (1 - td.armor / (td.armor + 90)))), 'phys', m, area ? { area: 1 } : null); return; }
   if (P.ghost || P.hidden) return;
-  if (R() >= SF.accuracy(d.atk + monAcc(m), defRating())) { floater(P.x, P.y, 'dodge', '#c8c8c8'); sfx('miss'); return; }
-  let raw = monRaw(m, rnd(dmgR[0], dmgR[1])); if (m.hexUntil > GT) raw *= .88; if (!ranged) { raw = meleeWard(m, raw); if (raw <= 0) return; }
-  if (P.veil && P.veil.until > GT && P.veil.left > 0) { const a = Math.min(P.veil.left, raw); P.veil.left -= a; raw -= a; if (a) floater(P.x, P.y, 'veil ' + Math.round(a), '#c8b890'); if (raw <= 0) return; }
-  const av = armorVal(); let dmg = Math.round(raw * (1 - av / (av + 90)));
+  if (R() >= SF.accuracy(d.atk + monAcc(m), defRating())) { floater(P.x, P.y, 'dodge', '#c8c8c8'); return; }
+  let raw = monRaw(m, rnd(dmgR[0], dmgR[1])); if (m.hexUntil > GT) raw *= .88; if (!ranged) { raw = meleeWard(m, raw); if (raw <= 0) { if (sndOnce('veil', .6)) snd('magic.ward', { gain: .6 }); return; } }
+  if (P.veil && P.veil.until > GT && P.veil.left > 0) { const a = Math.min(P.veil.left, raw); P.veil.left -= a; raw -= a; if (a) floater(P.x, P.y, 'veil ' + Math.round(a), '#c8b890'); if (raw <= 0) { if (sndOnce('veil', .6)) snd('magic.ward', { gain: .6 }); return; } }
+  const av = armorVal(); let dmg = Math.round(raw * (1 - av / (av + 90))), blocked = false;
   if (P.equip.armor) wear(P.equip.armor, .2);
-  if (P.equip.shield && frontArc(P, m) && !ranged) { const bc = SF.blockChance(sv('shieldwork'), P.braced > GT); gain('shieldwork', d.diff); if (R() < bc) { dmg = Math.round(dmg * (1 - SF.BLOCK_REDUCE)); P.stam = Math.max(0, P.stam - SF.BLOCK_STAM); wear(P.equip.shield, .3); floater(P.x, P.y, 'block', '#cfe8ff'); } }
-  if (dmg <= 0) { floater(P.x, P.y, 'absorbed', '#c8c8c8'); return; }
-  damagePlayer(dmg, m, 'phys');
+  if (P.equip.shield && frontArc(P, m) && !ranged) { const bc = SF.blockChance(sv('shieldwork'), P.braced > GT); gain('shieldwork', d.diff); if (R() < bc) { blocked = true; dmg = Math.round(dmg * (1 - SF.BLOCK_REDUCE)); P.stam = Math.max(0, P.stam - SF.BLOCK_STAM); wear(P.equip.shield, .3); floater(P.x, P.y, 'block', '#cfe8ff'); } }
+  if (dmg <= 0) { floater(P.x, P.y, 'absorbed', '#c8c8c8'); snd(blocked ? 'block.shield' : 'hit.armor', { gain: .5, key: 'impP' }); return; }
+  damagePlayer(dmg, m, 'phys', { blocked, area });
   if (d.poison && R() < d.poison[1] && !(P.poisonImmune > GT)) { if (!P.poison || P.poison.tier <= d.poison[0]) { P.poison = { tier: d.poison[0], ticks: SF.POISON_TICKS, next: GT + SF.POISON_GAP }; log('You are poisoned!', '#7be07b'); } }
 }
 
@@ -300,7 +385,7 @@ function useBandage(t) {
   if (P.task && P.task.kind === 'bandage') return log('You are already bandaging.');
   if (GT < (P.patientUntil || 0)) return log('That patient needs a moment before another bandage.');
   if (P.hp >= SF.maxHp(P) && !P.poison) return log('You are not hurt.');
-  SF.removeQty(P.pack, 'bandage', 1); const dur = SF.bandageTime(P.dex);
+  SF.removeQty(P.pack, 'bandage', 1); snd('item.bandage', { key: 'P' }); const dur = SF.bandageTime(P.dex);
   P.task = { kind: 'bandage', label: 'Bandaging', t0: GT, t1: GT + dur, pressure: 0, target: P };
 }
 function finishBandage() {
@@ -314,7 +399,7 @@ function useConsumable(id) {
   P.cd = P.cd || {}; if (GT < (P.consumeGap || 0)) return log('Too soon after your last consumable.');
   if (GT < (P.cd[c.fam] || 0)) return log(c.n + ' is on cooldown (' + Math.ceil(P.cd[c.fam] - GT) + ' s).');
   if (id === 'cinder') { AIM = { kind: 'flask', r: c.radius, range: 9, fn: pt => throwFlask(pt) }; log('Tap the ground to throw the cinder flask.'); return; }
-  SF.removeQty(P.pack, id, 1); P.consumeGap = GT + SF.CONSUME_GAP; P.cd[c.fam] = GT + c.cd;
+  SF.removeQty(P.pack, id, 1); P.consumeGap = GT + SF.CONSUME_GAP; P.cd[c.fam] = GT + c.cd; snd('item.drink', { key: 'P' });
   if (c.heal) { const b = P.hp; P.hp = Math.min(SF.maxHp(P), P.hp + c.heal); floater(P.x, P.y, '+' + Math.round(P.hp - b), '#7ee08a'); }
   if (c.stam) P.stam = Math.min(SF.maxStam(P), P.stam + c.stam); if (c.mana) P.mana = Math.min(SF.maxMana(P), P.mana + c.mana); if (c.cure && P.poison) { P.poison = null; log('The antidote clears the poison.'); }
 }
@@ -322,9 +407,9 @@ function throwFlask(pt) {
   if (Math.hypot(pt.x - P.x, pt.y - P.y) > 9) return log('Too far to throw.'); AIM = null; const c = SF.CONSUMABLES.cinder;
   SF.removeQty(P.pack, 'cinder', 1); P.consumeGap = GT + SF.CONSUME_GAP; P.cd.flask = GT + c.cd;
   const f = { k: 'flask', sx: P.x, sy: P.y, x: pt.x, y: pt.y, r: c.radius, t0: GT, until: GT + c.fuse + .5 }; EFX.push(f);
-  at(c.fuse, () => { FX.push({ k: 'boom', x: pt.x, y: pt.y, r: c.radius, t0: GT, dur: .5 }); sfx('boom'); const dmg = c.blast + Math.round(5 * sv('alchemy') / 100); for (const m of ents.slice()) if (m.kind === 'mon' && alive(m) && Math.hypot(m.x - pt.x, m.y - pt.y) <= c.radius) damageMon(m, dmg, 'phys'); if (Math.hypot(P.x - pt.x, P.y - pt.y) <= c.radius) damagePlayer(Math.round(dmg / 2), null, 'phys'); });
+  at(c.fuse, () => { FX.push({ k: 'boom', x: pt.x, y: pt.y, r: c.radius, t0: GT, dur: .5 }); sndAt('combat.blast', pt); const dmg = c.blast + Math.round(5 * sv('alchemy') / 100); for (const m of ents.slice()) if (m.kind === 'mon' && alive(m) && Math.hypot(m.x - pt.x, m.y - pt.y) <= c.radius) damageMon(m, dmg, 'phys', P, { area: 1 }); if (Math.hypot(P.x - pt.x, P.y - pt.y) <= c.radius) damagePlayer(Math.round(dmg / 2), null, 'phys', { area: 1 }); });
 }
-function eat(id) { if (!SF.removeQty(P.pack, id, 1)) return; P.fed = GT + 300; log('You eat. Out of combat you recover health faster for 5 minutes.', '#7ee08a'); }
+function eat(id) { if (!SF.removeQty(P.pack, id, 1)) return; snd('item.eat', { key: 'P' }); P.fed = GT + 300; log('You eat. Out of combat you recover health faster for 5 minutes.', '#7ee08a'); }
 function hide() {
   if (P.ghost || P.hidden) return; if (ents.some(e => e.kind === 'mon' && alive(e) && e.target === P && dist(e, P) < 3)) return log('Too close to a hostile to hide.', '#ffb070');
   if (GT - (P.lastHit || -99) < 4) return log('You must be clear of damage for 4 seconds to hide.', '#ffb070');
@@ -367,6 +452,7 @@ function interact() {
   if (AIM) { AIM = null; return; }
   if (P.ghost) { const r = nearestRes(); if (r && Math.hypot(r.x - P.x, r.y - P.y) <= 2.5) return resurrect(); return log('Walk to a shrine or healer to be restored. Follow the golden arrow.'); }
   if (nearBeacon()) return useBeacon();
+  const dr = nearDoor(); if (dr && !nearerThanDoor(doorDist(dr))) return useDoor(dr);
   if (interactExtra()) return;
   const sel = P.sel;
   if (sel && sel.kind === 'corpse' && dist(sel, P) <= 2) return openCorpse(sel);
@@ -383,24 +469,33 @@ function interact() {
   if (sel && sel.kind === 'node') return log('Move closer to the ' + (sel.skill === 'mining' || sel.skill === 'woodcutting' ? nodeLabel(sel) : sel.name) + '.');
   log('Nothing to interact with here.');
 }
+/* is something other than the door the more likely intent? explicit selection in reach, or anything usable nearer */
+function nearerThanDoor(dd) {
+  const sel = P.sel; if (sel && ((sel.kind === 'corpse' && dist(sel, P) <= 2) || (sel.kind === 'npc' && dist(sel, P) <= 2.5) || (sel.kind === 'node' && Math.hypot(sel.x + .5 - P.x, sel.y + .5 - P.y) <= 2))) return true;
+  for (const e of ents) if (!e.gone && ((e.kind === 'corpse' && dist(e, P) <= 2) || (e.kind === 'npc' && dist(e, P) <= 2.5)) && dist(e, P) <= dd) return true;   // ties go to the person or object
+  for (const c of CHESTS.values()) { const d = Math.hypot(c.x + .5 - P.x, c.y + .5 - P.y); if (d <= 2 && d <= dd) return true; }
+  for (const st of STATIONS) { const d = Math.hypot(st.x + .5 - P.x, st.y + .5 - P.y); if (d <= 2.2 && d <= dd) return true; }
+  return false;
+}
 function startGather(n) {
   if (P.ghost) return; const tl = gatherTool(n);
   if (!tl.ok) return log('You need a ' + SF.ITEMS[tl.id].n.toLowerCase() + '.', '#ffb070');
   if (n.skill !== 'fishing') { const tier = nodeTier(n.x, n.y), nm = nodeLabel(n); if (sv(n.skill) < SF.NODE_TIER_MIN[tier]) return log(`This ${nm} is grade ${tier + 1}; it needs ${SF.SKILL[n.skill].n} ${SF.NODE_TIER_MIN[tier]}.`, '#ffb070'); if (nodeStock(n.x, n.y).n <= 0) return log('This ' + nm + ' is exhausted for now.'); }
   if (overweight()) return log('You are carrying too much.', '#ffb070');
   P.task = { kind: 'gather', node: n, label: SF.SKILL[n.skill].n, t0: GT, t1: GT + SF.GATHER_TIME[n.skill], still: true, x0: P.x, y0: P.y }; faceToward(P, n.x + .5, n.y + .5);
+  if (n.skill === 'fishing') snd('fish.cast', { key: 'P' });   // the committed cast
 }
 function finishGather(n) {
   if (n.skill === 'mining' || n.skill === 'woodcutting') return finishStroke(n);
   const sk = n.skill, tier = sk === 'fishing' ? (Math.hypot(n.x - 92, n.y - 300) < 120 ? 0 : 1) : nodeTier(n.x, n.y), diff = SF.NODE_TIER_DIFF[tier];
   if (sk === 'fishing') { const rod = SF.findTool(P.pack, 'rod'); if (!rod) return log('You need a fishing rod.', '#ffb070'); if (SF.spendTool(P.pack, rod)) log('Your fishing rod snaps.', '#ff6a5a'); }
   gain(sk, diff, { target: 'node:' + n.x + ',' + n.y });
-  if (R() >= SF.opposed(sv(sk), diff)) { log({ woodcutting: 'You chop but get nothing usable.', mining: 'You break loose rock but no ore.', foraging: 'You find nothing worth taking.', fishing: 'Nothing bites.' }[sk]); sfx('chop'); return again(); }
-  if (sk === 'fishing') { give('fish', 1, tier ? { q: tier } : null); log('You land a brine perch.'); return again(); }
+  if (R() >= SF.opposed(sv(sk), diff)) { log({ woodcutting: 'You chop but get nothing usable.', mining: 'You break loose rock but no ore.', foraging: 'You find nothing worth taking.', fishing: 'Nothing bites.' }[sk]); if (sk === 'foraging') sndAt('gather.forage', { x: n.x + .5, y: n.y + .5 }); return again(); }
+  if (sk === 'fishing') { give('fish', 1, tier ? { q: tier } : null); log('You land a brine perch.'); snd('fish.catch', { key: 'P' }); return again(); }
   const st = nodeStock(n.x, n.y); st.n--; if (st.n <= 0) st.t = GT + 300;
   const out = NODE_OUT[n.t]; const q = sk === 'foraging' ? 1 + (tier >= 2 ? 1 : 0) : 1; give(out, q, tier ? { q: tier } : null);
   if (sk === 'mining' && R() < .12) give('ironshard', 2);
-  log(`You gather ${q} ${SF.ITEMS[out].n.toLowerCase()}${tier ? ' (grade ' + (tier + 1) + ')' : ''}.`); sfx(sk === 'mining' ? 'chop' : 'chop');
+  log(`You gather ${q} ${SF.ITEMS[out].n.toLowerCase()}${tier ? ' (grade ' + (tier + 1) + ')' : ''}.`); sndAt('gather.forage', { x: n.x + .5, y: n.y + .5 });
   if (st.n <= 0) { log('The ' + n.name + ' is exhausted.'); return; }
   again();
   function again() { at(.15, () => { if (!P.task && !P.ghost && P.sel === n && Math.hypot(n.x + .5 - P.x, n.y + .5 - P.y) <= (sk === 'fishing' ? 8 : 2) && !overweight() && P.speed < .1) startGather(n); }); }
@@ -410,13 +505,13 @@ function skin(c) {
   P.task = { kind: 'skin', corpse: c, label: 'Skinning', t0: GT, t1: GT + SF.GATHER_TIME.skinning, still: true, x0: P.x, y0: P.y };
 }
 function finishSkin(c) {
-  const d = MON[c.mon]; gain('skinning', d.diff); c.skinned = true;
+  const d = MON[c.mon]; gain('skinning', d.diff); c.skinned = true; sndAt('skin.cut', c);
   if (R() >= SF.opposed(sv('skinning'), d.diff)) { log('You ruin the hide.'); renderPanel(); return; }
   for (const k in d.skin) { const q = rnd(d.skin[k][0], d.skin[k][1]); if (q) give(k, q); } log('You skin the ' + d.n + '.'); renderPanel();
 }
 function openCorpse(c) {
   if (P.ghost) return; if (dist(c, P) > 2) return log('Move within 2 m.'); if (!los(P, c)) return log('No line of sight.');
-  P.opening = GT + .35; at(.35, () => { P.opening = 0; if (!c.gone && dist(c, P) <= 3) { P.lootOpen = c; openPanel('loot'); } });
+  P.opening = GT + .35; at(.35, () => { P.opening = 0; if (!c.gone && dist(c, P) <= 3) { P.lootOpen = c; openPanel('loot'); sndAt('loot.rummage', c); } });
 }
 function talk(n) { if (n.role === 'assay' || n.role === 'qsmith') { if (P.ghost) return; P.talkTo = n; return openPanel('guild'); } if (n.role === 'quaywarden') { if (P.ghost) return resurrect(); P.talkTo = n; return openPanel('quest'); } if (n.role === 'healer' || n.role === 'guard') { if (P.ghost) return resurrect(); say(n, n.role === 'guard' ? 'Keep the peace inside the Quay.' : 'Rest easy. Bind at the shrine if you travel.'); return; } P.talkTo = n; openPanel(n.role === 'banker' || n.role === 'campbank' ? 'bank' : n.role === 'trainer' ? 'trainer' : 'shop'); }
 
@@ -460,10 +555,11 @@ function update(dt) {
   }
   for (const e of ents.slice()) {
     if (e.gone) continue;
-    if (e.kind === 'mon') { aiMon(e, dt); if (e.poison && GT >= e.poison.next) { e.poison.next = GT + SF.POISON_GAP; damageMon(e, SF.POISON[e.poison.tier], 'poison'); if (e.poison && --e.poison.ticks <= 0) e.poison = null; } }
+    if (e.kind === 'mon') { const s0 = e.state; aiMon(e, dt); if (e.state !== s0) monSound(e, s0); if (e.poison && GT >= e.poison.next) { e.poison.next = GT + SF.POISON_GAP; damageMon(e, SF.POISON[e.poison.tier], 'poison'); if (e.poison && --e.poison.ticks <= 0) e.poison = null; } }
     else if (e.kind === 'corpse' && GT > e.expires) { if (e.mine) log('Your body has crumbled to dust, and everything on it is gone.', '#ff6a5a'); rmEnt(e); if (P.lootOpen === e) { closePanel(); P.lootOpen = null; } }
     else if (e.kind === 'pet') petTick(e, dt);
   }
+  sndTick();
   if (GT - spawnT > 1) { spawnT = GT; spawnTick(); }
   if (GT - saveT > 15) { saveT = GT; if (!save() && !P._saveWarn) { P._saveWarn = true; log('Saving failed (browser storage full?). Your last saved game is still safe.', '#ff9a6a'); } }
 }
@@ -556,6 +652,7 @@ function genWorld() {
   // docks
   for (const py of [288, 289, 311, 312]) for (let x = 36; x < q.x0; x++) tSet(x, py, T.BR);
   for (let y = 288; y <= 312; y++) for (const px of [36, 37]) tSet(px, y, T.BR);
+  for (let y = 286; y <= 314; y++) for (const px of [q.x0, q.x0 + 1]) tSet(px, y, T.RD);   // cobbled quayside where the piers land (v0.17)
   const carve = (pts, w, tile) => { for (let i = 0; i < pts.length - 1; i++) { const [x0, y0] = pts[i], [x1, y1] = pts[i + 1]; const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)); for (let k = 0; k <= n; k++) { const x = Math.round(x0 + (x1 - x0) * k / n), y = Math.round(y0 + (y1 - y0) * k / n); for (let oy = 0; oy < w; oy++) for (let ox = 0; ox < w; ox++) { const t = tAt(x + ox, y + oy); if ([T.FL, T.DR, T.AK, T.WL].includes(t)) continue; if (t === T.FN) { tSet(x + ox, y + oy, tile); continue; } tSet(x + ox, y + oy, t === T.WA || t === T.BR ? T.BR : (t === T.SH ? T.BR : tile)); } } } };
   // plaza and town roads
   disc(92, 300, 7, (x, y) => tSet(x, y, T.RD));
@@ -644,12 +741,33 @@ function envDraw(g, id, wx, wy, h, alpha) {
 /* ---- edge colliders (walls, props) bucketed per tile ---- */
 const ECOL = new Map();
 function addCol(x0, y0, x1, y1) { const r = [x0, y0, x1, y1]; for (let y = Math.floor(y0 - .5); y <= Math.floor(y1 + .5); y++) for (let x = Math.floor(x0 - .5); x <= Math.floor(x1 + .5); x++) { const k = y * W + x; let a = ECOL.get(k); if (!a) ECOL.set(k, a = []); a.push(r); } }
-function colBlocked(x, y, r) { const a = ECOL.get(Math.floor(y) * W + Math.floor(x)); if (!a) return false; for (const c of a) if (x + r > c[0] && x - r < c[2] && y + r > c[1] && y - r < c[3]) return true; return false; }
+function colBlocked(x, y, r) { const k = Math.floor(y) * W + Math.floor(x), a = ECOL.get(k); if (a) for (const c of a) if (x + r > c[0] && x - r < c[2] && y + r > c[1] && y - r < c[3]) return true;
+  const ds = DOORK.get(k); if (ds) for (const d of ds) { const c = d.col; if (!d.open && x + r > c[0] && x - r < c[2] && y + r > c[1] && y - r < c[3]) return true; } return false; }
 function addSprCol(id, ax, ay) { const m = ENV_COL[id]; if (m) for (const c of m) addCol(ax + c[0], ay + c[1], ax + c[2], ay + c[3]); }
 /* ---- placed pieces bucketed per tile; each has its own sort depth ---- */
 const PIECES = new Map();
 function place(id, x, y, o) { o = o || {}; const p = { id, x, y, h: o.h || 0, d: o.d !== undefined ? o.d : x + y, grp: o.grp || null, near: !!o.near, roof: !!o.roof }; const bx = o.bx !== undefined ? o.bx : x, by = o.by !== undefined ? o.by : y; const k = Math.floor(by) * W + Math.floor(bx); let a = PIECES.get(k); if (!a) PIECES.set(k, a = []); a.push(p); if (o.col) addSprCol(id, x, y); return p; }
 const KBUILD = [];
+/* ---- doors: each kit doorway keeps its placed leaf. Open by default (older saves have no door state); a closed
+   leaf swaps to door_closed_x and adds its own edge collider. The frame's side colliders never change. ---- */
+const DOORS = [], DOORK = new Map();
+function regDoor(x, y, leaf, mat) {
+  const m = ENV_COL.door_closed_x[0], d = { x, y, key: x + ',' + y, leaf, openId: leaf.id, mat, open: true, cd: 0, col: [x + m[0], y + m[1], x + m[2], y + m[3]] };
+  for (let ty = Math.floor(d.col[1] - .5); ty <= Math.floor(d.col[3] + .5); ty++) for (let tx = Math.floor(d.col[0] - .5); tx <= Math.floor(d.col[2] + .5); tx++) { const k = ty * W + tx; let a = DOORK.get(k); if (!a) DOORK.set(k, a = []); a.push(d); }
+  DOORS.push(d); return d;
+}
+function setDoor(d, open) { d.open = open; d.leaf.id = open ? d.openId : 'door_closed_x'; if (P && P.cx) { P.cx.doors = P.cx.doors || {}; if (open) delete P.cx.doors[d.key]; else P.cx.doors[d.key] = 0; } }
+function applyDoorState() { const st = (P.cx && P.cx.doors) || {}; for (const d of DOORS) setDoor(d, st[d.key] !== 0); }
+const doorDist = d => Math.hypot(d.x + .5 - P.x, d.y - P.y);
+function nearDoor(r) { let best = null, bd = r || 1.6; for (const d of DOORS) { const dd = doorDist(d); if (dd < bd) { bd = dd; best = d; } } return best; }
+/* one toggle per accepted action; repeats within the debounce are swallowed; never closes on an actor */
+function useDoor(d) {
+  if (GT < d.cd) return; d.cd = GT + .45;
+  if (d.open) { const c = d.col, r = .3; if (ents.some(e => !e.gone && e.kind !== 'corpse' && !(e === P && P.ghost) && e.x + r > c[0] && e.x - r < c[2] && e.y + r > c[1] && e.y - r < c[3])) return log('Something is standing in the doorway.', '#ffb070'); }
+  setDoor(d, !d.open); sndAt(d.open ? 'door.' + d.mat + '.open' : 'door.' + d.mat + '.close', { x: d.x + .1, y: d.y }, { key: 'door' + d.key });
+}
+/* which door, if any, a screen tap lands on: the leaf stands about one storey above its edge */
+function doorAtScreen(wx, wy) { for (const d of DOORS) { const X = SX(d.x + .5, d.y), Y = SY(d.x + .5, d.y); if (Math.abs(wx - X) < 22 && wy < Y + 8 && wy > Y - 76) return d; } return null; }
 /* A modular building: floor cells [x, x+w) × [y, y+d) with d even; walls on grid edges; gabled roof pairs along X; door on the south or north edge */
 function kitBuilding(x, y, w, d, doorSide, mat, role) {
   const wall = mat === 'stone' ? 'saltstone' : 'timber', B = { x, y, w, h: d, role, cx: x + w / 2, cy: y + d / 2, kit: true };
@@ -661,7 +779,7 @@ function kitBuilding(x, y, w, d, doorSide, mat, role) {
     const isDoor = ey === doorY && x + i === doorX; const win = !isDoor && (i % 3 === 1);
     const id = isDoor ? `wall_${wall}_doorframe_x` : win ? `wall_${wall}_window_x` : `wall_${wall}_x`;
     place(id, x + i, ey, { d: x + i + .5 + ey, grp, near: near(x + i, ey, 'x'), col: true });
-    if (isDoor) { place(doorSide === 'S' ? 'door_open_left_x' : 'door_open_right_x', x + i, ey, { d: x + i + .52 + ey, grp, near: near(x + i, ey, 'x') }); if (doorSide === 'S') { place('foundation_step_x', x + i, ey, { d: x + i + ey + .3 }); place('lantern_wall_lit', x + i + .88, ey + .12, { h: 1.58, d: x + i + ey + 1.05, grp, near: true }); LIGHTS.push({ x: x + i + 1, y: ey + .3, r: 4 }); } }
+    if (isDoor) { regDoor(x + i, ey, place(doorSide === 'S' ? 'door_open_left_x' : 'door_open_right_x', x + i, ey, { d: x + i + .52 + ey, grp, near: near(x + i, ey, 'x') }), 'wood'); if (doorSide === 'S') { place('foundation_step_x', x + i, ey, { d: x + i + ey + .3 }); place('lantern_wall_lit', x + i + .88, ey + .12, { h: 1.58, d: x + i + ey + 1.05, grp, near: true }); LIGHTS.push({ x: x + i + 1, y: ey + .3, r: 4 }); } }
   }
   for (let j = 0; j < d; j++) for (const ex of [x, x + w]) { const win = j % 2 === 1; place(`wall_${wall}_${win ? 'window_' : ''}z`, ex, y + j, { d: ex + y + j + .5, grp, near: near(ex, y + j, 'z'), col: true }); }
   for (const [cx, cy] of [[x, y], [x + w, y], [x, y + d], [x + w, y + d]]) place(`corner_${wall}`, cx, cy, { d: cx + cy + .02, grp, near: cx === x + w || cy === y + d, col: true });
@@ -770,7 +888,7 @@ const TASKS = {
   vet: t => { const p = t.p; if (p.gone || dist(p, P) > SF.VET.range + .3) return log('Your pet moved away.'); gain('veterinary', 40); if (R() < SF.opposed(sv('veterinary'), 30)) { const b = p.hp; p.hp = Math.min(p.max, p.hp + SF.VET.heal(sv('veterinary'))); floater(p.x, p.y, '+' + Math.round(p.hp - b), '#7ee08a'); } else log('The treatment does not take.'); },
   bard: t => { const m = t.m; if (!alive(m)) return; const diff = cl(MON[m.type].diff, 25, 75);
     gain('musicianship', diff); if (R() >= SF.opposed(sv('musicianship'), diff)) { log('Your playing falters and draws attention.', '#ffb070'); if (!m.target) { m.target = P; m.state = 'chase'; } return; }
-    gain(t.skill, diff); if (R() >= SF.opposed(sv(t.skill), diff)) { log('The creature shrugs off your song.', '#ffb070'); if (!m.target) { m.target = P; m.state = 'chase'; } return; }
+    snd('bard.' + { lullaby: 'lullaby', discord: 'discord', provocation: 'provoke' }[t.skill], { key: 'P' }); gain(t.skill, diff); if (R() >= SF.opposed(sv(t.skill), diff)) { log('The creature shrugs off your song.', '#ffb070'); if (!m.target) { m.target = P; m.state = 'chase'; } return; }
     if (t.skill === 'lullaby') { m.pacified = GT + SF.BARD.lullaby; m.target = null; m.state = 'idle'; if (P.sel === m) P.armed = false; floater(m.x, m.y, 'lulled', '#9fd0ff'); }
     if (t.skill === 'discord') { m.discordUntil = GT + SF.BARD.discordFor; floater(m.x, m.y, 'discorded', '#c97bff'); }
     if (t.skill === 'provocation') { const o = ents.filter(e => e.kind === 'mon' && e !== m && alive(e) && !MON[e.type].boss).sort((a, b) => dist(a, m) - dist(b, m))[0]; if (!o || dist(o, m) > 8) return log('Nothing nearby to set it against.'); m.target = o; m.provoked = GT + SF.BARD.provoke; m.state = 'chase'; floater(m.x, m.y, 'provoked!', '#ff9a6a'); log(`The ${MON[m.type].n} turns on the ${MON[o.type].n}.`); } },
@@ -778,13 +896,13 @@ const TASKS = {
     const units = Math.min(SF.PICK_MAX_UNITS, m.purse || 0); gain('pickpocketing', 55);
     if (!units) return log('Their purse is empty.');
     if (units * SF.ITEMS.gold.kg > SF.pickMaxKg(sv('pickpocketing'))) return log('Too heavy to lift unnoticed.');
-    if (R() < SF.pickChance(sv('pickpocketing'), units * SF.ITEMS.gold.kg)) { m.purse -= units; give('gold', units); log(`You lift ${units} gold.`, '#ffe08a'); sfx('coin'); }
+    if (R() < SF.pickChance(sv('pickpocketing'), units * SF.ITEMS.gold.kg)) { m.purse -= units; give('gold', units); log(`You lift ${units} gold.`, '#ffe08a'); snd('loot.coin', { gain: .6 }); }
     else { m.hidden = false; m.target = P; m.state = 'chase'; reveal('You are caught in the act!'); say(m, 'Thief!'); } },
   coat: () => { const tier = SF.venomTier(sv('venomcraft')); SF.removeQty(P.pack, 'venom', 1); gain('venomcraft', [0, 30, 55, 80][tier]); P.equip.weapon.venom = { tier, charges: SF.VENOM_CHARGES }; log(`Your weapon carries tier ${tier} venom for ${SF.VENOM_CHARGES} hits.`, '#7be07b'); },
-  trap: () => { SF.removeQty(P.pack, 'trapkit', 1); TRAPS.push({ x: P.x, y: P.y, owner: 'P', hidden: false, armedAt: GT + SF.TRAP.arm, until: GT + SF.TRAP.life, diff: 40 }); log('Snare set. It arms in a second and lasts 3 minutes.'); },
+  trap: () => { SF.removeQty(P.pack, 'trapkit', 1); snd('trap.set', { key: 'P' }); TRAPS.push({ x: P.x, y: P.y, owner: 'P', hidden: false, armedAt: GT + SF.TRAP.arm, until: GT + SF.TRAP.life, diff: 40 }); log('Snare set. It arms in a second and lasts 3 minutes.'); },
   disarm: t => { const tr = t.trap; gain('trapcraft', tr.diff); if (R() < SF.opposed(sv('trapcraft'), tr.diff)) { TRAPS.splice(TRAPS.indexOf(tr), 1); give('ironshard', 1); log('You disarm the snare and salvage a shard.'); } else if (R() < .3) { TRAPS.splice(TRAPS.indexOf(tr), 1); springOnPlayer(); } else log('You fail to disarm it.'); },
   lock: t => { const c = t.chest, diff = SF.CHEST_DIFF[c.tier]; gain('lockwork', diff, { target: 'chest:' + c.x + ',' + c.y });
-    if (R() < SF.opposed(sv('lockwork'), diff)) { c.open = true; c.refill = GT + 600; c.cont = chestLoot(c.tier); log('The lock clicks open.', '#ffe08a'); openChest(c); }
+    if (R() < SF.opposed(sv('lockwork'), diff)) { c.open = true; c.refill = GT + 600; c.cont = chestLoot(c.tier); log('The lock clicks open.', '#ffe08a'); sndAt('door.unlock', { x: c.x + .5, y: c.y + .5 }); openChest(c, true); }
     else { SF.removeQty(P.pack, 'lockpick', 1); log('Your lockpick snaps.'); } },
   appraise: t => { const it = t.item, d = SF.ITEMS[it.id], p = SF.PRICES[it.id] || 1, err = (1 - sv('appraisal') / 100) * .5; gain('appraisal', 30, { target: 'item:' + it.id });
     const lo = Math.max(1, Math.round(p * .4 * (1 - err))), hi = Math.round(p * 1.2 * (1 + err));
@@ -796,15 +914,16 @@ function chestLoot(tier) { const c = SF.newContainer('chest'); const add = (id, 
   if (tier === 1) { add('gold', 40, 90); add('draught', 0, 1); add('ironbar', 1, 2); add('lockpick', 1, 3); add(pick(Object.values(SF.REAGENT)), 3, 6); }
   if (tier === 2) { add('gold', 100, 200); add('bellshard', 1, 2); add('draught', 1, 2); if (R() < .35) add(pick(['chain', 'glaive', 'crossbow', 'leather']), 1, 1); }
   return c; }
-function openChest(c) { springRuneTrap(c, false); P.lootOpen = { kind: 'chest', x: c.x + .5, y: c.y + .5, cont: c.cont, name: 'chest', expires: c.refill }; openPanel('loot'); }
-function springOnPlayer() { damagePlayer(SF.TRAP.dmg, null, 'phys'); P.slowUntil = GT + SF.TRAP.slowFor; log('A snare bites your leg! Slowed.', '#ff8a6a'); }
+/* fresh: the lid actually opens; otherwise this only reopens the loot panel of an open chest (UI only) */
+function openChest(c, fresh) { springRuneTrap(c, false); P.lootOpen = { kind: 'chest', x: c.x + .5, y: c.y + .5, cont: c.cont, name: 'chest', expires: c.refill }; openPanel('loot'); if (fresh) sndAt('chest.open', P.lootOpen, { delay: .3 }); else snd('ui.open'); }
+function springOnPlayer() { snd('trap.spring', { key: 'P' }); damagePlayer(SF.TRAP.dmg, null, 'phys', { quiet: 1 }); P.slowUntil = GT + SF.TRAP.slowFor; log('A snare bites your leg! Slowed.', '#ff8a6a'); }
 function interactExtra() {
   // chests
   for (const c of CHESTS.values()) { if (Math.hypot(c.x + .5 - P.x, c.y + .5 - P.y) > 2) continue;
     if (c.open && GT > c.refill) { c.open = false; c.cont = null; }
     if (c.open) { openChest(c); return true; }
     if (!SF.count(P.pack, 'lockpick')) { log(`A locked chest (difficulty ${SF.CHEST_DIFF[c.tier]}). You need lockpicks.`, '#ffb070'); return true; }
-    P.task = { kind: 'lock', chest: c, label: 'Picking lock', t0: GT, t1: GT + SF.LOCK_TIME, still: true, x0: P.x, y0: P.y }; return true; }
+    P.task = { kind: 'lock', chest: c, label: 'Picking lock', t0: GT, t1: GT + SF.LOCK_TIME, still: true, x0: P.x, y0: P.y }; sndAt('lock.pick', { x: c.x + .5, y: c.y + .5 }); return true; }
   // revealed snares
   const tr = TRAPS.find(t => !t.hidden && t.owner !== 'P' && Math.hypot(t.x - P.x, t.y - P.y) <= 2);
   if (tr) { P.task = { kind: 'disarm', trap: tr, label: 'Disarming', t0: GT, t1: GT + SF.TRAP.place, still: true, x0: P.x, y0: P.y }; return true; }
@@ -817,7 +936,7 @@ function worldTick(dt) {
   // snares
   for (let i = TRAPS.length - 1; i >= 0; i--) { const tr = TRAPS[i]; if (tr.until && GT > tr.until) { TRAPS.splice(i, 1); continue; } if (GT < (tr.armedAt || 0)) continue;
     if (tr.owner !== 'P' && !P.ghost && Math.hypot(tr.x - P.x, tr.y - P.y) < .6) { TRAPS.splice(i, 1); springOnPlayer(); continue; }
-    if (tr.owner === 'P') for (const m of ents) if (m.kind === 'mon' && alive(m) && Math.hypot(tr.x - m.x, tr.y - m.y) < .7) { TRAPS.splice(i, 1); m.slowUntil = GT + SF.TRAP.slowFor; floater(m.x, m.y, 'snared', '#e8d090'); damageMon(m, SF.TRAP.dmg, 'phys'); break; } }
+    if (tr.owner === 'P') for (const m of ents) if (m.kind === 'mon' && alive(m) && Math.hypot(tr.x - m.x, tr.y - m.y) < .7) { TRAPS.splice(i, 1); m.slowUntil = GT + SF.TRAP.slowFor; floater(m.x, m.y, 'snared', '#e8d090'); sndAt('trap.spring', tr); damageMon(m, SF.TRAP.dmg, 'phys', P, { quiet: 1 }); break; } }
   if (P.prep === null && 0) return;
 }
 function seedTraps() { for (const [cx, cy] of [[232, 288], [318, 304], [395, 284], [300, 288], [360, 178]]) for (let k = 0; k < 2; k++) { const x = cx + (R() - .5) * 8, y = cy + (R() - .5) * 6; if (!BLK[tAt(Math.floor(x), Math.floor(y))]) TRAPS.push({ x, y, owner: 'world', hidden: true, armedAt: 0, until: 0, diff: 40 }); } }
@@ -911,7 +1030,7 @@ function useBeacon() {
   if (q.beacon === 0) return log('A cold beacon, its wick drowned by the storm. The Quaywarden may want it lit.');
   if (!q.crabDead) return log('The wreck crab will not let you near. Defeat it first.', '#ffb070');
   if (!hasWick()) return log('You need a dry wick. The Quaywarden can spare another.', '#ffb070');
-  SF.removeQty(P.pack, 'wick', 1); q.beacon = 2; FX.push({ k: 'puff', x: LM.beacon.x + .5, y: LM.beacon.y + .5, t0: GT, dur: 1 }); sfx('cast');
+  SF.removeQty(P.pack, 'wick', 1); q.beacon = 2; FX.push({ k: 'puff', x: LM.beacon.x + .5, y: LM.beacon.y + .5, t0: GT, dur: 1 }); sndAt('world.beacon', { x: LM.beacon.x + .5, y: LM.beacon.y + .5 });
   log('The beacon catches and roars to life. Return to the Quaywarden.', '#ffe08a'); save();
 }
 const QW_TEXT = '“The last storm put out our shore beacon. Take this wick up Lantern Road, light the beacon, and come back. Stick to the road. Beyond the boundary stones, you’re on your own.”';
@@ -985,7 +1104,7 @@ function drawMap() {
 /* ---------- contextual HUD buttons ---------- */
 function canInteract() {
   if (P.ghost) { const r = nearestRes(); return !!(r && Math.hypot(r.x - P.x, r.y - P.y) <= 2.5); }
-  if (nearBeacon()) return true;
+  if (nearBeacon() || nearDoor()) return true;
   for (const e of ents) { if (e === P || e.gone || e.hidden) continue; const d = Math.hypot(e.x - P.x, e.y - P.y); if ((e.kind === 'npc' && d <= 2.5) || (e.kind === 'corpse' && d <= 2) || (e.kind === 'pet' && d <= 1.5 && false)) return true; }
   for (const c of CHESTS.values()) if (Math.hypot(c.x + .5 - P.x, c.y + .5 - P.y) <= 2) return true;
   for (const s of STATIONS) if (Math.hypot(s.x + .5 - P.x, s.y + .5 - P.y) <= 2) return true;
@@ -1305,6 +1424,7 @@ function drawMini() {
 const KEYS = {}; const SETTINGS = { mirror: false, stickSprint: false };
 try { Object.assign(SETTINGS, JSON.parse(localStorage.getItem('shardfall.settings') || '{}')); } catch (e) { }
 const saveSettings = () => { try { localStorage.setItem('shardfall.settings', JSON.stringify(SETTINGS)); } catch (e) { } };
+muted = !!SETTINGS.muted; SFXA.setMuted(muted);   // mute persists with the other settings
 
 /* ---------- HUD ---------- */
 function bar(id, v, m, lbl) { const el = $(id); el.querySelector('i').style.width = cl(v / m * 100, 0, 100) + '%'; el.querySelector('span').textContent = lbl + ' ' + Math.floor(v) + '/' + m; }
@@ -1393,45 +1513,46 @@ const PANELS = {
   quest: () => questPanel(), journal: () => journalPanel(),
   help: () => ['How to play', `<p><b>Move</b> with the floating stick on the left. Press <b>Sprint</b> to run faster; it drains 7 stamina a second and switches off when you run out. Tapping the world never moves you.</p><p><b>Target</b> by tapping a creature, person, corpse or resource, or press <b>Target</b> to cycle nearby creatures. Tap your portrait to target yourself.</p><p><b>Attack</b> arms your basic attack on the selected creature; with nothing selected it picks the nearest creature you can see. Enemy spells do the same. You swing whenever it is in reach and your weapon is ready. It never chases, picks targets, casts or loots for you. <b>Cancel</b> disarms and stops actions.</p><p><b>Spells</b>: tap a spell slot to prepare (stand still), it is then held for 3 s; tap a target or tap the slot again to release. Ground spells need a tap on the ground. Casting stows your weapon.</p><p><b>Interact</b> gathers, opens bodies and chests, disarms revealed snares, talks and uses stations in reach. Stairs in the Sunken Bell ruin and the north Ashfen hatch lead down three levels to the Bellkeeper.</p><p><b>Menu → Abilities</b> holds Search, Tame, pet care, bard songs, pickpocketing, venom and snares. <b>Bar</b> cycles through three pages of three slots.</p><p><b>Death</b> in the wilderness leaves tradeable gear on your body for 12 minutes. On protected roads you keep your gear. Walk to a shrine or healer, or wait 12 s to return to your bound shrine. Bank what you cannot afford to lose.</p><p><b>Crafting</b>: Interact at the forge, anvil, bench, still or fire. Pick a category, then a recipe: the detail shows every input, the metal, your odds and what a failure costs before you commit. Mining and smithing mentors stand by the public forge.</p><p><b>Skills</b> rise 0.1 at a time from real use against suitable difficulty, to 100 each and 700 total.</p><p class="note">Keyboard: WASD/arrows move, Shift sprints, Space attack, E interact, 1–3 current bar slots, Tab target, Esc cancel.</p>`] };
 let PICK = [];
+function uiOpen(k) { openPanel(k); snd('ui.open'); }   // deliberate panel changes only, never on re-render
 
 /* ---------- actions ---------- */
 const findU = (c, u) => c.items.find(it => it.uid === +u);
 const ACT = {
-  close: closePanel, open: d => openPanel(d.p), bag: () => openPanel('bag'), gear: () => openPanel('gear'), skills: () => openPanel('skills'), spells: () => openPanel('spells'), menu: () => openPanel('menu'), logp: () => openPanel('log'),
-  hudmenu: () => openScreen('menu'), map: () => openScreen('map'), scrclose: closeScreen, mapfit: () => { mapFit(); drawMap(); }, journal: () => { closeScreen(); openPanel('journal'); },
+  close: () => { closePanel(); snd('ui.close'); }, open: d => uiOpen(d.p), bag: () => uiOpen('bag'), gear: () => uiOpen('gear'), skills: () => uiOpen('skills'), spells: () => uiOpen('spells'), menu: () => uiOpen('menu'), logp: () => uiOpen('log'),
+  hudmenu: () => { openScreen('menu'); snd('ui.open'); }, map: () => { openScreen('map'); snd('ui.open'); }, scrclose: () => { closeScreen(); snd('ui.close'); }, mapfit: () => { mapFit(); drawMap(); }, journal: () => { closeScreen(); uiOpen('journal'); },
   mgo: d => { closeScreen(); ACT[d.p](); },
-  qaccept: () => { if (Q().beacon !== 0) return; Q().beacon = 1; SF.addItem(P.pack, SF.newItem('wick', 1)); log('Quest accepted: A Light for the Quay. You receive a dry wick.', '#ffe08a'); say(P.talkTo || QW(), 'Lantern Road, north. Stick to the road.'); closePanel(); save(); },
+  qaccept: () => { if (Q().beacon !== 0) return; Q().beacon = 1; snd('quest.accept'); SF.addItem(P.pack, SF.newItem('wick', 1)); log('Quest accepted: A Light for the Quay. You receive a dry wick.', '#ffe08a'); say(P.talkTo || QW(), 'Lantern Road, north. Stick to the road.'); closePanel(); save(); },
   qwick: () => { if (Q().beacon !== 1 || hasWick()) return; SF.addItem(P.pack, SF.newItem('wick', 1)); log('The Quaywarden hands you another wick.', '#ffe08a'); closePanel(); save(); },
-  qturn: () => { if (Q().beacon !== 2) return; Q().beacon = 3; SF.addItem(P.pack, SF.newItem('bandage', 5)); SF.addItem(P.pack, SF.newItem('gold', 40)); log('Quest complete: A Light for the Quay. +5 bandages, +40 gold.', '#7ee08a'); log('Brine Road runs east to the gate. Past the gate pillars, full-loot wilderness rules begin.', '#ffb070'); closePanel(); save(); },
+  qturn: () => { if (Q().beacon !== 2) return; Q().beacon = 3; snd('quest.complete'); SF.addItem(P.pack, SF.newItem('bandage', 5)); SF.addItem(P.pack, SF.newItem('gold', 40)); log('Quest complete: A Light for the Quay. +5 bandages, +40 gold.', '#7ee08a'); log('Brine Road runs east to the gate. Past the gate pillars, full-loot wilderness rules begin.', '#ffb070'); closePanel(); save(); },
   atk: toggleArm, interact, cancel: () => { P.armed = false; if (P.prep || P.held) cancelCast(); AIM = null; P.batch = null; if (P.task) { log(P.task.label + ' cancelled.'); P.task = null; } P.meditating = null; },
   cycle: () => { const L = ents.filter(e => e.kind === 'mon' && alive(e) && dist(e, P) < 16 && los(P, e)).sort((a, b) => dist(a, P) - dist(b, P)); if (!L.length) return log('No creatures in sight.'); const i = L.indexOf(P.sel); P.sel = L[(i + 1) % L.length]; },
   slot: d => useSlot(+d.i + (P.hbPage || 0) * 3), page: () => { P.hbPage = ((P.hbPage || 0) + 1) % 3; },
   abil: d => { ABIL[d.id].fn(); }, petcmd: d => petCommand(d.c), appraise: d => { const it = findU(P.pack, d.u); if (!it) return; closePanel(); P.task = { kind: 'appraise', item: it, label: 'Appraising', t0: GT, t1: GT + SF.APPRAISE_TIME, still: true, x0: P.x, y0: P.y }; },
   repair: d => { const it = findU(P.pack, d.u) || Object.values(P.equip).find(e => e && e.uid === +d.u); if (!it) return; const k = SF.repairSkill(it.id); const st = nearestStation(k === 'smithing' ? ['anvil', 'forge'] : ['bench']); if (!st) return log(k === 'smithing' ? 'Repair metal at the smithy anvil.' : 'Repair this at a workbench.', '#ffb070'); if (!SF.count(P.pack, 'repairkit')) return log('You need a repair kit.', '#ffb070'); const rp = SF.repairPlan(it); if (!rp.ok) return log(cap1(rp.reason), '#ffb070'); P.task = { kind: 'repair', item: it, label: 'Repairing', t0: GT, t1: GT + SF.CRAFT_TIME, still: true, x0: P.x, y0: P.y }; }, self: () => { P.sel = P; if (P.held && SF.SPELL[P.held.sp.id].t === 'ally') releaseHeld(P); },
   desel: () => { P.sel = null; P.armed = false; }, ghostret: () => { if (GT - P.ghostAt >= 12) { const s = SHRINES.find(z => z.id === P.bound); resurrect({ x: s.x + .5, y: s.y + .5 }); } },
-  equip: d => { const it = findU(P.pack, d.u); if (!it) return; const def = SF.ITEMS[it.id]; const slot = def.slot; if (slot === 'shield' && P.equip.weapon && SF.WEAPONS[SF.ITEMS[P.equip.weapon.id].wpn].two) unequipTo('weapon'); if (slot === 'weapon' && SF.WEAPONS[def.wpn].two && P.equip.shield) unequipTo('shield'); if (P.equip[slot]) unequipTo(slot); P.pack.items.splice(P.pack.items.indexOf(it), 1); P.equip[slot] = it; if (slot === 'weapon') { P.drawn = false; P.readyAt = Math.max(P.readyAt || 0, GT + SF.SWAP_TIME); } renderPanel(); },
+  equip: d => { const it = findU(P.pack, d.u); if (!it) return; const def = SF.ITEMS[it.id]; const slot = def.slot; if (slot === 'shield' && P.equip.weapon && SF.WEAPONS[SF.ITEMS[P.equip.weapon.id].wpn].two) unequipTo('weapon'); if (slot === 'weapon' && SF.WEAPONS[def.wpn].two && P.equip.shield) unequipTo('shield'); if (P.equip[slot]) unequipTo(slot); P.pack.items.splice(P.pack.items.indexOf(it), 1); P.equip[slot] = it; snd('item.equip'); if (slot === 'weapon') { P.drawn = false; P.readyAt = Math.max(P.readyAt || 0, GT + SF.SWAP_TIME); } renderPanel(); },
   uneq: d => { unequipTo(d.s); renderPanel(); }, useitem: d => { const def = SF.ITEMS[d.id]; if (d.id === 'bandage') useBandage(); else if (def.use === 'eat') eat(d.id); else useConsumable(d.id); renderPanel(); },
   drop: d => { const it = findU(P.pack, d.u); if (!it) return; P.pack.items.splice(P.pack.items.indexOf(it), 1); dropPile(it); renderPanel(); },
   assign: d => { ASSIGN = { k: d.k, id: d.id }; openPanel('assign'); }, setslot: d => { P.hotbar[+d.i] = ASSIGN; closePanel(); },
   lock: d => { const s = P.skills[d.k]; s.lock = s.lock === 'raise' ? 'hold' : s.lock === 'hold' ? 'lower' : 'raise'; renderPanel(); },
   cast: d => { closePanel(); castSlot(d.s); },
-  take: d => { const c = P.lootOpen; if (!c || dist(c, P) > 2) return log('Move within 2 m.'); const it = findU(c.cont, d.u); if (!it) return; const r = SF.transfer(c.cont, P.pack, it.uid, d.half ? Math.ceil(it.qty / 2) : it.qty, { cap: cap() }); if (!r.ok) log(r.reason, '#ffb070'); else if (it.id === 'gold') sfx('coin'); renderPanel(); if (c.mine) save(); },
-  takeall: () => { const c = P.lootOpen; if (!c || dist(c, P) > 2) return; let n = 0; for (const it of c.cont.items.slice()) { const r = SF.transfer(c.cont, P.pack, it.uid, it.qty, { cap: cap() }); if (r.ok) n++; else { log('Stopped: ' + r.reason, '#ffb070'); break; } } if (n) sfx('coin'); renderPanel(); if (c.mine) save(); },
+  take: d => { const c = P.lootOpen; if (!c || dist(c, P) > 2) return log('Move within 2 m.'); const it = findU(c.cont, d.u); if (!it) return; const r = SF.transfer(c.cont, P.pack, it.uid, d.half ? Math.ceil(it.qty / 2) : it.qty, { cap: cap() }); if (!r.ok) log(r.reason, '#ffb070'); else if (it.id === 'gold') snd('loot.coin'); renderPanel(); if (c.mine) save(); },
+  takeall: () => { const c = P.lootOpen; if (!c || dist(c, P) > 2) return; let n = 0, gold = 0; for (const it of c.cont.items.slice()) { const r = SF.transfer(c.cont, P.pack, it.uid, it.qty, { cap: cap() }); if (r.ok) { n++; if (it.id === 'gold') gold++; } else { log('Stopped: ' + r.reason, '#ffb070'); break; } } if (n) snd(gold ? 'loot.coin' : 'loot.rummage'); /* one cue for the whole transfer */ renderPanel(); if (c.mine) save(); },
   skin: () => { const c = P.lootOpen || P.sel; if (c && c.mon && dist(c, P) <= 2) skin(c); else log('Stand by the remains.'); },
-  depgold: () => { for (const it of P.pack.items.filter(i => i.id === 'gold')) SF.transfer(P.pack, P.bank, it.uid, it.qty); save(); renderPanel(); },
+  depgold: () => { let g = 0; for (const it of P.pack.items.filter(i => i.id === 'gold')) if (SF.transfer(P.pack, P.bank, it.uid, it.qty).ok) g++; if (g) snd('loot.coin'); save(); renderPanel(); },
   dep: d => { const it = findU(P.pack, d.u); if (it) SF.transfer(P.pack, P.bank, it.uid, it.qty); save(); renderPanel(); },
   depeq: d => { const it = P.equip[d.s]; if (!it) return; P.equip[d.s] = null; SF.addItem(P.bank, it); if (d.s === 'weapon') P.drawn = false; save(); renderPanel(); },
   wd: d => { const it = findU(P.bank, d.u); if (!it) return; const r = SF.transfer(P.bank, P.pack, it.uid, it.qty, { cap: cap() }); if (!r.ok) log(r.reason, '#ffb070'); save(); renderPanel(); },
-  tab: d => { PTAB = d.t; renderPanel(true); },
-  buy: d => { const p = SF.PRICES[d.id] * +d.n; if (SF.count(P.pack, 'gold') < p) return log('Not enough gold.', '#ffb070'); const it = SF.newItem(d.id, +d.n, SF.ITEMS[d.id].stack ? null : SF.WEARABLE(d.id) ? { cond: 100, maxc: 100, omax: 100, origin: 'npc' } : { cond: 100 }); const r = SF.addItem(P.pack, it, cap()); if (!r.ok) return log(r.reason, '#ffb070'); SF.removeQty(P.pack, 'gold', p); sfx('coin'); renderPanel(); },
-  sell: d => { const it = findU(P.pack, d.u); if (!it) return; const n = d.all ? it.qty : 1, g = Math.max(1, Math.floor((SF.PRICES[it.id] || 1) * .4 * (SF.WORK_TOOLS[it.id] && !SF.ITEMS[it.id].stack ? SF.toolUses(it) / SF.TOOL_USES : 1))) * n; it.qty -= n; if (it.qty <= 0) P.pack.items.splice(P.pack.items.indexOf(it), 1); P.pack.ver++; SF.addItem(P.pack, SF.newItem('gold', g)); sfx('coin'); renderPanel(); },
+  tab: d => { PTAB = d.t; renderPanel(true); snd('ui.page'); },
+  buy: d => { const p = SF.PRICES[d.id] * +d.n; if (SF.count(P.pack, 'gold') < p) return log('Not enough gold.', '#ffb070'); const it = SF.newItem(d.id, +d.n, SF.ITEMS[d.id].stack ? null : SF.WEARABLE(d.id) ? { cond: 100, maxc: 100, omax: 100, origin: 'npc' } : { cond: 100 }); const r = SF.addItem(P.pack, it, cap()); if (!r.ok) return log(r.reason, '#ffb070'); SF.removeQty(P.pack, 'gold', p); snd('loot.coin'); renderPanel(); },
+  sell: d => { const it = findU(P.pack, d.u); if (!it) return; const n = d.all ? it.qty : 1, g = Math.max(1, Math.floor((SF.PRICES[it.id] || 1) * .4 * (SF.WORK_TOOLS[it.id] && !SF.ITEMS[it.id].stack ? SF.toolUses(it) / SF.TOOL_USES : 1))) * n; it.qty -= n; if (it.qty <= 0) P.pack.items.splice(P.pack.items.indexOf(it), 1); P.pack.ver++; SF.addItem(P.pack, SF.newItem('gold', g)); snd('loot.coin'); renderPanel(); },
   train: d => { const s = P.skills[d.k]; if (s.lock !== 'raise') return log('Set that skill to Raise first.', '#ffb070'); const v = s.v / 10; const cost = P.freeLessons > 0 ? 0 : SF.trainCost(v, 30); const add = 300 - s.v; if (SF.totalSkill(P) + add > SF.SKILL_CAP) return log('That would pass the 700 cap.', '#ffb070'); if (cost && SF.count(P.pack, 'gold') < cost) return log('Not enough gold.', '#ffb070'); if (cost) SF.removeQty(P.pack, 'gold', cost); else P.freeLessons--; s.v = 300; log(`You train ${SF.SKILL[d.k].n} to 30.`, '#7fd4ff'); save(); renderPanel(); },
   stat: d => { const n = +d.n, k = d.k; if (P.str + P.dex + P.int + n > SF.STAT_CAP) return log('Attribute total is capped at 225.', '#ffb070'); if (P[k] + n > SF.STAT_MAX) return log('Each attribute is capped at 100.', '#ffb070'); const c = SF.statTrainCost(n); if (SF.count(P.pack, 'gold') < c) return log('Not enough gold.', '#ffb070'); SF.removeQty(P.pack, 'gold', c); P[k] += n; save(); renderPanel(); },
   craft: d => { startCraft(d.r, +(d.n || 1)); },
   pick: d => { P.sel = PICK[+d.i]; closePanel(); },
   petatk: () => petCommand('attack'),
   zoom: () => { ZOOM = ZOOMS[(ZOOMS.indexOf(ZOOM) + 1) % ZOOMS.length]; resize(); renderPanel(); }, mirror: () => { SETTINGS.mirror = !SETTINGS.mirror; document.body.classList.toggle('mirror', SETTINGS.mirror); saveSettings(); renderPanel(); },
-  sprintt: () => { SETTINGS.stickSprint = !SETTINGS.stickSprint; saveSettings(); renderPanel(); }, sprint: () => { if (P.ghost) return; if (!P.sprintOn && P.stam < 5) return log('Too tired to sprint.', '#ffb070'); P.sprintOn = !P.sprintOn; }, mute: () => { muted = !muted; renderPanel(); }, savenow: () => { log(save() ? 'Saved.' : 'Save failed. Check browser storage.'); },
+  sprintt: () => { SETTINGS.stickSprint = !SETTINGS.stickSprint; saveSettings(); renderPanel(); }, sprint: () => { if (P.ghost) return; if (!P.sprintOn && P.stam < 5) return log('Too tired to sprint.', '#ffb070'); P.sprintOn = !P.sprintOn; }, mute: () => { muted = !muted; SETTINGS.muted = muted; saveSettings(); SFXA.setMuted(muted); renderPanel(); }, savenow: () => { log(save() ? 'Saved.' : 'Save failed. Check browser storage.'); },
   wipe: () => { const el = $('#panel .pb'); if (!el.querySelector('[data-a=wipe2]')) el.insertAdjacentHTML('beforeend', '<p>Delete this character for good? ' + btn('wipe2', 'Yes, delete', {}, 'on') + '</p>'); }, wipe2: () => { try { localStorage.removeItem(SAVEKEY); deletingSave = true; } catch (e) { return log('Could not delete the saved character.'); } location.reload(); },
   rotok: () => { $('#rot').hidden = true; ROTOK = true; } };
 let ROTOK = false;
@@ -1506,7 +1627,7 @@ function finishStroke(n) {
     if (sk === 'mining' && R() < .12) { const r2 = SF.addItem(P.pack, SF.newItem('ironshard', 2), cap()); if (r2.ok) log('Two iron shards come away with it.'); else log('Two iron shards fell away: no room.', '#a8a8a8'); }
     questEvent({ type: 'harvest', skill: sk, mat, qty: q, quay: isQuayNode(n.x, n.y) });
   } else log({ woodcutting: 'You chop but get nothing usable.', mining: 'You break loose rock but no ore.' }[sk]);
-  sfx('chop'); gain(sk, gdiff, { target: 'node:' + n.x + ',' + n.y });
+  sndAt(sk === 'mining' ? 'gather.mine' : 'gather.chop', { x: n.x + .5, y: n.y + .5 }); gain(sk, gdiff, { target: 'node:' + n.x + ',' + n.y });
   if (tl.it && SF.spendTool(P.pack, tl.it)) log('Your ' + SF.ITEMS[tl.id].n.toLowerCase() + ' breaks.', '#ff6a5a');
   if (st.n <= 0) { log('The ' + nm + ' is exhausted.'); return; }
   at(.15, () => { if (!P.task && !P.ghost && P.sel === n && Math.hypot(n.x + .5 - P.x, n.y + .5 - P.y) <= 2 && !overweight() && P.speed < .1) startGather(n); });
@@ -1574,7 +1695,7 @@ function questEvent(e) {
 }
 function gqAccept(id) {
   const d = GQD[id]; if (gq(id).s !== 'none') return; if (sv(d.skill) < d.min) return log(`Needs ${SF.SKILL[d.skill].n} ${d.min}.`, '#ffb070');
-  gqAll()[id] = { s: 'active', p: [], at: GT }; P.cx.track = id;
+  gqAll()[id] = { s: 'active', p: [], at: GT }; P.cx.track = id; snd('quest.accept');
   log(`Quest accepted: ${d.n}.`, '#ffe08a'); if (id === 'M1' || id === 'S1') log('You may use the guild pick at the marked Quay faces' + (id === 'S1' ? ', and Mara\'s tongs at her anvil.' : '.'), '#b6a68a');
   save(); renderPanel(true);
 }
@@ -1585,9 +1706,9 @@ function gqClaim(id) {
   for (const p of d.reward.pins || []) addPin(p);
   if (d.reward.ledger) P.cx.ledger = true;
   if (P.cx.track === id) P.cx.track = null;
-  log(`Quest complete: ${d.n}. +${d.reward.gold} gold.`, '#7ee08a'); payPending(id); save(); renderPanel(true);
+  log(`Quest complete: ${d.n}. +${d.reward.gold} gold.`, '#7ee08a'); snd('quest.complete'); payPending(id, true); save(); renderPanel(true);
 }
-function payPending(id) { const q = gq(id); if (!q.pending) return; const r = SF.addItem(P.pack, SF.newItem('gold', q.pending), cap()); if (r.ok) { q.pending = 0; sfx('coin'); } else log('Your pack is full. Collect the reward from the mentor when you have room.', '#ffb070'); }
+function payPending(id, quiet) { const q = gq(id); if (!q.pending) return; const r = SF.addItem(P.pack, SF.newItem('gold', q.pending), cap()); if (r.ok) { q.pending = 0; if (!quiet) snd('loot.coin'); } else log('Your pack is full. Collect the reward from the mentor when you have room.', '#ffb070'); }
 const PIN_AT = { quarry: () => ({ n: 'Quay quarry', x: 75.5, y: 282.5 }), forge: () => ({ n: 'Public forge', x: QUAY_FORGE().x, y: QUAY_FORGE().y }), anvil: () => ({ n: 'Mara\'s anvil', x: QUAY_ANVIL().x, y: QUAY_ANVIL().y }) };
 function addPin(k) { P.cx.pins = P.cx.pins || []; if (!P.cx.pins.some(p => p.k === k)) { const o = PIN_AT[k](); P.cx.pins.push({ k, n: o.n, x: o.x, y: o.y }); } }
 /* the tracked objective drives the HUD chip, map marker and the guide arrow */
@@ -1711,7 +1832,7 @@ function finishCraft(t) {
   if (!tool.ok) { P.batch = null; return log(tool.t + '.', '#ffb070'); }
   const p = SF.craftPlan(P, P.pack, r, t.mat), res = SF.craftAttempt(P, P.pack, p, R, cap(), { mark: !!P.cx.mark });
   if (!res.ok) { P.batch = null; log('Stopped: ' + res.reason + '.', '#ffb070'); renderPanel(); return; }
-  if (r.station === 'anvil') sfx('anvil'); else sfx(res.success ? 'coin' : 'fizzle');
+  craftSound(r, res.success);
   gain(r.skill, p.diff, { recipe: r.id });
   if (tool.it && SF.spendTool(P.pack, tool.it)) log('Your ' + SF.ITEMS[r.tool].n.toLowerCase() + ' wear out and break.', '#ff6a5a');
   if (res.success) { const it = res.items[0]; b.made++;
@@ -1724,13 +1845,13 @@ function finishCraft(t) {
 }
 function stopBatch(why) { if (P.batch) { P.batch = null; if (why) log(why, '#ffb070'); } if (PANEL === 'craft' && CUI && CUI.rid) closePanel(); }
 Object.assign(ACT, {
-  ccat: d => { CUI.cat = d.c; renderPanel(true); }, crec: d => { CUI.rid = d.r; renderPanel(true); }, cback: () => { CUI.rid = null; renderPanel(true); },
+  ccat: d => { CUI.cat = d.c; renderPanel(true); snd('ui.page'); }, crec: d => { CUI.rid = d.r; renderPanel(true); snd('ui.page'); }, cback: () => { CUI.rid = null; renderPanel(true); snd('ui.page'); },
   cmat: d => { CUI.mat = d.m; renderPanel(); }, cn: d => { CUI.n = cl(CUI.n + +d.d, 1, 20); renderPanel(); }, cmark: () => { P.cx.mark = !P.cx.mark; renderPanel(); },
   cmake: d => { startCraft(CUI.rid, +d.n, CUI.mat); renderPanel(); },
   survey: () => startSurvey(P.sel),
   gqacc: d => gqAccept(d.q), gqclaim: d => gqClaim(d.q), gqpay: d => { payPending(d.q); save(); renderPanel(true); },
   gqtrack: d => { P.cx.track = P.cx.track === d.q ? null : d.q; renderPanel(true); },
-  jtab: d => { PTAB = d.t; renderPanel(true); } });
+  jtab: d => { PTAB = d.t; renderPanel(true); snd('ui.page'); } });
 PANELS.craft = craftPanel; PANELS.guild = guildPanel;
 
 /* ---------- save migration v1 → v2 (§10): additive, backed up once ---------- */
@@ -1771,13 +1892,13 @@ function tapWorld(sx, sy) {
   if (P.held && heldTap(hits, w)) return;
   if (hits.length > 1 && hits[0].kind !== hits[1].kind && Math.abs(dist(hits[0], hits[1])) < .8) { PICK = hits.slice(0, 5); return openPanel('picker'); }
   if (hits.length) { if (hits[0].kind === 'corpse') { P.sel = hits[0]; if (dist(hits[0], P) <= 2.2) return interact(); return log('Walk next to the remains to loot them.'); } P.sel = hits[0]; if (P.sel.kind === 'mon') P.sel.nameUntil = GT + 3; return; }
+  const dr = doorAtScreen(w.wx, w.wy); if (dr) { if (doorDist(dr) <= 2.2) return useDoor(dr); return log('Walk up to the door.'); }
   const tl = tallAt(w.wx, w.wy); const tx = tl ? tl.x : Math.floor(w.x), ty = tl ? tl.y : Math.floor(w.y);
   const n = nodeAt(tx, ty); if (n) { P.sel = n; return; }
   if (tAt(tx, ty) === T.WA && SF.count(P.pack, 'rod')) { P.sel = { kind: 'node', x: tx, y: ty, t: T.WA, skill: 'fishing', name: 'fishing water' }; return; }
 }
 let PT = null;
 cv.addEventListener('pointerdown', e => {
-  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (_) { } }
   if (!P || PT) return; const leftZone = SETTINGS.mirror ? e.clientX > VW * .55 : e.clientX < VW * .45;
   PT = { id: e.pointerId, x: e.clientX, y: e.clientY, joy: leftZone, moved: false }; if (leftZone) { JOY.x0 = e.clientX; JOY.y0 = e.clientY; JOY.x = e.clientX; JOY.y = e.clientY; }
   try { cv.setPointerCapture(e.pointerId); } catch (_) { } e.preventDefault();
@@ -1789,7 +1910,7 @@ cv.addEventListener('mousemove', e => { if (AIM && !PT) { const w = screenToWorl
 const KM = { ArrowUp: 'u', w: 'u', W: 'u', ArrowDown: 'd', s: 'd', S: 'd', ArrowLeft: 'l', a: 'l', A: 'l', ArrowRight: 'r', d: 'r', D: 'r' };
 addEventListener('keydown', e => { if (!P || e.target.matches('input,select,textarea')) return;
   if (SCREEN || PANEL) {
-    if (e.key === 'Escape') { e.preventDefault(); if (SCREEN) closeScreen(); else closePanel(); refreshHud(); }
+    if (e.key === 'Escape') { e.preventDefault(); if (SCREEN) closeScreen(); else closePanel(); snd('ui.close'); refreshHud(); }
     return;
   } if (KM[e.key]) { KEYS[KM[e.key]] = 1; KEYS.any = 1; e.preventDefault(); } if (e.key === 'Shift') KEYS.shift = 1; if (e.key === ' ') { toggleArm(); e.preventDefault(); } if (e.key === 'e' || e.key === 'E') interact(); if (/^[1-3]$/.test(e.key)) ACT.slot({ i: +e.key - 1 }); if (e.key === 'Tab') { ACT.cycle(); e.preventDefault(); } if (e.key === 'Escape') { ACT.cancel(); closePanel(); } refreshHud(); });
 addEventListener('keyup', e => { if (KM[e.key]) KEYS[KM[e.key]] = 0; if (e.key === 'Shift') KEYS.shift = 0; KEYS.any = KEYS.u || KEYS.d || KEYS.l || KEYS.r; });
@@ -1851,7 +1972,7 @@ function boot(saved, fresh) {
     for (const co of saved.corpses || []) { const cont = SF.newContainer('corpse', 'p1'); cont.items = co.items; cont.diedAt = GT - (co.diedAgo ?? 999); cont.expires = GT + co.left; addEnt({ kind: 'corpse', mine: true, name: 'your body', x: co.x, y: co.y, cont, expires: GT + co.left }); }
     if (P.ghost && !Number.isFinite(c.ghostAt)) P.ghostAt = GT - 12; }
   else { P = newChar(fresh); starterKit(); }
-  P.cx = Object.assign({ survey: {}, pins: [], track: null, mark: false }, P.cx || {}); P.batch = null;
+  P.cx = Object.assign({ survey: {}, pins: [], track: null, mark: false, doors: {} }, P.cx || {}); P.batch = null; applyDoorState();
   ents.unshift(P); P.sect = P.sect || 0; P.drawn = false; P.readyAt = 0; while (P.hotbar.length < 9) P.hotbar.push(null); Q(); populate(); seedTraps();
   if (saved) for (const pt of saved.pets || []) { const d = MON[pt.type]; if (!d) continue; const near = Math.hypot(pt.dx || 0, pt.dy || 0) < 12; addEnt({ kind: 'pet', type: pt.type, name: pt.name || 'your ' + d.n, x: P.x + (near ? pt.dx : 1), y: P.y + (near ? pt.dy : 0), hp: Math.min(pt.hp, d.hp), max: d.hp, state: '', home: { x: P.x, y: P.y }, sect: 0, ward: 0, order: pt.order, slots: pt.slots || 1, target: null }); }
   mageryBoot(saved);
@@ -1865,7 +1986,7 @@ let last = performance.now(), hudT = 0;
 function loop(t) { const dt = Math.min(.1, (t - last) / 1000); last = t; try { update(dt); render(); if (P && t - hudT > 120) { hudT = t; refreshHud(); drawMini(); if (PANEL === 'loot' || PANEL === 'shop') renderPanel(); renderLog(); } } catch (e) { console.error(e); } requestAnimationFrame(loop); }
 addEventListener('visibilitychange', () => { if (document.hidden) save(); });
 loadScout(SCOUT_SRC); renderCC(); resize(); requestAnimationFrame(loop);
-window.__SF = { LOG, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer };
+window.__SF = { LOG, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY };
 
 }
 </script>
