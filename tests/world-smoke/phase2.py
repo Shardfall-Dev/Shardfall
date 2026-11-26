@@ -1,9 +1,9 @@
 # Living World phase 2 in the built game (Playwright + Chrome): the fixed 50 ms step, the world clock, light, navigation
 # (travel graph, A*, doors, stairs, boats, moongates, stuck recovery, the search budget) and the developer panel.
-# usage: python3 tests/world-smoke/phase2.py Shardfall_v0.22.html [/path/to/chrome]   (run.py calls it too)
+# usage: python3 tests/world-smoke/phase2.py Shardfall_v0.23.html [/path/to/chrome]   (run.py calls it too)
 import sys, json, os
 from playwright.sync_api import sync_playwright
-f = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else 'Shardfall_v0.22.html'); chrome = sys.argv[2] if len(sys.argv) > 2 else '/usr/bin/google-chrome'
+f = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else 'Shardfall_v0.23.html'); chrome = sys.argv[2] if len(sys.argv) > 2 else '/usr/bin/google-chrome'
 HOLD = "window.__rafHold = true; { const raf = window.requestAnimationFrame.bind(window); window.requestAnimationFrame = cb => window.__rafHold ? 0 : raf(cb); }"
 fails = 0
 def check(ok, msg, got=None):
@@ -114,7 +114,7 @@ with sync_playwright() as p:
   # 7. the developer panel (?dev): stats, time controls, pause, spawning, inspection
   ctx, pg, errs = page(b, hold=False, q='?dev'); new_char(pg); pg.wait_for_timeout(1500); pg.click('#devb'); pg.wait_for_timeout(500)
   txt = pg.inner_text('#devp')
-  check(all(k in txt for k in ['Shardfall v0.22', 'sim 20 Hz', 'actors ', 'NPCs ', 'creatures ', 'time ', 'paths: queue', 'AI ', 'audio voices', 'save ', 'last save', 'recent events', 'factions']), 'the panel shows version, rates, counts, time, paths, AI cost, audio, save and events', txt[:500])
+  check(all(k in txt for k in ['Shardfall v0.23', 'sim 20 Hz', 'actors ', 'NPCs ', 'creatures ', 'time ', 'paths: queue', 'AI ', 'audio voices', 'save ', 'last save', 'recent events', 'factions']), 'the panel shows version, rates, counts, time, paths, AI cost, audio, save and events', txt[:500])
   pg.click('[data-dev=hour][data-h="0"]'); pg.wait_for_timeout(200); h = J(pg, "() => __SF.SIM.fmtHour(__SF.hourOfDay())")
   check(h.startswith('00:0'), 'Midnight button sets the clock', h)
   pg.click('[data-dev=pause]'); g1 = J(pg, '() => __SF.GT'); pg.wait_for_timeout(800); g2 = J(pg, '() => __SF.GT'); pg.click('[data-dev=pause]'); pg.wait_for_timeout(500); g3 = J(pg, '() => __SF.GT')
