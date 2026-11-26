@@ -4,13 +4,14 @@ The roadmap is `docs/WORLD_SIMULATION_MASTER.md` (the full specification, unchan
 
 **Status words:** **Tested** — implemented and covered by an automated test that passes. **Implemented** — in the build, checked by hand only. **Partial** — some of the item is in; the rest is listed. **Planned** — not started. **Blocked** — waiting on something named.
 
-**Current build:** v0.22 (`Shardfall_v0.22.html`), branch `feature/living-world-phase2` (PR #13). The branches stack:
+**Current build:** v0.23 (`Shardfall_v0.23.html`), branch `feature/world-expansion` (PR #14). The branches stack:
 
+- `feature/world-expansion` on `feature/living-world-phase2` (v0.22, PR #13)
 - `feature/living-world-phase2` on `feature/living-world-phase1` (v0.21, PR #12)
 - `feature/living-world-phase1` on `feature/anniabreen-map` (v0.20, PR #11)
 - `feature/anniabreen-map` on `integration/v0.19` (PR #10)
 
-`main` is still at v0.16. Merge in the order #10, #11, #12, #13.
+`main` is still at v0.16. Merge in the order #10, #11, #12, #13, #14.
 
 ---
 
@@ -22,6 +23,7 @@ The spec's development sequence (§29, phases A–G) is numbered 1–7 here. Eac
 |---|---|---|---|---|
 | 1 | A | Audit and architecture: actor ids, archetypes and controllers, shared damage entry, structured events, seeded streams, deterministic tests | — | **Tested** (v0.21) |
 | 2 | B | Clock and navigation: fixed 50 ms simulation step, persistent world clock (120 min day), day/night lighting and local lights, A* plus a waypoint graph, doors, stuck recovery, developer debug panel | 1 | **Tested** (v0.22) |
+| 2½ | — | **World expansion** (asked for between phases 2 and 3): Anniabreen stretched ×1.35 between rigid towns, the Southern Reach, 8 camps, 5 sealed dungeon mouths, world 2620 × 1520 | 2 | **Tested** (v0.23) |
 | 3 | C | Population and monster ecosystem: regions and habitats, species profiles as data, roaming, territories, predator/prey, monster-vs-monster factions, creature audio | 1, 2 | Planned |
 | 4 | D | Living NPCs: named townsfolk with homes, workplaces and schedules; guards patrolling; merchants travelling; resource workers; basic adventurers | 1, 2, 3 (factions) | Planned |
 | 5 | E | Shared combat and law: NPC-vs-NPC and NPC-vs-monster combat, NPC spellcasting through Magery, actor death and looting, criminal flags, murder counts, guards, witnesses | 1, 3, 4 | Planned |
@@ -215,6 +217,93 @@ Spatial indexing (phase 6 in the spec) is needed earlier: phase 3 adds dozens of
 - **"Night must affect the gameplay world" (§6)** is limited to light in this phase. Perception at night, nocturnal creatures and undead activity are phase 3, where perception is built.
 - **Graph build timing.** The travel graph is built on first use (about 250 ms desktop), not at boot, so starting the game is not slower. Phase 3 will build it during population setup.
 
+## World expansion (v0.23) — **Tested**
+
+Requested on 2026-11-26: bigger distances, more camps, and places for dungeons. Three decisions were confirmed:
+
+- **Both** stretch Anniabreen and add new lands. This knowingly goes beyond the spec's "do not recreate the map"; the towns themselves are untouched.
+- Make the world **about twice** its area.
+- Place **dungeon sites now and build the interiors later**.
+
+### What was built
+
+- **The world** is 2620 × 1520 tiles (3.98 M), up from 2100 × 900 (1.89 M). Saltmarsh is unchanged.
+- **Anniabreen stretched, towns untouched (`annStretch` in `src/anniabreen.js`).**
+  - The v1.0 map is still drawn exactly as before, in its original frame.
+  - Every town (Mynoc with its mine, Vespar, Skara Bryn and its landing, Moonglen), the forest fork and Miner's Cross then move as rigid blocks by whole tiles.
+  - The wilderness between them stretches ×1.35 by an inverse-distance blend. It was checked fold-free before use: the smallest local area factor is 0.92 and the largest 3.2.
+  - Terrain is resampled; roads and the river are carved again along their stretched lines, outside the towns only. Woods are thinned again, outside the towns only.
+  - Everything the towns placed moves with them: pieces, colliders, doors, buildings, lights, stations, shrines, zones, NPC posts, signs, gates, piers and protection.
+  - `annWarp` / `annUnwarp` convert between the v1.0 frame and the new world. Zone rules written for v1.0 still run on the v1.0 coordinates.
+  - **Proof:** all six town zones are tile-for-tile identical to v0.22, and their buildings, doors, townsfolk, stations and gates match.
+- **The Southern Reach (`src/frontier.js`)** is new land across a strait, reached on foot by the **Long Causeway** from the forest fork.
+  - **Southwatch** crossroads has a shrine to bind at and return to, a lamp and a signpost.
+  - Roads run west to **Mirefen** (swamp: shallows, reeds), east past the **Greyspine** (cliffs and grade-2 ore) to **Kragmaw**, and south to the **Ashen Barrows** (a grave field).
+- **Eight camps,** each with cleared ground, a trail over land to a road or a town edge (never across water, never through a town), art and a *provisional* spawner on existing creatures:
+
+| Camp | Where | Creatures |
+|---|---|---|
+| Cutpurse Hollow | Westwood | road bandits (the smuggler's rules, own look) |
+| Greywolf Den | north woods | dire wolves |
+| Silkwood | east of the vale | giant spiders |
+| Trollgate | west ridge | trolls and an ettin |
+| Harpy Roost | Moonglen's east cliffs | harpies |
+| Kragmaw Camp | Reach hills, palisade with two gates | orcs |
+| Scalemire | Mirefen | lizardmen and bog slimes |
+| Ashen Barrows | Reach | skeletons |
+
+- **Five dungeon mouths,** original names on the spec's themes:
+
+| Mouth | Theme | Where | Guards |
+|---|---|---|---|
+| Hollowdeep | Despise | Northern Ridge | an earth elemental |
+| Wyrmhold | Destard | Greyspine | gargoyles |
+| Liar's Keep | Deceit | a ruined tower on Moonglen's north tip | — |
+| Sorrowstone | Shame | a crypt in Mirefen | — |
+| Gilt Maw | Covetous | the cliffs north-east of Vespar | — |
+
+  Each mouth is lit and labelled on the map. Trying it says plainly that it is sealed and opens in a later version. **No interior exists yet.**
+- **Travel.**
+  - The travel graph includes every site. Long links are laid along their verified paths in legs of at most 35 tiles.
+  - Every graph node and search end snaps to open ground, because stretched road points can sit a tile off the carved road.
+  - All 35 named places are reachable from Saltmarsh Quay, and all ~490 walk links pass a real search.
+  - The graph builds in about 0.85 s on first use.
+- **Save v6.** Anything saved at an Anniabreen position follows the stretch:
+  - the character, bodies, Wren and her body, map pins and marked recall runes;
+  - shut doors, and town resource-node and survey records;
+  - wilderness node records are dropped, because that ground was redrawn.
+
+  The v0.22 save is kept once as `shardfall.save.v1.prev5`. A character that would load inside something is nudged to the nearest open ground.
+- **Walking times now** (Anniabreen test, full stick, no sprint):
+
+| Route | v0.22 | v0.23 |
+|---|---|---|
+| Mynoc → Vespar by cart road | 78 s | 104 s |
+| Skara landing → fork | 48 s | 66 s |
+| Fork → Mynoc | 67 s | 91 s |
+| Fork → Vespar | 77 s | 104 s |
+
+  - All walks inside towns are unchanged to 0.1 s.
+  - Developer travellers from Saltmarsh Quay: Kragmaw 285 s, Sorrowstone 278 s, Hollowdeep 201 s, Liar's Keep 117 s (packet + boat).
+
+### Tests
+
+- `python3 tests/world-smoke/expansion.py` (called by `world-smoke/run.py`), 22 checks:
+  - World size; towns identical to the `towns_v022.json` reference.
+  - The sites, their zones and trails; camp creatures appear; a sealed mouth says so.
+  - The causeway is walkable; Moonglen is still an island; all places are reachable.
+  - Four long journeys arrive.
+  - A real v0.22 save made in Vespar migrates, with its rune, ore face and shut door.
+- `tests/anniabreen-smoke` now places its v1.0 points through the game's own warp. Its travel-time ranges are raised to the new distances. Every walk completes, and the town walks match v0.22 exactly.
+- The phase 1 and 2 checks accept the new save version. The full regression is in the table below.
+
+### Costs and limits
+
+- **Starting the game is slower and uses more memory** (desktop): 1.7 s instead of 1.0 s, and about 72 MB of heap instead of about 31 MB, because there is twice as much land. Phones are not measured; this joins the night pass and graph build on the phase 6 list. Caching the generated world is the obvious remedy (it is deterministic).
+- **Camp spawners are provisional.** They respawn like the old point spawners. Phase 3 turns camps into persistent populations with territories, patrols and recovery after clearing.
+- **Dungeon interiors:** none yet; each needs its own step.
+- **Missing art and sound.** Bandits use a tinted scout; there are no goblin, drake or dragon creatures. Tents, campfire, totem, huts, webs, bones, cave, crypt and keep are drawn in code in the kit's palette. Asset backlog: dragon and drake art, goblins, cave ambience.
+
 ## Implementation matrix (audit of v0.20 against the spec)
 
 | Spec § | Area | What exists in v0.20 | Status after phase 1 | Next |
@@ -232,9 +321,9 @@ Spatial indexing (phase 6 in the spec) is needed earlier: phase 3 adds dozens of
 | 12 | Utility AI + state machines | `aiMon` state machine; no utility scoring, personality or hysteresis | Planned | Phase 3–4 |
 | 13 | Perception | Aggro radius + `los()`; hidden player ignored; no hearing, sleep or night vision | Planned | Phase 3 |
 | 14 | Pathfinding | None: straight-line steering with a sidestep (`moveBy`); doors, bridges, stairs and moongates exist | **Tested** (phase 2): A* + travel graph, doors, stairs, boats, gates, stuck recovery, budget | Creatures use it in phase 3 (territories, pursuit limits); crowding at doors in phase 4 |
-| 15 | Population | `SPAWNS` point spawners: Saltmarsh, Anniabreen (8: boars, rats, a cemetery pair of skeletons, hounds, snappers, spiders) and dungeon rooms; bestiary creatures have stats but no spawns | Planned | Phase 3 |
-| 16 | Camps | Ashfen outlaw camp (static vendors, smugglers spawner) | Planned | Phase 3 |
-| 17 | Dungeons | Sunken Bell, 3 levels, seeded rooms, Bellkeeper boss, chests, stairs; Mynoc mine first chamber | Dungeon spawns/chests now deterministic | Phase 3; the spec's Anniabreen dungeon network is not in the repo yet (**Blocked** on that work) |
+| 15 | Population | `SPAWNS` point spawners: Saltmarsh, Anniabreen (8: boars, rats, a cemetery pair of skeletons, hounds, snappers, spiders) and dungeon rooms; bestiary creatures have stats but no spawns | **Partial** (v0.23): camp spawners on bestiary creatures | Phase 3 |
+| 16 | Camps | Ashfen outlaw camp (static vendors, smugglers spawner) | **Partial** (v0.23): 8 camp sites with art and provisional spawners | Phase 3: persistent populations, patrols, clearing |
+| 17 | Dungeons | Sunken Bell, 3 levels, seeded rooms, Bellkeeper boss, chests, stairs; Mynoc mine first chamber | **Partial** (v0.23): 5 sealed mouths placed and reachable; interiors **Planned** | One step per dungeon interior |
 | 18 | Combat between actors | Creatures ↔ player/pets/Wren; provoked creature ↔ creature | Shared entry **Tested** | Phase 5 |
 | 19 | Criminality | Protected zones (`PROT`, guarded towns); theft/pickpocket and snooping exist for the player; no notoriety | Planned | Phase 5 |
 | 20 | Corpses, death, loot | `SF.deathTransaction` for player and Wren, creature corpses with loot rolls, decay timers, skinning, the player's corpse saved | Death once **Tested** | Phase 5 (NPC looting), phase 6 (persist all corpses) |
@@ -253,7 +342,7 @@ Spatial indexing (phase 6 in the spec) is needed earlier: phase 3 adds dozens of
 - **Night Sight (resolved in phase 2).** It is now partial, per the spec.
 - **Ids versus ally `aid`.** Wren's `aid: 'wren'` (bandage links, body ownership) is kept as is. Her actor id is `npc:wren`.
 - **Quadratic push-apart.** `aiMon` checks every entity against every other for push-apart. With 212 entities this is fine; at the spec's hundreds it is not. A spatial index is needed in phase 3.
-- **Anniabreen is thinly populated.** The spec's milestone names Anniabreen places (graveyard, forest, dungeon). The map has 8 simple spawners, no camps and no dungeon network yet.
+- **Anniabreen was thinly populated** (v0.20). Since v0.23 it has camps and dungeon mouths; the populations behind them are phase 3.
 
 ---
 
@@ -285,8 +374,11 @@ Spatial indexing (phase 6 in the spec) is needed earlier: phase 3 adds dozens of
 | v0.20 | 0.79 ms | 4.6 ms | — |
 | v0.21 | 0.80 ms | 4.8 ms | — |
 | v0.22 | 0.80 ms | 4.3 ms | 5.8 ms |
+| v0.23 (256 entities) | 1.20 ms | 4.0 ms | 5.4 ms |
 
 - Each figure is the average of 3 runs of 4,000 updates and 200 renders.
+- **v0.23 update cost.** It rose from 0.80 to 1.20 ms per step. This is the creature push-apart in `aiMon`, which compares every entity with every other: with 256 entities instead of 212 that is 1.46× the pairs, which matches the measurement. It is still far inside the 50 ms step, but it is the first sign of the quadratic cost the audit flagged. The phase 3 spatial index removes it.
+- **v0.23 start-up:** 1.66 s to enter the world (was 1.0 s); about 72 MB of heap (was about 31 MB).
 - Night costs the full-screen tint plus the cached light sprites. Before the sprites were cached it was 7.9 ms.
 - **Path searches** are capped at 3,000 nodes per step. Twelve travellers starting at once stay under the cap, and their whole journeys cost about 0.7 ms per step on average.
 - **The travel graph** is built once, in about 250 ms.
