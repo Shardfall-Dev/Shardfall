@@ -1729,6 +1729,15 @@ function renderPanel(top) {
 }
 let bagSort = 'Category', bagUid = null;
 const bagSymbols = { weapon:'⚔', shield:'⛨', armor:'♜', coin:'◉', ore:'◆', metal:'▰', timber:'▥', reagent:'✧', potion:'⚗', tool:'⚒', food:'❧', medic:'✚', ammo:'➶', cloth:'▧' };
+/* Backpack icons v1.0.0 (src/backpack-icons.js): one atlas, looked up by the item's id; the atlas is set once as a CSS background
+   so each tile only carries its offset. Items without a painted icon keep the category glyph. */
+{ const st = document.createElement('style'); st.textContent = '.bagico{background-image:url(' + BAG_ICONS.src + ')}'; document.head.appendChild(st); }
+function bagIcon(it, size) {
+  const r = BAG_ICONS.rect[it.id];
+  if (!r) return '<i class="bagglyph" aria-hidden="true" style="width:' + size + 'px;height:' + size + 'px;font-size:' + Math.round(size * .6) + 'px">' + (bagSymbols[SF.ITEMS[it.id].cat] || '◇') + '</i>';
+  const k = size / r[2];
+  return '<i class="bagico" aria-hidden="true" data-icon="' + esc(it.id) + '" style="width:' + size + 'px;height:' + size + 'px;background-size:' + BAG_ICONS.w * k + 'px ' + BAG_ICONS.h * k + 'px;background-position:' + -r[0] * k + 'px ' + -r[1] * k + 'px"></i>';
+}
 
 function bagStats(it) {
   const def = SF.ITEMS[it.id], weapon = SF.WEAPONS[def.wpn];
@@ -1736,7 +1745,7 @@ function bagStats(it) {
   if (weapon) { lines.push('Base damage ' + weapon.dmg.join('–') + ' · Reach ' + weapon.reach + ' m'); lines.push(SF.SKILL[weapon.skill].n + ' · speed ' + weapon.speed + ' · STR ' + weapon.str + (weapon.two ? ' · two-handed' : '')); }
   if (def.armor && SF.ARMOR[def.armor] !== undefined) lines.push('Base armor ' + SF.ARMOR[def.armor]);
   if (!def.trade) lines.push('Protected');
-  return lines.map(line => '<span>' + esc(line) + '</span>').join('');
+  return '<div class="baghead">' + bagIcon(it, 56) + '<span>' + esc(lines[0]) + '</span></div>' + lines.slice(1).map(line => '<span>' + esc(line) + '</span>').join('');
 }
 
 function bagPanel() {
@@ -1763,7 +1772,7 @@ function bagPanel() {
       group = cat;
       h += '<b class="baggroup">' + esc(cap1(cat)) + '</b>';
     }
-    h += '<button class="bagcell" data-a="baginspect" data-u="' + it.uid + '" aria-pressed="' + (selected === it) + '"><i aria-hidden="true">' + (bagSymbols[cat] || '◇') + '</i><small>' + esc(SF.itemName(it)) + '</small>' + (it.qty > 1 ? '<strong>' + it.qty + '</strong>' : '') + '<span class="bagtip" role="tooltip">' + bagStats(it) + '</span></button>';
+    h += '<button class="bagcell" data-a="baginspect" data-u="' + it.uid + '" aria-pressed="' + (selected === it) + '">' + bagIcon(it, 40) + '<small>' + esc(SF.itemName(it)) + '</small>' + (it.qty > 1 ? '<strong>' + it.qty + '</strong>' : '') + '<span class="bagtip" role="tooltip">' + bagStats(it) + '</span></button>';
   }
   return ['Backpack', h + (items.length ? '' : 'Your backpack is empty.') + '</div>'];
 }

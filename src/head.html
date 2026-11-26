@@ -5,7 +5,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="screen-orientation" content="landscape">
-<title>Shardfall v0.19</title>
+<title>Shardfall v0.19.2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=Alegreya+Sans:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -145,9 +145,14 @@ ol.steps{margin:4px 0 6px;padding-left:22px}ol.steps li{margin:3px 0}ol.steps li
 .bagcell{position:relative;min-height:65px;min-width:0;color:#e7d8b9;background:linear-gradient(145deg,#39312a,#191918 75%);border:1px solid #77654c;border-radius:4px;padding:5px;cursor:pointer}
 .bagcell[aria-pressed=true],.bagcell:focus-visible{outline:2px solid #efd084;outline-offset:-2px}
 .bagcell i,.bagcell small,.bagcard span,.bagtip span{display:block}
-.bagcell i{font:24px Georgia;color:#dcbb79}.bagcell small{font-size:11px;overflow-wrap:anywhere}.bagcell strong{position:absolute;top:2px;right:4px;color:white;text-shadow:0 1px 3px black}
+.bagico,.bagglyph{display:block;flex:none;background-repeat:no-repeat;image-rendering:auto}.bagcell .bagico,.bagcell .bagglyph{margin:0 auto 2px}
+.bagglyph{font-family:Georgia;font-style:normal;color:#dcbb79;line-height:1;display:flex;align-items:center;justify-content:center}
+.bagcell small{font-size:11px;overflow-wrap:anywhere}
+.bagcell strong{position:absolute;top:3px;right:3px;z-index:1;min-width:18px;padding:1px 5px;border-radius:9px;background:rgba(10,10,12,.82);border:1px solid #8a744f;color:#fff;font:bold 12px/15px system-ui;text-align:center;text-shadow:0 1px 2px #000;pointer-events:none}
 .bagcard,.bagtip{color:#eddfc4;background:#161821;border:1px solid #b49564;border-radius:4px;padding:9px;text-align:left;font:13px/1.5 system-ui}
-.bagcard div{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}.bagcard span:first-child,.bagtip span:first-child{font:bold 16px Georgia;color:#f3d89f}
+.bagcard div{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}.bagcard .baghead{margin-top:0}
+.baghead{display:flex;align-items:center;gap:9px;margin-bottom:4px}.baghead .bagico,.baghead .bagglyph{border:1px solid #65513a;border-radius:4px;background-color:#221d18}
+.baghead span{font:bold 16px Georgia;color:#f3d89f}
 .bagtip{display:none;position:fixed;z-index:100;bottom:12px;left:50%;transform:translateX(-50%);width:min(265px,85vw);pointer-events:none;box-shadow:0 3px 18px #000}
 @media(hover:hover){.bagcell:hover .bagtip{display:block}}
 .bagcell:focus-visible .bagtip{display:block}
