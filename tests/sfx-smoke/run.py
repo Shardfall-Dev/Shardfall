@@ -64,9 +64,9 @@ with sync_playwright() as pw:
     page.wait_for_timeout(600)
 
     # ---------- doors ----------
-    door = J(page, """(() => { const S = __SF, b = S.BUILD.find(b => b.role === 'smith'), d = S.DOORS.find(d => d.x > b.x && d.x < b.x + b.w && (d.y === b.y || d.y === b.y + b.h)); return { x: d.x, y: d.y, n: S.DOORS.length, open: d.open, id: d.leaf.id }; })()""")
+    door = J(page, """(() => { const S = __SF, b = S.BUILD.find(b => b.role === 'smith'), d = S.DOORS.find(d => d.x > b.x && d.x < b.x + b.w && (d.y === b.y || d.y === b.y + b.h)); return { x: d.x, y: d.y, n: S.DOORS.filter(d => d.x < 600 && d.y < 600).length, open: d.open, id: d.leaf.id }; })()""")
     D = "__SF.DOORS.find(d => d.x === %d && d.y === %d)" % (door['x'], door['y'])
-    check('six kit doors registered, open by default', door['n'] == 6 and door['open'] and door['id'] == 'door_open_left_x', door)
+    check('six kit doors registered at the Quay, open by default', door['n'] == 6 and door['open'] and door['id'] == 'door_open_left_x', door)
     tp(page, door['x'] + .5, door['y'] + 1.1); page.wait_for_timeout(100); clear(page)
     page.keyboard.press('e'); page.keyboard.press('e'); page.wait_for_timeout(150)
     s1 = J(page, f"[{D}.open, {D}.leaf.id]")

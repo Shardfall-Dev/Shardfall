@@ -132,6 +132,7 @@ const spellSnd = (sp, at) => sndAt(SPELL_SND[sp.id] || EFFECT_SND[sp.effect] || 
 const ZONE_MUSIC = { quay: '01-saltmarsh-home', homes: '01-saltmarsh-home', beacon: '02-lanterns-on-the-quay', safe: '05-beyond-the-tidegate', roads: '05-beyond-the-tidegate', cross: '05-beyond-the-tidegate', pine: '05-beyond-the-tidegate',
   ford: '03-mist-on-the-causeway', silt: '03-mist-on-the-causeway', ashfen: '03-mist-on-the-causeway', camp: '03-mist-on-the-causeway', wreck: '03-mist-on-the-causeway',
   bell: '04-the-empty-watch', bell1: '04-the-empty-watch', bell2: '04-the-empty-watch', bell3: '04-the-empty-watch' };
+Object.assign(ZONE_MUSIC, ANN_ZONE_MUSIC);
 function musicTick(z) {
   const want = P.ghost ? null : ZONE_MUSIC[z] || null;
   if (want !== SND.musWant) { SND.musWant = want; SND.musAt = GT + (SFXA.musicNow || SND.musFirst ? 3 : 0); SND.musFirst = 1; }
@@ -185,7 +186,11 @@ function give(id, q, extra) { const r = SF.addItem(P.pack, SF.newItem(id, q, ext
 function dropPile(it) { let c = ents.find(e => e.kind === 'corpse' && e.pile && Math.hypot(e.x - P.x, e.y - P.y) < 1); if (!c) { const cont = SF.newContainer('pile'); c = addEnt({ kind: 'corpse', pile: true, name: 'dropped items', x: P.x, y: P.y, cont, expires: GT + 600 }); } c.cont.items.push(it); }
 
 /* ---------- movement ---------- */
-function canStand(e, x, y) { const r = .26; if (colBlocked(x, y, r)) return false; if (FIELDS.length && fieldBlocks(x, y)) return false; for (const [ox, oy] of [[-r, -r], [r, -r], [-r, r], [r, r]]) if (blockedAt(x + ox, y + oy)) return false; if (e.kind === 'mon' && !e.quest && protAt(x, y)) return false; return true; }
+/* trees, rock faces and shrubs block only at the trunk or boulder (v0.20), so a walker can thread a wood or a rock field */
+const SOFT = new Float32Array(64);
+function canStand(e, x, y) { const r = .26; if (colBlocked(x, y, r)) return false; if (FIELDS.length && fieldBlocks(x, y)) return false; for (const [ox, oy] of [[-r, -r], [r, -r], [-r, r], [r, r]]) { const t = tAt(Math.floor(x + ox), Math.floor(y + oy)); if (BLK[t] && !SOFT[t]) return false; }
+  const fx = Math.floor(x), fy = Math.floor(y); for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const h = SOFT[tAt(fx + dx, fy + dy)]; if (h && Math.abs(x - fx - dx - .5) < h + r && Math.abs(y - fy - dy - .5) < h + r) return false; }
+  if (e.kind === 'mon' && !e.quest && protAt(x, y)) return false; return true; }
 function moveBy(e, dx, dy) { let moved = 0; if (canStand(e, e.x + dx, e.y)) { e.x += dx; moved += Math.abs(dx); } if (canStand(e, e.x, e.y + dy)) { e.y += dy; moved += Math.abs(dy); } return moved; }
 function los(a, b) { const d = Math.hypot(b.x - a.x, b.y - a.y), n = Math.ceil(d / .25); for (let i = 1; i < n; i++) { const x = a.x + (b.x - a.x) * i / n, y = a.y + (b.y - a.y) * i / n; if (LOSB[tAt(Math.floor(x), Math.floor(y))]) return false; if (FIELDS.length && fieldBlocksSight(x, y)) return false; for (const f of EFX) if (f.k === 'cloud' && Math.hypot(x - f.x, y - f.y) < f.r && !(Math.hypot(a.x - f.x, a.y - f.y) < f.r && Math.hypot(b.x - f.x, b.y - f.y) < f.r)) return false; } return true; }
 function playerMove(dt) {
@@ -675,6 +680,7 @@ function interact() {
   if (AIM) { AIM = null; return; }
   if (P.ghost) { const r = nearestRes(); if (r && Math.hypot(r.x - P.x, r.y - P.y) <= 2.5) return resurrect(); return log('Walk to a shrine or healer to be restored. Follow the golden arrow.'); }
   if (nearBeacon()) return useBeacon();
+  if (annInteract()) return;
   const dr = nearDoor(); if (dr && !nearerThanDoor(doorDist(dr))) return useDoor(dr);
   if (interactExtra()) return;
   const sel = P.sel;
@@ -736,7 +742,7 @@ function openCorpse(c) {
   if (P.ghost) return; if (dist(c, P) > 2) return log('Move within 2 m.'); if (!los(P, c)) return log('No line of sight.');
   P.opening = GT + .35; at(.35, () => { P.opening = 0; if (!c.gone && dist(c, P) <= 3) { P.lootOpen = c; openPanel('loot'); sndAt('loot.rummage', c); } });
 }
-function talk(n) { if (n.role === 'assay' || n.role === 'qsmith') { if (P.ghost) return; P.talkTo = n; return openPanel('guild'); } if (n.role === 'quaywarden') { if (P.ghost) return resurrect(); P.talkTo = n; return openPanel('quest'); } if (n.role === 'healer' || n.role === 'guard') { if (P.ghost) return resurrect(); say(n, n.role === 'guard' ? 'Keep the peace inside the Quay.' : 'Rest easy. Bind at the shrine if you travel.'); return; } P.talkTo = n; openPanel(n.role === 'banker' || n.role === 'campbank' ? 'bank' : n.role === 'trainer' ? 'trainer' : 'shop'); }
+function talk(n) { if (annTalk(n)) return; if (n.role === 'assay' || n.role === 'qsmith') { if (P.ghost) return; P.talkTo = n; return openPanel('guild'); } if (n.role === 'quaywarden') { if (P.ghost) return resurrect(); P.talkTo = n; return openPanel('quest'); } if (n.role === 'healer' || n.role === 'guard') { if (P.ghost) return resurrect(); say(n, n.role === 'guard' ? 'Keep the peace inside the Quay.' : 'Rest easy. Bind at the shrine if you travel.'); return; } P.talkTo = n; openPanel(n.role === 'banker' || n.role === 'campbank' ? 'bank' : n.role === 'trainer' ? 'trainer' : 'shop'); }
 
 /* ---------- world population ---------- */
 function populate() {
@@ -749,9 +755,11 @@ function populate() {
   npc('healer', 'Sister Maud, healer', 94.5, 302.5); npc('quaywarden', 'Quaywarden Brann', 98.5, 305.5);
   for (const [x, y] of [[129.5, 297.5], [129.5, 303.5], [116.5, 260.5], [116.5, 340.5], [55.5, 285.5]]) npc('guard', 'Quay warden', x, y);
   const c = ZONES.camp; npc('healer', 'Old Fenna, camp healer', c.cx + 2.5, c.cy + 1.5); npc('campbank', 'Crow, camp strongbox', c.cx - 3.5, c.cy - 3.5); npc('outlaw', 'Mags, fence', c.cx + 3.5, c.cy - 3.5);
+  annPopulate(npc);
   for (let i = 0; i < 12; i++) { for (const s of SPAWNS) s.next = 0; spawnTick(); }
 }
 const SHOPS = { provisioner: ['hatchet', 'pickaxe', 'knife', 'rod', 'tongs', 'sewkit', 'cloth', 'vial', 'bandage', 'lanternoil', 'cookedmeat', 'clothvest', 'lute', 'lockpick', 'repairkit'], smith: ['dagger', 'kryss', 'spear', 'sword', 'battleaxe', 'glaive', 'mace', 'waraxe', 'hammer', 'ironbar', 'leather', 'chain', 'plate', 'buckler'], workshop: ['shortbow', 'crossbow', 'heavycrossbow', 'arrow', 'bolt', 'pine', 'buckler', 'strap', 'trapkit', 'repairkit'], apothecary: ['reedash', 'shelldust', 'marshroot', 'lanternoil', 'blacksalt', 'vial', 'draught', 'antidote', 'manatonic', 'stamtonic', 'cinder'], outlaw: ['bandage', 'draught', 'arrow', 'cookedmeat', 'cloth', 'vial', 'reedash', 'marshroot', 'knife', 'dagger', 'lockpick', 'venom', 'trapkit'] };
+Object.assign(SHOPS, ANN_SHOPS);
 
 /* ---------- main tick ---------- */
 let spawnT = 0, saveT = 0;
@@ -766,7 +774,7 @@ function update(dt) {
   if (!P.ghost) {
     attackTick(); prepTick(); bandageTick();
     if (P.task && GT >= P.task.t1) { const t = P.task; P.task = null; ({ hide: finishHide, gather: () => finishGather(t.node), skin: () => finishSkin(t.corpse), craft: () => finishCraft(t), ...TASKS }[t.kind] || (() => { }))(t); }
-    worldTick(dt); questTick();
+    worldTick(dt); questTick(); annTick(dt);
     // stamina
     const sMax = SF.maxStam(P); if (GT - (P.lastDrain || -9) > SF.STAM_DELAY) P.stam = Math.min(sMax, P.stam + (inCombat() ? SF.STAM_REGEN_COMBAT : SF.STAM_REGEN) * dt);
     // mana
@@ -802,10 +810,10 @@ function petTick(p, dt) {
 }
 
 /* ================= WORLD: the island slice ================= */
-const W = 600, H = 600;
+const W = 2100, H = 900, SW = 600;   // v0.20: Saltmarsh keeps its 600×600 slice at the origin; Anniabreen lies east of it (src/anniabreen.js)
 const T = { G: 0, TR: 1, WA: 2, RK: 3, SA: 4, RD: 5, FL: 6, WL: 7, DI: 8, SH: 9, FG: 10, AN: 11, BR: 12, DR: 13, AK: 14, LP: 15, BN: 16, ST: 17, FP: 18, RB: 19, SB: 20, HB: 21, SC: 22, FN: 23, BL: 24, MR: 25, SD: 26, SU: 27, CH: 28, CF: 29 };
-const BLK = new Uint8Array(32); for (const t of [T.TR, T.WA, T.RK, T.WL, T.FG, T.AN, T.AK, T.LP, T.BN, T.ST, T.FP, T.FN, T.BL, T.MR, T.CH]) BLK[t] = 1;
-const LOSB = new Uint8Array(32); for (const t of [T.WL, T.RK, T.FG, T.BL]) LOSB[t] = 1;     // trees and reeds are foliage: no LOS block
+const BLK = new Uint8Array(64); for (const t of [T.TR, T.WA, T.RK, T.WL, T.FG, T.AN, T.AK, T.LP, T.BN, T.ST, T.FP, T.FN, T.BL, T.MR, T.CH]) BLK[t] = 1;
+const LOSB = new Uint8Array(64); SOFT[T.TR] = .2; SOFT[T.RK] = .22; SOFT[T.MR] = .16; for (const t of [T.WL, T.RK, T.FG, T.BL]) LOSB[t] = 1;     // trees and reeds are foliage: no LOS block
 const NODE = { [T.TR]: 'woodcutting', [T.RK]: 'mining', [T.RB]: 'foraging', [T.SB]: 'foraging', [T.HB]: 'foraging', [T.SC]: 'foraging' };
 const NODE_OUT = { [T.TR]: 'pine', [T.RK]: 'ore', [T.RB]: 'reedash', [T.SB]: 'shelldust', [T.HB]: 'marshroot', [T.SC]: 'blacksalt' };
 const NODE_NAME = { [T.TR]: 'tree', [T.RK]: 'rock face', [T.RB]: 'reed bed', [T.SB]: 'shell bank', [T.HB]: 'marshroot clump', [T.SC]: 'salt crust' };
@@ -821,6 +829,7 @@ const ZONES = {
 const LEVELS = [{ id: 1, x0: 6, y0: 6 }, { id: 2, x0: 506, y0: 6 }, { id: 3, x0: 6, y0: 506 }], LV = 90;
 function levelAt(x, y) { for (const L of LEVELS) if (x >= L.x0 && x < L.x0 + LV && y >= L.y0 && y < L.y0 + LV) return L.id; return 0; }
 function zoneAt(x, y) {
+  if (x >= SW || y >= SW) return annZone(x, y);
   const lv = levelAt(x, y); if (lv) return 'bell' + lv;
   const q = ZONES.quay; if (x >= q.x0 && x <= q.x1 && y >= q.y0 && y <= q.y1) return 'quay';
   if (protAt(x, y)) return Math.hypot(x - LM.beacon.x, y - LM.beacon.y) < 12 ? 'beacon' : 'safe';
@@ -836,9 +845,11 @@ function zoneAt(x, y) {
   return 'roads';
 }
 const ZONE_NAME = { bell1: 'Sunken Bell · upper vault', bell2: 'Sunken Bell · drowned nave', bell3: 'Sunken Bell · bell chamber', quay: 'Saltmarsh Quay · protected', beacon: 'Shore Beacon · protected', safe: 'Protected road', cross: 'Brine Crossroads · wilderness', ford: 'Reedwater Ford · wilderness', wreck: 'Wreck Strand · wilderness', pine: 'Pinewatch Woods · wilderness', silt: 'Siltmarsh · wilderness', camp: 'Ashfen outlaw camp · unguarded', bell: 'Sunken Bell · sealed', homes: 'Homestead Belt', ashfen: 'Ashfen · wilderness', roads: 'Brine Roads · wilderness' };
+Object.assign(ZONE_NAME, ANN_ZONE_NAME);
 /* node tier by distance from the Quay: 0 (diff 15), 1 (45), 2 (70), rare 3 (85) */
 function nodeTier(x, y) {
   if (isQuayNode(x, y)) return 0;
+  if (x >= SW) return annTier(x, y);
   const h = hash(x, y); if (h % 41 === 0) return 3;
   const z = zoneAt(x, y); const lv = levelAt(x, y); if (lv) return Math.min(3, lv); if (z === 'ashfen' || z === 'camp') return 2;
   const d = Math.hypot(x - 92, y - 300); return d < 110 ? 0 : 1;
@@ -849,9 +860,10 @@ function mulberry(s) { return () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Ma
 function hash(x, y) { let h = Math.imul(x, 374761393) + Math.imul(y, 668265263); h = Math.imul(h ^ (h >>> 13), 1274126177); return (h ^ (h >>> 16)) >>> 0; }
 function genWorld() {
   const r = mulberry(1999);
-  const noise = cell => { const gw = Math.ceil(W / cell) + 2, g = []; for (let i = 0; i < gw * gw; i++) g.push(r()); const s = t => t * t * (3 - 2 * t); return (x, y) => { const fx = x / cell, fy = y / cell, ix = Math.floor(fx), iy = Math.floor(fy), u = s(fx - ix), v = s(fy - iy), a = g[iy * gw + ix], b = g[iy * gw + ix + 1], c = g[(iy + 1) * gw + ix], d = g[(iy + 1) * gw + ix + 1]; return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v; }; };
+  const noise = cell => { const gw = Math.ceil(SW / cell) + 2, g = []; for (let i = 0; i < gw * gw; i++) g.push(r()); const s = t => t * t * (3 - 2 * t); return (x, y) => { const fx = x / cell, fy = y / cell, ix = Math.floor(fx), iy = Math.floor(fy), u = s(fx - ix), v = s(fy - iy), a = g[iy * gw + ix], b = g[iy * gw + ix + 1], c = g[(iy + 1) * gw + ix], d = g[(iy + 1) * gw + ix + 1]; return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v; }; };
   const nCoast = noise(40), nFor = noise(14), nFor2 = noise(5), nRock = noise(11), nMarsh = noise(9), nMarsh2 = noise(4);
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+  map.fill(T.WA);
+  for (let y = 0; y < SW; y++) for (let x = 0; x < SW; x++) {
     const dx = (x - 305) / 255, dy = (y - 300) / 235, d = Math.hypot(dx, dy) + (nCoast(x, y) - .5) * .22;
     let t = T.G;
     if (d > 1) t = T.WA; else if (d > .955) t = T.SA;
@@ -866,7 +878,7 @@ function genWorld() {
     map[y * W + x] = t;
   }
   // shell banks along beaches
-  for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) if (map[y * W + x] === T.SA && r() < .04) map[y * W + x] = T.SB;
+  for (let y = 1; y < SW - 1; y++) for (let x = 1; x < SW - 1; x++) if (map[y * W + x] === T.SA && r() < .04) map[y * W + x] = T.SB;
   const disc = (cx, cy, rad, fn) => { for (let y = Math.floor(cy - rad); y <= cy + rad; y++) for (let x = Math.floor(cx - rad); x <= cx + rad; x++) { const d = Math.hypot(x - cx, y - cy) / rad; if (d <= 1) fn(x, y, d); } };
   // Lantern Quay
   const q = ZONES.quay;
@@ -898,7 +910,9 @@ function genWorld() {
   // Brine Roads: quick road and two slower cover trails
   genBrine(r, carve, disc); dressQuay();
   // thin forests: kit trees have wide canopies
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (map[y * W + x] === T.TR && !levelAt(x, y)) { const keep = Math.hypot(x - LM.pine.x, y - LM.pine.y) < 48 ? 3 : 2; if (hash(x, y) % 6 >= keep) map[y * W + x] = hash(x + 7, y) % 9 === 0 ? T.MR : T.G; }
+  // v0.20: a quarter of the trees and few boulders stay (Pinewatch included); with trunk-only collision, woods and rock fields are walkable
+  for (let y = 0; y < SW; y++) for (let x = 0; x < SW; x++) { const t = map[y * W + x]; if ((t !== T.TR && t !== T.RK) || levelAt(x, y)) continue; const h = hash(x, y);
+    if (t === T.TR ? h % 4 !== 0 : (h % 3 !== 0 || hash(x + 1, y) % 2 === 0 || hash(x, y + 1) % 2 === 0 && (x + y) % 2)) map[y * W + x] = t === T.TR && hash(x + 7, y) % 17 === 0 ? T.MR : T.G; }
   // ruins along the road: poor sight lines
   for (const [cx, cy] of [[232, 284], [318, 308], [270, 318], [395, 282]]) for (let i = 0; i < 16; i++) { const x = cx + Math.floor(r() * 9) - 4, y = cy + Math.floor(r() * 7) - 3; if (tAt(x, y) === T.G || tAt(x, y) === T.TR) tSet(x, y, T.WL); }
   // Ashfen outlaw camp
@@ -916,6 +930,7 @@ function genWorld() {
   // Homestead Belt lease plots (decor)
   for (let px = 240; px < 410; px += 26) for (const py of [88, 108]) for (let i = 0; i < 14; i++) for (let j = 0; j < 12; j++) { if (tAt(px + i, py + j) === T.WA) continue; const e = i === 0 || j === 0 || i === 13 || j === 11; if (e && !(i === 6 || i === 7)) tSet(px + i, py + j, T.FN); else if (!e) tSet(px + i, py + j, T.G); }
   placeQuayNodes();
+  genAnniabreen(carve, disc);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const t = map[y * W + x]; if (t === T.LP) LIGHTS.push({ x, y, r: 5 }); if (t === T.FG) LIGHTS.push({ x, y, r: 4 }); if (t === T.AK) LIGHTS.push({ x, y, r: 4 }); }
 }
 const RES = new Map();
@@ -1021,7 +1036,9 @@ function envGroundId(t, x, y, wf) {
   switch (t) {
     case T.G: case T.TR: case T.RK: case T.BS: case T.BC: return 'ground_grass_' + VAR(h);
     case T.DI: case T.BL: case T.CH: case T.FP: return 'ground_dirt_' + VAR(h);
-    case T.RD: case T.AK: case T.LP: return 'ground_cobble_' + VAR(h);
+    case T.RD: case T.AK: case T.LP: case T.SBR: return 'ground_cobble_' + VAR(h);
+    case T.GV: return 'ground_grass_' + VAR(h);
+    case T.CP: return 'ground_dirt_' + VAR(h);
     case T.SA: case T.SB: case T.SC: return 'ground_sand_' + VAR(h);
     case T.HB: return 'ground_mud_' + VAR(h);
     case T.MR: case T.RB: return 'ground_mud_' + VAR(h);
@@ -1032,7 +1049,7 @@ function envGroundId(t, x, y, wf) {
   return null;
 }
 function insideBuildTile(x, y) { for (const b of KBUILD) if (x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h) return b; return null; }
-const isWet = t => t === T.WA || t === T.SH || t === T.BR;
+const isWet = t => t === T.WA || t === T.SH || t === T.BR || t === T.SBR;
 /* overlays drawn after the whole ground pass: shorelines, floors, decks */
 function envOverlay(g, t, x, y) {
   if (t === T.FL || t === T.DR || t === T.FG || t === T.AN || t === T.BN || t === T.ST) { const b = insideBuildTile(x, y); if (b) return envDraw(g, b.floor, x, y); }
@@ -1056,6 +1073,7 @@ function envTall(g, t, x, y) {
 }
 function insideQuayBox(x, y) { const q = ZONES.quay; return x >= q.x0 - 1 && x <= q.x1 + 1 && y >= q.y0 - 1 && y <= q.y1 + 1; }
 function drawPiece(g, p) {
+  if (p.draw) return p.draw(g, p);
   const inB = P && insideBuild(P.x, P.y);
   if (p.roof) { const a = inB === p.grp ? .12 : 1; for (const [id, x, y] of p.grp.roof) envDraw(g, id, x, y, 0, a); return; }
   envDraw(g, p.id, p.x, p.y, p.h, p.near && inB === p.grp ? .35 : 1);
@@ -1185,6 +1203,8 @@ const PROT = new Uint8Array(W * H);
 const protAt = (x, y) => x >= 0 && y >= 0 && x < W && y < H && PROT[Math.floor(y) * W + Math.floor(x)] === 1;
 const riverX = y => 420 + Math.round(7 * Math.sin(y / 23));
 T.BC = 30; T.BS = 31; BLK[T.BC] = 1; BLK[T.BS] = 1;
+/* Anniabreen tiles (v0.20): cliff, stone bridge deck, grave, crop rows */
+T.CL = 32; T.SBR = 33; T.GV = 34; T.CP = 35; BLK[T.CL] = 1; LOSB[T.CL] = 1; BLK[T.GV] = 1;
 const QUEST_CRAB = { x: LM.beacon.x + 4.5, y: LM.beacon.y + 4.5 };
 
 function genBrine(r, carve, disc) {
@@ -1295,15 +1315,20 @@ function buildMapImgs() {
   pg.putImageData(id, 0, 0); mapProt = p;
 }
 function sizeMap() { const c = $('#mapc'), r = c.getBoundingClientRect(); c.width = Math.round(r.width * DPR); c.height = Math.round(r.height * DPR); }
-function mapFit() { const c = $('#mapc'); MV.s = Math.min(c.width / 540, c.height / 520); MV.ox = 305 - c.width / 2 / MV.s; MV.oy = 300 - c.height / 2 / MV.s; }
+/* Fit frames the land you are on (Saltmarsh or Anniabreen); World shows both */
+function mapFit(all) { const c = $('#mapc'); const b = all ? [0, 0, W, H] : P && (P.x >= SW || P.y >= SW) ? ANN_BOUNDS : [35, 40, 575, 560]; const bw = b[2] - b[0], bh = b[3] - b[1];
+  MV.s = Math.min(c.width / bw, c.height / bh); MV.ox = (b[0] + b[2]) / 2 - c.width / 2 / MV.s; MV.oy = (b[1] + b[3]) / 2 - c.height / 2 / MV.s; }
 function drawMap() {
   const c = $('#mapc'); if (!c || !P) return; if (!mapBase) buildMapImgs(); const g = c.getContext('2d'), s = MV.s;
   const X = x => (x - MV.ox) * s, Y = y => (y - MV.oy) * s;
   g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#1e5a96'; g.fillRect(0, 0, c.width, c.height); g.imageSmoothingEnabled = false;
   g.drawImage(mapBase, X(0), Y(0), W * s, H * s); g.drawImage(mapProt, X(0), Y(0), W * s, H * s);
   const f = Math.max(11, Math.min(16, 4 + s * 3)) * DPR / 1.6 + 4;
-  g.textAlign = 'center'; g.font = `600 ${f}px ${PXF}`; g.lineWidth = 4; g.strokeStyle = 'rgba(0,0,0,.85)';
-  for (const k in LM) { const m = LM[k]; const x = X(m.x), y = Y(m.y); g.fillStyle = '#ffe9b0'; g.beginPath(); g.arc(x, y, 3 * DPR, 0, 7); g.fill(); g.strokeText(m.n, x, y - 7 * DPR); g.fillText(m.n, x, y - 7 * DPR); }
+  g.textAlign = 'center'; g.lineJoin = 'round'; g.font = `600 ${f}px ${PXF}`; g.lineWidth = 4; g.strokeStyle = 'rgba(0,0,0,.85)';
+  const small = c.width < 700 * DPR || s < 1.1;   // phone or zoomed out: towns and travel symbols first
+  if (!small || s > 1.6) for (const k in LM) { const m = LM[k]; const x = X(m.x), y = Y(m.y); g.fillStyle = '#ffe9b0'; g.beginPath(); g.arc(x, y, 3 * DPR, 0, 7); g.fill(); g.strokeText(m.n, x, y - 7 * DPR); g.fillText(m.n, x, y - 7 * DPR); }
+  else { const x = X(LM.quay.x), y = Y(LM.quay.y); g.font = `bold ${f * 1.15}px ${PXF}`; g.fillStyle = '#ffe9b0'; g.strokeText('Saltmarsh Quay', x, y - 8 * DPR); g.fillText('Saltmarsh Quay', x, y - 8 * DPR); g.font = `600 ${f}px ${PXF}`; }
+  annMapDraw(g, X, Y, s, f, small);
   // gate boundary label
   { const x = X(LM.gate.x + 6), y = Y(LM.gate.y + 9); g.font = `${f * .8}px ${PXF}`; g.fillStyle = '#ff8a6a'; g.strokeText('full-loot beyond', x, y + 10 * DPR); g.fillText('full-loot beyond', x, y + 10 * DPR); }
   // pins from the guilds and the last vein surveyed
@@ -1311,10 +1336,11 @@ function drawMap() {
   // quest marker
   const o = questObjective(); if (o && o.at) { const x = X(o.at.x + .5), y = Y(o.at.y + .5), b = Math.sin(GT * 5) * 3 * DPR; g.font = `bold ${f * 1.6}px ${PXF}`; g.fillStyle = '#ffd23a'; g.strokeText('!', x, y - 10 * DPR + b); g.fillText('!', x, y - 10 * DPR + b); }
   // player arrow: screen-space facing converted to world heading
-  const a = SECT_ANG[P.sect || 0] * Math.PI / 180, hx = (Math.cos(a) + 2 * Math.sin(a)) / 2, hy = (2 * Math.sin(a) - Math.cos(a)) / 2, hl = Math.hypot(hx, hy) || 1, ux = hx / hl, uy = hy / hl;
+  const [ux, uy] = headingOf(P);
   const px = X(P.x), py = Y(P.y), R2 = 9 * DPR; g.fillStyle = '#ffffff'; g.strokeStyle = '#000'; g.lineWidth = 2 * DPR;
   g.beginPath(); g.moveTo(px + ux * R2, py + uy * R2); g.lineTo(px - ux * R2 * .7 - uy * R2 * .6, py - uy * R2 * .7 + ux * R2 * .6); g.lineTo(px - ux * R2 * .3, py - uy * R2 * .3); g.lineTo(px - ux * R2 * .7 + uy * R2 * .6, py - uy * R2 * .7 - ux * R2 * .6); g.closePath(); g.stroke(); g.fill();
   if (levelAt(Math.floor(P.x), Math.floor(P.y))) { g.font = `${f}px ${PXF}`; g.fillStyle = '#fff'; g.fillText('You are underground', c.width / 2, c.height - 20 * DPR); }
+  compassN(g, c.width - 26 * DPR, 26 * DPR, 18 * DPR);
 }
 { const ptrs = new Map(); let last = null;
   const mc = () => $('#mapc');
@@ -1332,7 +1358,7 @@ function drawMap() {
 /* ---------- contextual HUD buttons ---------- */
 function canInteract() {
   if (P.ghost) { const r = nearestRes(); return !!(r && Math.hypot(r.x - P.x, r.y - P.y) <= 2.5); }
-  if (nearBeacon() || nearDoor()) return true;
+  if (nearBeacon() || nearDoor() || annCanInteract()) return true;
   for (const e of ents) { if (e === P || e.gone || e.hidden) continue; const d = Math.hypot(e.x - P.x, e.y - P.y); if ((e.kind === 'npc' && d <= 2.5) || (e.kind === 'corpse' && d <= 2) || (e.kind === 'pet' && d <= 1.5 && false)) return true; }
   for (const c of CHESTS.values()) if (Math.hypot(c.x + .5 - P.x, c.y + .5 - P.y) <= 2) return true;
   for (const s of STATIONS) if (Math.hypot(s.x + .5 - P.x, s.y + .5 - P.y) <= 2) return true;
@@ -1393,7 +1419,7 @@ function buildTiles() {
 function ground(t, x, y, wf) {
   const h = hash(x, y) & 3;
   switch (t) { case T.WA: return TC.wa[wf][h]; case T.SH: case T.RB: case T.MR: return TC.sh[wf][h]; case T.SA: return TC.sa[h]; case T.SB: return TC.sb[h]; case T.SC: return TC.sc[h]; case T.HB: return TC.hb[h];
-    case T.DI: case T.BL: return TC.di[h]; case T.CF: return TC.cf[h]; case T.SD: return TC.sd[0]; case T.SU: return TC.su[0]; case T.CH: return levelAt(x, y) ? TC.cf[h] : TC.di[h]; case T.RD: case T.AK: case T.LP: return TC.rd[h]; case T.FL: case T.FG: case T.AN: case T.WL: case T.BN: case T.ST: return TC.fl[h]; case T.RK: return TC.rk[h]; case T.BR: return TC.br[0]; case T.DR: return TC.dr[0]; case T.FP: return TC.di[h]; default: return TC.g[h]; }
+    case T.DI: case T.BL: return TC.di[h]; case T.CF: return TC.cf[h]; case T.SD: return TC.sd[0]; case T.SU: return TC.su[0]; case T.CH: return levelAt(x, y) ? TC.cf[h] : TC.di[h]; case T.RD: case T.AK: case T.LP: return TC.rd[h]; case T.FL: case T.FG: case T.AN: case T.WL: case T.BN: case T.ST: return TC.fl[h]; case T.RK: case T.CL: return TC.rk[h]; case T.SBR: return TC.rd[h]; case T.CP: return TC.di[h]; case T.BR: return TC.br[0]; case T.DR: return TC.dr[0]; case T.FP: return TC.di[h]; default: return TC.g[h]; }
 }
 function poly(g, pts) { g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]); g.closePath(); g.fill(); }
 function rr(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
@@ -1404,7 +1430,7 @@ function inFront(x, y) { if (!P) return false; const d = (x + y + 1) - (P.x + P.
 function shade(hex, amt) { const n = parseInt(hex.slice(1), 16); const r = cl((n >> 16) + amt, 0, 255), gg = cl((n >> 8 & 255) + amt, 0, 255), b = cl((n & 255) + amt, 0, 255); return `rgb(${r},${gg},${b})`; }
 function drawTall(t, x, y) {
   const g = ctx, h = hash(x, y), cx = SX(x + .5, y + .5), cy = SY(x + .5, y + .5); g.save();
-  if ((t === T.WL || t === T.TR || t === T.RK || t === T.MR) && inFront(x, y)) g.globalAlpha = .4;
+  if ((t === T.WL || t === T.TR || t === T.RK || t === T.MR || t === T.CL) && inFront(x, y)) g.globalAlpha = .4;
   if (t === T.TR) {   // pine
     const s = .85 + (h % 5) * .06, st = nodeStock(x, y).n <= 0; g.fillStyle = 'rgba(0,0,0,.28)'; g.beginPath(); g.ellipse(cx + 6, cy + 2, 20 * s, 8 * s, 0, 0, 7); g.fill();
     g.fillStyle = '#4e331b'; g.fillRect(cx - 3, cy - (st ? 10 : 22), 6, st ? 11 : 23);
@@ -1437,10 +1463,11 @@ function drawTall(t, x, y) {
     const gl = .6 + .4 * Math.sin(GT * 3); g.fillStyle = `rgba(255,214,120,${gl})`; g.fillRect(cx - 5, cy - 58, 10, 10); g.fillStyle = '#5a5040'; g.fillRect(cx - 7, cy - 60, 14, 2); g.fillRect(cx - 7, cy - 48, 14, 2); }
   else if (t === T.LP) { g.fillStyle = 'rgba(0,0,0,.3)'; g.beginPath(); g.ellipse(cx, cy, 9, 4, 0, 0, 7); g.fill(); g.fillStyle = '#2a2522'; g.fillRect(cx - 2, cy - 44, 4, 44); g.fillStyle = '#ffd27a'; g.fillRect(cx - 6, cy - 56, 12, 12); g.strokeStyle = '#2a2522'; g.lineWidth = 2; g.strokeRect(cx - 6, cy - 56, 12, 12); }
   else if (t === T.CH) { const c = CHESTS.get(y * W + x); const p = block(g, x, y, 14, c && c.open ? '#3a2a18' : '#8a5a2a', '#6a4220', '#4e3016'); g.fillStyle = '#c8a040'; g.fillRect(cx - 2, cy - 12, 4, 5); g.fillStyle = 'rgba(0,0,0,.3)'; g.fillRect(p.L[0] + 4, p.L[1] - 9, 22, 2); }
+  else if (t === T.CL || t === T.GV || t === T.CP) drawAnnTile(g, t, x, y, h, cx, cy);
   else if (t === T.BL) { g.fillStyle = 'rgba(0,0,0,.3)'; g.beginPath(); g.ellipse(cx, cy, 22, 9, 0, 0, 7); g.fill(); g.fillStyle = '#5a6a5a'; g.beginPath(); g.moveTo(cx - 20, cy - 4); g.quadraticCurveTo(cx - 18, cy - 40, cx, cy - 44); g.quadraticCurveTo(cx + 18, cy - 40, cx + 20, cy - 4); g.closePath(); g.fill(); g.fillStyle = '#7a8a6a'; g.fillRect(cx - 12, cy - 36, 6, 20); g.fillStyle = '#2a3a2a'; g.fillRect(cx - 4, cy - 10, 8, 8); }
   g.restore();
 }
-const TALL = new Uint8Array(32); for (const t of [30, 31, T.HB, T.CH, T.TR, T.WL, T.RK, T.FG, T.AN, T.AK, T.LP, T.BN, T.ST, T.FP, T.RB, T.FN, T.BL, T.MR]) TALL[t] = 1;
+const TALL = new Uint8Array(64); for (const t of [30, 31, T.CL, T.GV, T.CP, T.HB, T.CH, T.TR, T.WL, T.RK, T.FG, T.AN, T.AK, T.LP, T.BN, T.ST, T.FP, T.RB, T.FN, T.BL, T.MR]) TALL[t] = 1;
 
 /* ---- Saltmarsh Scout atlas: screen-direction sectors, feet at (48,86) ---- */
 const SCOUT = { img: null, cache: new Map(), cell: 96, fx: 48, fy: 86 };
@@ -1630,6 +1657,7 @@ function render() {
 function drawOverlay(camX, camY) {
   const g = mctx; g.setTransform(DPR, 0, 0, DPR, 0, 0); const S = (wx, wy) => [(SX(wx, wy) - camX) / CAM.f, (SY(wx, wy) - camY) / CAM.f]; g.textAlign = 'center';
   const [px, py] = S(P.x, P.y);
+  annOverlay(g, S);
   if (!P.ghost) for (const e of ents) {
     if (e.gone || e === P || e.hidden) continue; const isC = e.kind === 'corpse';
     const hgt = isC ? 18 : e.type && MON[e.type] ? MON[e.type].h : 74; const [x, top] = S(e.x, e.y); const yy = top - hgt / CAM.f * 1 - 6;
@@ -1659,15 +1687,21 @@ function drawOverlay(camX, camY) {
   if (JOY.on) { g.globalAlpha = .45; g.strokeStyle = '#c8a860'; g.lineWidth = 2; g.beginPath(); g.arc(JOY.x0, JOY.y0, 56, 0, 7); g.stroke(); const vx = JOY.x - JOY.x0, vy = JOY.y - JOY.y0, m = Math.min(56, Math.hypot(vx, vy)) / (Math.hypot(vx, vy) || 1); g.fillStyle = JOY.sprint ? '#ffd060' : '#6ec6ff'; g.beginPath(); g.arc(JOY.x0 + vx * m, JOY.y0 + vy * m, 20, 0, 7); g.fill(); g.globalAlpha = 1; }
 }
 let miniImg = null, miniCtx = null;
-function buildMini() { const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'); const id = g.createImageData(W, H); const col = { 30: [255, 190, 80], 31: [220, 80, 60], [T.G]: [74, 138, 60], [T.TR]: [30, 80, 44], [T.WA]: [30, 90, 150], [T.RK]: [110, 104, 98], [T.SA]: [216, 192, 138], [T.RD]: [150, 144, 132], [T.FL]: [160, 106, 58], [T.WL]: [180, 172, 156], [T.DI]: [124, 92, 60], [T.SH]: [74, 110, 88], [T.FG]: [200, 90, 40], [T.AN]: [60, 60, 60], [T.BR]: [154, 106, 60], [T.DR]: [74, 40, 16], [T.AK]: [255, 214, 120], [T.LP]: [255, 210, 122], [T.BN]: [176, 124, 68], [T.ST]: [138, 106, 74], [T.FP]: [255, 120, 30], [T.RB]: [138, 160, 64], [T.SB]: [240, 230, 210], [T.HB]: [122, 192, 80], [T.SC]: [220, 216, 206], [T.FN]: [154, 116, 72], [T.BL]: [90, 106, 90], [T.MR]: [58, 48, 40] };
+function buildMini() { const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'); const id = g.createImageData(W, H); const col = { 30: [255, 190, 80], 31: [220, 80, 60], [T.G]: [74, 138, 60], [T.TR]: [30, 80, 44], [T.WA]: [30, 90, 150], [T.RK]: [110, 104, 98], [T.SA]: [216, 192, 138], [T.RD]: [150, 144, 132], [T.FL]: [160, 106, 58], [T.WL]: [180, 172, 156], [T.DI]: [124, 92, 60], [T.SH]: [74, 110, 88], [T.FG]: [200, 90, 40], [T.AN]: [60, 60, 60], [T.BR]: [154, 106, 60], [T.DR]: [74, 40, 16], [T.AK]: [255, 214, 120], [T.LP]: [255, 210, 122], [T.BN]: [176, 124, 68], [T.ST]: [138, 106, 74], [T.FP]: [255, 120, 30], [T.RB]: [138, 160, 64], [T.SB]: [240, 230, 210], [T.HB]: [122, 192, 80], [T.SC]: [220, 216, 206], [T.FN]: [154, 116, 72], [T.BL]: [90, 106, 90], [T.MR]: [58, 48, 40], [T.CL]: [92, 84, 76], [T.CF]: [70, 64, 58], [T.SBR]: [196, 188, 170], [T.GV]: [120, 130, 110], [T.CP]: [150, 130, 70] };
   for (let i = 0; i < W * H; i++) { const c3 = col[map[i]] || [0, 0, 0]; id.data[i * 4] = c3[0]; id.data[i * 4 + 1] = c3[1]; id.data[i * 4 + 2] = c3[2]; id.data[i * 4 + 3] = 255; } g.putImageData(id, 0, 0); miniImg = c; miniCtx = $('#mini').getContext('2d'); }
 function drawMini() {
   if (!miniCtx || !P) return; const s = 180, sc = 2.2, g = miniCtx; g.save(); g.clearRect(0, 0, s, s); g.beginPath(); g.arc(s / 2, s / 2, s / 2, 0, 7); g.clip(); g.fillStyle = '#0a1a30'; g.fillRect(0, 0, s, s); g.imageSmoothingEnabled = false;
-  g.translate(s / 2, s / 2); g.rotate(Math.PI / 4); g.scale(sc, sc); g.drawImage(miniImg, -P.x, -P.y);
+  g.translate(s / 2, s / 2); g.scale(sc, sc); g.drawImage(miniImg, -P.x, -P.y);   // north-up, the same way round as the full map (v0.20)
+  annMiniDraw(g);
   if (!P.ghost) for (const e of ents) { if (e.gone || e === P || e.hidden) continue; if (e.kind !== 'mon' && e.kind !== 'npc' && e.kind !== 'ally' && !(e.kind === 'corpse' && e.mine)) continue; const dx = e.x - P.x, dy = e.y - P.y; if (Math.abs(dx) > 45 || Math.abs(dy) > 45) continue; g.fillStyle = e.kind === 'corpse' ? '#f0c94a' : relColor(e); g.fillRect(dx - 1, dy - 1, 2, 2); }
   for (const sh of SHRINES) { g.fillStyle = '#ffd678'; g.fillRect(sh.x - P.x - 2, sh.y - P.y - 2, 4, 4); }
-  g.restore(); g.fillStyle = '#fff'; g.fillRect(s / 2 - 3, s / 2 - 3, 6, 6); g.strokeStyle = '#c8a860'; g.lineWidth = 3; g.beginPath(); g.arc(s / 2, s / 2, s / 2 - 1.5, 0, 7); g.stroke();
+  g.restore(); g.strokeStyle = '#c8a860'; g.lineWidth = 3; g.beginPath(); g.arc(s / 2, s / 2, s / 2 - 1.5, 0, 7); g.stroke();
+  const [ux, uy] = headingOf(P); g.save(); g.translate(s / 2, s / 2); g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 2; g.beginPath(); g.moveTo(ux * 9, uy * 9); g.lineTo(-ux * 6 - uy * 6, -uy * 6 + ux * 6); g.lineTo(-ux * 2, -uy * 2); g.lineTo(-ux * 6 + uy * 6, -uy * 6 - ux * 6); g.closePath(); g.stroke(); g.fill(); g.restore();
+  compassN(g, s / 2, 13, 11);
 }
+/* the player's facing as a world (map) direction; screen sectors are isometric */
+function headingOf(e) { const a = SECT_ANG[e.sect || 0] * Math.PI / 180, hx = (Math.cos(a) + 2 * Math.sin(a)) / 2, hy = (2 * Math.sin(a) - Math.cos(a)) / 2, hl = Math.hypot(hx, hy) || 1; return [hx / hl, hy / hl]; }
+function compassN(g, x, y, f) { g.save(); g.font = `bold ${f}px ${PXF}`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = 'rgba(10,20,40,.85)'; g.beginPath(); g.arc(x, y, f * .85, 0, 7); g.fill(); g.strokeStyle = '#c8a860'; g.lineWidth = Math.max(1, f / 8); g.stroke(); g.fillStyle = '#ffe9b0'; g.fillText('N', x, y + 1); g.restore(); }
 
 /* ================= UI: HUD, panels, touch input, creation, persistence ================= */
 const KEYS = {}; const SETTINGS = { mirror: false, stickSprint: false };
@@ -1800,7 +1834,7 @@ const PANELS = {
     for (const it of c.cont.items) h += `<div class="row"><span class="nm">${esc(iname(it))}</span>${btn('take', 'Take', { u: it.uid })}${it.qty > 1 ? btn('take', 'Half', { u: it.uid, half: 1 }) : ''}</div>`;
     if (c.mon && !c.skinned) h += '<p>' + btn('skin', 'Skin the remains', {}) + '</p>';
     return [cap1(c.name), h]; },
-  bank: () => { let h = `<div class="note">Bank storage is safe when you die. Shared between the Quay bank and the camp strongbox.</div>${btn('depgold', 'Deposit all gold', {}, 'ac')}<div class="sec">Bank (${SF.count(P.bank, 'gold')} gold)</div>`;
+  bank: () => { let h = `<div class="note">Bank storage is safe when you die. One account at every bank: the Quay, Mynoc, Vespar, Skara Bryn, Moonglen and the camp strongbox.</div>${btn('depgold', 'Deposit all gold', {}, 'ac')}<div class="sec">Bank (${SF.count(P.bank, 'gold')} gold)</div>`;
     if (!P.bank.items.length) h += '<p class="note">Empty.</p>'; for (const it of P.bank.items) h += `<div class="row"><span class="nm">${esc(iname(it))}</span>${btn('wd', 'Withdraw', { u: it.uid })}</div>`;
     h += '<div class="sec">Pack</div>'; for (const it of P.pack.items) if (SF.ITEMS[it.id].trade) h += `<div class="row"><span class="nm">${esc(iname(it))}</span>${btn('dep', 'Deposit', { u: it.uid })}</div>`;
     for (const s of ['weapon', 'shield', 'armor']) { const it = P.equip[s]; if (it && SF.ITEMS[it.id].trade) h += `<div class="row"><span class="nm">${esc(iname(it))} <span class="note">worn</span></span>${btn('depeq', 'Deposit', { s })}</div>`; }
@@ -1827,7 +1861,7 @@ const ACT = {
   bagsort: d => { bagSort = d.s; renderPanel(); },
   baginspect: d => { bagUid = bagUid === d.u ? null : d.u; renderPanel(); },
   close: () => { closePanel(); snd('ui.close'); }, open: d => uiOpen(d.p), bag: () => uiOpen('bag'), gear: () => uiOpen('gear'), skills: () => uiOpen('skills'), spells: () => uiOpen('spells'), menu: () => uiOpen('menu'), logp: () => uiOpen('log'),
-  hudmenu: () => { openScreen('menu'); snd('ui.open'); }, map: () => { openScreen('map'); snd('ui.open'); }, scrclose: () => { closeScreen(); snd('ui.close'); }, mapfit: () => { mapFit(); drawMap(); }, journal: () => { closeScreen(); uiOpen('journal'); },
+  hudmenu: () => { openScreen('menu'); snd('ui.open'); }, map: () => { openScreen('map'); snd('ui.open'); }, scrclose: () => { closeScreen(); snd('ui.close'); }, mapfit: () => { mapFit(); drawMap(); }, mapall: () => { mapFit(true); drawMap(); }, journal: () => { closeScreen(); uiOpen('journal'); },
   mgo: d => { closeScreen(); ACT[d.p](); },
   qaccept: () => { if (Q().beacon !== 0) return; Q().beacon = 1; snd('quest.accept'); SF.addItem(P.pack, SF.newItem('wick', 1)); log('Quest accepted: A Light for the Quay. You receive a dry wick.', '#ffe08a'); say(P.talkTo || QW(), 'Lantern Road, north. Stick to the road.'); closePanel(); save(); },
   qwick: () => { if (Q().beacon !== 1 || hasWick()) return; SF.addItem(P.pack, SF.newItem('wick', 1)); log('The Quaywarden hands you another wick.', '#ffe08a'); closePanel(); save(); },
@@ -2176,6 +2210,12 @@ function migrateSave(s, raw) {
     if (!s.char.hotbar.some(h => h && h.k === 'act' && h.id === 'bandother')) { const i = s.char.hotbar.findIndex((h, k) => !h && k > 0); if (i >= 0) s.char.hotbar[i] = { k: 'act', id: 'bandother' }; else if (s.char.hotbar.length < 9) s.char.hotbar.push({ k: 'act', id: 'bandother' }); }
     s.combatReform = r; s.v = 3;
   }
+  if (s.v < 4) {   // v0.20 Anniabreen: the grid widened from 600 to W tiles; tile-keyed node and survey records move with it
+    const re = k => { k = +k; return Math.floor(k / 600) * W + k % 600; };
+    s.nodes = (s.nodes || []).map(n => [re(n[0])].concat(n.slice(1)));
+    const sv = s.char.cx && s.char.cx.survey; if (sv) { const o = {}; for (const k in sv) o[re(k)] = sv[k]; s.char.cx.survey = o; }
+    s.v = 4;
+  }
   return s;
 }
 function migrateV2(s, raw) {
@@ -2250,7 +2290,7 @@ function save() {
     const pets = ents.filter(e => e.kind === 'pet' && e.type && !e.summon && !e.gone && e.hp > 0).map(e => ({ type: e.type, hp: e.hp, order: e.order === 'stay' ? 'stay' : 'follow', slots: e.slots, name: e.name, dx: e.x - P.x, dy: e.y - P.y }));
     const nodes = []; for (const [k, o] of RES) nodes.push([k, o.gen || 1, o.spec || 0, o.n, o.max || 0, Math.round(o.t * 10) / 10]);
     const ally = allySave(); if (ally) { [ally.equip.weapon, ally.equip.shield, ally.equip.armor].forEach(scan); ally.pack.forEach(scan); if (ally.body) ally.body.items.forEach(scan); }
-    localStorage.setItem(SAVEKEY, JSON.stringify({ v: 3, char: c, corpses, pets, nodes, ally, uid: maxUid + 1, gt: GT, savedAt: Date.now() }));
+    localStorage.setItem(SAVEKEY, JSON.stringify({ v: 4, char: c, corpses, pets, nodes, ally, uid: maxUid + 1, gt: GT, savedAt: Date.now() }));
     return true;
   } catch (e) { return false; }
 }
@@ -2318,7 +2358,7 @@ loadScout(SCOUT_SRC); renderCC(); resize(); requestAnimationFrame(loop);
 function spawnMon(type, dx = 3, dy = 0) { const d = MON[type]; if (!d) return null; let x = P.x + dx, y = P.y + dy;
   for (let r = 0; r < 6 && BLK[tAt(Math.floor(x), Math.floor(y))]; r += .5) for (let a = 0; a < 8; a++) { const nx = P.x + dx + Math.cos(a * Math.PI / 4) * r, ny = P.y + dy + Math.sin(a * Math.PI / 4) * r; if (!BLK[tAt(Math.floor(nx), Math.floor(ny))]) { x = nx; y = ny; break; } }
   return addEnt({ kind: 'mon', type, name: d.n, x, y, hp: d.hp, max: d.hp, state: 'idle', home: { x, y }, sect: 0, ward: 0 }); }
-window.__SF = { LOG, spawnMon, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
+window.__SF = { LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
 
 }
 </script>

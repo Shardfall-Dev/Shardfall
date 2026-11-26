@@ -61,7 +61,7 @@ with sync_playwright() as p:
   check(n1['hot'][:4] == ['item:bandage', 'spell:magery.05', 'act:brace', 'item:draught'] and n1['hot'][5] == 'act:track' and 'act:bandother' in n1['hot'], 'hotbar bindings kept; Bandage other added to a free slot')
   check(n1['weapon'] == ['glaive', 'exceptional', 'Oldie', 77] and n1['armor'] == 'chain', 'equipment and crafted quality kept')
   snapc = json.loads(snap) if snap else {}
-  check(snapc.get('v') == 2 and all(snapc['char']['skills'][k] == v for k, v in o1['skills'].items()) and n1['savedV'] == 3, 'pre-migration snapshot preserved; save now v3')
+  check(snapc.get('v') == 2 and all(snapc['char']['skills'][k] == v for k, v in o1['skills'].items()) and n1['savedV'] >= 3, 'pre-migration snapshot preserved; save now v3 or later (v4 since Anniabreen)')
   check(n2['sw'] == 500 and n2['pool'] == 300 and n2['total'] == n1['total'] and n2['hot'] == n1['hot'] and n2['snapSame'] == snap, 'loading again is idempotent')
   b.close()
 bad += [f'page error: {e}' for e in errs]

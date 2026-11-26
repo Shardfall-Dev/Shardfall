@@ -6,7 +6,7 @@ A T2A-era Ultima Online-style 2.5D isometric sandbox RPG for phones, built as a 
 
 **Online:** every merge to `main` publishes the newest build on GitHub Pages (`.github/workflows/pages.yml`; one-time setup: Settings → Pages → Source: GitHub Actions. Pages on a private repository needs a paid GitHub plan, and the site itself is public): `https://shardfall-dev.github.io/Shardfall/`. On iPhone, Share → Add to Home Screen gives it an app icon.
 
-**On your computer:** run `python3 -m http.server` in this folder and open `http://localhost:8000/Shardfall_v0.19.html`. The game loads its sound and music from `assets/audio/web/`, so it needs to be served like this; opened straight from disk it plays silently. For a single file that plays from disk with sound effects, build `./build.sh 0.19 --offline`.
+**On your computer:** run `python3 -m http.server` in this folder and open `http://localhost:8000/Shardfall_v0.20.html`. The game loads its sound and music from `assets/audio/web/`, so it needs to be served like this; opened straight from disk it plays silently. For a single file that plays from disk with sound effects, build `./build.sh 0.20 --offline`.
 
 Progress saves to the browser's local storage.
 
@@ -23,22 +23,38 @@ Progress saves to the browser's local storage.
 - `src/magery-art.js` — the 64 spell signs as one embedded atlas.
 - `src/bestiary-art.js` — the 11 bestiary v1 sheets and their manifest, embedded (generated: `python3 tools/embed_bestiary.py` reads `assets/bestiary/Shardfall_Bestiary_v1.0.0.zip`).
 - `src/magic.js` — casting in the world: prepare → hold → release, targets, effects, fields, runes, summons, spellbook panel, hotbar signs.
+- `src/anniabreen.js` — Anniabreen v1.0: the mainland, Vespar's river islands, Skara Bryn and Moonglen; towns, roads, the Mynoc mine, landmark art, ferries, boats, the public moongates and their map symbols.
 - `src/game.js` — the game: world generation, rendering, input, NPCs, quests, crafting UI, save/load, and the one physical-combat resolver every swing goes through.
-- `build.sh` — joins the parts into the game: `./build.sh 0.19` → `Shardfall_v0.19.html` (web build, 5.8 MB); `./build.sh 0.19 --offline` → `Shardfall_v0.19_offline.html` (22 MB, every sound inside, not committed). Needs `python3`.
-- `Shardfall_v0.19.html` — the current built game.
+- `build.sh` — joins the parts into the game: `./build.sh 0.20` → `Shardfall_v0.20.html` (web build, 5.8 MB); `./build.sh 0.20 --offline` → `Shardfall_v0.20_offline.html` (22 MB, every sound inside, not committed). Needs `python3`.
+- `Shardfall_v0.20.html` — the current built game.
 - `.github/workflows/pages.yml` — publishes the newest build to GitHub Pages as `index.html`, with the audio beside it.
 - `docs/Shardfall_Audio.md` — what plays when, the audio pipeline and sound-release versioning.
 - `docs/Shardfall_Crafting_Guide.md` — the crafting design guide the build follows.
 - `docs/combat/STATUS.md` — combat and First Aid: the rules, the weapon table, the save migration, sources and every approximation.
 - `docs/magery/` — the Magery kit: brief (`Magery_Brief.txt`), illustrated book (`Shardfall_Spellbook.html`, `Spellbook.md`), `spells.json`, reference math, and `STATUS.md` (what is in, what differs, what is left).
-- `tests/rules.test.js` — deterministic rules tests: `node tests/rules.test.js Shardfall_v0.19.html`
-- `tests/magery.test.js` — Magery rules tests: `node tests/magery.test.js Shardfall_v0.19.html`
-- `tests/combat.test.js` — combat and First Aid rules tests: `node tests/combat.test.js Shardfall_v0.19.html`
-- `tests/magery-smoke/run.py` — in-browser Magery scenarios (Playwright + Chrome): `python3 tests/magery-smoke/run.py Shardfall_v0.19.html`
-- `tests/combat-smoke/run.py` — in-browser combat, archery, First Aid, reload, old-save and phone play-test scenarios: `python3 tests/combat-smoke/run.py Shardfall_v0.19.html` (screenshots in `$COMBAT_SHOTS`, default `/tmp/combat-shots`)
-- `tests/backpack-smoke/run.py` — in-browser backpack checks (saved character, three sorts, desktop hover, phone tap, actions after sorting): `python3 tests/backpack-smoke/run.py Shardfall_v0.19.html`
-- `tests/sfx-smoke/run.py` — browser checks for sound, music, doors and footsteps (Playwright + Chrome; serves the web build on a local port): `python3 tests/sfx-smoke/run.py "$PWD/Shardfall_v0.19.html"`
-- `tests/bestiary-smoke/run.py` — bestiary checks in the built game (sheets load, pixel-exact cells, 8 facings, walk / wind-up / impact against the player; preview screenshots when the pack is extracted): `python3 tests/bestiary-smoke/run.py Shardfall_v0.19.html [chrome] [screenshot-dir]`
+- `tests/rules.test.js` — deterministic rules tests: `node tests/rules.test.js Shardfall_v0.20.html`
+- `tests/magery.test.js` — Magery rules tests: `node tests/magery.test.js Shardfall_v0.20.html`
+- `tests/combat.test.js` — combat and First Aid rules tests: `node tests/combat.test.js Shardfall_v0.20.html`
+- `tests/magery-smoke/run.py` — in-browser Magery scenarios (Playwright + Chrome): `python3 tests/magery-smoke/run.py Shardfall_v0.20.html`
+- `tests/combat-smoke/run.py` — in-browser combat, archery, First Aid, reload, old-save and phone play-test scenarios: `python3 tests/combat-smoke/run.py Shardfall_v0.20.html` (screenshots in `$COMBAT_SHOTS`, default `/tmp/combat-shots`)
+- `tests/backpack-smoke/run.py` — in-browser backpack checks (saved character, three sorts, desktop hover, phone tap, actions after sorting): `python3 tests/backpack-smoke/run.py Shardfall_v0.20.html`
+- `tests/sfx-smoke/run.py` — browser checks for sound, music, doors and footsteps (Playwright + Chrome; serves the web build on a local port): `python3 tests/sfx-smoke/run.py "$PWD/Shardfall_v0.20.html"`
+- `tests/anniabreen-smoke/run.py` — Anniabreen walk-through (Playwright + Chrome): a scripted walker drives the joystick through the real update loop and times the routes; mine/smelt/bank, ferries, boats, moongates, doors, touch and mouse over a bridge, reload, save migration, phone map: `python3 tests/anniabreen-smoke/run.py Shardfall_v0.20.html [--shots DIR]`
+- `tests/bestiary-smoke/run.py` — bestiary checks in the built game (sheets load, pixel-exact cells, 8 facings, walk / wind-up / impact against the player; preview screenshots when the pack is extracted): `python3 tests/bestiary-smoke/run.py Shardfall_v0.20.html [chrome] [screenshot-dir]`
+
+## v0.20 — Anniabreen v1.0
+
+- A new world east of Saltmarsh, after classic Britannia's four towns, with original coastlines and streets:
+  - **Mynoc** at the head of the valley under the northern ridge: the public forge's chimney is the first thing you see from the south road; smith, ore scales and a bank facing the anvil; miners' cottages to the west; the mine cut into the cliff with timber portal, cart siding and spoil heap, and a walkable first chamber of ore faces (grade 1 at the front, grade 2 at the back).
+  - **Vespar** where the river splits into three channels: the road from Mynoc arrives on the west bank by a small cemetery; a stone bridge to Market Island (the bank opens onto the square), a timber bridge to Workshop Island (tailor, tinker, supplies), Customs Bridge to Customs Island (warehouses, fish hall, the harbour), a quay route back via a footbridge, and a footbridge to the east bank.
+  - **Skara Bryn** split by a narrow channel: fields, stable, ranger hall and ferry landing on the mainland; inn, bank, bowyer and fletcher round an old tree on the island, an archery range behind, and an orchard with the moongate.
+  - **Moonglen** across the water from Vespar: harbour, reagent seller and inn, the walled college (bank and mage by the south arch), library and observatory dome through the far arch, a herb-garden loop, and the moongate among three standing stones.
+- Roads: forest road from Skara's landing to a signposted fork with a broken watchtower; north to Mynoc, east to Vespar; the ore-cart road Mynoc–Vespar past a waterwheel and **Miner's Cross** (sign: Mynoc Mine / Vespar Docks).
+- Travel: the Skara ferry and the Vespar–Moonglen boat both work in both directions with one interaction; the **Quay packet** links Saltmarsh Quay and Vespar. Three public moongates (Miner's Cross, Skara Bryn, Moonglen): step in or Interact for a small picker (tap or click, Cancel); you step out on clear ground beside the gate, outside the radius that opens it.
+- Walking times at normal speed, measured by the walk-through test: forge → first ore face 19 s · Mynoc forge → Vespar market by cart road 78 s · Skara landing → fork 48 s · fork → Mynoc 67 s · fork → Vespar 77 s · Moonglen harbour → college 24 s.
+- Woods and rock fields are passable: trees, rock faces and shrubs block only at the trunk or boulder, Anniabreen woods keep at most one tree in each 3×3 patch, and Saltmarsh's woods and rock outcrops are thinned too.
+- The minimap and the full map are both **north-up** with an N marker (the minimap used to be turned 45° to the view). The map shows towns, roads, river channels, ferry and boat routes, moongates and you; on a phone it shows the four town names and travel symbols first. **Fit** frames the land you are on, **World** shows both.
+- New characters still start at Saltmarsh Quay; quests, NPCs, encounters and saves carry over. Saves move to v4 (tile-keyed node and survey records follow the wider grid).
 
 ## v0.19 — everything together
 
