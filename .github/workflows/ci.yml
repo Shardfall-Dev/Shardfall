@@ -1,0 +1,64 @@
+# Checks for every push and pull request, and the gate in front of every Pages deployment (pages.yml calls this workflow).
+#   build:  every script block compiles, the committed build equals ./build.sh output, assets and manifests are complete,
+#           and all six rules suites pass against the built game.
+#   smoke:  every browser suite in Chrome (desktop and phone sizes), including the stabilization save/reload checks.
+name: Checks
+
+on:
+  push:
+  pull_request:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Find the build
+        run: |
+          GAME=$(ls Shardfall_v*.html | grep -v _offline | sort -V | tail -n 1)
+          echo "GAME=$GAME" >> "$GITHUB_ENV"; echo "Checking $GAME"
+      - name: Build freshness, syntax and assets
+        run: python3 tests/check-build.py "$GAME"
+      - name: Rules suites
+        run: |
+          for t in rules magery equipment combat world inventory; do
+            echo "::group::$t"; node "tests/$t.test.js" "$GAME"; echo "::endgroup::"
+          done
+
+  smoke:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch the old builds the save-migration tests load (v0.16, v0.22)
+        run: git fetch --depth=1 origin 70c5d60336a9a341b3350ef416d0e77dfec4c78c e59be0201e7a80393453d469ddf46ef0e115241c
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Playwright (uses the runner's Google Chrome)
+        run: pip install playwright
+      - name: Browser suites
+        run: |
+          GAME=$(ls Shardfall_v*.html | grep -v _offline | sort -V | tail -n 1); G="$PWD/$GAME"; fail=0
+          run() { echo "::group::$1"; shift; if ! "$@"; then fail=1; echo "::error::$* failed"; fi; echo "::endgroup::"; }
+          run stability   python3 tests/stability-smoke/run.py "$G"
+          run equipment   python3 tests/equipment-smoke/run.py "$G"
+          run combat      python3 tests/combat-smoke/run.py "$G"
+          run magery      python3 tests/magery-smoke/run.py "$G"
+          run backpack    python3 tests/backpack-smoke/run.py "$G"
+          run panels      python3 tests/backpack-smoke/panels.py "$G"
+          run icons       python3 tests/backpack-smoke/icons.py "$G"
+          run bestiary    python3 tests/bestiary-smoke/run.py "$G"
+          run sfx         python3 tests/sfx-smoke/run.py "$G"
+          run anniabreen  python3 tests/anniabreen-smoke/run.py "$G"
+          run world       python3 tests/world-smoke/run.py "$G"
+          exit $fail

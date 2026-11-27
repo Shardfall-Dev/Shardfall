@@ -1,6 +1,8 @@
-# Publish the game on GitHub Pages every time main changes.
-# The newest Shardfall_vX.Y.html becomes the site's front page (index.html); the sound and music it loads go beside it.
-# One-time setup: repository Settings → Pages → Source: "GitHub Actions".
+# Publish the game on GitHub Pages every time main changes, after every check in ci.yml has passed.
+# The newest Shardfall_vX.Y.Z.html becomes the site's front page (index.html); the sound and music it loads go beside it.
+# One-time setup by the repository owner: Settings → Pages → Source: "GitHub Actions". On a private repository owned by a
+# personal account this needs a paid plan (GitHub Pro), and the published site itself is public. Until Pages is enabled the
+# deploy job reports a warning and skips instead of failing.
 name: Deploy to GitHub Pages
 
 on:
@@ -18,33 +20,41 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+
   deploy:
+    needs: checks
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Is GitHub Pages enabled?
+        id: pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api "repos/${{ github.repository }}/pages" --silent 2>/dev/null; then echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else echo "enabled=false" >> "$GITHUB_OUTPUT"; echo "::warning::GitHub Pages is not enabled for this repository (Settings → Pages → Source: GitHub Actions). The checks passed; nothing was published."; fi
       - uses: actions/checkout@v4
-
-      - name: Check the build
+        if: steps.pages.outputs.enabled == 'true'
+      - name: Assemble the site
+        if: steps.pages.outputs.enabled == 'true'
         run: |
           GAME=$(ls Shardfall_v*.html | grep -v _offline | sort -V | tail -n 1)
-          echo "GAME=$GAME" >> "$GITHUB_ENV"
-          node tests/rules.test.js "$GAME"
-          node tests/magery.test.js "$GAME"
-
-      - name: Assemble the site
-        run: |
           mkdir -p _site/assets/audio _site/assets/music/v1.0.0
           cp "$GAME" _site/index.html
           cp "$GAME" "_site/$GAME"
           cp -r assets/audio/web assets/audio/sfx assets/audio/manifest.json _site/assets/audio/
           cp -r assets/music/v1.0.0/MP3 _site/assets/music/v1.0.0/
           echo "Publishing $GAME"; du -sh _site
-
       - uses: actions/configure-pages@v5
+        if: steps.pages.outputs.enabled == 'true'
       - uses: actions/upload-pages-artifact@v3
+        if: steps.pages.outputs.enabled == 'true'
         with:
           path: _site
       - id: deployment
+        if: steps.pages.outputs.enabled == 'true'
         uses: actions/deploy-pages@v4
