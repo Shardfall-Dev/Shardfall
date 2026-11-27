@@ -4,7 +4,7 @@ The roadmap is `docs/WORLD_SIMULATION_MASTER.md` (the full specification, unchan
 
 **Status words:** **Tested** — implemented and covered by an automated test that passes. **Implemented** — in the build, checked by hand only. **Partial** — some of the item is in; the rest is listed. **Planned** — not started. **Blocked** — waiting on something named.
 
-**Current build:** v0.27 (`Shardfall_v0.27.html`), branch `feature/living-world-phase4`, built on `integration/v0.26` (phase 3 merged with the equipment work). Phase 4 is living NPCs.
+**Current build:** v0.28 (`Shardfall_v0.28.html`), branch `feature/living-world-phase4b`, from `main` at v0.27 (#22). Phase 4, part 2: all four towns, townsfolk memory of the player, and saved NPC state.
 
 ---
 
@@ -451,6 +451,45 @@ Requested on 2026-11-26: bigger distances, more camps, and places for dungeons. 
 - **Creatures respawn on load as before; camp clearance is the one thing saved now.** Saving every creature is phase 6 (§26).
 - **The quarter-rate tier for distant idle creatures** is a stopgap so the larger population costs less than the old one did. Phase 6 replaces it with the spec's tiers A/B/C.
 
+## Phase 4, part 2 (v0.28) — **Tested**
+
+### What was built
+
+- **All four Anniabreen towns live** (`LIFE_TOWNS`).
+  - **New schedules (all valid over 24 h):**
+    - *innkeeper*: open 09:30–01:00, living in at the inn.
+    - *scholar*: library days, the inn in the evening.
+    - *astronomer*: works 19:00–06:00 at the observatory, sleeps 06:00–14:00.
+    - *student*: studies at the library, gathers in the evening.
+  - **Live-in homes.** A town with no houses gives its people a home in their own workplace (Skara Bryn's shops and inn, Moonglen's inn and observatory) or in the hall (the college hall for students).
+  - **Four new residents:** Bryn the forester and Ysolde the herb gatherer in Skara Bryn; Tibbet and Mira, students in Moonglen. Woodcutters leave the trees within 18 tiles of the town centre alone, so Skara Bryn's forester works the woods around the village.
+  - **Buyers by product.** Ore goes to the mine stores; wood to the mine stores, the fletcher or the bowyer; fish to the fishmonger or the innkeeper. A sale happens within 3.2 m of the buyer, across the counter.
+- **Memory of the player.** Talking to someone writes "talked with" you into their memory. After that, residents greet you by name, shopkeepers at their counter greet you (at most every two minutes), and a closed shop apologises by name.
+- **Saved NPC state (`life` block in the save; save version unchanged, the change is additive).**
+  - Saved: each townsperson's needs, memory, carried goods and purse; the town stores; the travelling merchant's town, trips and purse.
+  - Positions are not saved: the schedule still places everyone on load.
+- **Journey watchdog.** A townsperson whose journey has got no closer to its goal for 6 s gives up that path: within 4.5 m it counts as arrived, otherwise it tries again. A path still being searched is never counted as a stall.
+
+### Tests
+
+`phase4.py` now has 28 checks:
+- 39 townsfolk with lives, including 2 innkeepers, the astronomer and 2 students; 13 residents.
+- **The accelerated day:**
+  - 10:00: all 12 shopkeepers and innkeepers at their counters, the astronomer asleep, five workers at work.
+  - 03:00: all 26 day-folk asleep at home, while the astronomer is up through the night.
+  - The stores receive ore, fish and wood from Mynoc and from Skara Bryn.
+- Maeve's inn is open at 23:30.
+- Lise greets you by name the second time you talk to her.
+- After a reload, memories and stores are still there.
+
+**Regression on v0.28:**
+- Node: rules, equipment, magery, combat and world (140) all pass.
+- Browser: equipment 67/67, backpack panels 97/97, backpack 32/32, icons 32/32, bestiary 123/123, magery-smoke, anniabreen-smoke, world-smoke 142/142.
+- sfx 47/48: only the known "a whiff" flake.
+- Combat-smoke: every scenario passes. The phone play-test timed out once on the "Bandage Wren" button and passed on both re-runs. The old-save step needs `main:Shardfall_v0.16.html`, which a shallow clone does not have.
+
+**Performance:** 0.80 ms per step (v0.27: 0.67 ms), render 4.2 ms by day and 5.5 ms at night, start-up 2.28 s, heap about 67 MB.
+
 ### Integration (v0.26)
 
 v0.26 merges phase 3 with the equipment and paper doll work (#19, which already contains the missing icons, #18). Both branches had been numbered v0.25.
@@ -563,7 +602,7 @@ v0.26 merges phase 3 with the equipment and paper doll work (#19, which already 
 | 4 | Simulation/render separation, timestep, events, seeded RNG | `update(dt)` with frame dt (capped 0.1 s); `render()` separate; `R` swappable (`setRng`); world gen seeded (`mulberry(1999)`); no event log | **Tested:** events, seeded streams, deterministic harness (phase 1); fixed 50 ms step with interpolation (phase 2) | — |
 | 5 | World clock | `hourOfDay()` = `(GT/60 + 9) % 24`: a 24-minute day, starting at 09:00. `GT` is saved, so time already persists. HUD clock exists. | **Tested** (phase 2): 120-minute day, periods, saved, HUD | Offline progression stays off (spec) |
 | 6 | Day/night visuals | `darkness()` overlay with radial holes for the player, `LIGHTS` and blasts. Night Sight sets darkness to 0. Dungeons fixed at 0.8. | **Tested** (phase 2): tinted periods, local lights and glow, partial Night Sight, dungeons apart | Torch items and spell light radii when those exist; night gameplay in phase 3 |
-| 7 | NPC life | 58 static NPCs (Saltmarsh + Anniabreen towns), roles, shops, dialogue lines; no movement or schedules | **Tested** (phase 4) in Vespar and Mynoc: homes, workplaces, schedules, needs, memory, nine residents, resource workers on real nodes, shop hours, shelter from danger; guard patrols in all four towns; a travelling merchant | Skara Bryn and Moonglen routines; the economy behind the stores (phase 7) |
+| 7 | NPC life | 58 static NPCs (Saltmarsh + Anniabreen towns), roles, shops, dialogue lines; no movement or schedules | **Tested** (phase 4; all four towns since v0.28, with memory of the player and saved state): homes, workplaces, schedules, needs, memory, nine residents, resource workers on real nodes, shop hours, shelter from danger; guard patrols in all four towns; a travelling merchant | Saltmarsh Quay residents; the economy behind the stores (phase 7) |
 | 8 | NPC adventurers | Wren: one hireling with skills, equipment, bandaging, ghost/resurrection, follow/wait | Classified (hireling) | Phase 5 (they need NPC combat) |
 | 9–10 | Monster ecosystem | `MON` table (23 types) with aggro, leash, speed, loot, skin; `SPAWNS` point spawners with caps and respawn timers; `aiMon` idle/chase/telegraph/strike/recover/return | **Tested** (phase 3): 27 species profiles as data, temperaments, hours, prey, packs and herds, retreat, feeding; deer, hares and bears added | Goblins, zombies, dragons when art exists; orc roles and lich commands with NPC Magery (phase 5) |
 | 11 | Factions | None; creatures target only the player, pets or Wren (or a provoked creature) | **Tested** (phase 3): 20 factions, five levels, symmetric table; creatures fight creatures; hostility is not a crime | Law and notoriety: phase 5 |
