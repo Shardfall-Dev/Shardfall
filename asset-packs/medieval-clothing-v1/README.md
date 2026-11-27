@@ -12,3 +12,6 @@ world-rig.mjs: fork of existing armor rig with garment paint phases.
 views.mjs: shared world and doll render APIs, appearance cache-key prototype.
 preview.html: animated art studio with atlas exports.
 manifest.json: format and limits. test.mjs: structural test suite, run before integration.
+
+## Rendered samples and validation
+Open samples/role-lineup.svg and samples/guard-lineup.svg for rendered world-and-paperdoll examples. samples/apron-long-walk-outer.svg is a transparent 896x1600 cosmetic-only atlas (8 frames, 16 body/direction rows). views.mjs also exports garmentFrameSVG and garmentAtlasSVG; use wardrobePhase to preserve depth. Baseline shirt/trousers are not isolated, and heraldry needs a tabard context. No independently painted PNG overlays are included. A separate JS evaluator executed the committed renderer with stripped module declarations and injected dependencies: 20,416 last-frame samples (44 roles x 2 bodies x 8 directions x 29 actions), zero invalid strings, material change altered the rendered SVG. Native Node full test, browser PNG export and visual pixel checks were not run. The garment-only apron sample was generated and checked for expected phase, geometry and finite coordinates.
