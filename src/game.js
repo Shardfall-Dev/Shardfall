@@ -329,7 +329,7 @@ function fighter(a) {
   if (isPlayerLike(a)) {
     const w = weaponOfActor(a), it = w === SF.WEAPONS.unarmed ? null : a.equip.weapon, sh = a.equip.shield;
     // armor is resolved per blow on the struck body region (applyBlow → regionHit); armorAR here is the expected summary for display
-    return { a, player: true, w, it, atk: skOf(a, w.skill), def: skOf(a, w.skill), tactics: skOf(a, 'tactics'), anatomy: skOf(a, 'anatomy'), str: a.str,
+    return { a, player: true, w, it, atk: skOf(a, w.skill) + SF.SK.magicAcc(it), def: skOf(a, w.skill), tactics: skOf(a, 'tactics'), anatomy: skOf(a, 'anatomy'), str: a.str,
       armorAR: Math.round(SF.EQ.effective(a).ar) + magicArmor(a), armorItem: null, regions: true,
       shieldAR: sh && SF.ITEMS[sh.id].slot === 'shield' ? Math.round(SF.EQ.shieldAR(sh)) : 0, shieldItem: sh, parry: skOf(a, 'parrying'), braced: a.braced > GT,
       diff: Math.max(10, Math.round(skOf(a, w.skill))) };
@@ -365,7 +365,7 @@ function damageActor(t, amt, kind, src, hx) { if (t === P) return damagePlayer(a
 /* one landed blow. A = attacker view (taken at the swing or the release), t = recipient. Returns the stage record. */
 function applyBlow(A, t, opt) {
   opt = opt || {}; if (!fighterAlive(t)) return null; const a = A.a, D = fighter(t);
-  const raw = SF.rawDamage(A.player ? { dice: A.w.dice, quality: A.it && A.it.quality, cond: A.it && A.it.cond, maxc: A.it && A.it.maxc, tactics: A.tactics, anatomy: A.anatomy, str: A.str } : { range: A.range, scale: A.scale }, R);
+  const raw = SF.rawDamage(A.player ? { dice: A.w.dice, bonus: SF.SK.magicDmg(A.it), quality: A.it && A.it.quality, cond: A.it && A.it.cond, maxc: A.it && A.it.maxc, tactics: A.tactics, anatomy: A.anatomy, str: A.str } : { range: A.range, scale: A.scale }, R);
   let v = raw.value;
   if (!A.player && a.kind === 'mon') { v = monRaw(a, v); if (a.hexUntil > GT) v *= .88; }   // strength hex/boon and Dampening Hex on the striker
   if (t === P && !opt.ranged && a !== P) { v = meleeWard(a, v); if (v <= 0) { wardSound(t); return { raw, final: 0, warded: true }; } }   // Rebounding Armor
@@ -466,7 +466,8 @@ function killMon(m, src) {
   if (m.kind === 'pet') { log((m.name || d.n) + ' has died.', '#ff6a5a'); return; }
   if (m.quest) questCrabKilled();
   const cont = SF.newContainer('corpse'); if (m.pack2) cont.items.push(...m.pack2.items); else for (const k in d.loot) { const q = rnd(d.loot[k][0], d.loot[k][1]); if (q > 0) cont.items.push(lootItem(k, q, 100)); }   // a pack that was snooped or robbed is what the body holds: nothing stolen comes back
-  for (const [id, ch] of d.rare || []) if (R() < ch) cont.items.push(lootItem(id, 1, rnd(60, 100)));
+  for (const [id, ch] of d.rare || []) if (R() < ch) cont.items.push(magicLoot(lootItem(id, 1, rnd(60, 100)), d.boss ? 5 : 3, d.boss ? 1 : .35));
+  if ((d.boss || d.diff >= 75) && R() < (d.boss ? 1 : .15)) cont.items.push(newTreasureMap(d.boss ? 4 + (R() < .5 ? 1 : 0) : 1 + Math.floor(R() * 3)));   // treasure maps from strong foes
   if (m.purse) cont.items.push(SF.newItem('gold', m.purse));
   const corpse = addEnt({ kind: 'corpse', mon: m.type, sect: m.sect || 0, t0: GT, killer: src ? (src === P ? P.name : src.name || (MON[src.type] || {}).n || null) : null, killKind: src && src.kind, name: d.n + ' remains', x: m.x, y: m.y, cont, expires: GT + (d.boss ? 600 : 240), skinned: !d.skin });
   if (corpse && (P.sel === m || src === P) && mine) { P.sel = corpse; if (!P.lootHinted) { P.lootHinted = true; log('Tap the bones (or press Interact) beside them to loot.', '#ffe08a'); } }
@@ -854,6 +855,10 @@ function populate() {
 }
 const SHOPS = { provisioner: ['hatchet', 'pickaxe', 'knife', 'rod', 'tongs', 'sewkit', 'cloth', 'vial', 'bandage', 'lanternoil', 'cookedmeat', 'shirt', 'trousers', 'shoes', 'cloak', 'lute', 'lockpick', 'repairkit'], smith: ['dagger', 'kryss', 'spear', 'sword', 'battleaxe', 'glaive', 'mace', 'waraxe', 'hammer', 'ironbar', 'ringmail_tunic', 'ringmail_sleeves', 'ringmail_gloves', 'ringmail_leggings', 'chain_coif', 'chain_tunic', 'chain_leggings', 'plate_gorget', 'plate_chest', 'plate_arms', 'plate_gauntlets', 'plate_leggings', 'bascinet', 'open_helm', 'closed_helm', 'plate_helm', 'buckler', 'metal_shield', 'kite_shield'], workshop: ['shortbow', 'crossbow', 'heavycrossbow', 'arrow', 'bolt', 'pine', 'buckler', 'wooden_shield', 'strap', 'trapkit', 'repairkit'], apothecary: ['reedash', 'shelldust', 'marshroot', 'lanternoil', 'blacksalt', 'vial', 'draught', 'antidote', 'manatonic', 'stamtonic', 'cinder'], outlaw: ['bandage', 'draught', 'arrow', 'cookedmeat', 'cloth', 'vial', 'reedash', 'marshroot', 'knife', 'dagger', 'lockpick', 'venom', 'trapkit'] };
 Object.assign(SHOPS, ANN_SHOPS);
+/* v0.30 skill supplies: kindling and bedrolls, blank maps and scrolls, pens, crooks, poisons and the practice boxes */
+for (const [role, ids] of [['provisioner', ['kindling', 'bedroll', 'crook', 'blankmap']], ['scholar', ['blankmap', 'mappen', 'blankscroll', 'scribepen']], ['mage', ['blankscroll', 'scribepen']], ['reagents', ['blankscroll']],
+  ['tinker', ['mappen', 'scribepen', 'lockbox', 'trapbox', 'lockpick']], ['apothecary', ['poison_lesser', 'venom']], ['outlaw', ['lockpick', 'poison_lesser', 'venom']]]) if (SHOPS[role]) for (const id of ids) if (!SHOPS[role].includes(id)) SHOPS[role].push(id);
+SF.SK.addInscription();   // one Inscription recipe per Magery spell (needs src/magery.js, loaded before the game)
 
 /* ---------- main tick ---------- */
 let spawnT = 0, saveT = 0;
@@ -874,7 +879,7 @@ function update(dt) {
     // mana
     const medI = SF.EQ.effective(P).med, mr = SF.SK.manaRegen(P.int, sv('meditation'), medI, !!(P.meditating && GT - P.meditating.t0 > SF.MEDITATE_SETTLE));   // Second Age regeneration (src/skills.js)
     const mb = P.mana; P.mana = Math.min(SF.maxMana(P), P.mana + mr * dt); if (P.meditating) { P.meditating.gained += P.mana - mb; if (P.mana >= SF.maxMana(P)) { P.meditating = null; log('You are at peace.'); } }
-    trackUpdate(); petLoyaltyTick();
+    trackUpdate(); petLoyaltyTick(); campTick(); spiritTick();
     // health: slow out-of-combat recovery, faster when fed
     if (!inCombat() && !P.poison) P.hp = Math.min(SF.maxHp(P), P.hp + (P.fed > GT ? 1 : .1) * dt);
     if (P.poison && GT >= P.poison.next) { P.poison.next = GT + SF.POISON_GAP; damagePlayer(SF.POISON[P.poison.tier], null, 'poison'); if (P.poison && --P.poison.ticks <= 0) P.poison = null; }
@@ -1203,6 +1208,7 @@ const TRAPS = [];
 /* ================= skills in the world: every active skill's real action (rules: src/skills.js SF.SK; status: docs/skills/STATUS.md) =================
    One usage delay per skill (P.cdA), checks through skillCheck/skillUse, targets by selection or by a tap after a prompt (pickTarget). */
 const SKD = SF.SK;
+const ITEM_SKILL = {};   // item-target skills (Arms Lore, Taste Identification, treasure maps) register here; itemSkill() dispatches
 const cdLeft = id => Math.max(0, ((P.cdA || {})[id] || 0) - GT);
 function skillDelay(id, s) { P.cdA = P.cdA || {}; P.cdA[id] = GT + s; }
 const hasInstrument = () => SF.count(P.pack, 'lute') > 0;
@@ -1447,7 +1453,7 @@ const TASKS = {
     else log('You fail to safely remove the trap.', '#ffb070'); },
   lock: t => {
     if (t.chest) { const c = t.chest, diff = SF.CHEST_DIFF[c.tier];
-      if (skillCheck('lockpicking', ...SKD.lockWindow(diff))) { c.open = true; c.picked = { by: P.name, at: GT }; c.refill = GT + 600; c.cont = chestLoot(c.tier); log('The lock quickly yields to your skill.', '#ffe08a'); sndAt('door.unlock', { x: c.x + .5, y: c.y + .5 }); if (c.trap) springChestTrap(c); openChest(c, true); }
+      if (skillCheck('lockpicking', ...SKD.lockWindow(diff))) { c.open = true; c.picked = { by: P.name, at: GT }; c.refill = GT + 600; c.cont = c.treasure ? treasureLoot(c) : chestLoot(c.tier); if (c.treasure && P.cx.tchest) P.cx.tchest.opened = true; log('The lock quickly yields to your skill.', '#ffe08a'); sndAt('door.unlock', { x: c.x + .5, y: c.y + .5 }); if (c.trap) springChestTrap(c); openChest(c, true); }
       else { if (R() < .3) { SF.removeQty(P.pack, 'lockpick', 1); log('You broke the lockpick.'); } else log('You are unable to pick the lock.'); } return; }
     const b = t.box; if (!b || !findU(P.pack, b.uid)) return;
     if (skillCheck('lockpicking', ...SKD.lockWindow(b.lockLvl || 20))) { b.locked = false; b.picked = { by: P.name, at: GT }; P.pack.ver++; log('The lock quickly yields to your skill.', '#ffe08a'); snd('door.unlock', { key: 'P' }); }
@@ -1464,12 +1470,163 @@ const magicName = it => it.magic ? ({ dmg: ['', 'ruin', 'might', 'force', 'power
 /* chest traps (dungeon chests of the second and third tier): a poison needle or an explosion when the lid opens untouched */
 function springChestTrap(c) { const p = c.trap; c.trap = 0; c.trapSeen = false; snd('trap.spring', { key: 'P' }); if (R() < .5) { damagePlayer(Math.round(p / 4), null, 'phys', { quiet: 1 }); log('The chest explodes in your face!', '#ff8a6a'); FX.push({ k: 'boom', x: c.x + .5, y: c.y + .5, r: .8, t0: GT, dur: .5 }); } else { applyPoison(P, p >= 70 ? 3 : 2); log('A poison needle pricks your finger!', '#7be07b'); } }
 function springBox(b) { snd('trap.spring', { key: 'P' }); damagePlayer(Math.max(2, Math.round((b.power || 20) / 10)), null, 'phys', { quiet: 1 }); log('The practice box snaps shut on your fingers!', '#ff8a6a'); }
+/* ================= the ten skills Shardfall lacked (Phase D): Arms Lore, Begging, Camping, Cartography, Forensic Evaluation,
+   Herding, Inscription, Snooping, Spirit Speak, Taste Identification; plus magic loot for Item Identification ================= */
+/* magic loot: some rare drops and the best chest finds carry a hidden property (SK.rollMagic); Item Identification names it */
+function magicLoot(it, lvlMax, chance) { if (!it || R() >= chance) return it; const m = SKD.rollMagic(it.id, lvlMax, R); if (m) { it.magic = m; it.unid = true; } return it; }
+/* a treasure map points at open, walkable wilderness away from towns (deterministic from the map's own seed) */
+function newTreasureMap(lvl) {
+  const it = SF.newItem('tmap', 1, { level: lvl, seed: Math.floor(R() * 1e9) }); const rng = mulberry(it.seed);
+  for (let k = 0; k < 400; k++) { const x = Math.floor(rng() * W), y = Math.floor(rng() * H); if (BLK[tAt(x, y)] || tAt(x, y) === T.WA || protAt(x + .5, y + .5) || levelAt(x, y) || !canStand(P, x + .5, y + .5)) continue; it.tx = x; it.ty = y; break; }
+  if (it.tx === undefined) { it.tx = 300; it.ty = 300; } return it;
+}
+Object.assign(ABIL, {
+  armslore: { n: 'Arms Lore', cd: 1, fn: () => { const w = P.equip.weapon || P.equip.chest; if (w) return itemSkill('armslore', w.uid, true); log('Choose a weapon or piece of armor in your backpack (Arms Lore).'); openPanel('bag'); } },
+  itemid: { n: 'Item Identification', fn: () => { log('Choose an item in your backpack and press Identify.'); openPanel('bag'); } },
+  taste: { n: 'Taste Identification', cd: 1, fn: () => { log('Choose food, drink or a potion in your backpack and press Taste.'); openPanel('bag'); } },
+  beg: { n: 'Begging', cd: SKD.BEG.delay, fn: () => pickTarget('Tap the person to beg from.', e => e.kind === 'npc' && e.role !== 'guard' && !e.dev && !e.gone, begUse) },
+  camp: { n: 'Camping', fn: () => campUse() },
+  forensic: { n: 'Forensic Evaluation', cd: 1, fn: () => forensicUse() },
+  herd: { n: 'Herding', cd: 1, fn: () => { if (!SF.count(P.pack, 'crook')) return log('You need a shepherd\'s crook (Carpentry makes them).', '#ffb070'); pickTarget('Tap the animal to herd.', e => isAnimal(e), herdPick); } },
+  snoop: { n: 'Snooping', cd: 1, fn: () => pickTarget('Tap the person or creature whose pack you want to look into.', packOwner, snoopUse) },
+  spirit: { n: 'Spirit Speak', cd: 10, fn: () => spiritUse() },
+  draw: { n: 'Cartography', fn: () => openCraft('map') },
+  scribe: { n: 'Inscription', fn: () => { SF.SK.addInscription(); openCraft('scribe'); } },
+  dig: { n: 'Dig for treasure', fn: () => digUse() } });
+/* ---- Arms Lore and Taste Identification (item targets) ---- */
+ITEM_SKILL.armslore = it => {
+  const d = SF.ITEMS[it.id], w = SF.weaponOf(it); if (!w && !(d.slot && d.slot !== 'weapon' && d.cat !== 'jewelry')) return log('That is neither a weapon nor armor.', '#ffb070');
+  if (!cdReady('armslore', 1)) return; useAbilityReveal('armslore'); if (!skillCheck('armslore', 0, 100)) return log('You are not certain…', '#a8a8a8');
+  const s = sv('armslore'), exact = SKD.readExact(s), max = it.maxc || it.omax || 100;
+  let msg = `${SF.itemName(it)} ${SKD.conditionWord(it.cond, max)}${s >= 50 && it.cond !== undefined ? ` (${Math.round(it.cond)}/${max})` : ''}`;
+  if (it.quality === 'exceptional') msg += ', and is of exceptional quality';
+  if (w) { const avg = (w.dmg[0] + w.dmg[1]) / 2 + SKD.magicDmg(it); msg += `. It ${SKD.dmgWord(avg)}${exact ? ` (${w.dmg[0]}–${w.dmg[1]}${SKD.magicDmg(it) ? ' +' + SKD.magicDmg(it) : ''})` : ''}`; if (it.venom) msg += `. It is coated with poison (${it.venom.charges} uses)`; }
+  else { const ar = SF.EQ.regionAR(it); msg += `. It ${SKD.arWord(ar)}${exact ? ` (AR ${Math.round(ar)})` : ''}`; }
+  log(msg + '.', '#e8d8b0');
+};
+ITEM_SKILL.taste = it => {
+  const d = SF.ITEMS[it.id]; if (!(d.use === 'eat' || d.cat === 'potion' || d.cat === 'food')) return log('You cannot taste that.', '#ffb070');
+  if (!cdReady('taste', 1)) return; useAbilityReveal('taste'); if (!skillCheck('tasteidentification', 0, 100)) return log('You cannot discern anything about this.', '#a8a8a8');
+  it.tasted = true; P.pack.ver++;
+  const p = it.poison || d.poisonLvl || 0, word = ['', 'lesser', 'regular', 'greater', 'deadly'][p];
+  log(p ? `It is ${d.poisonLvl ? 'a' : 'tainted with'} ${word} poison${d.poisonLvl ? ' potion' : ''}.` : d.cat === 'potion' ? `It is ${SF.ITEMS[it.id].n.toLowerCase()}, and safe.` : 'You detect nothing unusual.', p ? '#7be07b' : '#e8d8b0');
+};
+/* ---- Begging ---- */
+function begUse(n) {
+  if (!inReach(n, SKD.BEG.range) || !cdReady('beg', SKD.BEG.delay)) return; useAbilityReveal('beg');
+  if (GT < (n.begAt || 0)) return say(n, pick(['I have already given thee something.', 'Away with thee!', 'Not again.']));
+  say(P, pick(['Spare some gold, kind soul?', 'Any coin for a poor wanderer?', 'Please, a few coppers…']));
+  const pack = npcPack(n), purse = SF.count(pack, 'gold');
+  if (!skillCheck('begging', 0, 100) || !purse) { n.begAt = GT + 60; return say(n, pick(['I have nothing for thee.', 'Go find work!', 'Not today.'])); }
+  const g = SKD.begAmount(sv('begging'), purse, R); SF.removeQty(pack, 'gold', g); give('gold', g); n.begAt = GT + SKD.BEG.perPerson;
+  say(n, pick(['Here, take this.', 'Bless thee.', 'Get thee some bread.'])); log(`${n.name.split(',')[0]} gives you ${g} gold.`, '#ffe08a');
+}
+/* ---- Camping: kindling, campfires, secure camps ---- */
+const CAMPS = [];
+function campUse() {
+  const fire = CAMPS.find(c => Math.hypot(c.x - P.x, c.y - P.y) <= SKD.CAMP.range);
+  if (fire && fire.secureAt <= GT && SF.count(P.pack, 'bedroll')) return makeCamp(fire);
+  if (fire && fire.secureAt <= GT) return log('Your camp is secure. With a bedroll you could make camp here.', '#9fd0ff');
+  if (fire) return log(`Stay by your fire a little longer (${Math.ceil(fire.secureAt - GT)} s) and the camp will be secure.`);
+  if (SF.count(P.pack, 'kindling')) return lightKindling();
+  const tree = nearTree(); if (tree && carveBlade()) { P.task = { kind: 'kindling', label: 'Cutting kindling', t0: GT, t1: GT + 1.5, still: true, x0: P.x, y0: P.y }; return; }
+  log('You need kindling: cut some from a tree with a blade, or buy it from a provisioner.', '#ffb070');
+}
+function nearTree() { for (let r = 1; r <= 2; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { const x = Math.floor(P.x) + dx, y = Math.floor(P.y) + dy; if (tAt(x, y) === T.TR) return { x, y }; } return null; }
+function lightKindling() {
+  if (levelAt(Math.floor(P.x), Math.floor(P.y))) return log('You cannot light a fire here.', '#ffb070');
+  const spot = [[1, 0], [0, 1], [-1, 0], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]].map(([dx, dy]) => [Math.floor(P.x) + dx, Math.floor(P.y) + dy]).find(([x, y]) => !BLK[tAt(x, y)] && tAt(x, y) !== T.WA && !STATIONS.some(s => s.x === x && s.y === y) && !CHESTS.has(y * W + x));
+  if (!spot) return log('There is no room for a fire here.', '#ffb070'); const [fx, fy] = spot;
+  useAbilityReveal('camp'); SF.removeQty(P.pack, 'kindling', 1);
+  if (!skillCheck('camping', 0, 100)) return log('You fail to ignite the campfire.', '#a8a8a8');
+  const c = { x: fx + .5, y: fy + .5, t0: GT, until: GT + SKD.CAMP.life, secureAt: GT + SKD.CAMP.secureAfter, under: tAt(fx, fy), st: { k: 'fire', x: fx, y: fy, camp: true } };
+  tSet(fx, fy, T.FP); CAMPS.push(c); STATIONS.push(c.st); sndAt('world.hearth', c, { gain: .6 });   // the existing fire-pit tile is the campfire
+  log('The kindling catches. You can cook here; stay close and the camp will be secure.', '#ffd090');
+}
+function makeCamp(c) { P.camp = { x: P.x, y: P.y, at: GT }; save(); log('You feel it would be safe to rest here. You make camp; the game is saved and you will wake here.', '#9fd0ff'); }
+function campTick() {
+  for (let i = CAMPS.length - 1; i >= 0; i--) { const c = CAMPS[i];
+    if (Math.hypot(c.x - P.x, c.y - P.y) > SKD.CAMP.range && c.secureAt > GT) c.secureAt = GT + SKD.CAMP.secureAfter;   // you must stay by it for the camp to become secure
+    if (!c.said && c.secureAt <= GT && Math.hypot(c.x - P.x, c.y - P.y) <= SKD.CAMP.range) { c.said = 1; log('Your camp is now secure.', '#9fd0ff'); }
+    if (GT > c.until) { CAMPS.splice(i, 1); const k = STATIONS.indexOf(c.st); if (k >= 0) STATIONS.splice(k, 1); if (tAt(c.st.x, c.st.y) === T.FP) tSet(c.st.x, c.st.y, c.under); log('Your campfire dies down.', '#a8a8a8'); } }
+}
+/* ---- Cartography: drawing maps is crafting (station: anywhere, a mapmaker's pen); treasure maps decode, then you dig ---- */
+ITEM_SKILL.decode = it => {
+  if (it.decoded) return log(`The map shows a spot near ${it.tx}, ${it.ty}. It is pinned on your map.`);
+  if (!SF.count(P.pack, 'mappen')) return log('You need a mapmaker\'s pen to decode a map.', '#ffb070');
+  const w = SKD.tmapWindow(it.level || 1); if (sv('cartography') < w[0]) return log(`You cannot make anything of this level ${it.level} map yet.`, '#ffb070');
+  useAbilityReveal('draw'); if (!skillCheck('cartography', w[0], w[1])) return log('You fail to make anything of the map.', '#a8a8a8');
+  it.decoded = true; P.pack.ver++; P.cx.pins = P.cx.pins || []; P.cx.pins.push({ k: 'tmap:' + it.uid, n: `Treasure (level ${it.level})`, x: it.tx, y: it.ty }); log(`You decode the map: treasure lies near ${it.tx}, ${it.ty}. It is pinned on your map.`, '#ffe08a');
+};
+function digUse() {
+  const it = P.pack.items.find(i => i.id === 'tmap' && i.decoded && !i.dug && Math.hypot(i.tx + .5 - P.x, i.ty + .5 - P.y) <= 3);
+  if (!it) return log('You are not near the spot on any decoded map.', '#ffb070');
+  if (!SF.count(P.pack, 'pickaxe') && !(P.equip.weapon && P.equip.weapon.id === 'pickaxe')) return log('You need a pickaxe to dig.', '#ffb070');
+  P.task = { kind: 'dig', map: it, label: 'Digging', t0: GT, t1: GT + 3, still: true, x0: P.x, y0: P.y };
+}
+function treasureUp(it) {
+  const lvl = it.level || 1, tier = lvl >= 3 ? 2 : 1, x = it.tx, y = it.ty; it.dug = true; P.pack.ver++;
+  const under = tAt(x, y); tSet(x, y, T.CH); const c = { x, y, tier, open: false, refill: 0, treasure: lvl, under, trap: [0, 30, 45, 60, 75, 90][lvl], trapSeen: false };
+  CHESTS.set(y * W + x, c); P.cx.tchest = { x, y, tier, lvl, under };
+  for (const g of SKD.TMAP_GUARDS[lvl]) { const m = spawnMon(g, x - P.x + (R() - .5) * 4, y - P.y + (R() - .5) * 4); if (m) { m.target = P; m.state = 'chase'; } }
+  log('You dig up a treasure chest! Its guardians rise to defend it.', '#ffe08a'); sndAt('gather.mine', { x: x + .5, y: y + .5 });
+}
+function treasureLoot(c) { const cont = chestLoot(c.tier), g = SKD.TMAP_GOLD[c.treasure]; cont.items.push(SF.newItem('gold', rnd(g[0], g[1]))); for (let i = 0; i < c.treasure; i++) { const id = pick(['kryss', 'battleaxe', 'spear', 'mace', 'waraxe', 'chain_tunic', 'plate_arms', 'kite_shield', 'closed_helm']); const it = lootItem(id, 1, rnd(70, 100)); magicLoot(it, c.treasure, .8); cont.items.push(it); }
+  if (R() < .3) cont.items.push(newTreasureMap(Math.min(5, c.treasure + 1))); return cont; }
+/* ---- Forensic Evaluation ---- */
+function forensicUse() {
+  if (!cdReady('forensic', 1)) return;
+  const body = P.sel && P.sel.kind === 'corpse' && dist(P.sel, P) <= 3 ? P.sel : ents.filter(e => e.kind === 'corpse' && !e.gone && dist(e, P) <= 3).sort((a, b) => dist(a, P) - dist(b, P))[0];
+  const chest = !body && nearChest(), box = !body && !chest && P.pack.items.find(i => i.id === 'lockbox' && i.picked);
+  if (!body && !(chest && chest.picked) && !box) return log('Examine a body, or a chest or box whose lock was forced.', '#ffb070');
+  useAbilityReveal('forensic'); if (!skillCheck('forensicevaluation', 0, 100)) return log('You cannot determine anything useful.', '#a8a8a8');
+  const s = sv('forensicevaluation'), ago = t => { const m = Math.max(1, Math.round((GT - t) / 60)); return m + ' minute' + (m > 1 ? 's' : '') + ' ago'; };
+  if (body) { const who = body.mine ? 'you' : body.name.replace(/ remains$/, ''); log(`These are the remains of ${who}, dead about ${ago(body.t0 || body.cont && body.cont.diedAt || GT)}.` + (s >= 50 ? (body.killer ? ` ${body.killer === P.name ? 'You' : cap1(body.killer)} killed ${body.mine ? 'you' : 'it'}.` : ' You find no sign of who killed it.') : ' You cannot tell who did it.'), '#e8d8b0'); return; }
+  const p = (chest && chest.picked) || box.picked; log(`The lock was forced ${ago(p.at)}${s >= 40 ? ` by ${p.by === P.name ? 'you' : p.by}` : ''}.`, '#e8d8b0');
+}
+/* ---- Herding ---- */
+function herdPick(m) {
+  if (!inReach(m, SKD.HERD.range)) return;
+  AIM = { range: SKD.HERD.dest, r: .6, ok: true, fn: pt => { AIM = null; herdUse(m, pt); }, pt: null, herd: true }; log('Tap where the animal should go.', '#9fd0ff');
+}
+function herdUse(m, pt) {
+  if (!alive(m) || !cdReady('herd', 1)) return; useAbilityReveal('herd'); const d = tameMin(m.type) !== null ? tameMin(m.type) : monDiff(m);
+  if (!skillCheck('herding', ...SKD.herdWindow(d))) return log('You don\'t seem to be able to persuade that to move.', '#a8a8a8');
+  m.lured = { x: pt.x, y: pt.y, t0: GT, until: GT + SKD.HERD.walk }; m.target = null; m.state = 'idle'; floater(m.x, m.y, 'herded', '#c8e0ff'); log(`The ${MON[m.type].n} is herded toward the spot.`, '#c8e0ff');
+}
+/* ---- Snooping ---- */
+let SNOOP = null;
+function snoopUse(e) {
+  if (!inReach(e, SKD.STEAL.range) || !cdReady('snoop', 1)) return;
+  if (P.hidden) reveal('You reveal yourself as you reach for their pack.');   // snooping unhides (UOSA)
+  if (!skillCheck('snooping', 0, 100)) { log('You fail to peek into the container.', '#ffb070');
+    if (e.kind === 'npc') say(e, pick(['Keep thy hands to thyself!', 'What dost thou think thou art doing?'])); else if (!e.target) { e.target = P; e.state = 'chase'; } return; }
+  SNOOP = e; npcPack(e); openPanel('snoop');
+}
+/* ---- Spirit Speak ---- */
+function spiritUse() {
+  if (!cdReady('spirit', 10)) return; useAbilityReveal('spirit');
+  if (!skillCheck('spiritspeak', 0, 100)) return log('You fail to contact the netherworld.', '#a8a8a8');
+  P.spiritUntil = GT + SKD.spiritFor(sv('spiritspeak')); log('You establish a connection to the netherworld.', '#c8b0ff');
+}
+const GHOST_LINES = ['I was a fisher here, before the bell rang for me.', 'Dig where the reeds grow thin, by the old cairn…', 'Tell my brother I kept the ring.', 'The Bellkeeper does not sleep.', 'Do not trust the drowned captain\'s maps.', 'Bandage your wounds before the night comes.'];
+function ghostSpeech(e, line) { if (P.spiritUntil > GT || P.ghost) say(e, line); else say(e, pick(['OOooOOoo', 'oOOoooO', 'OOoo… oOOo'])); }
+function spiritTick() {
+  const al = allyOf(); if (al && al.ghost && dist(al, P) < 12 && GT > (al.ghostSay || 0)) { al.ghostSay = GT + 14; ghostSpeech(al, pick(['Take me to a healer, or bandage me back.', 'It is so cold here…', 'Do not leave me behind.'])); }
+  const hr = hourOfDay(); if (P.spiritUntil > GT && GT > (P.whisperAt || 0) && (hr < 5 || hr > 21)) {
+    const g = ECOS && ECOS.regions ? [...ECOS.regions.values()].find(r => r.kind === 'graveyard' && Math.hypot(r.x - P.x, r.y - P.y) < 18) : null;
+    if (g && P.spiritUntil > GT && GT > (P.whisperAt || 0)) { P.whisperAt = GT + 25; log('A spirit whispers: “' + pick(GHOST_LINES) + '”', '#c8b0ff'); }
+  }
+}
+TASKS.kindling = () => { give('kindling', 1); log('You cut some kindling.'); };
+TASKS.dig = t => { const it = t.map; const w = SKD.digWindow(it.level || 1);
+  if (!skillCheck('mining', w[0], w[1])) return log('You dig, but find nothing yet. Keep digging.', '#a8a8a8'); treasureUp(it); };
 /* a found item: gear arrives as a proper instance (material, durability), worn to pct % of its maximum */
 function lootItem(id, q, pct) { if (SF.EQ.isGear(id)) { const it = SF.EQ.make(id, { origin: 'loot' }); if (it.omax) it.cond = Math.max(1, Math.round(it.omax * pct / 100)); return it; } return SF.newItem(id, q, SF.WEARABLE(id) ? { cond: pct, maxc: 100 } : null); }
 function chestLoot(tier) { const c = SF.newContainer('chest'); const add = (id, a, b) => { const q = rnd(a, b); if (q > 0) c.items.push(lootItem(id, q, rnd(70, 100))); };
   if (tier === 0) { add('gold', 15, 40); add('bandage', 2, 5); add(pick(Object.values(SF.REAGENT)), 2, 5); }
   if (tier === 1) { add('gold', 40, 90); add('draught', 0, 1); add('ironbar', 1, 2); add('lockpick', 1, 3); add(pick(Object.values(SF.REAGENT)), 3, 6); }
-  if (tier === 2) { add('gold', 100, 200); add('bellshard', 1, 2); add('draught', 1, 2); if (R() < .35) add(pick(['chain_tunic', 'glaive', 'crossbow', 'studded_tunic', 'kryss', 'battleaxe', 'spear', 'norse_helm', 'kite_shield', 'ringmail_leggings']), 1, 1); }
+  if (tier === 2) { add('gold', 100, 200); add('bellshard', 1, 2); add('draught', 1, 2); if (R() < .35) add(pick(['chain_tunic', 'glaive', 'crossbow', 'studded_tunic', 'kryss', 'battleaxe', 'spear', 'norse_helm', 'kite_shield', 'ringmail_leggings']), 1, 1); for (const it of c.items) magicLoot(it, 3, .5); if (R() < .2) c.items.push(newTreasureMap(1 + Math.floor(R() * 2))); }
   return c; }
 /* fresh: the lid actually opens; otherwise this only reopens the loot panel of an open chest (UI only) */
 function openChest(c, fresh) { springRuneTrap(c, false); P.lootOpen = { kind: 'chest', x: c.x + .5, y: c.y + .5, cont: c.cont, name: 'chest', expires: c.refill }; openPanel('loot'); if (fresh) sndAt('chest.open', P.lootOpen, { delay: .3 }); else snd('ui.open'); }
@@ -1477,7 +1634,7 @@ function springOnPlayer() { snd('trap.spring', { key: 'P' }); damagePlayer(SF.TR
 function interactExtra() {
   // chests
   for (const c of CHESTS.values()) { if (Math.hypot(c.x + .5 - P.x, c.y + .5 - P.y) > 2) continue;
-    if (c.open && GT > c.refill) { c.open = false; c.cont = null; chestTrapRoll(c); }
+    if (c.open && GT > c.refill) { if (c.treasure) { CHESTS.delete(c.y * W + c.x); tSet(c.x, c.y, c.under); P.cx.tchest = null; continue; } c.open = false; c.cont = null; chestTrapRoll(c); }
     if (!c.open && c.trap && !SF.count(P.pack, 'lockpick') && c.trapSeen) { log(`A locked and trapped chest (trap ${c.trap}). Remove Trap, then pick the lock.`, '#ffb070'); return true; }
     if (c.open) { openChest(c); return true; }
     if (!SF.count(P.pack, 'lockpick')) { log(`A locked chest (difficulty ${SF.CHEST_DIFF[c.tier]}). You need lockpicks.`, '#ffb070'); return true; }
@@ -2147,15 +2304,14 @@ function bagPanel() {
   return ['Backpack', h + (items.length ? '' : 'Your backpack is empty.') + '</div>'];
 }
 
-function itemSkill(k, u) {
-  const it = findU(P.pack, u); if (!it) return; closePanel();
+function itemSkill(k, u, worn) {
+  const it = findU(P.pack, u) || (worn ? Object.values(P.equip).find(x => x && x.uid === u) : null); if (!it) return; closePanel();
   if (k === 'picklock') return lockUse(it);
   if (k === 'untrap') return untrapUse(it);
   if (k === 'lockup') { it.locked = true; it.lockLvl = it.lockLvl || 20; P.pack.ver++; snd('door.unlock', { key: 'P', gain: .5 }); return log(`You lock the box (lock ${it.lockLvl}).`); }
   if (k === 'arm') { it.armed = true; it.power = it.power || 20; P.pack.ver++; return log(`You arm the box's trap (power ${it.power}).`); }
   if (ITEM_SKILL[k]) return ITEM_SKILL[k](it);
 }
-const ITEM_SKILL = {};   // phase D item-target skills (Arms Lore, Taste Identification, Camping, Cartography) register here
 function bagActions(it) {
   const d = SF.ITEMS[it.id]; let a = '';
   if (d.slot) a += btn('equip', 'Equip', { u: it.uid });
@@ -2170,6 +2326,10 @@ function bagActions(it) {
   if (it.id === 'lockbox') a += it.locked ? btn('skitem', 'Pick lock', { k: 'picklock', u: it.uid }) : btn('skitem', 'Lock', { k: 'lockup', u: it.uid });
   if (it.id === 'trapbox') a += it.armed ? btn('skitem', 'Remove trap', { k: 'untrap', u: it.uid }) : btn('skitem', 'Arm', { k: 'arm', u: it.uid });
   if (d.poisonLvl) a += btn('abil', 'Poison…', { id: 'poison' });
+  if (SF.weaponOf(it) || (d.slot && d.slot !== 'weapon' && d.cat !== 'jewelry')) a += btn('skitem', 'Arms Lore', { k: 'armslore', u: it.uid });
+  if (d.use === 'eat' || d.cat === 'potion') a += btn('skitem', 'Taste', { k: 'taste', u: it.uid });
+  if (it.id === 'tmap') a += btn('skitem', it.decoded ? 'Where?' : 'Decode', { k: 'decode', u: it.uid }) + (it.decoded && !it.dug ? btn('abil', 'Dig', { id: 'dig' }) : '');
+  if (it.id === 'kindling') a += btn('abil', 'Light', { id: 'camp' });
   if (d.trade) a += btn('drop', 'Drop', { u: it.uid });
   return a;
 }
@@ -2180,7 +2340,7 @@ let PICKT = null;   // a pending creature/item target for a skill (src: pickTarg
 const SKILL_ABIL = { anatomy: 'anatomy', hiding: 'hide', tracking: 'track', meditation: 'meditate', detectinghidden: 'detect', animaltaming: 'tame', veterinary: 'vet',
   peacemaking: 'peace', enticement: 'entice', provocation: 'provoke', stealing: 'steal', poisoning: 'poison', stealth: 'stealth', animallore: 'lore', evaluatingintelligence: 'evalint',
   itemidentification: 'itemid', armslore: 'armslore', musicianship: 'play', begging: 'beg', camping: 'camp', forensicevaluation: 'forensic', herding: 'herd', snooping: 'snoop',
-  spiritspeak: 'spirit', tasteidentification: 'taste', lockpicking: 'picklock', removetrap: 'untrap' };
+  spiritspeak: 'spirit', tasteidentification: 'taste', lockpicking: 'picklock', removetrap: 'untrap', cartography: 'draw', inscription: 'scribe' };
 const ABIL_LIST = [['bandother', 'Bandage other (Healing: an ally or a player ghost)'], ['anatomy', 'Anatomy'], ['evalint', 'Evaluating Intelligence'], ['hide', 'Hiding'], ['stealth', 'Stealth (while hidden, 80 Hiding)'],
   ['detect', 'Detecting Hidden'], ['track', 'Tracking'], ['meditate', 'Meditation'], ['tame', 'Animal Taming'], ['lore', 'Animal Lore'], ['vet', 'Veterinary'], ['feed', 'Feed a pet'], ['herd', 'Herding (crook)'],
   ['play', 'Musicianship'], ['peace', 'Peacemaking'], ['entice', 'Enticement'], ['provoke', 'Provocation'], ['snoop', 'Snooping'], ['steal', 'Stealing'], ['poison', 'Poisoning'], ['picklock', 'Lockpicking'],
@@ -2228,6 +2388,8 @@ const PANELS = {
   skills: () => skillsPanel(),
   spells: () => spellbookPanel(),
   abilities: () => ['Abilities', `<p class="note">Use now or put an action on a hotbar slot. Every skill with a use is here; the Skills page has the same Use buttons.</p>` + ABIL_LIST.filter(([id]) => ABIL[id] || ['hide', 'track', 'meditate'].includes(id)).map(([id, n]) => `<div class="row"><span class="nm">${n}${cdLeft(id) > 0 ? ` <span class="note">${Math.ceil(cdLeft(id))} s</span>` : ''}</span>${btn('abil', 'Use', { id })}${btn('assign', 'Slot', { k: 'act', id })}</div>`).join('')],
+  snoop: () => { const e = SNOOP; if (!e || e.gone || dist(e, P) > SF.SK.STEAL.range + .5) { SNOOP = null; return null; } const pack = npcPack(e);
+    return [`${cap1(e.name || (MON[e.type] || {}).n)}'s pack`, '<p class="note">You peek inside. Stealing an item takes a moment, and you may be noticed.</p>' + (pack.items.map(it => `<div class="row">${rowIcon(it)}<span class="nm">${esc(SF.itemName(it))}${it.qty > 1 ? ' ×' + it.qty : ''}</span><span class="v">${(SF.itemKg({ id: it.id, qty: 1 }) * SF.WU).toFixed(1)} wt</span>${SF.ITEMS[it.id].trade ? btn('stealit', 'Steal', { u: it.uid }) : ''}</div>`).join('') || '<p class="note">Empty.</p>')]; },
   track: () => { const n = sv('tracking'); let h = `<p class="note">Range about ${Math.round(SF.SK.trackRange(n))} m. Choose what to look for, then whose trail to follow.</p><div class="grid2">${Object.entries(SF.SK.TRACK_KINDS).map(([k, l]) => btn('trackk', l, { k }, TRACKUI && TRACKUI.kind === k ? 'ac' : '')).join('')}</div>`;
     if (TRACKUI) h += TRACKUI.list.filter(e => !e.gone).map((e, i) => `<div class="row"><span class="nm">${esc(cap1(e.name || (MON[e.type] || {}).n || 'someone'))}</span><span class="v">${Math.round(dist(e, P))} m</span>${btn('trackf', 'Follow', { i })}</div>`).join('');
     return ['Tracking', h]; },
@@ -2281,6 +2443,7 @@ const ACT = {
   abil: d => { useAbility(d.id); },
   trackk: d => trackStart(d.k), trackf: d => { const e = TRACKUI && TRACKUI.list[+d.i]; if (e) trackFollow(e); },
   poisonapply: d => poisonApply(+d.u, d.t),
+  stealit: d => { const e = SNOOP; if (!e) return; const it = npcPack(e).items.find(i => i.uid === +d.u); if (it) stealStart(e, it); },
   skitem: d => itemSkill(d.k, +d.u), petcmd: d => petCommand(d.c), appraise: d => { const it = findU(P.pack, d.u); if (!it) return; closePanel(); P.task = { kind: 'appraise', item: it, label: 'Appraising', t0: GT, t1: GT + SF.APPRAISE_TIME, still: true, x0: P.x, y0: P.y }; },
   repair: d => { const it = findU(P.pack, d.u) || Object.values(P.equip).find(e => e && e.uid === +d.u); if (!it) return; const k = SF.repairSkill(it.id); const st = nearestStation(k === 'blacksmithy' ? ['anvil', 'forge'] : ['bench']); if (!st) return log(k === 'blacksmithy' ? 'Repair metal at the smithy anvil.' : 'Repair this at a workbench.', '#ffb070'); if (!SF.count(P.pack, 'repairkit')) return log('You need a repair kit.', '#ffb070'); const rp = SF.repairPlan(it); if (!rp.ok) return log(cap1(rp.reason), '#ffb070'); P.task = { kind: 'repair', item: it, label: 'Repairing', t0: GT, t1: GT + SF.CRAFT_TIME, still: true, x0: P.x, y0: P.y }; }, self: () => { P.sel = P; if (P.held && SF.SPELL[P.held.sp.id].t === 'ally') releaseHeld(P); },
   desel: () => { P.sel = null; P.armed = false; }, ghostret: () => { if (GT - P.ghostAt >= 12) { const s = SHRINES.find(z => z.id === P.bound); resurrect({ x: s.x + .5, y: s.y + .5 }); } },
@@ -2329,6 +2492,7 @@ const isQuayNode = (x, y) => QUAY_NODE.has(y * W + x);
 const anvilHasForge = a => STATIONS.some(s => s.k === 'forge' && Math.hypot(s.x - a.x, s.y - a.y) <= 2.01);
 /* the station a recipe needs, in reach; null with a reason otherwise */
 function craftStation(r) {
+  if (r.station === 'any') { if (r.insc) { const sp = SF.MAGERY.SPELL[r.insc]; if (!SF.MAGERY.bookSpells(P.pack).has(r.insc)) return { st: null, why: 'That spell is not in your spellbook.', short: 'not in your book' }; if (P.mana < sp.mp) return { st: null, why: `You need ${sp.mp} mana to scribe it.`, short: sp.mp + ' mana' }; } return { st: { k: 'any', x: Math.floor(P.x), y: Math.floor(P.y) } }; }
   if (r.station === 'anvil') { const a = nearestStation(['anvil']); if (!a) return { st: null, why: 'Move next to an anvil.' }; if (!anvilHasForge(a)) return { st: null, why: 'This anvil needs a forge burning within 2 m.' }; return { st: a }; }
   const s = nearestStation([r.station]); return s ? { st: s } : { st: null, why: 'Move next to the ' + ({ forge: 'forge', bench: 'workbench', still: 'alchemy still', fire: 'cooking fire' }[r.station] || r.station) + '.' };
 }
@@ -2519,12 +2683,13 @@ function guildJournal() {
 
 /* ---------- crafting: category → recipe → detail with the full preview (§4.1, §10 compact mobile) ---------- */
 let CUI = null;
-const FAMILY = { forge: ['forge', 'anvil'], anvil: ['forge', 'anvil'], bench: ['bench'], still: ['still'], fire: ['fire'] };
+const FAMILY = { forge: ['forge', 'anvil'], anvil: ['forge', 'anvil'], bench: ['bench'], still: ['still'], fire: ['fire'], map: ['any'], scribe: ['any'] };
+const FAMILY_SKILL = { map: 'cartography', scribe: 'inscription' };
 const STATION_N = { forge: 'Public forge and anvil', anvil: 'Public forge and anvil', bench: 'Workbench', still: 'Alchemy still', fire: 'Cooking fire' };
 const recipeCat = r => r.cat || SF.SKILL[r.skill].n;
 const recipeName = r => r.name || SF.ITEMS[r.out].n;
 function openCraft(k) { CUI = { st: k, cat: null, rid: null, mat: null, n: 10, x0: P.x, y0: P.y }; openPanel('craft'); }
-function craftList() { return SF.RECIPES.filter(r => FAMILY[CUI.st].includes(r.station)); }
+function craftList() { return SF.RECIPES.filter(r => FAMILY[CUI.st].includes(r.station) && (!FAMILY_SKILL[CUI.st] || r.skill === FAMILY_SKILL[CUI.st])); }
 function toolState(r, stn) {
   if (!r.tool) return { ok: true, t: '' };
   const it = findTool(r.tool); if (it) return { ok: true, it, t: `${SF.ITEMS[r.tool].n} · ${SF.toolUses(it)} uses left` };
@@ -2592,12 +2757,13 @@ function finishCraft(t) {
   const r = SF.RECIPE[t.r], stn = craftStation(r), tool = toolState(r, stn.st);
   if (!stn.st) { P.batch = null; return log(stn.why, '#ffb070'); }
   if (!tool.ok) { P.batch = null; return log(tool.t + '.', '#ffb070'); }
+  if (r.insc) { const sp = SF.MAGERY.SPELL[r.insc]; if (P.mana < sp.mp) { P.batch = null; return log(`You need ${sp.mp} mana to scribe ${sp.n}.`, '#ffb070'); } P.mana -= sp.mp; }   // Inscription spends the spell's mana on every attempt
   const p = SF.craftPlan(P, P.pack, r, t.mat, t.sec), res = SF.craftAttempt(P, P.pack, p, R, cap(), { mark: !!P.cx.mark });
   if (!res.ok) { P.batch = null; log('Stopped: ' + res.reason + '.', '#ffb070'); renderPanel(); return; }
   craftSound(r, res.success);
   skillUse(r.skill, p.chance, res.success, null, SF.SK.CRAFT_WINDOW(p.diff));   // every attempt teaches while the recipe is still a challenge
   if (tool.it && spendTool(tool.it)) log('Your ' + SF.ITEMS[r.tool].n.toLowerCase() + ' wear out and break.', '#ff6a5a');
-  if (res.success) { const it = res.items[0]; b.made++; if (it.id === 'lockbox') Object.assign(it, { lockLvl: Math.max(10, Math.round(sv('tinkering'))), locked: true }); if (it.id === 'trapbox') Object.assign(it, { power: Math.max(10, Math.round(sv('tinkering'))), armed: true });   // a tinker's box is as hard as its maker was skilled
+  if (res.success) { const it = res.items[0]; b.made++; if (it.id === 'lockbox') Object.assign(it, { lockLvl: Math.max(1, Math.round(sv('tinkering'))), locked: true }); if (it.id === 'trapbox') Object.assign(it, { power: Math.max(1, Math.round(sv('tinkering'))), armed: true });   // a tinker's box is as hard as its maker was skilled
     log(`You make ${it.qty > 1 ? it.qty + ' × ' : ''}${SF.itemName(it).toLowerCase()}${res.exceptional ? ' — exceptional work!' : ''}.`, res.exceptional ? '#ffe08a' : '#e8e2d2');
     questEvent({ type: recipeCat(r) === 'Smelt' ? 'smelt' : 'make', rid: r.id, out: r.out, mat: SF.matOf(it), qty: it.qty, exceptional: res.exceptional });
     simEmit('ItemCrafted', { actor: aidOf(P), recipe: r.id, item: it.id, qty: it.qty, uid: it.uid, exceptional: !!res.exceptional }); }
@@ -2764,7 +2930,7 @@ let deletingSave = false;
 const SAVEKEY = 'shardfall.save.v1';
 function save() {
   if (!P || deletingSave) return false; try {
-    const c = {}; for (const k of ['name', 'x', 'y', 'str', 'dex', 'int', 'hp', 'stam', 'mana', 'skills', 'pack', 'bank', 'equip', 'look', 'bound', 'quest', 'freeLessons', 'hotbar', 'ghost', 'ghostAt', 'gainLog', 'recipeN', 'cx', 'skillPool', 'combatMig', 't2aMig', 'eqMig', 'bandSeq', 'bandDone', 'lowerRank']) c[k] = P[k];
+    const c = {}; for (const k of ['name', 'x', 'y', 'str', 'dex', 'int', 'hp', 'stam', 'mana', 'skills', 'pack', 'bank', 'equip', 'look', 'bound', 'quest', 'freeLessons', 'hotbar', 'ghost', 'ghostAt', 'gainLog', 'recipeN', 'cx', 'skillPool', 'combatMig', 't2aMig', 'camp', 'eqMig', 'bandSeq', 'bandDone', 'lowerRank']) c[k] = P[k];
     c.bandage = bandageSave();
     if (P.base) Object.assign(c, P.base); c.magery = { mig: (P.mg && P.mg.mig) || 0 };
     const corpses = ents.filter(e => e.mine && !e.gone).map(e => ({ x: e.x, y: e.y, items: e.cont.items, left: e.expires - GT, diedAgo: GT - e.cont.diedAt }));
@@ -2822,6 +2988,7 @@ function boot(saved, fresh) {
     if (P.ghost && !Number.isFinite(c.ghostAt)) P.ghostAt = GT - 12; }
   else { P = newChar(fresh); starterKit(); }
   P.cx = Object.assign({ survey: {}, pins: [], track: null, mark: false, doors: {} }, P.cx || {}); P.batch = null; applyDoorState();
+  { const t = P.cx.tchest; if (t && !t.opened) { tSet(t.x, t.y, T.CH); CHESTS.set(t.y * W + t.x, { x: t.x, y: t.y, tier: t.tier, open: false, refill: 0, treasure: t.lvl, under: t.under, trap: 0, trapSeen: false }); } }   // a dug-up treasure chest waits through a reload
   if (saved && !canStand(P, P.x, P.y)) { find: for (let r = 1; r <= 12; r++) for (let a = 0; a < 16; a++) { const x = P.x + Math.cos(a / 8 * Math.PI) * r, y = P.y + Math.sin(a / 8 * Math.PI) * r; if (canStand(P, x, y)) { P.x = x; P.y = y; break find; } } }   // never load into a wall or a tree
   WS = SIM.create({ clock: () => GT, saved: saved && saved.sim, onError: e => console.error(e) }); simAdopt(P);   // actor ids continue from the save
   if (saved && !(saved.sim && saved.sim.clock)) WS.clock.setHour(GT, (GT / 60 + 9) % 24);   // older saves keep the hour they were at; from now on a day lasts 120 minutes
@@ -2837,6 +3004,7 @@ function boot(saved, fresh) {
   if (P.ghost) log('You are a ghost. Follow the golden arrow to a shrine or healer.', '#ff6a5a');
   if (saved && saved.t2aReform && saved.t2aReform.changed) { log('Your skills now follow the Second Age: 49 classic skills under their own names. Every trained point moved with them.', '#ffe08a'); if (saved.t2aReform.displaced) log(`Skinning and Foraging are activities now, not skills: their ${f1(saved.t2aReform.displaced)} points wait on your Skills page to be placed.`, '#ffe08a'); }
   if (saved && saved.combatReform && saved.combatReform.changed) { log('The combat skills now follow the Second Age: Swordsmanship, Mace Fighting, Fencing, Archery, Wrestling, Parrying and Healing. Your trained points moved with them.', '#ffe08a'); if (P.skillPool > 0) log(`${f1(P.skillPool)} points from merged skills wait on your Skills page.`, '#ffe08a'); }
+  if (saved && P.camp) log('You wake at your camp, rested.', '#9fd0ff');
   if (!saved) log('Wren, a quay sellsword, nurses a wound by the plaza. Tap her to bandage her or ask her to follow you.', '#b6a68a');
   if (VH > VW) $('#rot').hidden = false; save(); refreshHud();
 }
@@ -2850,4 +3018,4 @@ function spawnMon(type, dx = 3, dy = 0) { const d = MON[type]; if (!d) return nu
   return addEnt({ kind: 'mon', type, name: d.n, x, y, hp: d.hp, max: d.hp, state: 'idle', home: { x, y }, sect: 0, ward: 0 }); }
 window.__SF = { get WS() { return WS; }, dist, closePanel, lifeSave, LIFE, LIFE_SCHED, lifeTick, lifeResume, lifeInspect, lifeTownGeo, lifeTalk, talk, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
 Object.defineProperties(window.__SF, { PICKT: { get: () => PICKT }, TRACKS: { get: () => TRACKS }, TRACKUI: { get: () => TRACKUI } });   // live views (Object.assign would copy a getter's value)
-Object.assign(window.__SF, { skillCheck, skillUse, noteLearn, SKUI, SKLOG, useAbility, ABIL, TASKS, pickTap, tameStart, loreUse, vetStart, feedPet, peaceUse, enticeUse, provokeStart, provokeUse, stealStart, npcPack, poisonApply, lockUse, untrapUse, stealthUse, hide, finishHide, reveal, trackStart, trackFollow, magicStrike, petLoyaltyTick, petCommand, evalUse, meditate, playMusic, tamedPets, chestTrapRoll, itemSkill, eat, CHESTS, cdLeft, onPlayerMoved });
+Object.assign(window.__SF, { skillCheck, skillUse, noteLearn, SKUI, SKLOG, useAbility, ABIL, TASKS, pickTap, tameStart, loreUse, vetStart, feedPet, peaceUse, enticeUse, provokeStart, provokeUse, stealStart, npcPack, poisonApply, lockUse, untrapUse, stealthUse, hide, finishHide, reveal, trackStart, trackFollow, magicStrike, petLoyaltyTick, petCommand, evalUse, meditate, playMusic, tamedPets, chestTrapRoll, itemSkill, eat, CHESTS, cdLeft, onPlayerMoved, begUse, campUse, lightKindling, makeCamp, forensicUse, herdPick, herdUse, snoopUse, spiritUse, digUse, treasureUp, newTreasureMap, magicLoot, CAMPS, ITEM_SKILL, ghostSpeech, killMon, MG: SF.MAGERY });

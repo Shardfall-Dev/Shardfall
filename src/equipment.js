@@ -244,7 +244,7 @@ EQ.broken = broken;
 /* AR of a region this piece covers, before wear */
 EQ.baseRegionAR = it => { const d = SF.ITEMS[it.id]; if (!d || !d.fam || d.cat === 'shield' || d.cat === 'jewelry') return 0; const a = d.ar !== undefined ? d.ar : EQ.FAMILIES[d.fam].ar; return a * EQ.mat(d.fixedMat || SF.matOf(it)).prot * EQ.qual(it).prot; };
 /* after wear: broken gives nothing; under 20 % condition the badly-worn −15 % (SF.condFactor) */
-EQ.regionAR = it => broken(it) ? 0 : EQ.baseRegionAR(it) * SF.condFactor(it.cond, it.maxc);
+EQ.regionAR = it => broken(it) ? 0 : EQ.baseRegionAR(it) * SF.condFactor(it.cond, it.maxc) + (it.magic && it.magic.k === 'def' ? it.magic.l : 0);   // + a magic piece's defense level
 /* the piece's share of the suit: what the tooltip calls its protection (region AR × body coverage) */
 EQ.protection = it => { const d = SF.ITEMS[it.id]; return d && d.slot ? EQ.regionAR(it) * EQ.coverage(d.slot) : 0; };
 EQ.baseProtection = it => { const d = SF.ITEMS[it.id]; return d && d.slot ? EQ.baseRegionAR(it) * EQ.coverage(d.slot) : 0; };

@@ -212,10 +212,11 @@ SK.manaRegen = (int, med, interference, active) => {
 };
 SK.medWindow = manaPct => { const d = 100 - manaPct; return [d - 10, d + 20]; };
 /* Hiding and Stealth (UOSA Stealth): hiding is a check across 0–100; walking while hidden reveals you unless you use Stealth, which
-   needs 80 real Hiding and grants one step per 10 points of Stealth. Armor makes Stealth harder (the "optimal AR" table: cloth
-   teaches to about 85, 14–16 AR to 100); above 18 AR you cannot move hidden at all. */
+   needs 80 real Hiding and grants one step per 10 points of Stealth. Armor makes Stealth harder: the check runs from −20 + 2×AR to
+   80 + 2×AR (RunUO pre-AoS; matches the UOSA advice to add armor as the skill rises, 10+ AR to reach 100); above 18 AR (UOSA)
+   you cannot move hidden at all. */
 SK.STEALTH = { maxAR: 18, needHiding: 80, stepLen: .8 };
-SK.stealthWindow = ar => { const top = 85 + Math.max(0, ar || 0); return [top - 50, top]; };
+SK.stealthWindow = ar => { const a = Math.max(0, ar || 0); return [-20 + 2 * a, 80 + 2 * a]; };
 SK.stealthSteps = s => Math.max(1, Math.floor(s / 10));
 /* Detecting Hidden: range skill/10 tiles (at least 1); each hidden thing in range is an opposed roll, each side ±10 */
 SK.detectRadius = s => 1 + s / 10;
@@ -325,6 +326,101 @@ RX({ id: 'crook', name: 'Shepherd\'s crook', out: 'crook', qty: 1, skill: 'carpe
 // the shortbow becomes a wood-primary recipe like the crossbows, so rarer woods make harder, better bows
 { const sb = SF.RECIPES.find(r => r.id === 'shortbow'); Object.assign(sb, { name: 'Bow', prim: 'wood', defMat: 'pine', lines: [{ form: 'log', qty: 4 }, { item: 'sinew', qty: 1 }] }); delete sb.inputs; }
 SF.reindexRecipes();
+
+/* ================= Phase D: the ten skills the Second Age had and Shardfall lacked ================= */
+/* Arms Lore: condition, quality and how hard a weapon hits or how well armor protects; exact figures from about 76 */
+SK.CONDITION_WORDS = ['is in danger of falling apart', 'is badly damaged', 'is fairly worn', 'has some wear', 'is in good shape', 'is in full repair'];
+SK.conditionWord = (cond, max) => SK.CONDITION_WORDS[Math.min(5, Math.floor(clamp(0, 1, (cond === undefined ? 1 : cond / (max || 100))) * 5.999))];
+SK.DMG_WORDS = ['does almost no damage', 'does very little damage', 'does little damage', 'does fair damage', 'does considerable damage', 'is a very dangerous weapon', 'is an extremely deadly weapon'];
+SK.AR_WORDS = ['offers no defense', 'offers little defense', 'offers fair defense', 'offers good defense', 'offers great defense', 'offers superb defense', 'offers excellent defense'];
+SK.dmgWord = avg => SK.DMG_WORDS[Math.min(6, Math.floor(avg / 6))];
+SK.arWord = ar => SK.AR_WORDS[Math.min(6, Math.floor(ar / 6))];
+/* Begging: once in a while per person; skill decides the coins (from what they actually carry) */
+SK.BEG = { range: 2.5, perPerson: 600, delay: 10 };
+SK.begAmount = (s, purse, rng) => Math.min(purse, 1 + Math.floor(s / 10) + Math.floor(rng() * 3));
+/* Camping: kindling lights a campfire (a cooking fire for two minutes); after 30 s beside it the camp is secure, and a bedroll
+   lets you make camp: the game saves there and you wake there. No travel. */
+SK.CAMP = { life: 120, secureAfter: 30, range: 4, kindlingRange: 2 };
+/* Cartography: four map grades from blank maps; treasure maps of five levels to decode (RunUO pre-AoS minimums −3 / 41 / 51 / 61 / 70,
+   each teaching 60 points past its minimum); digging is a Mining check by level; the chest is locked and trapped. */
+SK.TMAP_MIN = [null, -3, 41, 51, 61, 70];
+SK.tmapWindow = lvl => [SK.TMAP_MIN[lvl], SK.TMAP_MIN[lvl] + 60];
+SK.digWindow = lvl => { const m = (lvl - 1) * 15; return [m, m + 50]; };
+SK.TMAP_GUARDS = [null, ['skeleton'], ['skeleton', 'skeleton'], ['orc', 'skeleton', 'skeleton'], ['troll', 'orc', 'skeleton'], ['earth_elemental', 'troll', 'skeleton']];
+SK.TMAP_GOLD = [null, [150, 300], [300, 600], [500, 900], [800, 1400], [1200, 2000]];
+/* Forensic Evaluation: the body's killer from 50, the time always; a forced lock names who picked it */
+/* Herding: an animal, then a destination; the creature's difficulty sets the window */
+SK.HERD = { range: 8, dest: 12, walk: 25 };
+SK.herdWindow = d => [d - 25, d + 25];
+/* Inscription: a spell in your book, a blank scroll, its reagents and its mana; the circle sets the difficulty */
+SK.inscDiff = circle => circle * 12.5 - 5;
+SK.inscMin = circle => Math.max(0, (circle - 2) * 12.5);
+/* Spirit Speak: for a minute and more you understand the dead */
+SK.spiritFor = s => 60 + s;
+/* magic loot (Item Identification reveals it; it works either way). Weapons: damage +1/+3/+5/+7/+9 (ruin … vanquishing) or accuracy
+   +5 … +25 skill; armor: +1 … +5 AR on the piece (Shardfall scale for region armor). Unidentified until identified. */
+SK.MAGIC_DMG = [0, 1, 3, 5, 7, 9];
+SK.rollMagic = (id, lvlMax, rng) => {
+  const d = SF.ITEMS[id]; if (!d) return null; const l = 1 + Math.floor(rng() * Math.max(1, lvlMax));
+  if (d.wpn) return { k: rng() < .6 ? 'dmg' : 'acc', l: Math.min(5, l) };
+  if (d.slot && d.slot !== 'weapon' && d.cat !== 'jewelry') return { k: 'def', l: Math.min(5, l) };
+  return null;
+};
+SK.magicDmg = it => it && it.magic && it.magic.k === 'dmg' ? SK.MAGIC_DMG[it.magic.l] || 0 : 0;
+SK.magicAcc = it => it && it.magic && it.magic.k === 'acc' ? it.magic.l * 5 : 0;
+SK.magicDef = it => it && it.magic && it.magic.k === 'def' ? it.magic.l : 0;
+/* inscription recipes: one per Magery spell, built once the spellbook data is loaded (src/magery.js) */
+SK.addInscription = () => {
+  const MG = SF.MAGERY; if (!MG || SF.RECIPE.insc_magery_01 || SF.RECIPES.some(r => r.insc)) return;
+  for (const sp of MG.SPELLS) { if (sp.legacy || !sp.circle) continue; const inputs = { blankscroll: 1 }; for (const r of sp.regs || []) inputs[r] = (inputs[r] || 0) + 1;
+    SF.RECIPES.push({ id: 'insc_' + sp.id.replace('.', '_'), name: 'Scroll: ' + sp.n, out: sp.scroll, qty: 1, skill: 'inscription', min: SK.inscMin(sp.circle), diff: SK.inscDiff(sp.circle), station: 'any', tool: 'scribepen', cat: 'Circle ' + sp.circle, insc: sp.id, inputs }); }
+  SF.reindexRecipes();
+};
+/* cartography recipes */
+SF.RECIPES.push(
+  { id: 'map_local', name: 'Local map', out: 'map_local', qty: 1, skill: 'cartography', min: 0, diff: 20, station: 'any', tool: 'mappen', cat: 'Maps', inputs: { blankmap: 1 } },
+  { id: 'map_city', name: 'City map', out: 'map_city', qty: 1, skill: 'cartography', min: 20, diff: 45, station: 'any', tool: 'mappen', cat: 'Maps', inputs: { blankmap: 1 } },
+  { id: 'map_sea', name: 'Sea chart', out: 'map_sea', qty: 1, skill: 'cartography', min: 35, diff: 60, station: 'any', tool: 'mappen', cat: 'Maps', inputs: { blankmap: 1 } },
+  { id: 'map_world', name: 'World map', out: 'map_world', qty: 1, skill: 'cartography', min: 50, diff: 75, station: 'any', tool: 'mappen', cat: 'Maps', inputs: { blankmap: 2 } });
+SF.ITEMS.tmap = { id: 'tmap', n: 'Tattered treasure map', kg: .05, cat: 'scroll', trade: true }; SF.PRICES.tmap = 30;
+SF.reindexRecipes();
+
+/* ================= every skill's road from 0 to 100.0 in this build (checked by tests/skills-mech.test.js) =================
+   Each entry lists difficulty windows the game really offers (from its recipes, creatures and objects). A road exists when, from
+   the trainer's 30.0 (or 0), some window still teaches at every value up to 99.9. CREATURE_DIFF mirrors MON[*].diff in src/game.js
+   (a browser test checks they agree). */
+SK.CREATURE_DIFF = { rat: 15, hare: 15, boar: 40, hound: 60, deer: 30, wreckcrab: 30, snapper: 50, spider: 55, smuggler: 55, wisp: 60, skeleton: 55, sentinel: 75, captain: 85, bellkeeper: 95, slime: 30, dire_wolf: 65, giant_spider: 65, orc: 60, lizardman: 60, harpy: 60, gargoyle: 72, troll: 78, ettin: 80, earth_elemental: 82, bear: 68, lich_lord: 95 };
+SK.routes = () => {
+  const R = {}, add = (k, w, why) => (R[k] = R[k] || []).push([w[0], w[1], why]);
+  const open = (k, why, top) => add(k, [0, top || 100], why);
+  const diffs = Object.entries(SK.CREATURE_DIFF);
+  // combat: hit chance (atk + 50) / (2 (def + 50)) stays under 1 against defenders of 50+ at any skill up to 100
+  for (const k of ['swordsmanship', 'macefighting', 'fencing', 'archery', 'wrestling']) add(k, [0, 150], 'swings at a creature of defence 50 or more');
+  open('tactics', 'every hit'); open('anatomy', 'every hit, and studying a target'); add('parrying', [0, 1000], 'blocking with a shield (chance never reaches 100%)');
+  add('healing', [0, 120], 'every treatment'); open('itemidentification', 'identifying an item'); open('armslore', 'judging a weapon or armor');
+  open('hiding', 'hiding'); for (const ar of [0, 6, 12, 16]) add('stealth', SK.stealthWindow(ar), 'stealth at ' + ar + ' AR'); open('detectinghidden', 'searching'); open('tracking', 'tracking');
+  open('begging', 'begging townsfolk'); open('camping', 'lighting kindling'); open('forensicevaluation', 'examining bodies and forced locks'); open('snooping', 'snooping packs');
+  open('spiritspeak', 'listening to the dead'); open('tasteidentification', 'tasting food and potions'); open('evaluatingintelligence', 'judging minds and casting damage spells');
+  add('animallore', [0, 110], 'studying creatures'); add('veterinary', [0, 120], 'treating pets'); add('musicianship', SK.BARD.musicWin, 'every song');
+  for (const [t, m] of Object.entries(SK.TAME_MIN)) add('animaltaming', SK.tameWindow(m), 'taming a ' + t);
+  for (const [t, d] of diffs) { for (const k of ['peacemaking', 'enticement', 'provocation']) add(k, SK.bardWindow(d), 'a ' + t); add('herding', SK.herdWindow(SK.TAME_MIN[t] !== undefined ? SK.TAME_MIN[t] : d), 'herding a ' + t); }
+  add('peacemaking', [0, 100], 'calming an empty field');
+  for (let s = 0; s <= 100; s += 10) add('meditation', SK.medWindow(100 - s), `meditating at ${100 - s}% mana`);
+  for (let st = 1; st <= 10; st++) add('stealing', SK.stealWindow(st), `a ${st}-stone item`);
+  for (const l of [1, 2, 3, 4]) add('poisoning', SK.POISON_WIN[l], 'poison strength ' + l);
+  for (let d = 10; d <= 100; d += 5) add('lockpicking', SK.lockWindow(d), 'a lock of ' + d);
+  for (let p = 0; p <= 100; p += 5) add('removetrap', SK.trapWindow(p), 'a trap of power ' + p);
+  for (let c = 1; c <= 8; c++) add('magery', SK.magCircleWindow(c), 'circle ' + c);
+  for (let c = 1; c <= 8; c++) add('resistingspells', [0, Math.min(120, SK.resistMaxFor(c))], 'spells of circle ' + c);
+  for (let l = 1; l <= 5; l++) add('cartography', SK.tmapWindow(l), 'treasure map level ' + l);
+  add('fishing', SK.HARVEST.common, 'fish'); add('mining', SK.HARVEST.common, 'iron ore'); add('lumberjacking', SK.HARVEST.common, 'pine');
+  for (const r of SF.RECIPES) if (r.diff !== undefined || r.min !== undefined) { const d = r.diff !== undefined ? r.diff : Math.min(100, (r.min || 0) + 15); add(r.skill, SK.CRAFT_WINDOW(d), 'craft ' + (r.name || r.id)); if (r.prim === 'metal' || r.prim === 'wood') add(r.skill, SK.CRAFT_WINDOW(100), 'craft ' + (r.name || r.id) + ' in the rarest material'); }
+  for (const k of ['mining', 'lumberjacking']) for (const g of [65, 80, 95, 100]) add(k, SK.HARVEST.rare(g), 'rare material ' + g);
+  return R;
+};
+SK.roadTo100 = (k, from) => {   // returns the first value (in tenths) with no teaching window, or null when 0/30 → 100.0 is open
+  const W = (SK.routes()[k] || []); for (let v = from === undefined ? 0 : from; v < SF.SKILL_MAX; v++) { const x = v / 10; if (!W.some(([a, b]) => x >= a && x < b)) return v; } return null;
+};
 
 if (typeof module !== 'undefined' && module.exports) module.exports = SK;
 SF.SK = SK;

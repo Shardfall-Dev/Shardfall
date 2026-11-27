@@ -36,39 +36,39 @@ SF.SKILL_DEFS = [
   ['anatomy', 'Anatomy', 'misc', 1, 'creature', 1, [], [.15, .15, .7], [0, 0, 1], 'live', 'Adds up to 20% weapon damage and improves bandage healing. Use it on a living target to judge its strength and dexterity.'],
   ['animallore', 'Animal Lore', 'wild', 1, 'creature', 1, [], [0, 0, 1], [0, 0, 1], 'live', 'Study a creature: its health, strength, diet and, for pets, how content it is. Helps you control difficult pets and treat them.'],
   ['itemidentification', 'Item Identification', 'misc', 1, 'item', 1, [], [0, 0, 1], [0, 0, 1], 'live', 'Reveal an item\'s hidden properties, maker, condition and fair price.'],
-  ['armslore', 'Arms Lore', 'misc', 1, 'item', 1, [], [.75, .15, .1], [0, .5, .5], 'pending', 'Judge a weapon or piece of armor: condition, quality, how hard it hits or how well it protects.'],
+  ['armslore', 'Arms Lore', 'misc', 1, 'item', 1, [], [.75, .15, .1], [0, .5, .5], 'live', 'Judge a weapon or piece of armor: condition, quality, how hard it hits or how well it protects.'],
   ['parrying', 'Parrying', 'combat', 0, 'none', 0, [], [.75, .25, 0], [0, 1, 0], 'live', 'With a shield: half your Parrying as a percent chance to block part of a physical hit.'],
-  ['begging', 'Begging', 'misc', 1, 'npc', 10, [], [0, 0, 0], [0, 0, 1], 'pending', 'Plead with townsfolk for a few coins. Each person gives at most once in a while.'],
+  ['begging', 'Begging', 'misc', 1, 'npc', 10, [], [0, 0, 0], [0, 0, 1], 'live', 'Plead with townsfolk for a few coins. Each person gives at most once in a while.'],
   ['blacksmithy', 'Blacksmithy', 'trade', 0, 'craft', 0, [], [1, 0, 0], [.5, .5, 0], 'live', 'Forge weapons, armor and fittings at an anvil, and repair metal gear.'],
   ['bowcraft', 'Bowcraft & Fletching', 'trade', 0, 'craft', 0, [], [.6, 1.6, 0], [0, 1, 0], 'live', 'Make bows, crossbows, arrows and bolts at a bench.'],
   ['peacemaking', 'Peacemaking', 'bard', 1, 'self', 10, ['musicianship'], [0, 0, 0], [0, .5, .5], 'live', 'Play to calm every creature around you; fighting stops for a few moments. Needs an instrument and a Musicianship check.'],
-  ['camping', 'Camping', 'wild', 1, 'item', 2, [], [2, 1.5, 1.5], [0, .5, .5], 'pending', 'Light kindling into a campfire. After a while the camp is secure: make camp with a bedroll to rest and save safely.'],
+  ['camping', 'Camping', 'wild', 1, 'item', 2, [], [2, 1.5, 1.5], [0, .5, .5], 'live', 'Light kindling into a campfire. After a while the camp is secure: make camp with a bedroll to rest and save safely.'],
   ['carpentry', 'Carpentry', 'trade', 0, 'craft', 0, [], [2, .5, 0], [.5, .5, 0], 'live', 'Work wood into shields, furniture and kits at a bench, and repair wooden gear.'],
-  ['cartography', 'Cartography', 'misc', 1, 'craft', 0, [], [0, .75, .75], [0, .5, .5], 'pending', 'Draw maps with a mapmaker\'s pen, and decode treasure maps.'],
+  ['cartography', 'Cartography', 'misc', 1, 'craft', 0, [], [0, .75, .75], [0, .5, .5], 'live', 'Draw maps with a mapmaker\'s pen, and decode treasure maps.'],
   ['cooking', 'Cooking', 'trade', 0, 'craft', 0, [], [0, 2, 3], [0, .5, .5], 'live', 'Cook meat, fish and meals over a fire.'],
   ['detectinghidden', 'Detecting Hidden', 'thief', 1, 'self', 10, [], [0, .4, .6], [0, 0, 1], 'live', 'Search the area around you for hidden creatures and traps. Range grows with skill.'],
   ['enticement', 'Enticement', 'bard', 1, 'creature', 10, ['musicianship'], [0, .25, .25], [0, .5, .5], 'live', 'Lure a creature to you with music: it leaves what it was doing and comes to listen.'],
   ['evaluatingintelligence', 'Evaluating Intelligence', 'magic', 1, 'creature', 1, [], [0, 0, 1], [0, 0, 1], 'live', 'Raises the damage of your spells. Use it on a creature to judge its intelligence and mana.'],
   ['healing', 'Healing', 'misc', 0, 'none', 0, ['anatomy'], [.6, .6, .8], [0, .5, .5], 'live', 'First Aid with bandages: heal wounds; cure poison at 60 Healing and 60 Anatomy; resurrect another player at 80 and 80.'],
   ['fishing', 'Fishing', 'wild', 0, 'ground', 0, [], [.5, .5, 0], [0, .5, .5], 'live', 'Fish open water with a rod. Skilled anglers sometimes pull up more than fish.'],
-  ['forensicevaluation', 'Forensic Evaluation', 'misc', 1, 'corpse', 1, [], [0, .2, .8], [0, 0, 1], 'pending', 'Examine a body or a forced lock: who did it and how long ago.'],
-  ['herding', 'Herding', 'wild', 1, 'creature', 1, [], [1, 1, .1], [0, .5, .5], 'pending', 'With a shepherd\'s crook, direct an animal to walk to a spot you choose.'],
+  ['forensicevaluation', 'Forensic Evaluation', 'misc', 1, 'corpse', 1, [], [0, .2, .8], [0, 0, 1], 'live', 'Examine a body or a forced lock: who did it and how long ago.'],
+  ['herding', 'Herding', 'wild', 1, 'creature', 1, [], [1, 1, .1], [0, .5, .5], 'live', 'With a shepherd\'s crook, direct an animal to walk to a spot you choose.'],
   ['hiding', 'Hiding', 'thief', 1, 'self', 10, [], [0, .8, .2], [0, 1, 0], 'live', 'Slip out of sight. Walking reveals you unless you also have Stealth; acting or being found reveals you.'],
   ['provocation', 'Provocation', 'bard', 1, 'creature2', 10, ['musicianship'], [0, .45, .05], [0, .5, .5], 'live', 'Play to set one creature against another: choose the first, then the second. Failure turns them on you.'],
-  ['inscription', 'Inscription', 'magic', 0, 'craft', 0, ['magery'], [0, .2, .8], [0, 0, 1], 'pending', 'Write spell scrolls from your spellbook onto blank scrolls with the spell\'s reagents and mana.'],
+  ['inscription', 'Inscription', 'magic', 0, 'craft', 0, ['magery'], [0, .2, .8], [0, 0, 1], 'live', 'Write spell scrolls from your spellbook onto blank scrolls with the spell\'s reagents and mana.'],
   ['lockpicking', 'Lockpicking', 'thief', 1, 'item', 2, [], [0, 2, 0], [0, 1, 0], 'live', 'Pick locked chests and boxes with lockpicks.'],
   ['magery', 'Magery', 'magic', 0, 'none', 0, [], [0, 0, 1.5], [0, 0, 1], 'live', 'Cast the eight circles of spells from your spellbook. Higher circles need more skill.'],
   ['resistingspells', 'Resisting Spells', 'magic', 0, 'none', 0, [], [.25, .25, .5], [0, 0, 0], 'live', 'A chance to halve the damage of hostile spells. It rises when resistible magic strikes you.'],
   ['tactics', 'Tactics', 'combat', 0, 'none', 0, [], [2, 0, 0], [0, 0, 0], 'live', 'Weapon damage: 50% of the rolled damage at 0, 150% at 100. Does not change hit chance.'],
-  ['snooping', 'Snooping', 'thief', 1, 'creature', 1, [], [0, 2.5, 0], [0, 1, 0], 'pending', 'Peek into someone\'s pack without being noticed. Needed to see what you might steal.'],
+  ['snooping', 'Snooping', 'thief', 1, 'creature', 1, [], [0, 2.5, 0], [0, 1, 0], 'live', 'Peek into someone\'s pack without being noticed. Needed to see what you might steal.'],
   ['musicianship', 'Musicianship', 'bard', 1, 'self', 5, [], [0, .8, .2], [0, 1, 0], 'live', 'Play an instrument well. Every bardic skill checks it first.'],
   ['poisoning', 'Poisoning', 'thief', 1, 'item', 2, [], [0, .4, 1.6], [0, 0, 1], 'live', 'Apply a poison potion to a bladed or piercing weapon, or to food.'],
   ['archery', 'Archery', 'combat', 0, 'none', 0, [], [.25, .75, 0], [0, 1, 0], 'live', 'Hit chance with bows (arrows) and crossbows (bolts). Stand still to aim; the shot lands a second later.'],
-  ['spiritspeak', 'Spirit Speak', 'magic', 1, 'self', 10, [], [0, 0, 1], [0, 0, 1], 'pending', 'Open your ears to the dead for a while: ghosts and restless spirits speak plainly to you.'],
+  ['spiritspeak', 'Spirit Speak', 'magic', 1, 'self', 10, [], [0, 0, 1], [0, 0, 1], 'live', 'Open your ears to the dead for a while: ghosts and restless spirits speak plainly to you.'],
   ['stealing', 'Stealing', 'thief', 1, 'item', 10, [], [0, 1, 0], [0, 1, 0], 'live', 'Take an item from someone\'s pack. Heavier items are harder; being caught has consequences.'],
   ['tailoring', 'Tailoring', 'trade', 0, 'craft', 0, [], [.38, 1.63, .5], [0, 1, 0], 'live', 'Sew cloth and leather into clothing and armor, and make bandages.'],
   ['animaltaming', 'Animal Taming', 'wild', 1, 'creature', 10, [], [1.4, .2, .4], [0, 0, 1], 'live', 'Tame a wild creature. Each kind needs a minimum skill; stronger creatures need an experienced master to obey.'],
-  ['tasteidentification', 'Taste Identification', 'misc', 1, 'item', 1, [], [.2, 0, .8], [0, 0, 1], 'pending', 'Taste food, drink or a potion to find poison and how strong it is.'],
+  ['tasteidentification', 'Taste Identification', 'misc', 1, 'item', 1, [], [.2, 0, .8], [0, 0, 1], 'live', 'Taste food, drink or a potion to find poison and how strong it is.'],
   ['tinkering', 'Tinkering', 'trade', 0, 'craft', 0, [], [.5, .2, .3], [0, .5, .5], 'live', 'Make tools, lockpicks, lockboxes, traps and devices.'],
   ['tracking', 'Tracking', 'wild', 1, 'self', 10, [], [0, 1.25, 1.25], [0, .5, .5], 'live', 'Choose animals, monsters or people, then one of them: an arrow follows its trail.'],
   ['veterinary', 'Veterinary', 'wild', 1, 'creature', 0, ['animallore'], [.8, .4, .4], [0, .5, .5], 'live', 'Bandage a pet: heal it; cure its poison at 60 Veterinary and 60 Animal Lore.'],
@@ -149,7 +149,7 @@ SF.absorbRoll = (ar, rng) => ar <= 0 ? 0 : Math.ceil(ar / 2) + Math.floor(rng() 
 /* stage 1: what the swing carries before any defence. o = {dice | range [lo, hi], roll, quality, cond, maxc, tactics, anatomy, str, scale} */
 SF.rawDamage = (o, rng) => {
   const roll = o.roll !== undefined ? o.roll : o.range ? o.range[0] + Math.floor(rng() * (o.range[1] - o.range[0] + 1)) : SF.rollDice(o.dice, rng);
-  const base = roll + (SF.QUALITY_DMG[o.quality] || 0);
+  const base = roll + (SF.QUALITY_DMG[o.quality] || 0) + (o.bonus || 0);   // bonus: a magic weapon's damage level (src/skills.js SK.magicDmg)
   const scale = o.scale !== undefined ? o.scale : SF.damageScale(o);
   const wear = SF.wearFactor(o.cond, o.maxc);
   return { roll, base, scale, wear, value: Math.max(0, base) * scale * wear };
@@ -500,7 +500,7 @@ SF.removeMat = (c, id, mat, qty) => {
   for (let i = c.items.length - 1; i >= 0 && qty > 0; i--) { const it = c.items[i]; if (it.id !== id || (mat && SF.matOf(it) !== mat)) continue; const t = Math.min(qty, it.qty); it.qty -= t; qty -= t; if (it.qty <= 0) c.items.splice(i, 1); }
   c.ver++; return true;
 };
-SF.canStack = (a, b) => SF.ITEMS[a.id].stack && a.id === b.id && (a.q || 0) === (b.q || 0) && !a.maker && !b.maker && (a.material || null) === (b.material || null);
+SF.canStack = (a, b) => SF.ITEMS[a.id].stack && a.id === b.id && (a.q || 0) === (b.q || 0) && !a.maker && !b.maker && (a.material || null) === (b.material || null) && (a.poison || 0) === (b.poison || 0);   // poisoned food stays apart (Poisoning)
 SF.itemKg = it => SF.ITEMS[it.id].kg * (it.kgMul || 1) * it.qty;
 
 /* ---------------- condition and repair (crafting guide §4.6, §5) ---------------- */

@@ -6,7 +6,7 @@ new Function('module', 'globalThis', scripts.find(t => t.includes('SF.METALS')))
 new Function('module', 'globalThis', 'SF', scripts.find(t => t.includes('SF.SK = SK')))({}, g, g.SF);
 new Function('module', 'globalThis', scripts.find(t => t.includes('SF.MAGERY = MG')))({}, g);
 new Function('module', 'globalThis', scripts.find(t => t.includes('SF.EQ = EQ')))({}, g);
-const SF = g.SF, SK = SF.SK;
+const SF = g.SF, SK = SF.SK; SK.addInscription();
 let fails = 0; const eq = (a, b, msg) => { const ok = JSON.stringify(a) === JSON.stringify(b); if (!ok) { fails++; console.log('FAIL', msg, JSON.stringify(a), '!=', JSON.stringify(b)); } else console.log('ok  ', msg); };
 const near = (a, b, msg, tol) => eq(Math.abs(a - b) < (tol || 1e-9), true, msg + ` (${a} ≈ ${b})`);
 const seq = arr => { let i = 0; return () => arr[i++ % arr.length]; };
