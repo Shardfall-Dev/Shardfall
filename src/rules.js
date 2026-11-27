@@ -94,51 +94,8 @@ SF.newSkills = () => { const s = {}; for (const [k] of SF.SKILLS) s[k] = { v: 0,
 SF.totalSkill = ch => Object.values(ch.skills).reduce((a, s) => a + s.v, 0);
 SF.sv = (ch, k) => (ch.skills && ch.skills[k] ? ch.skills[k].v / 10 : (ch.sk && ch.sk[k]) || 0);
 
-SF.validateCreation = o => {
-  const e = [];
-  const st = [o.str, o.dex, o.int];
-  if (st.some(v => !Number.isInteger(v))) e.push('Stats must be whole numbers.');
-  if (st.reduce((a, b) => a + b, 0) !== SF.CREATE_STATS) e.push('Spend exactly 150 stat points.');
-  if (st.some(v => v < SF.CREATE_STAT_MIN || v > SF.STAT_MAX)) e.push('Each stat must be between 25 and 100.');
-  const sk = Object.entries(o.skills || {}).filter(([, v]) => v > 0);
-  const tot = sk.reduce((a, [, v]) => a + v, 0);
-  if (tot > 100) e.push('Starting skills may total at most 100.');
-  if (sk.some(([k, v]) => !SF.SKILL[k] || v > 50)) e.push('Each starting skill is at most 50.');
-  return e;
-};
-
-// spec §5: initial chance = clamp(.04,.30,.24-.0018*skill) * max(0, 1-|skill-difficulty|/40)
-SF.gainChance = (skill, diff) => clamp(0.04, 0.30, 0.24 - 0.0018 * skill) * Math.max(0, 1 - Math.abs(skill - diff) / 40);
-SF.REPEAT_WINDOW = 600; SF.REPEAT_MAX = 3; SF.RECIPE_TAPER_FROM = 10;
-SF.recipeTaper = n => n < SF.RECIPE_TAPER_FROM ? 1 : Math.max(0.15, 1 - (n - SF.RECIPE_TAPER_FROM + 1) * 0.06);
-
-/* tryGain: one committed, eligible action. ctx = {now (s), rng, target: string key, recipe: id}
-   Returns {gained, reason, chance}. Never throws; the reason is shown in the skill log. */
-SF.tryGain = (ch, key, diff, ctx) => {
-  const s = ch.skills[key]; const now = ctx.now, rng = ctx.rng || Math.random;
-  if (!s) return { gained: false, reason: 'unknown skill' };
-  if (s.lock !== 'raise') return { gained: false, reason: s.lock === 'hold' ? 'skill is on Hold' : 'skill is set to Lower' };
-  if (s.v >= SF.SKILL_MAX) return { gained: false, reason: 'skill is at 100' };
-  ch.gainLog = ch.gainLog || {};
-  let mult = 1;
-  if (ctx.target) {
-    const k = key + '|' + ctx.target; const L = (ch.gainLog[k] || []).filter(t => now - t < SF.REPEAT_WINDOW);
-    if (L.length >= SF.REPEAT_MAX) { ch.gainLog[k] = L; return { gained: false, reason: 'same target or node used 3 times in 10 minutes' }; }
-    L.push(now); ch.gainLog[k] = L;
-  }
-  if (ctx.recipe) { ch.recipeN = ch.recipeN || {}; const n = ch.recipeN[ctx.recipe] = (ch.recipeN[ctx.recipe] || 0) + 1; mult = SF.recipeTaper(n - 1); }
-  const chance = SF.gainChance(s.v / 10, diff) * mult;
-  if (chance <= 0) return { gained: false, reason: diff < s.v / 10 ? 'too easy to learn from' : 'too difficult to learn from', chance };
-  if (rng() >= chance) return { gained: false, reason: 'no gain this time', chance };
-  if (SF.totalSkill(ch) + 1 > SF.SKILL_CAP) {
-    const order = (ch.lowerRank || []).concat(Object.keys(ch.skills));
-    const dn = order.find(k => k !== key && ch.skills[k] && ch.skills[k].lock === 'lower' && ch.skills[k].v > 0);
-    if (!dn) return { gained: false, reason: 'skill cap 700 reached: set a skill to Lower', chance };
-    ch.skills[dn].v -= 1; s.v += 1;   // atomic transfer
-    return { gained: true, chance, value: s.v, lowered: dn };
-  }
-  s.v += 1; return { gained: true, chance, value: s.v };
-};
+/* creation rules, skill checks, gains and stat gains: src/skills.js (SF.SK). The old blanket gain window, the three-uses-per-target
+   limit and the per-recipe taper are gone (docs/skills/T2A_SKILL_PARITY_v1.md §1). */
 SF.opposed = (skill, diff) => clamp(0.10, 0.95, 0.55 + (skill - diff) / 125);
 
 /* ---------------- combat: UO Second Age (T2A) reconstruction, issue #3 ----------------
@@ -678,8 +635,6 @@ SF.VENOM_CHARGES = 5;
 // §9 condition and repair: each repair restores to max minus 3% of the original maximum; below 40% replace
 SF.WEARABLE = id => ['weapon', 'shield', 'armor'].includes(SF.ITEMS[id].cat) && SF.ITEMS[id].trade;
 SF.repairSkill = id => { const d = SF.ITEMS[id]; if (d.wpn === 'shortbow' || d.wpn === 'crossbow' || d.wpn === 'heavycrossbow') return 'bowcraft'; if (id === 'buckler') return 'carpentry'; if (d.armor === 'cloth' || d.armor === 'leather') return 'tailoring'; return 'blacksmithy'; };
-SF.trainCost = (skill, to) => Math.max(0, Math.round((to * to - skill * skill) * 0.6));
-SF.statTrainCost = n => n * 25;
 
 if (typeof module !== 'undefined' && module.exports) module.exports = SF; else root.SF = SF;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

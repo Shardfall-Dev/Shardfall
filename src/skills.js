@@ -52,6 +52,214 @@ SK.migrateSkills = (c, opt) => {
   return out;
 };
 
+/* ================= Phase B: skill checks, gains, stats, real and displayed values, trainers ================= */
+/* Real (base) skill is what was trained: it alone counts toward the 700.0 cap, gates prerequisites (Stealth needs 80 real Hiding)
+   and is what trainers and the migration move. The displayed (effective) skill adds a small lift from the stats each skill leans on,
+   fading to nothing at 100.0. Reconstruction: classic clients separated real and modified values; the size of the stat lift here
+   (at most SK.STAT_BONUS points, at stat 100 and skill 0) is a Shardfall tuning choice, not a verified patch value. */
+SK.STAT_BONUS = 5;
+SK.base = (ch, k) => ch && ch.skills && ch.skills[k] ? ch.skills[k].v / 10 : 0;
+SK.bonusTenths = (ch, k) => {
+  const d = SF.SKILL[k], s = ch && ch.skills && ch.skills[k]; if (!d || !s) return 0;
+  const w = d.bonus, tw = w.str + w.dex + w.int; if (!tw) return 0;
+  const avg = ((ch.str || 0) * w.str + (ch.dex || 0) * w.dex + (ch.int || 0) * w.int) / tw;
+  return Math.max(0, Math.floor(SK.STAT_BONUS * 10 * clamp(0, 100, avg) / 100 * (1 - s.v / SF.SKILL_MAX) + 1e-9));
+};
+SK.value = (ch, k) => { const s = ch && ch.skills && ch.skills[k]; if (!s) return (ch && ch.sk && ch.sk[k]) || 0; return Math.min(SF.SKILL_MAX, s.v + SK.bonusTenths(ch, k)) / 10; };
+SF.sv = SK.value;                                   // every rules caller (crafting plans, …) uses the displayed value
+
+/* ---------- gains (RunUO-style reconstruction of the classic check; docs/skills/STATUS.md) ----------
+   A use is checked against a window [min, max] in skill points: below min the attempt cannot succeed and teaches nothing; at or
+   above max it cannot fail and teaches nothing ("no challenge"); between, the success chance is (value − min) / (max − min).
+   An eligible use teaches with chance gc = ((cap − real)/cap + (1 − chance) × (success ? .5 : .2)) / 2 × rate, never below 1%.
+   Under 10.0 real every eligible use teaches 0.1–0.4. No same-target limit and no recipe taper: repetition is how you train.
+   SK.POLICY is a separate, switched-off anti-automation hook for a future multiplayer server; progression never depends on it. */
+SK.GAIN = { rate: 1, floor: .01, fastBelow: 100 };   // rate: single-player tuning multiplier (documented config, 1 = reference)
+SK.POLICY = { antiMacro: false, window: 600, max: 3 };
+SK.windowChance = (value, min, max) => value < min ? 0 : value >= max ? 1 : (value - min) / (max - min);
+SK.gainChance = (real10, chance, success) => Math.max(SK.GAIN.floor, ((SF.SKILL_MAX - real10) / SF.SKILL_MAX + (1 - chance) * (success ? .5 : .2)) / 2 * SK.GAIN.rate);
+/* learn from one eligible use. Returns { gained, amount, lowered, stat, reason }. ctx = { rng, now, target } */
+SK.learn = (ch, key, chance, success, ctx) => {
+  ctx = ctx || {}; const rng = ctx.rng || Math.random, s = ch.skills && ch.skills[key], out = { gained: false, chance, success };
+  if (!s) { out.reason = 'unknown skill'; return out; }
+  if (s.lock !== 'raise') { out.reason = s.lock === 'hold' ? 'skill is on Hold' : 'skill is set to Lower'; return out; }
+  if (SK.POLICY.antiMacro && ctx.target) {               // off by default; a future server may switch it on
+    ch.gainLog = ch.gainLog || {}; const k = key + '|' + ctx.target, L = (ch.gainLog[k] || []).filter(t => ctx.now - t < SK.POLICY.window);
+    if (L.length >= SK.POLICY.max) { ch.gainLog[k] = L; out.reason = 'anti-automation limit'; return out; } L.push(ctx.now); ch.gainLog[k] = L;
+  }
+  const gc = SK.gainChance(s.v, chance, success); out.gc = gc;
+  if (!(s.v < SK.GAIN.fastBelow || rng() < gc)) { out.reason = 'no gain this time'; return out; }
+  // the gain event: the skill rises if it can, and the stats may rise with it (stats can still rise at 100.0 or at the 700 cap)
+  if (s.v < SF.SKILL_MAX) {
+    let amt = s.v < SK.GAIN.fastBelow ? 1 + Math.floor(rng() * 4) : 1; amt = Math.min(amt, SF.SKILL_MAX - s.v);
+    if (SF.totalSkill(ch) + amt > SF.SKILL_CAP) {
+      const order = (ch.lowerRank || []).concat(Object.keys(ch.skills));
+      const dn = order.find(k => k !== key && ch.skills[k] && ch.skills[k].lock === 'lower' && ch.skills[k].v > 0);
+      if (!dn) { out.reason = 'skill cap 700 reached: set a skill to Lower'; amt = 0; }
+      else { amt = Math.min(amt, ch.skills[dn].v, SF.SKILL_CAP - SF.totalSkill(ch) + ch.skills[dn].v); ch.skills[dn].v -= amt; out.lowered = dn; }   // an atomic transfer
+    }
+    if (amt > 0) { s.v += amt; out.gained = true; out.amount = amt; out.value = s.v; }
+  } else out.reason = 'skill is at 100';
+  const st = SK.statGain(ch, key, rng); if (st) out.stat = st;
+  return out;
+};
+/* a check against a window: rolls success, then learns if the use was a challenge. Returns { success, chance, learn } */
+SK.check = (ch, key, min, max, ctx) => {
+  ctx = ctx || {}; const rng = ctx.rng || Math.random, v = SK.value(ch, key), chance = SK.windowChance(v, min, max);
+  if (v < min) return { success: false, chance: 0, learn: { gained: false, reason: 'too difficult to learn from' } };   // at exactly min the attempt fails but still teaches
+  if (chance >= 1) return { success: true, chance: 1, learn: { gained: false, reason: 'too easy to learn from' } };
+  const success = rng() < chance; return { success, chance, learn: SK.learn(ch, key, chance, success, ctx) };
+};
+/* learning when the action decided success itself (a swing's hit chance, a resist roll …), still bounded by an optional window */
+SK.use = (ch, key, chance, success, ctx, win) => {
+  if (win) { const w = SK.windowChance(SK.value(ch, key), win[0], win[1]); if (w <= 0 || w >= 1) return { gained: false, reason: w <= 0 ? 'too difficult to learn from' : 'too easy to learn from' }; }
+  if (!(chance >= 0)) return { gained: false, reason: 'too difficult to learn from' };
+  if (chance >= 1) return { gained: false, reason: 'too easy to learn from' };
+  return SK.learn(ch, key, chance, success, ctx);
+};
+
+/* ---------- natural attribute progression ----------
+   Each gain event may raise the stats its skill leans on: chance weight / 33.3 per stat (SF.SKILL[k].gain). A stat stops at 100;
+   at the 225 total a gain in one stat lowers another (Second Age atrophy, no stat locks in this era). Stats never fall below 10. */
+SK.STAT_DIV = 33.3;
+SK.statTotal = ch => (ch.str || 0) + (ch.dex || 0) + (ch.int || 0);
+SK.statGain = (ch, key, rng) => {
+  const d = SF.SKILL[key]; if (!d) return null;
+  for (const st of ['str', 'dex', 'int']) { const w = d.gain[st]; if (w > 0 && rng() < w / SK.STAT_DIV) { const r = SK.raiseStat(ch, st, rng); if (r) return r; } }
+  return null;
+};
+SK.raiseStat = (ch, st, rng) => {
+  if ((ch[st] || 0) >= SF.STAT_MAX) return null;
+  let lowered = null;
+  if (SK.statTotal(ch) + 1 > SF.STAT_CAP) {
+    const others = ['str', 'dex', 'int'].filter(o => o !== st && (ch[o] || 0) > SF.STAT_MIN); if (!others.length) return null;
+    lowered = others[Math.floor(rng() * others.length)]; ch[lowered]--;
+  }
+  ch[st] = (ch[st] || 0) + 1; return { stat: st, value: ch[st], lowered };
+};
+
+/* ---------- character creation (late 1999): 80 stat points, each 10–60; up to three different skills, 100 points, at most 50 each ----------
+   Source: UOSA examples (60/10/10 style spreads); Stealth and Remove Trap cannot be starting skills (they need trained prerequisites). */
+SK.CREATE = { stats: 80, statMin: 10, statMax: 60, skills: 100, skillMax: 50, count: 3, banned: ['stealth', 'removetrap'] };
+SK.validateCreation = o => {
+  const e = [], C = SK.CREATE, st = [o.str, o.dex, o.int];
+  if (st.some(v => !Number.isInteger(v))) e.push('Stats must be whole numbers.');
+  if (st.reduce((a, b) => a + b, 0) !== C.stats) e.push(`Spend exactly ${C.stats} stat points.`);
+  if (st.some(v => v < C.statMin || v > C.statMax)) e.push(`Each stat must be between ${C.statMin} and ${C.statMax}.`);
+  const sk = Object.entries(o.skills || {}).filter(([, v]) => v > 0);
+  if (sk.length > C.count) e.push(`Choose at most ${C.count} starting skills.`);
+  if (sk.reduce((a, [, v]) => a + v, 0) > C.skills) e.push(`Starting skills may total at most ${C.skills}.`);
+  if (sk.some(([k, v]) => !SF.SKILL[k] || v > C.skillMax || !Number.isInteger(v))) e.push(`Each starting skill is at most ${C.skillMax}.`);
+  if (sk.some(([k]) => C.banned.includes(k))) e.push('Stealth and Remove Trap cannot be starting skills.');
+  return e;
+};
+SF.validateCreation = SK.validateCreation;
+Object.assign(SF, { CREATE_STATS: SK.CREATE.stats, CREATE_STAT_MIN: SK.CREATE.statMin });
+
+/* ---------- NPC trainers ----------
+   Townsfolk teach their profession's skills (UOSA NPC trainer table, mapped onto Shardfall's people), up to 30.0, at one gold per
+   0.1 point taught (reconstruction of the classic "the price is …" offer; a smaller purse buys a shorter lesson). No one sells stats. */
+SK.TRAIN_CAP = 300;   // tenths
+SK.TRAIN_PRICE = 1;   // gold per tenth
+SK.TRAINERS = {
+  trainer: ['swordsmanship', 'macefighting', 'fencing', 'wrestling', 'tactics', 'parrying', 'archery'],
+  guard: ['swordsmanship', 'macefighting', 'fencing', 'wrestling', 'tactics', 'parrying'],
+  smith: ['blacksmithy', 'armslore', 'mining'], miner: ['mining'], tailor: ['tailoring'], tinker: ['tinkering'], fishmonger: ['fishing'],
+  workshop: ['bowcraft', 'carpentry', 'lumberjacking'], fletcher: ['bowcraft'],
+  apothecary: ['alchemy', 'tasteidentification'], reagents: ['alchemy', 'tasteidentification'],
+  healer: ['anatomy', 'healing', 'forensicevaluation', 'spiritspeak'],
+  mage: ['magery', 'meditation', 'inscription', 'evaluatingintelligence', 'resistingspells'],
+  ranger: ['archery', 'camping', 'tracking', 'detectinghidden', 'tactics'],
+  stable: ['animaltaming', 'animallore', 'veterinary', 'herding'],
+  scholar: ['cartography', 'itemidentification', 'inscription'],
+  innkeeper: ['cooking', 'musicianship', 'peacemaking', 'provocation', 'enticement'],
+  provisioner: ['camping', 'cooking'],
+  outlaw: ['hiding', 'stealth', 'stealing', 'snooping', 'lockpicking', 'poisoning', 'removetrap', 'detectinghidden', 'begging', 'fencing'] };
+SK.REQUIRES = { stealth: [['hiding', 80]], removetrap: [['lockpicking', 50], ['detectinghidden', 50]] };   // real skill
+SK.meetsReq = (ch, k) => (SK.REQUIRES[k] || []).every(([r, n]) => SK.base(ch, r) >= n);
+SK.reqText = k => (SK.REQUIRES[k] || []).map(([r, n]) => `${n} ${SF.SKILL[r].n}`).join(' and ');
+/* what a trainer can teach this character in one lesson: tenths and price; gold limits the lesson */
+SK.trainQuote = (ch, k, gold, free) => {
+  const s = ch.skills[k]; if (!s) return { ok: false, reason: 'unknown skill' };
+  if (s.lock !== 'raise') return { ok: false, reason: 'Set that skill to raise first.' };
+  if (s.v >= SK.TRAIN_CAP) return { ok: false, reason: 'You already know all I can teach.' };
+  if (!SK.meetsReq(ch, k)) return { ok: false, reason: `First learn ${SK.reqText(k)}.` };
+  let n = SK.TRAIN_CAP - s.v; n = Math.min(n, SF.SKILL_CAP - SF.totalSkill(ch));
+  if (n <= 0) return { ok: false, reason: 'That would pass the 700 cap.' };
+  if (!free) n = Math.min(n, Math.floor(gold / SK.TRAIN_PRICE));
+  if (n <= 0) return { ok: false, reason: 'You cannot afford even a short lesson.' };
+  return { ok: true, tenths: n, price: free ? 0 : n * SK.TRAIN_PRICE, to: s.v + n, full: s.v + n >= SK.TRAIN_CAP };
+};
+SK.train = (ch, k, gold, free) => { const q = SK.trainQuote(ch, k, gold, free); if (!q.ok) return q; ch.skills[k].v += q.tenths; return q; };
+
+/* ---------- difficulty windows for common uses ---------- */
+SK.CRAFT_WINDOW = diff => [diff - 44, diff + 36];            // matches SF.craftChance (.55 at diff, 0 at −44, 1 at +36)
+SK.repairDiff = (cond, max) => 125 * clamp(0, 1, (max - cond) / Math.max(1, max)) - 25;   // RunUO GetRepairDifficulty in skill points
+SK.HARVEST = { common: [0, 100], rare: g => [g - 40, g + 40] }; // ordinary ore/logs/fish teach to 100; coloured materials from their gate − 40 to + 40
+SK.magCircleWindow = circle => { const avg = (100 / 7) * (circle - 1); return [avg - 20, avg + 20]; };   // circle 1 −20…20 … circle 8 80…120
+SK.resistMaxFor = circle => circle * 10 + (1 + Math.floor((circle - 1) / 6)) * 25;   // resist teaches only below this for a spell of that circle
+
+/* ================= supporting content: items and recipes that give every skill a road to 100.0 =================
+   Recipes keep the existing crafting rules (SF.craftPlan): difficulty, success, failure loss, quality. New items use existing
+   materials (wood, metal, hides, reagents, fish, meat). Item and recipe ids are new; no existing id changes meaning. */
+const ITEM = (id, o) => { SF.ITEMS[id] = Object.assign({ id, trade: true }, o); };
+const PRICE = o => Object.assign(SF.PRICES, o);
+// alchemy: four strengths of poison (the old Mire venom vial is the regular one) and a greater healing draught
+SF.ITEMS.venom.n = 'Poison potion'; SF.ITEMS.venom.poisonLvl = 2;
+ITEM('poison_lesser', { n: 'Lesser poison potion', kg: .2, stack: 1, cat: 'potion', poisonLvl: 1 });
+ITEM('poison_greater', { n: 'Greater poison potion', kg: .2, stack: 1, cat: 'potion', poisonLvl: 3 });
+ITEM('poison_deadly', { n: 'Deadly poison potion', kg: .2, stack: 1, cat: 'potion', poisonLvl: 4 });
+ITEM('greater_draught', { n: 'Greater healing draught', kg: .3, stack: 1, cat: 'potion', use: 'consume' });
+SF.CONSUMABLES.greater_draught = { n: 'Greater healing draught', heal: 40, cd: 16, fam: 'heal' };
+// cooking: meals from fish, meat and marshroot
+ITEM('fishstew', { n: 'Fish stew', kg: .5, stack: 1, cat: 'food', use: 'eat' });
+ITEM('meatpie', { n: 'Marsh pie', kg: .5, stack: 1, cat: 'food', use: 'eat' });
+ITEM('feast', { n: 'Saltmarsh feast', kg: 1.2, stack: 1, cat: 'food', use: 'eat' });
+// tinkering: practice boxes for Lockpicking and Remove Trap, instruments of the trade, and tools for the new skills
+ITEM('lockbox', { n: 'Tinker\'s lockbox', kg: 3, cat: 'tool', lockable: true });
+ITEM('trapbox', { n: 'Trapped practice box', kg: 3, cat: 'tool', trappable: true });
+ITEM('sextant', { n: 'Sextant', kg: 1, stack: 1, cat: 'tool' });
+ITEM('spyglass', { n: 'Spyglass', kg: 1, stack: 1, cat: 'tool' });
+ITEM('clockwork', { n: 'Clockwork movement', kg: 1.5, stack: 1, cat: 'tool' });
+ITEM('mappen', { n: 'Mapmaker\'s pen', kg: .1, cat: 'tool', tool: 'cartography' });
+ITEM('scribepen', { n: 'Scribe\'s pen', kg: .1, cat: 'tool', tool: 'inscription' });
+// carpentry: the shepherd's crook (Herding)
+ITEM('crook', { n: 'Shepherd\'s crook', kg: 2, cat: 'tool', tool: 'herding' });
+// cartography and inscription stock, camping supplies
+ITEM('blankmap', { n: 'Blank map', kg: .05, stack: 1, cat: 'scroll' });
+ITEM('map_local', { n: 'Local map', kg: .05, stack: 1, cat: 'scroll' });
+ITEM('map_city', { n: 'City map', kg: .05, stack: 1, cat: 'scroll' });
+ITEM('map_sea', { n: 'Sea chart', kg: .05, stack: 1, cat: 'scroll' });
+ITEM('map_world', { n: 'World map', kg: .05, stack: 1, cat: 'scroll' });
+ITEM('blankscroll', { n: 'Blank scroll', kg: .05, stack: 1, cat: 'scroll' });
+ITEM('kindling', { n: 'Kindling', kg: .5, stack: 1, cat: 'timber' });
+ITEM('bedroll', { n: 'Bedroll', kg: 2, cat: 'tool' });
+PRICE({ poison_lesser: 12, poison_greater: 45, poison_deadly: 90, greater_draught: 60, fishstew: 12, meatpie: 18, feast: 45, lockbox: 40, trapbox: 45, sextant: 70, spyglass: 90, clockwork: 140,
+  mappen: 10, scribepen: 10, crook: 15, blankmap: 4, map_local: 18, map_city: 35, map_sea: 60, map_world: 110, blankscroll: 3, kindling: 2, bedroll: 25 });
+const RX = o => SF.RECIPES.push(o);
+RX({ id: 'poison_lesser', out: 'poison_lesser', qty: 1, skill: 'alchemy', min: 0, diff: 15, station: 'still', inputs: { blacksalt: 1, vial: 1 } });
+SF.RECIPE.venom && Object.assign(SF.RECIPES.find(r => r.id === 'venom'), { name: 'Poison potion', min: 15, diff: 35 });
+RX({ id: 'poison_greater', out: 'poison_greater', qty: 1, skill: 'alchemy', min: 55, diff: 70, station: 'still', inputs: { blacksalt: 2, marshroot: 1, vial: 1 } });
+RX({ id: 'poison_deadly', out: 'poison_deadly', qty: 1, skill: 'alchemy', min: 90, diff: 100, station: 'still', inputs: { blacksalt: 3, nightshade: 2, vial: 1 } });
+RX({ id: 'greater_draught', out: 'greater_draught', qty: 1, skill: 'alchemy', min: 55, diff: 75, station: 'still', inputs: { shelldust: 2, marshroot: 2, ginseng: 1, vial: 1 } });
+RX({ id: 'fishstew', out: 'fishstew', qty: 1, skill: 'cooking', min: 25, diff: 45, station: 'fire', inputs: { fish: 2, marshroot: 1 } });
+RX({ id: 'meatpie', out: 'meatpie', qty: 1, skill: 'cooking', min: 45, diff: 65, station: 'fire', inputs: { meat: 2, marshroot: 1, travelloaf: 1 } });
+RX({ id: 'feast', out: 'feast', qty: 1, skill: 'cooking', min: 70, diff: 88, station: 'fire', inputs: { meat: 2, fish: 2, softcheese: 1, travelloaf: 1 } });
+RX({ id: 'bolts', name: 'Bolts', out: 'bolt', qty: 20, skill: 'bowcraft', min: 0, diff: 20, station: 'bench', tool: 'knife', inputs: { pine: 1, ironshard: 1 } });
+RX({ id: 'crossbow', name: 'Crossbow', out: 'crossbow', qty: 1, skill: 'bowcraft', min: 60, station: 'bench', tool: 'knife', prim: 'wood', defMat: 'pine', diff: 75, lines: [{ form: 'log', qty: 7 }, { item: 'sinew', qty: 2 }] });
+RX({ id: 'heavycrossbow', name: 'Heavy crossbow', out: 'heavycrossbow', qty: 1, skill: 'bowcraft', min: 80, station: 'bench', tool: 'knife', prim: 'wood', defMat: 'pine', diff: 92, lines: [{ form: 'log', qty: 10 }, { item: 'sinew', qty: 3 }] });
+RX({ id: 'lockbox', name: 'Tinker\'s lockbox', out: 'lockbox', qty: 1, skill: 'tinkering', min: 20, diff: 45, station: 'bench', tool: 'tongs', inputs: { ironbar: 2, pine: 2 } });
+RX({ id: 'trapbox', name: 'Trapped practice box', out: 'trapbox', qty: 1, skill: 'tinkering', min: 30, diff: 55, station: 'bench', tool: 'tongs', inputs: { ironbar: 2, pine: 2, ironshard: 3 } });
+RX({ id: 'mappen', name: 'Mapmaker\'s pen', out: 'mappen', qty: 1, skill: 'tinkering', min: 0, diff: 20, station: 'bench', tool: 'tongs', inputs: { ironshard: 2 } });
+RX({ id: 'scribepen', name: 'Scribe\'s pen', out: 'scribepen', qty: 1, skill: 'tinkering', min: 0, diff: 20, station: 'bench', tool: 'tongs', inputs: { ironshard: 2 } });
+RX({ id: 'sextant', name: 'Sextant', out: 'sextant', qty: 1, skill: 'tinkering', min: 50, diff: 70, station: 'bench', tool: 'tongs', inputs: { ironbar: 3, ironshard: 2 } });
+RX({ id: 'spyglass', name: 'Spyglass', out: 'spyglass', qty: 1, skill: 'tinkering', min: 65, diff: 82, station: 'bench', tool: 'tongs', inputs: { ironbar: 2, bellshard: 1, ironshard: 2 } });
+RX({ id: 'clockwork', name: 'Clockwork movement', out: 'clockwork', qty: 1, skill: 'tinkering', min: 80, diff: 95, station: 'bench', tool: 'tongs', inputs: { ironbar: 4, bellshard: 2, ironshard: 4 } });
+RX({ id: 'crook', name: 'Shepherd\'s crook', out: 'crook', qty: 1, skill: 'carpentry', min: 0, diff: 20, station: 'bench', tool: 'knife', inputs: { pine: 3 } });
+// the shortbow becomes a wood-primary recipe like the crossbows, so rarer woods make harder, better bows
+{ const sb = SF.RECIPES.find(r => r.id === 'shortbow'); Object.assign(sb, { name: 'Bow', prim: 'wood', defMat: 'pine', lines: [{ form: 'log', qty: 4 }, { item: 'sinew', qty: 1 }] }); delete sb.inputs; }
+SF.reindexRecipes();
+
 if (typeof module !== 'undefined' && module.exports) module.exports = SK;
 SF.SK = SK;
 })(typeof SF !== 'undefined' ? SF : globalThis.SF);

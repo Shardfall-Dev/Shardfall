@@ -42,7 +42,8 @@ let GT = 0, P = null, AIM = null, TRACKS = null, NID = 1;
 const ents = [], FX = [], EFX = [], LOG = [], SKLOG = [];
 const JOY = { on: false, x0: 0, y0: 0, x: 0, y: 0, sprint: false };
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-const sv = k => P.skills[k].v / 10;
+const sv = k => SF.SK.value(P, k);            // displayed skill (real + a small stat lift): what every check uses
+const svReal = k => SF.SK.base(P, k);        // real skill: prerequisites, trainers, the 700 cap
 /* ---------- Living World Phase 1: every actor has a stable id, an archetype and a controller (src/world.js, docs/WORLD_SIMULATION_PROGRESS.md) ----------
    WS is this world's SIM state, made at boot. Corpses and piles are world objects, not actors. Species classes are data; an unlisted creature is a monster. */
 let WS = null;
@@ -82,12 +83,22 @@ function relColor(e) { if (e === P || e.kind === 'npc' || e.kind === 'pet' || e.
 function log(t, c, kind) { LOG.push({ t, c: c || '#e8e2d2', at: GT, kind: kind || 'sys' }); if (LOG.length > 300) LOG.shift(); renderLog(); }
 function floater(x, y, t, c) { FX.push({ k: 'txt', x, y, t, c, t0: GT, dur: 1.1 }); }
 function say(e, t) { e.say = { t, until: GT + 3 }; }
-function gain(key, diff, ctx) {
-  const r = SF.tryGain(P, key, diff, Object.assign({ now: GT }, ctx || {}));
-  SKLOG.push({ k: key, at: GT, r: r.gained ? `+0.1 → ${f1(P.skills[key].v)}` + (r.lowered ? ` (−0.1 ${SF.SKILL[r.lowered].n})` : '') : r.reason }); if (SKLOG.length > 80) SKLOG.shift();
-  if (r.gained) { log(`${SF.SKILL[key].n} +0.1 (${f1(P.skills[key].v)})`, '#7fd4ff', 'skill'); if (GT - SND.gainAt > 1.5) { SND.gainAt = GT; snd('skill.gain'); } }
+/* ---------- skill checks (src/skills.js, SF.SK): every use goes through one of these and lands in the skill log ---------- */
+const STAT_NAME = { str: 'Strength', dex: 'Dexterity', int: 'Intelligence' };
+function noteLearn(key, r) {
+  if (!r) return r;
+  SKLOG.push({ k: key, at: GT, r: r.gained ? `+${f1(r.amount)} → ${f1(P.skills[key].v)}` + (r.lowered ? ` (−${f1(r.amount)} ${SF.SKILL[r.lowered].n})` : '') : r.reason || '' }); if (SKLOG.length > 80) SKLOG.shift();
+  if (r.gained) { log(`${SF.SKILL[key].n} +${f1(r.amount)} (${f1(P.skills[key].v)})`, '#7fd4ff', 'skill'); if (GT - SND.gainAt > 1.5) { SND.gainAt = GT; snd('skill.gain'); } }
+  if (r.stat) log(`Your ${STAT_NAME[r.stat.stat]} rises to ${r.stat.value}.` + (r.stat.lowered ? ` Your ${STAT_NAME[r.stat.lowered]} falls to ${P[r.stat.lowered]} (225 is the most anyone can hold).` : ''), '#ffe08a', 'skill');
   return r;
 }
+const skCtx = ctx => Object.assign({ rng: R, now: GT }, ctx || {});
+/* a use checked against a difficulty window [min, max] in skill points: returns whether it succeeded; teaches when it was a challenge */
+function skillCheck(key, min, max, ctx) { const r = SF.SK.check(P, key, min, max, skCtx(ctx)); noteLearn(key, r.learn); return r.success; }
+/* the action rolled its own success with chance `chance`; teach from it (optionally only inside a window) */
+function skillUse(key, chance, success, ctx, win) { return noteLearn(key, SF.SK.use(P, key, chance, success, skCtx(ctx), win)); }
+/* interim shape for uses reworked in later phases: a difficulty d teaches across d − 50 … d + 50 */
+function gain(key, diff, ctx) { const v = sv(key), ch = SF.SK.windowChance(v, diff - 50, diff + 50); return skillUse(key, ch, true, ctx); }
 
 /* ---------- sound: src/audio.js (SFXA) plays the sound pack; this section decides what plays and where ---------- */
 let AC = null, muted = false;   // AC is SFXA's shared AudioContext once a gesture unlocks it; muted persists in SETTINGS
@@ -191,7 +202,7 @@ function sndTick() {
 
 /* ---------- player ---------- */
 function newChar(o) {
-  const c = { kind: 'player', pid: 'p1', name: o.name, x: 92.5, y: 304.5, sect: 0, str: o.str, dex: o.dex, int: o.int, skills: SF.newSkills(), pack: SF.newContainer('pack', 'p1'), bank: SF.newContainer('bank', 'p1'), equip: emptyEquip(), eqMig: SF.EQ.MIGRATION, look: o.look || {}, bound: 'quay', freeLessons: 2, hotbar: [null, null, null, null], sw: SF.newSwing(), combatMig: SF.COMBAT_MIGRATION, t2aMig: SF.SK.MIGRATION };
+  const c = { kind: 'player', pid: 'p1', name: o.name, x: 92.5, y: 304.5, sect: 0, str: o.str, dex: o.dex, int: o.int, skills: SF.newSkills(), pack: SF.newContainer('pack', 'p1'), bank: SF.newContainer('bank', 'p1'), equip: emptyEquip(), eqMig: SF.EQ.MIGRATION, look: o.look || {}, bound: 'quay', freeLessons: 0, hotbar: [null, null, null, null], sw: SF.newSwing(), combatMig: SF.COMBAT_MIGRATION, t2aMig: SF.SK.MIGRATION };
   c.id = 'p1'; for (const [k, v] of Object.entries(o.skills)) c.skills[k].v = v * 10;
   c.hp = SF.maxHp(c); c.stam = SF.maxStam(c); c.mana = SF.maxMana(c); return c;
 }
@@ -205,6 +216,7 @@ function starterKit() {
   for (const [k, tool] of [['lumberjacking', 'hatchet'], ['mining', 'pickaxe'], ['fishing', 'rod'], ['blacksmithy', 'tongs'], ['tailoring', 'sewkit'], ['carpentry', 'knife'], ['bowcraft', 'knife']]) if (P.skills[k].v > 0 && !SF.count(P.pack, tool)) add(tool, 1);
   if (P.skills.magery.v > 0) mageryStarter(add);
   if (P.skills.alchemy.v > 0) add('vial', 6);
+  if (P.skills.musicianship.v > 0) add('lute', 1); if (P.skills.lockpicking.v > 0) add('lockpick', 10); if (P.skills.tinkering.v > 0 && !SF.count(P.pack, 'tongs')) add('tongs', 1); if (P.skills.poisoning.v > 0) add('venom', 2); if (P.skills.veterinary.v > 0) add('bandage', 10);
   P.hotbar = [{ k: 'item', id: 'bandage' }, P.skills.magery.v > 0 ? { k: 'spell', id: 'magery.04' } : { k: 'item', id: 'draught' }, P.skills.magery.v > 0 ? { k: 'spell', id: 'magery.05' } : P.skills.hiding.v > 0 ? { k: 'act', id: 'hide' } : { k: 'act', id: 'track' }, { k: 'act', id: 'meditate' }, { k: 'act', id: 'bandother' }];
 }
 /* equipment and weight (src/equipment.js, SF.EQ). Weight is shown in weight units (SF.WU per authored kg); worn gear counts. */
@@ -359,10 +371,10 @@ function applyBlow(A, t, opt) {
   if (D.regions) { const rg = SF.EQ.regionArmor(t, SF.EQ.pickRegion(R)); D.armorAR = rg.ar + magicArmor(t); D.armorItem = rg.item; D.region = rg.region; }   // one body region per blow; unprotected regions take it bare
   const m = SF.mitigate(v, { parry: D.parry, braced: D.braced, shieldAR: D.shieldAR, armorAR: D.armorAR, player: D.player, mace: !!(A.w && A.w.mace) }, R); m.region = D.region;
   // side effects, each once: parry check and shield wear, armor wear (mace: half what it absorbed), weapon wear, stamina drain, gains
-  if (D.shieldAR > 0) { if (t === P) gain('parrying', A.diff); if (m.parried) { wear(D.shieldItem, .3); floater(t.x, t.y, 'parry', '#cfe8ff'); } }
+  if (D.shieldAR > 0) { if (t === P) skillUse('parrying', m.parryChance, m.parried); if (m.parried) { wear(D.shieldItem, .3); floater(t.x, t.y, 'parry', '#cfe8ff'); } }
   if (D.armorItem) { if (A.w && A.w.mace) { if (m.armorWear > 0) wear(D.armorItem, m.armorWear); } else wear(D.armorItem, .2); }
   if (A.w && A.w.mace) drainStam(t, rnd(SF.MACE_STAM[0], SF.MACE_STAM[1]));
-  if (a === P) { gain('tactics', D.diff); gain('anatomy', D.diff); if (A.it && A.w.hp) wear(A.it, 25 / A.w.hp);
+  if (a === P) { skillCheck('tactics', 0, 100); skillCheck('anatomy', 0, 100); if (A.it && A.w.hp) wear(A.it, 25 / A.w.hp);
     const it = A.it; if (it && it.venom && it.venom.charges > 0 && !A.w.ammo) { it.venom.charges--; applyPoison(t, it.venom.tier); if (!it.venom.charges) { delete it.venom; log('The venom on your weapon is spent.'); } } }
   m.raw = raw;
   if (m.final <= 0) { floater(t.x, t.y, m.parried ? 'parried' : 'absorbed', '#c8c8c8'); noHarmSound(t, m.parried); return m; }
@@ -385,7 +397,7 @@ function swingAt(a, t) {
   SF.swingSpend(a.sw, GT); a.lastCombat = GT; if (a === P) { P.lastCombat = GT; P.drawn = true; P.drawing = 0; }
   faceToward(a, t.x, t.y); const A = fighter(a), D = fighter(t);
   const chance = SF.hitChance(A.atk, D.def), hit = R() < chance;
-  if (a === P) gain(w.skill, D.diff);                                                   // a legitimate attempt
+  if (a === P) skillUse(w.skill, chance, hit);                                            // the hit chance is the challenge: a sure hit teaches nothing
   if (a === P) { playOnce((w.fam || 'Unarmed') + '_Attack', 0); P.lunge = .001; } else a.lunge = .001;
   provoke(t, a); swingSound(a, w);
   if (w.ammo) { const s = { id: ++SHOTID, a, t, w, A, hit, x0: a.x, y0: a.y, at: GT + SF.ARCHERY.flight }; a.shots = (a.shots || 0) + 1;
@@ -632,9 +644,9 @@ function finishFirstAid() {
   if (!b.self && (dist(P, e) > SF.FIRST_AID.range || !los(P, e))) { floater(P.x, P.y, 'out of reach', '#ffb070'); return out(`${cap1(who)} moved out of reach; the ${FA_WORD[b.kind]} is wasted.`); }
   const now = SF.firstAidKind(st);
   if (now !== b.kind) return out(b.kind === 'res' ? `${cap1(who)} is no longer a ghost.` : now === 'res' ? `${cap1(who)} died before you finished.` : now === 'cure' ? `${cap1(who)} was poisoned before you finished; this bandage was for wounds.` : now === 'heal' ? `The poison is already gone; this bandage was for poison.` : `${cap1(who)} no longer needs treatment.`);
-  const heal = sv('healing'), ana = sv('anatomy');
+  const real = b.kind !== 'heal', heal = real ? svReal('healing') : sv('healing'), ana = real ? svReal('anatomy') : sv('anatomy');   // cure and resurrection: the 60/60 and 80/80 thresholds read real skill
   const r = SF.firstAidResolve({ kind: b.kind, heal, ana, slips: b.slips, missing: st.max - st.hp }, R);
-  if (r.chance > 0 && r.chance < 1) { gain('healing', heal + 5); gain('anatomy', ana + 5); }    // a sure or impossible treatment teaches nothing
+  if (r.chance > 0) { skillCheck('healing', 0, 120); skillCheck('anatomy', 0, 120); }    // each real treatment teaches (a sure heal still teaches up to 100.0); one the healer cannot attempt does not
   const sl = b.slips ? ` (${b.slips} slip${b.slips > 1 ? 's' : ''})` : '';
   if (b.kind === 'heal') {
     if (!r.success) { floater(e.x, e.y, 'no effect', '#c8c8c8'); return out(`You fail to stop the bleeding${sl}.`); }
@@ -668,7 +680,7 @@ function anatomyCheck() {
   if (t !== P && (dist(t, P) > 8 || !los(P, t))) return log('Move closer to study them.', '#ffb070');
   const d = t.type ? MON[t.type] : null, x = d ? monT2A(d) : null;
   const tv = t === P || isAlly(t) ? { str: t.str, dex: t.dex, stam: t.stam, maxStam: t.dex } : { str: x.str, dex: x.dex, stam: stamOf(t), maxStam: x.dex };
-  const ana = sv('anatomy'); gain('anatomy', d ? d.diff : 40, { target: 'ana:' + (t === P ? 'P' : t.id) });
+  skillCheck('anatomy', 0, 100); const ana = sv('anatomy');
   const r = SF.anatomyRead(ana, tv);
   log(`${t === P ? 'You look' : cap1(t.name || 'it') + ' looks'} ${r.strWord} (STR ${r.str[0]}–${r.str[1]}) and ${r.dexWord} (DEX ${r.dex[0]}–${r.dex[1]})${r.stam ? `, stamina ${r.stam[0]}/${r.stam[1]}` : ''}.`, '#e8d8b0');
 }
@@ -764,7 +776,7 @@ function startGather(n) {
   P.task = { kind: 'gather', node: n, label: n.skill === 'forage' ? 'Foraging' : SF.SKILL[n.skill].n, t0: GT, t1: GT + SF.GATHER_TIME[n.skill], still: true, x0: P.x, y0: P.y }; faceToward(P, n.x + .5, n.y + .5);
   if (n.skill === 'fishing') snd('fish.cast', { key: 'P' });   // the committed cast
 }
-function fishCheck(diff) { gain('fishing', diff); return R() < SF.opposed(sv('fishing'), diff); }
+function fishCheck(diff) { const ch = SF.opposed(sv('fishing'), diff), ok = R() < ch; skillUse('fishing', ch, ok, null, SF.SK.HARVEST.common); return ok; }
 function finishGather(n) {
   if (n.skill === 'mining' || n.skill === 'lumberjacking') return finishStroke(n);
   const sk = n.skill, tier = sk === 'fishing' ? (Math.hypot(n.x - 92, n.y - 300) < 120 ? 0 : 1) : nodeTier(n.x, n.y), diff = SF.NODE_TIER_DIFF[tier];
@@ -793,7 +805,7 @@ function openCorpse(c) {
   if (P.ghost) return; if (dist(c, P) > 2) return log('Move within 2 m.'); if (!los(P, c)) return log('No line of sight.');
   P.opening = GT + .35; at(.35, () => { P.opening = 0; if (!c.gone && dist(c, P) <= 3) { P.lootOpen = c; openPanel('loot'); sndAt('loot.rummage', c); } });
 }
-function talk(n) { if (n.dev) return say(n, n.nav && n.nav.state === 'moving' ? 'On my way to ' + (n.nav.goal.name || 'somewhere') + '.' : 'Just passing through.'); if (lifeTalk(n)) return; if (annTalk(n)) return; if (n.role === 'assay' || n.role === 'qsmith') { if (P.ghost) return; P.talkTo = n; return openPanel('guild'); } if (n.role === 'quaywarden') { if (P.ghost) return resurrect(); P.talkTo = n; return openPanel('quest'); } if (n.role === 'healer' || n.role === 'guard') { if (P.ghost) return resurrect(); say(n, n.role === 'guard' ? 'Keep the peace inside the Quay.' : 'Rest easy. Bind at the shrine if you travel.'); return; } P.talkTo = n; openPanel(n.role === 'banker' || n.role === 'campbank' ? 'bank' : n.role === 'trainer' ? 'trainer' : 'shop'); }
+function talk(n) { if (n.dev) return say(n, n.nav && n.nav.state === 'moving' ? 'On my way to ' + (n.nav.goal.name || 'somewhere') + '.' : 'Just passing through.'); if (!P.ghost && teachesHere(n)) { P.talkTo = n; return openPanel('trainer'); } if (lifeTalk(n)) return; if (annTalk(n)) return; if (n.role === 'assay' || n.role === 'qsmith') { if (P.ghost) return; P.talkTo = n; return openPanel('guild'); } if (n.role === 'quaywarden') { if (P.ghost) return resurrect(); P.talkTo = n; return openPanel('quest'); } if (n.role === 'healer' || n.role === 'guard') { if (P.ghost) return resurrect(); say(n, n.role === 'guard' ? 'Keep the peace inside the Quay.' : 'Rest easy. Bind at the shrine if you travel.'); return; } P.talkTo = n; openPanel(n.role === 'banker' || n.role === 'campbank' ? 'bank' : n.role === 'trainer' ? 'trainer' : 'shop'); }
 
 /* ---------- world population ---------- */
 function populate() {
@@ -1210,11 +1222,12 @@ const TASKS = {
   lock: t => { const c = t.chest, diff = SF.CHEST_DIFF[c.tier]; gain('lockpicking', diff, { target: 'chest:' + c.x + ',' + c.y });
     if (R() < SF.opposed(sv('lockpicking'), diff)) { c.open = true; c.refill = GT + 600; c.cont = chestLoot(c.tier); log('The lock clicks open.', '#ffe08a'); sndAt('door.unlock', { x: c.x + .5, y: c.y + .5 }); openChest(c, true); }
     else { SF.removeQty(P.pack, 'lockpick', 1); log('Your lockpick snaps.'); } },
-  appraise: t => { const it = t.item, d = SF.ITEMS[it.id], p = SF.PRICES[it.id] || 1, err = (1 - sv('itemidentification') / 100) * .5; gain('itemidentification', 30, { target: 'item:' + it.id });
+  appraise: t => { const it = t.item, d = SF.ITEMS[it.id], p = SF.PRICES[it.id] || 1, err = (1 - sv('itemidentification') / 100) * .5; skillCheck('itemidentification', 0, 100);
     const lo = Math.max(1, Math.round(p * .4 * (1 - err))), hi = Math.round(p * 1.2 * (1 + err));
     log(`${SF.itemName(it)}${it.quality === 'exceptional' ? ' (exceptional)' : ''}: ${it.maker ? 'made by ' + it.maker + ', ' : ''}${it.cond !== undefined ? 'condition ' + Math.round(it.cond) + '/' + (it.maxc || 100) + ', ' : ''}worth about ${lo}–${hi} gold${d.trade ? '' : ', cannot be traded'}.`, '#e8d8b0'); },
-  repair: t => { const it = t.item, k = SF.repairSkill(it.id); const rp = SF.repairPlan(it); if (!rp.ok) return log(cap1(rp.reason), '#ffb070'); if (!SF.removeQty(P.pack, 'repairkit', 1)) return log('You need a repair kit.'); gain(k, 30);
-    if (R() < SF.opposed(sv(k), 30)) { const r = SF.EQ.repairItem(P, { uid: it.uid, skill: sv(k), rng: R }); log(r.ok ? `Repaired to ${r.maxc}/${r.maxc}.` + (r.lost ? ` The maximum drops by ${r.lost}.` : ' The maximum holds.') : r.reason, r.ok ? '#7ee08a' : '#ffb070'); } else log('The repair fails and the kit is used up.', '#ffb070'); renderPanel(); } };
+  repair: t => { const it = t.item, k = SF.repairSkill(it.id); const rp = SF.repairPlan(it); if (!rp.ok) return log(cap1(rp.reason), '#ffb070'); if (!SF.removeQty(P.pack, 'repairkit', 1)) return log('You need a repair kit.');
+    const rd = SF.SK.repairDiff(it.cond === undefined ? 100 : it.cond, it.maxc || 100);   // a badly worn piece is harder to mend (−25 … 100)
+    if (skillCheck(k, rd - 25, rd + 25)) { const r = SF.EQ.repairItem(P, { uid: it.uid, skill: sv(k), rng: R }); log(r.ok ? `Repaired to ${r.maxc}/${r.maxc}.` + (r.lost ? ` The maximum drops by ${r.lost}.` : ' The maximum holds.') : r.reason, r.ok ? '#7ee08a' : '#ffb070'); } else log('The repair fails and the kit is used up.', '#ffb070'); renderPanel(); } };
 /* a found item: gear arrives as a proper instance (material, durability), worn to pct % of its maximum */
 function lootItem(id, q, pct) { if (SF.EQ.isGear(id)) { const it = SF.EQ.make(id, { origin: 'loot' }); if (it.omax) it.cond = Math.max(1, Math.round(it.omax * pct / 100)); return it; } return SF.newItem(id, q, SF.WEARABLE(id) ? { cond: pct, maxc: 100 } : null); }
 function chestLoot(tier) { const c = SF.newContainer('chest'); const add = (id, a, b) => { const q = rnd(a, b); if (q > 0) c.items.push(lootItem(id, q, rnd(70, 100))); };
@@ -1911,16 +1924,54 @@ function bagActions(it) {
   if (d.trade) a += btn('drop', 'Drop', { u: it.uid });
   return a;
 }
+/* ---------- the Skills page: classic groups, real or displayed values to 0.1, locks, search, one-tap use, help, prerequisites ---------- */
+const SKUI = { real: false, q: '', closed: {} };
+let PICKT = null;   // a pending creature/item target for a skill (src: pickTarget)
+// skill → ability id for the one-tap Use button (abilities live in ABIL, or are the hide/track/meditate built-ins)
+const SKILL_ABIL = { anatomy: 'anatomy', hiding: 'hide', tracking: 'track', meditation: 'meditate', detectinghidden: 'detect', animaltaming: 'tame', veterinary: 'vet',
+  peacemaking: 'peace', enticement: 'entice', provocation: 'provoke', stealing: 'steal', poisoning: 'poison', stealth: 'stealth', animallore: 'lore', evaluatingintelligence: 'evalint',
+  itemidentification: 'itemid', armslore: 'armslore', musicianship: 'play', begging: 'beg', camping: 'camp', forensicevaluation: 'forensic', herding: 'herd', snooping: 'snoop',
+  spiritspeak: 'spirit', tasteidentification: 'taste', lockpicking: 'picklock', removetrap: 'untrap' };
+function useAbility(id) { if (ABIL[id]) return ABIL[id].fn(); const f = { hide, track, meditate }[id]; if (f) return f(); }
+function skillsPanel() {
+  const tot = SF.totalSkill(P), q = SKUI.q.trim().toLowerCase();
+  let h = `<div class="sktop"><input id="skq" type="search" placeholder="Search skills" value="${esc(SKUI.q)}" autocomplete="off" aria-label="Search skills">${btn('skview', SKUI.real ? 'Showing real' : 'Showing displayed')}</div>`;
+  h += `<div class="note">Real total ${f1(tot)} / 700.0 · ▲ raise · ■ hold · ▼ lower (gives points back at the cap). ${SKUI.real ? 'Real values: what you trained.' : 'Displayed values include a small lift from your stats; the real value counts toward 700.'}</div>`;
+  if (P.skillPool > 0) h += `<div class="sec">Skill reform</div><p class="note">${f1(P.skillPool)} trained points from skills that merged or were retired are waiting. Tap +1.0 on a skill to place them (never past 100.0 or the 700.0 total).</p>`;
+  for (const [g, gn] of SF.SKILL_GROUPS) {
+    const rows = SF.SKILLS.filter(sk => sk[2] === g && (!q || sk[1].toLowerCase().includes(q) || (SF.SKILL_TIP[sk[0]] || '').toLowerCase().includes(q)));
+    if (!rows.length) continue; const sum = rows.reduce((a, sk) => a + P.skills[sk[0]].v, 0), shut = SKUI.closed[g] && !q;
+    h += `<button class="skgrp" data-a="skgrp" data-g="${g}" aria-expanded="${!shut}">${shut ? '▸' : '▾'} ${gn} <span class="note">${f1(sum)}</span></button>`;
+    if (shut) continue;
+    for (const [k, n] of rows) {
+      const s = P.skills[k], D = SF.SKILL[k], lk = s.lock === 'raise' ? '▲' : s.lock === 'hold' ? '■' : '▼', v = SKUI.real ? s.v / 10 : sv(k), ab = SKILL_ABIL[k];
+      const badge = D.state === 'pending' ? ' <span class="badge pend">pending</span>' : D.state === 'partial' ? ' <span class="badge part">partial</span>' : '';
+      const req = SF.SK.REQUIRES[k] && !SF.SK.meetsReq(P, k) ? ` <span class="badge req">needs ${esc(SF.SK.reqText(k))}</span>` : '';
+      h += `<div class="row ${D.live ? '' : 'na'}" title="${esc(D.help)}"><span class="nm">${n}${badge}${req}<br><span class="note">${esc(D.help)}</span></span><span class="v">${v.toFixed(1)}</span>${P.skillPool > 0 && s.v < SF.SKILL_MAX ? btn('pool', '+1.0', { k }) : ''}${D.live && ab && (ABIL[ab] || ['hide', 'track', 'meditate'].includes(ab)) ? btn('skuse', 'Use', { k }) : ''}${btn('lock', lk, { k })}</div>`;
+    }
+  }
+  h += '<div class="sec">Recent skill checks</div>' + (SKLOG.slice(-14).reverse().map(l => `<div class="note">${SF.SKILL[l.k].n}: ${esc(l.r)}</div>`).join('') || '<p class="note">None yet.</p>');
+  return ['Skills', h];
+}
+document.addEventListener('input', e => { if (e.target && e.target.id === 'skq') { SKUI.q = e.target.value; renderPanel(); } });
+/* ---------- NPC trainers (src/skills.js SK.TRAINERS): each profession teaches its own skills up to 30.0 at 1 gold per 0.1 ---------- */
+const trainerRole = n => n && n.role;
+const teachesHere = n => !!(SF.SK.TRAINERS[trainerRole(n)] && !SHOPS[n.role] && !(n.life && n.life.doing === 'sleep'));
+function trainerRows(n) {
+  const gold = SF.count(P.pack, 'gold'), free = P.freeLessons > 0; let h = `<p class="note">I can teach these up to 30.0, at one gold for each tenth of a point. A lighter purse buys a shorter lesson. Skills on Hold or Lower cannot be taught.${free ? ` You still have ${P.freeLessons} free lesson${P.freeLessons > 1 ? 's' : ''} from before.` : ''}</p>`;
+  for (const k of SF.SK.TRAINERS[trainerRole(n)] || []) {
+    const s = P.skills[k], q = SF.SK.trainQuote(P, k, gold, free);
+    h += `<div class="row"><span class="nm">${SF.SKILL[k].n} <span class="note">${f1(s.v)}${q.ok ? ' → ' + f1(q.to) : ''}</span>${q.ok ? '' : `<br><span class="note">${esc(q.reason)}</span>`}</span><span class="v">${q.ok ? (q.price ? q.price + ' gp' : 'free') : ''}</span>${q.ok ? btn('train', 'Learn', { k }) : ''}</div>`;
+  }
+  return h;
+}
+function trainerPanel() { const n = P.talkTo; if (!n || dist(n, P) > 4) return null; return [n.name, `<div class="note" style="text-align:right">${SF.count(P.pack, 'gold')} gold</div>` + trainerRows(n)]; }
 const PANELS = {
   bag: bagPanel,
   gear: () => { const t = (k, n) => `<span>${n}</span><span>${P[k]}</span>`; let h = `<div class="kv">${t('str', 'Strength')}${t('dex', 'Dexterity')}${t('int', 'Intellect')}<span>Stat total</span><span>${P.str + P.dex + P.int} / 225</span><span>Health</span><span>${Math.floor(P.hp)} / ${SF.maxHp(P)}</span><span>Stamina</span><span>${Math.floor(P.stam)} / ${SF.maxStam(P)}</span><span>Mana</span><span>${Math.floor(P.mana)} / ${SF.maxMana(P)}</span><span>Armor rating</span><span>${armorVal()}</span><span>Carried</span><span>${fmtWt(carryWt())} / ${fmtWt(SF.carryCap(P))} · ${encumb().n}</span><span>Weapon</span><span>${wDef().fam} · ${wDef().dmg.join('–')} · reach ${wDef().reach} m · swing every ${SF.swingDelay(P.stam, wDef().speed).toFixed(2)} s</span><span>Bound shrine</span><span>${SHRINES.find(s => s.id === P.bound).n}</span><span>Skills</span><span>${f1(SF.totalSkill(P))} / 700.0</span></div><div class="sec">Equipped ${btn('eqwin', 'Paper doll (C)', {}, 'ac')}</div>`;
     for (const s of SF.EQ.SLOT_IDS) { const it = P.equip[s]; if (!it && !['weapon', 'shield', 'chest'].includes(s)) continue; h += `<div class="row"><span class="v" style="width:5.5em">${SF.EQ.SLOT[s].n}</span>${it ? rowIcon(it) : ''}<span class="nm">${it ? esc(iname(it)) : '<span class="note">empty</span>'}</span>${it && SF.WEARABLE(it.id) && it.cond !== undefined && it.cond < (it.maxc || 100) ? btn('repair', 'Repair', { u: it.uid }) : ''}${it && SF.ITEMS[it.id].trade ? btn('uneq', 'Remove', { s }) : ''}</div>`; }
-    return ['Character', h + '<p class="note">Stats do not grow by use. Buy points from Master Vey (up to 225 total).</p>']; },
-  skills: () => { let h = `<div class="note">Total ${f1(SF.totalSkill(P))} / 700.0 · ▲ raise · ■ hold · ▼ lower (gives points when you hit the cap)</div>`;
-    if (P.skillPool > 0) h += `<div class="sec">Skill reform</div><p class="note">${f1(P.skillPool)} trained points from skills that merged or were retired are waiting. Tap +1.0 on a skill to place them (never past 100.0 or the 700.0 total).</p>`;
-    for (const [k, n, g, live] of SF.SKILLS) { const s = P.skills[k]; const lk = s.lock === 'raise' ? '▲' : s.lock === 'hold' ? '■' : '▼'; const tip = SF.SKILL_TIP[k]; h += `<div class="row ${live ? '' : 'na'}"${tip ? ` title="${esc(tip)}"` : ''}><span class="nm">${n}${live ? '' : ' <span class="note">later milestone</span>'}${tip ? `<br><span class="note">${esc(tip)}</span>` : ''}</span><span class="v">${f1(s.v)}</span>${P.skillPool > 0 && s.v < SF.SKILL_MAX ? btn('pool', '+1.0', { k }) : ''}${btn('lock', lk, { k })}</div>`; }
-    h += '<div class="sec">Recent skill checks</div>' + (SKLOG.slice(-14).reverse().map(l => `<div class="note">${SF.SKILL[l.k].n}: ${esc(l.r)}</div>`).join('') || '<p class="note">None yet.</p>');
-    return ['Skills', h]; },
+    return ['Character', h + '<p class="note">Stats grow as you use the skills that lean on them: Strength, Dexterity and Intelligence each up to 100, 225 in all. At 225 a gain in one lowers another.</p>']; },
+  skills: () => skillsPanel(),
   spells: () => spellbookPanel(),
   abilities: () => ['Abilities', `<p class="note">Use now or put an action on a hotbar slot (two bars of four).</p>` + [['bandother', 'Bandage other (Healing: an ally or a player ghost)'], ['anatomy', 'Anatomy (judge a living target)'], ['hide', 'Hide (Hiding)'], ['track', 'Track (Tracking)'], ['meditate', 'Meditate (Meditation)'], ['detect', 'Detect Hidden (finds hidden foes and snares)'], ['tame', 'Tame (Animal Taming)'], ['vet', 'Treat pet (Veterinary)'], ['peace', 'Peacemaking (needs an instrument)'], ['entice', 'Enticement (needs an instrument)'], ['provoke', 'Provocation (needs an instrument)'], ['steal', 'Steal (Stealing)'], ['poison', 'Poison a weapon (Poisoning 30)'], ['trap', 'Set a snare (a tinker\'s snare kit)']].map(([id, n]) => `<div class="row"><span class="nm">${n}</span>${ABIL[id] ? btn('abil', 'Use', { id }) : ''}${btn('assign', 'Slot', { k: 'act', id })}</div>`).join('')],
   assign: () => ['Choose a slot', `<p class="note">Assign ${esc(ASSIGN.k === 'spell' ? SF.SPELL[ASSIGN.id].n : ASSIGN.k === 'item' ? SF.ITEMS[ASSIGN.id].n : (ABIL[ASSIGN.id] ? ABIL[ASSIGN.id].n : ASSIGN.id))} to:</p><div class="grid2">${P.hotbar.map((_, i) => btn('setslot', 'Bar ' + (1 + Math.floor(i / 3)) + ' · ' + (i % 3 + 1) + ': ' + esc(slotLabel(P.hotbar[i])[0]), { i })).join('')}</div>`],
@@ -1934,14 +1985,12 @@ const PANELS = {
     h += '<div class="sec">Pack</div>'; for (const it of P.pack.items) if (SF.ITEMS[it.id].trade) h += `<div class="row">${rowIcon(it)}<span class="nm">${esc(iname(it))}</span>${btn('dep', 'Deposit', { u: it.uid })}</div>`;
     for (const s of SF.EQ.SLOT_IDS) { const it = P.equip[s]; if (it && SF.ITEMS[it.id].trade) h += `<div class="row">${rowIcon(it)}<span class="nm">${esc(iname(it))} <span class="note">worn</span></span>${btn('depeq', 'Deposit', { s })}</div>`; }
     return [P.talkTo ? P.talkTo.name : 'Bank', h]; },
-  shop: () => { const n = P.talkTo; if (!n || dist(n, P) > 4) return null; const stock = SHOPS[n.role] || []; const tab = PTAB || 'buy'; let h = `<div class="tabs">${btn('tab', 'Buy', { t: 'buy' }, tab === 'buy' ? 'ac' : '')}${btn('tab', 'Sell', { t: 'sell' }, tab === 'sell' ? 'ac' : '')}<span class="note" style="margin-left:auto">${SF.count(P.pack, 'gold')} gold</span></div>`;
-    if (tab === 'buy') for (const id of stock) { const p = SF.PRICES[id]; const st = SF.ITEMS[id].stack; h += `<div class="row">${rowIcon({ id })}<span class="nm">${esc(SF.itemName({ id, qty: 1 }))}</span><span class="v">${p} gp</span>${btn('buy', 'Buy', { id, n: 1 })}${st ? btn('buy', '×10', { id, n: 10 }) : ''}</div>`; }
+  shop: () => { const n = P.talkTo; if (!n || dist(n, P) > 4) return null; const stock = SHOPS[n.role] || []; const tab = PTAB || 'buy'; let h = `<div class="tabs">${btn('tab', 'Buy', { t: 'buy' }, tab === 'buy' ? 'ac' : '')}${btn('tab', 'Sell', { t: 'sell' }, tab === 'sell' ? 'ac' : '')}${SF.SK.TRAINERS[n.role] ? btn('tab', 'Lessons', { t: 'learn' }, tab === 'learn' ? 'ac' : '') : ''}<span class="note" style="margin-left:auto">${SF.count(P.pack, 'gold')} gold</span></div>`;
+    if (tab === 'learn') h += trainerRows(n);
+    else if (tab === 'buy') for (const id of stock) { const p = SF.PRICES[id]; const st = SF.ITEMS[id].stack; h += `<div class="row">${rowIcon({ id })}<span class="nm">${esc(SF.itemName({ id, qty: 1 }))}</span><span class="v">${p} gp</span>${btn('buy', 'Buy', { id, n: 1 })}${st ? btn('buy', '×10', { id, n: 10 }) : ''}</div>`; }
     else for (const it of P.pack.items) { if (!SF.ITEMS[it.id].trade || it.id === 'gold') continue; const p = Math.max(1, Math.floor((SF.PRICES[it.id] || 1) * .4)); h += `<div class="row">${rowIcon(it)}<span class="nm">${esc(iname(it))}</span><span class="v">${p} gp ea</span>${btn('sell', 'Sell 1', { u: it.uid })}${it.qty > 1 ? btn('sell', 'All', { u: it.uid, all: 1 }) : ''}</div>`; }
     return [n.name, h]; },
-  trainer: () => { const tab = PTAB || 'skills'; let h = `<div class="tabs">${btn('tab', 'Lessons', { t: 'skills' }, tab === 'skills' ? 'ac' : '')}${btn('tab', 'Attributes', { t: 'stats' }, tab === 'stats' ? 'ac' : '')}<span class="note" style="margin-left:auto">${SF.count(P.pack, 'gold')} gold · ${P.freeLessons} free lessons</span></div>`;
-    if (tab === 'skills') { h += '<p class="note">Lessons raise a skill to 30. Your first two are free. Skills set to Hold or Lower cannot be trained.</p>'; for (const [k, n, , live] of SF.SKILLS) { if (!live) continue; const v = P.skills[k].v / 10; if (v >= 30) continue; const cost = P.freeLessons > 0 ? 0 : SF.trainCost(v, 30); h += `<div class="row"><span class="nm">${n} <span class="note">${v.toFixed(1)} → 30</span></span><span class="v">${cost ? cost + ' gp' : 'free'}</span>${btn('train', 'Learn', { k })}</div>`; } }
-    else { h += `<p class="note">Attribute points cost ${SF.statTrainCost(1)} gold each. Total ${P.str + P.dex + P.int} / 225, each at most 100.</p>`; for (const [k, n] of [['str', 'Strength'], ['dex', 'Dexterity'], ['int', 'Intellect']]) h += `<div class="row"><span class="nm">${n}</span><span class="v">${P[k]}</span>${btn('stat', '+1', { k, n: 1 })}${btn('stat', '+5', { k, n: 5 })}</div>`; }
-    return ['Master Vey, trainer', h]; },
+  trainer: () => trainerPanel(),
   log: () => ['Combat and system log', LOG.slice(-150).reverse().map(l => `<div style="color:${l.c};padding:2px 0">${esc(l.t)}</div>`).join('')],
   picker: () => ['Which one?', PICK.map((e, i) => `<div class="row"><span class="nm">${esc(e.name)}</span><span class="v">${dist(e, P).toFixed(1)} m</span>${btn('pick', 'Select', { i })}</div>`).join('')],
   menu: () => ['Menu', `<div class="grid2">${btn('open', 'Abilities', { p: 'abilities' })}${btn('open', 'Log', { p: 'log' })}${btn('zoom', 'Zoom ×' + ZOOM)}${btn('mirror', SETTINGS.mirror ? 'Right-handed layout' : 'Left-handed layout')}${btn('sprintt', SETTINGS.stickSprint ? 'Stick sprint: on (push far)' : 'Stick sprint: off (button only)')}${btn('mute', muted ? 'Sound off' : 'Sound on')}${btn('music', SFXA.musicOn ? 'Music on' : 'Music off')}${btn('savenow', 'Save now')}${btn('open', 'How to play', { p: 'help' })}</div><p class="note" style="margin-top:12px">Shardfall web slice · offline M1. ${btn('wipe', 'Delete character', {}, 'on')}</p>`],
@@ -1984,8 +2033,13 @@ const ACT = {
   tab: d => { PTAB = d.t; renderPanel(true); snd('ui.page'); },
   buy: d => { const p = SF.PRICES[d.id] * +d.n; if (SF.count(P.pack, 'gold') < p) return log('Not enough gold.', '#ffb070'); const it = SF.EQ.isGear(d.id) || (SF.WEARABLE(d.id) && !SF.ITEMS[d.id].stack) ? SF.EQ.make(d.id, { origin: 'npc' }) : SF.newItem(d.id, +d.n, SF.ITEMS[d.id].stack ? null : { cond: 100 }); const r = SF.addItem(P.pack, it, cap()); if (!r.ok) return log(r.reason, '#ffb070'); SF.removeQty(P.pack, 'gold', p); snd('loot.coin'); renderPanel(); },
   sell: d => { const it = findU(P.pack, d.u); if (!it) return; const n = d.all ? it.qty : 1, g = Math.max(1, Math.floor((SF.PRICES[it.id] || 1) * .4 * (SF.WORK_TOOLS[it.id] && !SF.ITEMS[it.id].stack ? SF.toolUses(it) / SF.TOOL_USES : 1))) * n; it.qty -= n; if (it.qty <= 0) P.pack.items.splice(P.pack.items.indexOf(it), 1); P.pack.ver++; SF.addItem(P.pack, SF.newItem('gold', g)); snd('loot.coin'); renderPanel(); },
-  train: d => { const s = P.skills[d.k]; if (s.lock !== 'raise') return log('Set that skill to Raise first.', '#ffb070'); const v = s.v / 10; const cost = P.freeLessons > 0 ? 0 : SF.trainCost(v, 30); const add = 300 - s.v; if (SF.totalSkill(P) + add > SF.SKILL_CAP) return log('That would pass the 700 cap.', '#ffb070'); if (cost && SF.count(P.pack, 'gold') < cost) return log('Not enough gold.', '#ffb070'); if (cost) SF.removeQty(P.pack, 'gold', cost); else P.freeLessons--; s.v = 300; log(`You train ${SF.SKILL[d.k].n} to 30.`, '#7fd4ff'); save(); renderPanel(); },
-  stat: d => { const n = +d.n, k = d.k; if (P.str + P.dex + P.int + n > SF.STAT_CAP) return log('Attribute total is capped at 225.', '#ffb070'); if (P[k] + n > SF.STAT_MAX) return log('Each attribute is capped at 100.', '#ffb070'); const c = SF.statTrainCost(n); if (SF.count(P.pack, 'gold') < c) return log('Not enough gold.', '#ffb070'); SF.removeQty(P.pack, 'gold', c); P[k] += n; save(); renderPanel(); },
+  train: d => { const n = P.talkTo; if (!n || dist(n, P) > 4 || !(SF.SK.TRAINERS[trainerRole(n)] || []).includes(d.k)) return log('Speak to a teacher of that skill.', '#ffb070');
+    const free = P.freeLessons > 0, q = SF.SK.train(P, d.k, SF.count(P.pack, 'gold'), free); if (!q.ok) return log(q.reason, '#ffb070');
+    if (q.price) SF.removeQty(P.pack, 'gold', q.price); else P.freeLessons--;
+    say(n, q.full ? 'That is all I can teach thee.' : 'That is all thy gold will buy.'); log(`${n.name.split(',')[0]} teaches you ${SF.SKILL[d.k].n}: ${f1(q.to - q.tenths)} → ${f1(q.to)}${q.price ? ' for ' + q.price + ' gold' : ' (a free lesson)'}.`, '#7fd4ff'); snd('loot.coin'); save(); renderPanel(); },
+  skgrp: d => { SKUI.closed[d.g] = !SKUI.closed[d.g]; renderPanel(); },
+  skview: () => { SKUI.real = !SKUI.real; renderPanel(); },
+  skuse: d => { const id = SKILL_ABIL[d.k]; if (!id) return; closePanel(); useAbility(id); },
   craft: d => { startCraft(d.r, +(d.n || 1)); },
   pick: d => { P.sel = PICK[+d.i]; closePanel(); },
   petatk: () => petCommand('attack'),
@@ -2056,19 +2110,19 @@ function finishStroke(n) {
   const sk = n.skill, tier = nodeTier(n.x, n.y), diff = SF.NODE_TIER_DIFF[tier], st = nodeStock(n.x, n.y), nm = nodeLabel(n);
   if (st.n <= 0) return log('This ' + nm + ' is exhausted for now.');
   const tl = gatherTool(n); if (!tl.ok) return log('You need a ' + SF.ITEMS[tl.id].n.toLowerCase() + '.', '#ffb070');
-  const s = sv(sk), hit = R() < SF.opposed(s, diff);
-  let gdiff = diff;
+  const s = sv(sk), hch = SF.opposed(s, diff), hit = R() < hch;
+  let win = SF.SK.HARVEST.common;
   if (hit) {
     const mat = SF.strokeMaterial(sk, st.spec, s, R), id = sk === 'mining' ? SF.oreId(mat) : SF.logId(mat), q = SF.STROKE_YIELD[sk];
     const add = SF.addItem(P.pack, SF.newItem(id, q), cap());
     if (!add.ok) { log(`No room for ${q} ${SF.ITEMS[id].n.toLowerCase()}: ${add.reason}. Nothing was taken.`, '#ffb070'); return; }   // commit nothing
-    if (mat !== SF.commonOf(sk)) gdiff = Math.max(diff, SF.gateFor(sk, mat));
+    if (mat !== SF.commonOf(sk)) win = SF.SK.HARVEST.rare(SF.gateFor(sk, mat));   // a coloured ore or rare wood teaches from its gate − 40
     st.n--; if (st.n <= 0) st.t = GT + nodeRegion(n.x, n.y).refill;
     log(`You ${sk === 'mining' ? 'break loose' : 'fell'} ${q} ${SF.ITEMS[id].n.toLowerCase()}${mat !== SF.commonOf(sk) ? '!' : '.'}`, mat !== SF.commonOf(sk) ? '#ffe08a' : undefined);
     if (sk === 'mining' && R() < .12) { const r2 = SF.addItem(P.pack, SF.newItem('ironshard', 2), cap()); if (r2.ok) log('Two iron shards come away with it.'); else log('Two iron shards fell away: no room.', '#a8a8a8'); }
     questEvent({ type: 'harvest', skill: sk, mat, qty: q, quay: isQuayNode(n.x, n.y) }); simEmit('ResourceGathered', { actor: aidOf(P), skill: sk, item: id, qty: q, node: n.y * W + n.x, x: n.x, y: n.y });
   } else log({ lumberjacking: 'You chop but get nothing usable.', mining: 'You break loose rock but no ore.' }[sk]);
-  sndAt(sk === 'mining' ? 'gather.mine' : 'gather.chop', { x: n.x + .5, y: n.y + .5 }); gain(sk, gdiff, { target: 'node:' + n.x + ',' + n.y });
+  sndAt(sk === 'mining' ? 'gather.mine' : 'gather.chop', { x: n.x + .5, y: n.y + .5 }); skillUse(sk, hch, hit, null, win);
   if (tl.it && spendTool(tl.it)) log('Your ' + SF.ITEMS[tl.id].n.toLowerCase() + ' breaks.', '#ff6a5a');
   if (st.n <= 0) { log('The ' + nm + ' is exhausted.'); return; }
   at(.15, () => { if (!P.task && !P.ghost && P.sel === n && Math.hypot(n.x + .5 - P.x, n.y + .5 - P.y) <= 2 && !overweight() && P.speed < .1) startGather(n); });
@@ -2274,7 +2328,7 @@ function finishCraft(t) {
   const p = SF.craftPlan(P, P.pack, r, t.mat, t.sec), res = SF.craftAttempt(P, P.pack, p, R, cap(), { mark: !!P.cx.mark });
   if (!res.ok) { P.batch = null; log('Stopped: ' + res.reason + '.', '#ffb070'); renderPanel(); return; }
   craftSound(r, res.success);
-  gain(r.skill, p.diff, { recipe: r.id });
+  skillUse(r.skill, p.chance, res.success, null, SF.SK.CRAFT_WINDOW(p.diff));   // every attempt teaches while the recipe is still a challenge
   if (tool.it && spendTool(tool.it)) log('Your ' + SF.ITEMS[r.tool].n.toLowerCase() + ' wear out and break.', '#ff6a5a');
   if (res.success) { const it = res.items[0]; b.made++;
     log(`You make ${it.qty > 1 ? it.qty + ' × ' : ''}${SF.itemName(it).toLowerCase()}${res.exceptional ? ' — exceptional work!' : ''}.`, res.exceptional ? '#ffe08a' : '#e8e2d2');
@@ -2449,17 +2503,20 @@ function save() {
 function loadSave() { try { const s = localStorage.getItem(SAVEKEY); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
 
 /* ---------- boot & creation ---------- */
+/* starting ideas: editable suggestions, never classes. 80 stat points (10–60 each) and up to three skills worth 100 (late 1999 creation, src/skills.js SK.CREATE) */
 const PROFILES = {
-  'Glaive hybrid': { s: [55, 45, 50], k: { swordsmanship: 50, magery: 30, tactics: 20 }, ideal: 'Swordsmanship, Tactics, Magery, Evaluating Intelligence, Resisting Spells, Meditation, Wrestling' },
-  'Venom skirmisher': { s: [50, 60, 40], k: { fencing: 50, tactics: 30, healing: 20 }, ideal: 'Fencing, Tactics, Anatomy, Healing, Resisting Spells, Poisoning, Hiding' },
-  'Group healer': { s: [40, 40, 70], k: { magery: 50, healing: 30, meditation: 20 }, ideal: 'Magery, Evaluating Intelligence, Resisting Spells, Meditation, Wrestling, Healing, Anatomy' },
-  'Archer scout': { s: [45, 65, 40], k: { archery: 50, tactics: 30, hiding: 20 }, ideal: 'Archery, Tactics, Anatomy, Healing, Tracking, Hiding, Stealth' },
-  'Mace dexer': { s: [60, 60, 30], k: { macefighting: 50, tactics: 30, healing: 20 }, ideal: 'Mace Fighting, Tactics, Anatomy, Healing, Parrying, Resisting Spells, Wrestling' },
-  'Merchant smith': { s: [60, 50, 40], k: { mining: 40, blacksmithy: 40, lumberjacking: 20 }, ideal: 'Mining, Blacksmithy, Tinkering, Carpentry, Lumberjacking, Item Identification, Tailoring' } };
-let CC = { name: '', prof: 'Glaive hybrid', s: [55, 45, 50], k: Object.entries(PROFILES['Glaive hybrid'].k), cloak: '' };
+  'Glaive hybrid': { s: [45, 10, 25], k: { swordsmanship: 50, magery: 30, tactics: 20 }, ideal: 'Swordsmanship, Tactics, Anatomy, Healing, Parrying, Resisting Spells, Magery' },
+  'Venom skirmisher': { s: [30, 40, 10], k: { fencing: 50, tactics: 30, healing: 20 }, ideal: 'Fencing, Tactics, Anatomy, Healing, Resisting Spells, Poisoning, Hiding' },
+  'Group healer': { s: [20, 10, 50], k: { magery: 50, healing: 30, meditation: 20 }, ideal: 'Magery, Evaluating Intelligence, Meditation, Resisting Spells, Wrestling, Swordsmanship, Tactics' },
+  'Archer scout': { s: [25, 45, 10], k: { archery: 50, tactics: 30, hiding: 20 }, ideal: 'Archery, Tactics, Anatomy, Healing, Tracking, Hiding, Stealth' },
+  'Mace dexer': { s: [45, 25, 10], k: { macefighting: 50, tactics: 30, healing: 20 }, ideal: 'Mace Fighting, Tactics, Anatomy, Healing, Parrying, Resisting Spells, Wrestling' },
+  'Bard mage': { s: [20, 10, 50], k: { musicianship: 50, provocation: 30, magery: 20 }, ideal: 'Magery, Evaluating Intelligence, Meditation, Resisting Spells, Musicianship, Provocation, Peacemaking' },
+  'Tamer': { s: [20, 10, 50], k: { animaltaming: 50, animallore: 30, veterinary: 20 }, ideal: 'Animal Taming, Animal Lore, Veterinary, Magery, Meditation, Evaluating Intelligence, Resisting Spells' },
+  'Merchant smith': { s: [50, 20, 10], k: { mining: 40, blacksmithy: 40, lumberjacking: 20 }, ideal: 'Mining, Blacksmithy, Lumberjacking, Carpentry, Tinkering, Tailoring, Bowcraft & Fletching' } };
+let CC = { name: '', prof: 'Glaive hybrid', s: [45, 10, 25], k: Object.entries(PROFILES['Glaive hybrid'].k), cloak: '' };
 const CLOAKS = ['', '#8a2a2a', '#2a3a8a', '#5a2a6a', '#3a3a3a', '#8a6a2a'];
 function renderCC() {
-  const sv0 = loadSave(), live = SF.SKILLS.filter(s => s[3]); const opts = sel => live.map(s => `<option value="${s[0]}"${s[0] === sel ? ' selected' : ''}>${esc(s[1])}</option>`).join('');
+  const sv0 = loadSave(), live = SF.SKILLS.filter(s => s[3] && !SF.SK.CREATE.banned.includes(s[0])); const opts = sel => live.map(s => `<option value="${s[0]}"${s[0] === sel ? ' selected' : ''}>${esc(s[1])}</option>`).join('');
   const tot = CC.s.reduce((a, b) => a + b, 0), kt = CC.k.reduce((a, b) => a + b[1], 0);
   $('#ccin').innerHTML = `<div class="cchead"><img src="${SCOUT_SRC}" alt="" class="ccimg"><div><h1>Shardfall</h1><div class="sub">Saltmarsh Quay · offline island slice</div></div></div>
   ${sv0 ? `<button class="btn ac big" data-c="cont">Continue as ${esc(sv0.char.name)}${sv0.char.ghost ? ' (ghost)' : ''}</button><div class="sub" style="margin:8px 0 0">or create a new character below (replaces the saved one)</div>` : ''}
@@ -2467,15 +2524,15 @@ function renderCC() {
   <label>Starting idea <span class="note">(editable, no class is locked in)</span></label><div class="chips">${Object.keys(PROFILES).map(p => `<button class="btn sm ${CC.prof === p ? 'ac' : ''}" data-c="prof" data-p="${p}">${p}</button>`).join('')}</div>
   ${PROFILES[CC.prof] ? `<p class="note">At the cap: ${PROFILES[CC.prof].ideal}.</p>` : ''}
   <label>Cloak</label><div class="sw">${CLOAKS.map(c => `<button style="background:${c || '#2f5a5a'}" class="${CC.cloak === c ? 'on' : ''}" data-c="cloak" data-v="${c}" aria-label="cloak colour"></button>`).join('')}</div></div>
-  <div><label>Attributes <span class="note">(${tot} / 150, each 25–100)</span></label>${['Strength', 'Dexterity', 'Intellect'].map((n, i) => `<div class="stat"><span>${n}</span><button class="btn sm" data-c="st" data-i="${i}" data-d="-5">−</button><b>${CC.s[i]}</b><button class="btn sm" data-c="st" data-i="${i}" data-d="5">+</button></div>`).join('')}
+  <div><label>Attributes <span class="note">(${tot} / ${SF.SK.CREATE.stats}, each ${SF.SK.CREATE.statMin}–${SF.SK.CREATE.statMax}; they grow as you use your skills)</span></label>${['Strength', 'Dexterity', 'Intellect'].map((n, i) => `<div class="stat"><span>${n}</span><button class="btn sm" data-c="st" data-i="${i}" data-d="-5">−</button><b>${CC.s[i]}</b><button class="btn sm" data-c="st" data-i="${i}" data-d="5">+</button></div>`).join('')}
   <p class="note">HP ${50 + Math.floor(CC.s[0] / 2)} · stamina ${CC.s[1]} · mana ${CC.s[2]}</p>
-  <label>Starting skills <span class="note">(${kt} / 100, at most 50 each)</span></label>${CC.k.map((k, i) => `<div class="skl"><select data-c="sk" data-i="${i}" aria-label="Skill ${i + 1}">${opts(k[0])}</select><select data-c="kv" data-i="${i}" aria-label="Skill ${i + 1} points">${[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50].map(v => `<option${v === k[1] ? ' selected' : ''}>${v}</option>`).join('')}</select></div>`).join('')}</div></div>
-  <div id="ccerr" class="warn"></div><button class="btn ac big" data-c="go">Enter Saltmarsh Quay</button><p class="note" style="text-align:center">Saves in this browser. Your first two trainer lessons are free.</p>`;
+  <label>Starting skills <span class="note">(${kt} / 100, up to three, at most 50 each)</span></label>${CC.k.map((k, i) => `<div class="skl"><select data-c="sk" data-i="${i}" aria-label="Skill ${i + 1}">${opts(k[0])}</select><select data-c="kv" data-i="${i}" aria-label="Skill ${i + 1} points">${[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50].map(v => `<option${v === k[1] ? ' selected' : ''}>${v}</option>`).join('')}</select></div>`).join('')}</div></div>
+  <div id="ccerr" class="warn"></div><button class="btn ac big" data-c="go">Enter Saltmarsh Quay</button><p class="note" style="text-align:center">Saves in this browser. Townsfolk teach their trades for gold.</p>`;
 }
 $('#cc').addEventListener('click', ev => { const b = ev.target.closest('[data-c]'); if (!b || b.tagName === 'SELECT') return; const c = b.dataset.c; CC.name = $('#ccn')?.value ?? CC.name;
   if (c === 'cont') { const s = loadSave(); if (s) boot(s); return; }
   if (c === 'prof') { CC.prof = b.dataset.p; const p = PROFILES[CC.prof]; CC.s = p.s.slice(); CC.k = Object.entries(p.k); }
-  if (c === 'st') { const i = +b.dataset.i, d = +b.dataset.d, nv = CC.s[i] + d, tot = CC.s.reduce((a, x) => a + x, 0) + d; if (nv >= 25 && nv <= 100 && tot <= 150) CC.s[i] = nv; }
+  if (c === 'st') { const i = +b.dataset.i, d = +b.dataset.d, nv = CC.s[i] + d, tot = CC.s.reduce((a, x) => a + x, 0) + d; const C = SF.SK.CREATE; if (nv >= C.statMin && nv <= C.statMax && tot <= C.stats) CC.s[i] = nv; }
   if (c === 'cloak') CC.cloak = b.dataset.v;
   if (c === 'go') { const err = $('#ccerr'); const name = CC.name.trim().replace(/[^\p{L}\p{N} '\-]/gu, '').slice(0, 16); if (name.length < 2) return err.textContent = 'Choose a name of at least 2 letters.'; const sk = {}; for (const [k, v] of CC.k) sk[k] = (sk[k] || 0) + v; const e = SF.validateCreation({ str: CC.s[0], dex: CC.s[1], int: CC.s[2], skills: sk }); if (e.length) return err.textContent = e.join(' '); if (CC.k.some(([k], i) => CC.k.findIndex(x => x[0] === k) !== i && CC.k[i][1] > 0)) return err.textContent = 'Pick different skills.'; boot(null, { name, str: CC.s[0], dex: CC.s[1], int: CC.s[2], skills: sk, look: { cloak: CC.cloak || null } }); return; }
   renderCC(); });
@@ -2516,3 +2573,4 @@ function spawnMon(type, dx = 3, dy = 0) { const d = MON[type]; if (!d) return nu
   for (let r = 0; r < 6 && BLK[tAt(Math.floor(x), Math.floor(y))]; r += .5) for (let a = 0; a < 8; a++) { const nx = P.x + dx + Math.cos(a * Math.PI / 4) * r, ny = P.y + dy + Math.sin(a * Math.PI / 4) * r; if (!BLK[tAt(Math.floor(nx), Math.floor(ny))]) { x = nx; y = ny; break; } }
   return addEnt({ kind: 'mon', type, name: d.n, x, y, hp: d.hp, max: d.hp, state: 'idle', home: { x, y }, sect: 0, ward: 0 }); }
 window.__SF = { get WS() { return WS; }, dist, closePanel, lifeSave, LIFE, LIFE_SCHED, lifeTick, lifeResume, lifeInspect, lifeTownGeo, lifeTalk, talk, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
+Object.assign(window.__SF, { skillCheck, skillUse, noteLearn, SKUI, SKLOG, useAbility, ABIL, TASKS, get PICKT() { return PICKT; } });

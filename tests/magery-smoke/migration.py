@@ -17,7 +17,7 @@ with sync_playwright() as p:
     pg.evaluate("__SF.save()"); pg.reload(); pg.wait_for_timeout(800); pg.click('[data-c=cont]'); pg.wait_for_timeout(800)
     r2 = pg.evaluate("""() => { const P = __SF.P; return { hot: P.hotbar.slice(0,4).map(h => h && h.id), books: P.pack.items.filter(i => i.id === 'spellbook').length }; }""")
     # curtain still castable from old bar
-    r3 = pg.evaluate("""() => { const S = __SF, P = S.P; S.SF.addItem(P.pack, S.SF.newItem('shelldust', 5)); S.SF.addItem(P.pack, S.SF.newItem('marshroot', 5)); S.SF.addItem(P.pack, S.SF.newItem('blacksalt', 5)); P.skills.magery.v = 800; P.mana = 60; S.castSlot('curtain'); for (let i = 0; i < 30; i++) S.update(.05); const held = P.held && P.held.sp.id; const ok = S.releaseHeld({ x: P.x + 2, y: P.y }); return { held, ok, log: S.LOG.slice(-3).map(l => l.t) }; }""")
+    r3 = pg.evaluate("""() => { const S = __SF, P = S.P; S.SF.addItem(P.pack, S.SF.newItem('shelldust', 5)); S.SF.addItem(P.pack, S.SF.newItem('marshroot', 5)); S.SF.addItem(P.pack, S.SF.newItem('blacksalt', 5)); P.skills.magery.v = 800; P.mana = 60; S.setRng(() => .01); S.castSlot('curtain'); for (let i = 0; i < 30; i++) S.update(.05); const held = P.held && P.held.sp.id; const ok = S.releaseHeld({ x: P.x + 2, y: P.y }); S.setRng(null); return { held, ok, log: S.LOG.slice(-3).map(l => l.t) }; }""")
     # death clears buffs
     r4 = pg.evaluate("""() => { const S = __SF, P = S.P, MG = S.SF.MAGERY; P.mg.mods = { str: { pos: { v: 5, until: S.GT + 99 } } }; P.mg.night = S.GT + 99; S.update(.05); const s1 = P.str; S.damagePlayer(9999, null, 'phys'); S.update(.05); return { buffed: s1, after: P.str, base: P.base.str, night: !!P.mg.night }; }""")
     b.close()

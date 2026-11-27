@@ -108,7 +108,7 @@ def run(pg, tag, phone):
 
     # ---------- crafting: recipe rows and inputs show their outputs' and inputs' tiles; none of the seven is craftable ----------
     makes = pg.evaluate("ids => __SF.SF.RECIPES.filter(r => ids.includes(r.out)).map(r => r.id)", NEW)
-    check(makes == [], f'{tag} crafting: no recipe makes the seven (they come from vendors and the Quaywarden), as before', makes)
+    check(makes in ([], ['heavycrossbow']), f'{tag} crafting: no recipe makes the seven except the heavy crossbow (Bowcraft & Fletching makes it since v0.30)', makes)
     for st in ['anvil', 'bench']:
         pg.evaluate("st => { const S = __SF; const b = S.STATIONS.find(s => s.k === st); S.P.x = b.x + .5; S.P.y = b.y + 1.5; S.interact(); }", st)
         pg.wait_for_timeout(120)
