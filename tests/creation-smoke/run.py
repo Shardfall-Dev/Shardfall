@@ -163,7 +163,7 @@ with sync_playwright() as p:
     r = J(pg, """(() => { const S = __SF, P = S.P, SF = S.SF; const step = (sec) => { for (let i = 0; i < Math.round(sec / .05); i++) S.update(.05); };
       for (let k = 0; k < 200; k++) { const x = 120 + (k % 20) * 2, y = 280 + Math.floor(k / 20) * 2; if (!S.BLK[S.tAt(Math.floor(x), Math.floor(y))] && !S.protAt(x, y)) { P.x = x + .5; P.y = y + .5; break; } }
       const rat = S.spawnMon('rat', 1.2, 0); P.sel = rat; P.armed = true; let t = 0; while (!rat.dead && t < 60) { step(.5); t += .5; P.sel = rat; P.armed = true; }
-      P.armed = false; P.hp = Math.max(1, SF.maxHp(P) - 20); const hp0 = P.hp; S.firstAid(P); step(9); return { killed: !!rat.dead, t, healed: P.hp > hp0, band: SF.count(P.pack, 'bandage') }; })()""")
+      P.armed = false; P.hp = Math.max(1, SF.maxHp(P) - 20); const hp0 = P.hp; S.setRng(() => .01); S.firstAid(P); step(9); S.setRng(null);   /* a Healing 20 bandage can fail by chance: fix the roll */ return { killed: !!rat.dead, t, healed: P.hp > hp0, band: SF.count(P.pack, 'bandage') }; })()""")
     check(r['killed'] and r['healed'] and r['band'] == 9, 'a new Swordsman kills a rat and bandages himself', r)
     # a natural attribute gain from a real swing (src/skills.js SK.statGain): with the roll forced low the next skill gain also raises a stat
     r = J(pg, """(() => { const S = __SF, P = S.P, SF = S.SF; const step = (sec) => { for (let i = 0; i < Math.round(sec / .05); i++) S.update(.05); };
