@@ -8,7 +8,7 @@
    Sprites: the procedural rig (src/human-rig.js) builds one strip per figure × action × direction, rasterised once at native size,
    trimmed and kept in a bounded LRU cache; nothing is rasterised in the draw call itself, the build queue runs a few strips per frame. ---- */
 const LOOK = SF.LOOK;
-const HUM = { cache: new Map(), px: 0, maxPx: 7e6, queue: [], inflight: 0, tick: 0, K: 1.1, built: 0, evicted: 0, fallbacks: 0, buildMs: 0, maxBuildMs: 0, perFrame: 3, maxInflight: 6 };
+const HUM = { cache: new Map(), px: 0, maxPx: 7e6, queue: [], decoded: [], inflight: 0, tick: 0, K: 1.1, built: 0, evicted: 0, fallbacks: 0, buildMs: 0, maxBuildMs: 0, packMs: 0, maxPackMs: 0, perFrame: 2, maxInflight: 4, budgetMs: 4 };
 let HUM_FLAG = null;
 function humOn() {
   if (HUM_FLAG === null) { const q = /[?&]humans=([a-z0-9]+)/i.exec(location.search || ''); HUM_FLAG = q ? /^(v2|on|1|new)$/i.test(q[1]) : !!(typeof SETTINGS !== 'undefined' && SETTINGS.humansV2); }
@@ -88,24 +88,22 @@ function humBuild(job) {
   const s = HUM.cache.get(job.key); if (!s) return; const t0 = performance.now();
   const f = job.tool !== undefined && job.tool !== '' ? Object.assign({}, job.f, { weapon: job.tool === 'none' ? null : job.tool }) : job.f;
   const svg = SFRIG.stripSVG(f, job.action, job.dir, HUM.K), im = new Image(); HUM.inflight++;
-  im.onload = () => { HUM.inflight--; try { humPack(s, im, job, f); } catch (err) { console.warn('human strip failed', err); HUM.cache.delete(job.key); } HUM.buildMs += performance.now() - t0; };
+  im.onload = () => { HUM.decoded.push({ s, im, job, f }); HUM.buildMs += performance.now() - t0; };   // rasterised and packed in humPump, within the frame budget
   im.onerror = () => { HUM.inflight--; HUM.cache.delete(job.key); };
   im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 }
-/* draw the strip once, trim every frame to its pixels, pack them side by side; ghosts get the pale blue wash */
+/* draw the strip once, trim every frame to its pixels (one pass: alpha threshold, ghost wash, bounds), pack them side by side */
 function humPack(s, im, job, f) {
-  const C = SFRIG.CELL, K = HUM.K, n = SFRIG.ANIMATIONS[job.action] || 1, cw = Math.ceil(C.width * K), ch = Math.ceil(C.height * K);
-  const tmp = document.createElement('canvas'); tmp.width = Math.ceil(n * C.width * K); tmp.height = ch; const tg = tmp.getContext('2d'); tg.drawImage(im, 0, 0, tmp.width, tmp.height);
-  const d = tg.getImageData(0, 0, tmp.width, tmp.height), a = d.data, W = tmp.width;
-  for (let i = 0; i < a.length; i += 4) { if (a[i + 3] < 48) { a[i + 3] = 0; continue; } if (f.ghost) { const l = (a[i] + a[i + 1] + a[i + 2]) / 3; a[i] = l * .7 + 60; a[i + 1] = l * .8 + 80; a[i + 2] = l + 110; a[i + 3] = Math.min(a[i + 3], 150); } }
+  const C = SFRIG.CELL, K = HUM.K, n = SFRIG.ANIMATIONS[job.action] || 1, cw = C.width * K, ch = Math.ceil(C.height * K);
+  const tmp = document.createElement('canvas'); tmp.width = Math.ceil(n * C.width * K); tmp.height = ch; const tg = tmp.getContext('2d', { willReadFrequently: true }); tg.drawImage(im, 0, 0, tmp.width, tmp.height);
+  const W = tmp.width, d = tg.getImageData(0, 0, W, ch), a = d.data, bx0 = new Array(n).fill(1e9), by0 = new Array(n).fill(1e9), bx1 = new Array(n).fill(-1), by1 = new Array(n).fill(-1), ghost = f.ghost;
+  for (let y = 0; y < ch; y++) { let i = y * W * 4; for (let x = 0; x < W; x++, i += 4) { const al = a[i + 3]; if (!al) continue; if (al < 48) { a[i + 3] = 0; continue; }
+    if (ghost) { const l = (a[i] + a[i + 1] + a[i + 2]) / 3; a[i] = l * .7 + 60; a[i + 1] = l * .8 + 80; a[i + 2] = l + 110; a[i + 3] = Math.min(al, 150); }
+    const k = Math.min(n - 1, (x / cw) | 0); if (x < bx0[k]) bx0[k] = x; if (x > bx1[k]) bx1[k] = x; if (y < by0[k]) by0[k] = y; if (y > by1[k]) by1[k] = y; } }
   tg.putImageData(d, 0, 0);
   const rects = []; let total = 0, H = 1;
-  for (let k = 0; k < n; k++) {
-    const X0 = Math.floor(k * C.width * K); let x0 = cw, y0 = ch, x1 = -1, y1 = -1;
-    for (let y = 0; y < ch; y++) for (let x = 0; x < cw && X0 + x < W; x++) if (a[(y * W + X0 + x) * 4 + 3]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
-    if (x1 < 0) { x0 = 0; y0 = 0; x1 = 0; y1 = 0; }
-    const r = { sx: total, w: x1 - x0 + 1, h: y1 - y0 + 1, srcX: X0 + x0, srcY: y0, ox: x0 - C.anchorX * K, oy: y0 - C.anchorY * K }; rects.push(r); total += r.w; H = Math.max(H, r.h);
-  }
+  for (let k = 0; k < n; k++) { const X0 = Math.floor(k * cw); if (bx1[k] < 0) { bx0[k] = X0; bx1[k] = X0; by0[k] = 0; by1[k] = 0; }
+    const r = { sx: total, w: bx1[k] - bx0[k] + 1, h: by1[k] - by0[k] + 1, srcX: bx0[k], srcY: by0[k], ox: bx0[k] - X0 - C.anchorX * K, oy: by0[k] - C.anchorY * K }; rects.push(r); total += r.w; H = Math.max(H, r.h); }
   const out = document.createElement('canvas'); out.width = Math.max(1, total); out.height = H; const og = out.getContext('2d');
   for (const r of rects) og.drawImage(tmp, r.srcX, r.srcY, r.w, r.h, r.sx, 0, r.w, r.h);
   s.canvas = out; s.rects = rects; s.px = out.width * out.height; s.ready = true; HUM.px += s.px; HUM.built++; humEvict();
@@ -116,7 +114,11 @@ function humEvict() {
 }
 /* the build queue: a few strips per frame, never inside the draw call */
 function humPump() {
-  HUM.tick++; let started = 0;
+  HUM.tick++; let started = 0; const t0 = performance.now();
+  while (HUM.decoded.length && (started === 0 || performance.now() - t0 < HUM.budgetMs)) {   // finish decoded strips first, within the budget
+    const d = HUM.decoded.shift(); HUM.inflight--; if (HUM.cache.get(d.job.key) !== d.s) continue; const t = performance.now(); try { humPack(d.s, d.im, d.job, d.f); } catch (err) { console.warn('human strip failed', err); HUM.cache.delete(d.job.key); }
+    const dt = performance.now() - t; HUM.packMs += dt; HUM.maxPackMs = Math.max(HUM.maxPackMs, dt); if (started++ > 6) break; }
+  started = 0;
   while (HUM.queue.length && HUM.inflight < HUM.maxInflight && started < HUM.perFrame) { const job = HUM.queue.shift(); const t = performance.now(); humBuild(job); HUM.maxBuildMs = Math.max(HUM.maxBuildMs, performance.now() - t); started++; }
 }
 /* ---- drawing ---- */
@@ -200,5 +202,5 @@ function ccLookAction(b) {
   return false;
 }
 /* developer / test access */
-const HUMANS_API = { on: humOn, set: humSetFlag, stats: () => ({ on: humOn(), strips: HUM.cache.size, ready: [...HUM.cache.values()].filter(s => s.ready).length, px: HUM.px, maxPx: HUM.maxPx, queue: HUM.queue.length, inflight: HUM.inflight, built: HUM.built, evicted: HUM.evicted, fallbacks: HUM.fallbacks, buildMs: Math.round(HUM.buildMs), maxBuildMs: Math.round(HUM.maxBuildMs * 10) / 10 }),
+const HUMANS_API = { on: humOn, set: humSetFlag, stats: () => ({ on: humOn(), strips: HUM.cache.size, ready: [...HUM.cache.values()].filter(s => s.ready).length, px: HUM.px, maxPx: HUM.maxPx, queue: HUM.queue.length, inflight: HUM.inflight, built: HUM.built, evicted: HUM.evicted, fallbacks: HUM.fallbacks, buildMs: Math.round(HUM.buildMs), maxBuildMs: Math.round(HUM.maxBuildMs * 10) / 10, packMs: Math.round(HUM.packMs), maxPackMs: Math.round(HUM.maxPackMs * 10) / 10, decoded: HUM.decoded.length }),
   figure: e => humFigure(e), anim: e => humAnim(e, humFigure(e)), isHuman: humIsHuman, baseLook: humBaseLook, LOOK, RIG: () => SFRIG, cache: HUM };

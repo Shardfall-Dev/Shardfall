@@ -67,7 +67,7 @@ with sync_playwright() as p:
   out['other'] = ev("() => ({ active: !!__SF.P.bandage, patient: __SF.P.bandage && __SF.P.bandage.e.name, dur: __SF.P.bandage && __SF.P.bandage.t1 - __SF.P.bandage.t0 })")
   pg.wait_for_timeout(4500)
   out['other']['after'] = ev(f"() => ({{ hpGain: Math.round(__SF.allyOf().hp - {wh}), log: __SF.LOG.filter(l => /Wren/.test(l.t)).slice(-1).map(l => l.t) }})"); out['other']['button'] = btn
-  check(btn == 'Bandage' and out['other']['active'] and out['other']['patient'] == 'Wren' and out['other']['dur'] == 5 and out['other']['after']['hpGain'] >= 33 and 'You heal Wren for' in ''.join(out['other']['after']['log']), 'tapped Wren, pressed Bandage Wren (as a 90/60 healer): a 5 s application that heals her')
+  check(btn == 'Bandage' and out['other']['active'] and out['other']['patient'] == 'Wren' and abs(out['other']['dur'] - 5) < 1e-6 and out['other']['after']['hpGain'] >= 33 and 'You heal Wren for' in ''.join(out['other']['after']['log']), 'tapped Wren, pressed Bandage Wren (as a 90/60 healer): a 5 s application that heals her')
   # ask Wren to follow and fight together
   tap_sel('#tgt [data-a=allycmd]'); out['follow'] = ev("() => __SF.allyOf().order")
   check(out['follow'] == 'follow', 'Wren follows on request')
