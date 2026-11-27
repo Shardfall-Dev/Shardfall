@@ -171,7 +171,7 @@ with sync_playwright() as p:
       let t = 0; while (sum(P.base) === sum(b0) && t < 20) { step(.25); t += .25; P.sel = rat; P.armed = true; rat.hp = Math.max(rat.hp, 100); }
       S.setRng(null); P.armed = false; rat.hp = 0; S.killMon && S.killMon(rat);
       return { gained: sum(P.base) > sum(b0), b0, b1: P.base, msg: S.LOG.filter(l => /rises to/.test(l.t)).map(l => l.t), eff: [P.str, P.dex] }; })()""")
-    check(r['gained'] and sum(r['b1'].values()) == sum(r['b0'].values()) + 1 and any('rises to' in m for m in r['msg']) and r['eff'] == [r['b1']['str'], r['b1']['dex']], 'fighting raises Strength or Dexterity naturally, with a journal line', r)
+    check(r['gained'] and sum(r['b1'].values()) == sum(r['b0'].values()) + len(r['msg']) and len(r['msg']) >= 1 and all('rises to' in m for m in r['msg']) and r['eff'] == [r['b1']['str'], r['b1']['dex']], 'fighting raises Strength or Dexterity naturally, with a journal line', r)
     check(not errs, 'no page errors (warrior)', errs[:3]); ctx.close()
 
     # ================= play: a mage casts =================
@@ -191,7 +191,7 @@ with sync_playwright() as p:
       for (let k = 0; k < 40 && SF.count(P.pack, 'ore') < 6; k++) { if (!P.task) S.startGather(node); step(2.2); }
       const ore = SF.count(P.pack, 'ore'); P.x = FG[0]; P.y = FG[1]; P.sel = null;
       for (let k = 0; k < 8 && SF.count(P.pack, 'ironbar') < 3; k++) { S.startCraft('ironbar', 1); step(4); }
-      const bars = SF.count(P.pack, 'ironbar'); const rec = SF.RECIPES.filter(r => r.skill === 'smithing' && r.min <= 50 && !/bar|ingot/.test(r.out)).sort((a, b) => a.min - b.min);
+      const bars = SF.count(P.pack, 'ironbar'); const rec = SF.RECIPES.filter(r => r.skill === 'blacksmithy' && r.min <= 50 && !/bar|ingot/.test(r.out)).sort((a, b) => a.min - b.min);
       let made = null; for (const r of rec) { const p = SF.craftPlan(P, P.pack, r); if (p.ok) { const n0 = P.pack.items.length; S.startCraft(r.id, 1); step(6); made = r.out; break; } }
       S.setRng(null); return { ore, bars, made, items: P.pack.items.map(i => i.id) }; })()""")
     check(r['ore'] >= 3 and r['bars'] >= 1 and r['made'], 'a new Blacksmith mines ore, smelts bars and forges an item in Mynoc', r)
@@ -232,7 +232,7 @@ with sync_playwright() as p:
         check(min(sz) >= 30, f'{tag}: touch targets at least 30 px (most 44)', min(sz))
         pg.locator('[data-c=go]').tap(); pg.wait_for_function('window.__SF && __SF.P')
         r = P(pg, "({ s: [P.base.str, P.base.dex, P.base.int], sk: [P.skills.fencing.v, P.skills.tactics.v, P.skills.healing.v], skin: P.look.skinTone, w: P.equip.weapon && P.equip.weapon.id })")
-        check(r == {'s': [25, 30, 10], 'sk': [500, 310, 190], 'skin': 'tan', 'w': 'dagger'}, f'{tag}: created by touch', r)
+        check(r == {'s': [35, 35, 10], 'sk': [500, 310, 190], 'skin': 'tan', 'w': 'dagger'}, f'{tag}: created by touch', r)
         check(not errs, f'{tag}: no page errors', errs[:3]); ctx.close()
     b.close()
 

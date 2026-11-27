@@ -210,11 +210,11 @@ function tfModel(t) {
   else if (t.kind === 'corpse') { m.dot = 'item'; m.name = t.name; const ls = t.cont && Number.isFinite(t.cont.diedAt) ? SF.lootStatus(t.cont, P.id, GT) : null;   // loot rights exist only on bodies that carry them (player bodies today) if (t.cont) m.sub.push(t.cont.items.length ? t.cont.items.length + ' stack' + (t.cont.items.length === 1 ? '' : 's') : 'empty'); m.sub.push(dm);
     if (ls && (t.mine || !ls.lawful)) m.chips.push([cap1(ls.label), ls.lawful ? '' : 'warn']);
     m.acts = `<button class="btn sm ac" data-a="interact">Loot</button>${t.mon && !t.skinned ? '<button class="btn sm" data-a="skin">Skin</button>' : ''}`; }
-  else if (t.kind === 'node') { const fish = t.skill === 'fishing', rw = t.skill === 'mining' || t.skill === 'woodcutting', tier = fish ? 0 : nodeTier(t.x, t.y), need = SF.NODE_TIER_MIN[tier];
+  else if (t.kind === 'node') { const fish = t.skill === 'fishing', rw = t.skill === 'mining' || t.skill === 'lumberjacking', tier = fish ? 0 : nodeTier(t.x, t.y), need = SF.NODE_TIER_MIN[tier];
     m.dot = 'res'; m.name = cap1(rw ? nodeLabel(t) : t.name); if (t.skill === 'mining' && m.name === 'Rock face') m.name = 'Mining deposit';
     m.sub.push(SF.SKILL[t.skill].n + (need ? ' ' + need : '')); if (!fish) m.sub.push(rw ? nodeNote(t) : nodeStock(t.x, t.y).n + ' left'); if (!fish && isQuayNode(t.x, t.y)) m.sub.push('training'); m.sub.push(dm);
     if (need && sv(t.skill) < need) m.chips.push([`Needs ${SF.SKILL[t.skill].n} ${need}`, 'warn']);
-    m.acts = `<button class="btn sm ac" data-a="interact">${t.skill === 'mining' ? 'Mine' : t.skill === 'woodcutting' ? 'Chop' : fish ? 'Fish' : 'Gather'}</button>` + (rw ? `<button class="btn sm" data-a="survey">${t.skill === 'mining' ? 'Survey' : 'Read grain'}</button>` : ''); }
+    m.acts = `<button class="btn sm ac" data-a="interact">${t.skill === 'mining' ? 'Mine' : t.skill === 'lumberjacking' ? 'Chop' : fish ? 'Fish' : 'Gather'}</button>` + (rw ? `<button class="btn sm" data-a="survey">${t.skill === 'mining' ? 'Survey' : 'Read grain'}</button>` : ''); }
   return m;
 }
 renderTarget = function () {

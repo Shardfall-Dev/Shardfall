@@ -2484,7 +2484,7 @@ const ACT = {
 let ROTOK = false;
 /* counter actions re-check the live situation, not just that a button was drawn: alive, the right panel still open, the same
    keeper still there and within reach, and for a purchase a whole quantity of something this keeper sells. */
-const COUNTER_ACT = { depgold: 'bank', dep: 'bank', depeq: 'bank', wd: 'bank', buy: 'shop', sell: 'shop', train: 'trainer', stat: 'trainer' };
+const COUNTER_ACT = { depgold: 'bank', dep: 'bank', depeq: 'bank', wd: 'bank', buy: 'shop', sell: 'shop', train: 'trainer' };
 function atCounter(kind) { const n = P && P.talkTo; if (!n || !P || P.ghost || PANEL !== kind || n.gone || dist(n, P) > 4) return false;
   return kind === 'bank' ? !!MERCHANT_ROLES[n.role] : kind === 'trainer' ? n.role === 'trainer' : !!SHOPS[n.role]; }
 for (const k in COUNTER_ACT) { const fn = ACT[k]; ACT[k] = d => { d = d || {};

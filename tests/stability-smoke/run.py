@@ -25,7 +25,7 @@ def page(b, mobile):
   return ctx, pg, errs
 def fresh(pg, name='Stab'):
   pg.goto(URL); pg.wait_for_timeout(300); pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_selector('[data-c=new]')
-  pg.evaluate("o => __CC.quick(o)", {'name': name, 'template': 'advanced', 'stats': [45, 10, 25], 'skills': [['swordsmanship', 50], ['magery', 30], ['tactics', 20]]}); pg.wait_for_function('window.__SF && __SF.P')
+  pg.evaluate("o => __CC.quick(o)", {'name': name, 'template': 'advanced', 'stats': [35, 10, 35], 'skills': [['swordsmanship', 50], ['magery', 30], ['tactics', 20]]}); pg.wait_for_function('window.__SF && __SF.P')
 def put(pg, val):
   pg.goto(URL); pg.wait_for_selector('#cc'); pg.evaluate("(v) => localStorage.setItem('shardfall.save.v1', v)", val); pg.reload()
 def cont(pg):
@@ -84,7 +84,7 @@ with sync_playwright() as p:
     # ---- A06: the loot panel shows total carried weight against the carrying limit, not the old 45-stack pack limit
     h = J(pg, """() => { const S = __SF, P = S.P, SF = S.SF; P.ghost = false; P.hp = SF.maxHp(P); const pile = SF.newContainer('pile'); pile.items.push(SF.newItem('gold', 3));
       const e = S.addEnt({ kind: 'corpse', pile: true, name: 'dropped items', x: P.x, y: P.y, cont: pile, expires: S.GT + 60 }); P.lootOpen = e; S.openPanel('loot'); const t = document.querySelector('#panel').innerText; const tw = SF.EQ.totalWt(P), cw = SF.EQ.capWt(P); S.closePanel(); return { t, tw, cw }; }""")
-    check('/ 45' not in h['t'] and ('/ %d' % round(h['cw'])) in h['t'], f'[{tag}] loot panel shows weight against the carrying limit', h)
+    check('/ 45' not in h['t'] and any(('/ %s' % x) in h['t'] for x in (round(h['cw']), ('%.1f' % h['cw']).rstrip('0').rstrip('.'))), f'[{tag}] loot panel shows weight against the carrying limit', h)
 
     check(not errs, f'[{tag}] no page or console errors in the save/reload run', errs[:5])
     ctx.close()

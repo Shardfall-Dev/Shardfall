@@ -147,8 +147,9 @@ with sync_playwright() as p:
 
     # ================= NPCs, Wren and many actors =================
     J(pg, FRAME)
-    npc = J(pg, "(() => { const S = __SF; const out = { guards: 0, guardTwo: 0, drawn: 0, wren: null }; for (const e of S.ents) { if (e.kind === 'npc' && e._gA) { out.drawn++; if (e.role === 'guard') { out.guards++; if (e._gA.R.occ.offhand === false) out.guardTwo++; } } } const a = S.allyOf(); if (a) { const A = __GEAR.of(a); out.wren = [A.R.slots.weapon && A.R.slots.weapon.id, A.R.slots.shield && A.R.slots.shield.id, A.R.body]; } return out; })()")
+    npc = J(pg, "(() => { const S = __SF; const out = { guards: 0, guardTwo: 0, drawn: 0, wren: null }; for (const e of S.ents) { const A = e.kind === 'npc' && (e._wdA || e._gA); if (A) { out.drawn++; if (e._wdA) out.wardrobe = (out.wardrobe || 0) + 1; if (e.role === 'guard') { out.guards++; if (A.R.occ.offhand === false) out.guardTwo++; } } } const a = S.allyOf(); if (a) { const A = __GEAR.of(a); out.wren = [A.R.slots.weapon && A.R.slots.weapon.id, A.R.slots.shield && A.R.slots.shield.id, A.R.body]; } return out; })()")
     check(npc['drawn'] > 0, 'townsfolk near the player are drawn with the layered rig', npc)
+    check(npc.get('wardrobe', 0) == npc['drawn'], 'their clothes come from the NPC wardrobe (#39) on SF.GEAR', npc)
     check(npc['wren'] and npc['wren'][0] == 'sword', "Wren is drawn from her real equipment", npc['wren'])
     J(pg, "(() => { const S = __SF, P = S.P, roles = ['guard', 'smith', 'healer', 'banker', 'trainer', 'outlaw', 'traveller', 'apothecary']; for (let i = 0; i < 60; i++) { const a = i / 60 * 6.283, r = 2 + (i % 6); S.addEnt({ kind: 'npc', role: roles[i % roles.length], name: 'Extra ' + i, x: P.x + Math.cos(a) * r, y: P.y + Math.sin(a) * r * .6, sect: i % 8, speed: i % 3 ? 3 : 0 }); } })()")
     for _ in range(40): J(pg, FRAME)

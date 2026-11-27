@@ -201,9 +201,9 @@ with sync_playwright() as p:
     check(t and t['sub'].split(' · ')[0] != '', 'NPC role or profession shown', t and t['sub'])
     pg.screenshot(path=os.path.join(shots, 'desktop-target-npc.png'))
     # mining deposit and tree
-    node = pg.evaluate("""() => { const S = __SF, P = S.P; for (const [k, lbl] of [['mining', 'rock'], ['woodcutting', 'tree']]) {}
+    node = pg.evaluate("""() => { const S = __SF, P = S.P; for (const [k, lbl] of [['mining', 'rock'], ['lumberjacking', 'tree']]) {}
       const find = sk => { for (let r = 1; r < 40; r++) for (let dx = -r; dx <= r; dx++) for (const dy of [-r, r]) { const n = S.nodeAt(Math.floor(P.x) + dx, Math.floor(P.y) + dy); if (n && n.skill === sk) return n; } return null; };
-      const rock = find('mining'), tree = find('woodcutting'); window.__rock = rock; window.__tree = tree; return [!!rock, !!tree]; }""")
+      const rock = find('mining'), tree = find('lumberjacking'); window.__rock = rock; window.__tree = tree; return [!!rock, !!tree]; }""")
     check(node == [True, True], 'found a rock face and a tree near the start')
     pg.evaluate("() => { const S = __SF, r = window.__rock; S.P.x = r.x + .5 - 2; S.P.y = r.y + .5; S.P.sel = S.nodeAt(r.x, r.y); S.refreshHud(); }")
     t = pg.evaluate(TGT)
@@ -216,7 +216,7 @@ with sync_playwright() as p:
     check(pg.evaluate(TGT) is None and pg.evaluate("__SF.TGT.reason") == 'distance', 'walking beyond the resource retention distance clears it', pg.evaluate("__SF.TGT.reason"))
     pg.evaluate("() => { const S = __SF, t = window.__tree; S.P.x = t.x + .5 - 9; S.P.y = t.y + .5; S.P.sel = S.nodeAt(t.x, t.y); S.refreshHud(); }")
     t = pg.evaluate(TGT)
-    check(t and t['n'].lower().endswith('tree') and 'Chop' in t['acts'] and 'Woodcutting' in t['sub'], 'tree picked from 9 tiles: wood type, skill, Chop', t)
+    check(t and t['n'].lower().endswith('tree') and 'Chop' in t['acts'] and 'Lumberjacking' in t['sub'], 'tree picked from 9 tiles: wood type, skill, Chop', t)
     pg.evaluate(PLACE, [4, 0]); pg.evaluate(STEP, 30); pg.evaluate(PLACE, [-0.8, 0]); pg.evaluate(STEP, 30)
     check(pg.evaluate(TGT) is not None, 'after walking up to it, a small step back keeps it (limit closes in to 5 + 1)')
     pg.evaluate("() => { const S = __SF, t = window.__tree; S.tSet(t.x, t.y, S.T.GR !== undefined ? S.T.GR : 0); }"); pg.evaluate(STEP, 1)

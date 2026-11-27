@@ -59,7 +59,7 @@ with sync_playwright() as p:
     S.SF.addItem(P.pack, S.SF.newItem('gold', 500)); S.ACT.train({ k: 'tactics' }); const t2 = P.skills.tactics.v; S.ACT.train({ k: 'magery' });
     return { panel: S.PANEL, stats: /Attribute/.test(html), skills: [...document.querySelectorAll('#panel .row .nm')].map(e => e.firstChild.textContent.trim()), g0, t1, g1, t2, gold: S.SF.count(P.pack, 'gold'), magery: P.skills.magery.v }; }""")
   check(tr['panel'] == 'trainer' and not tr['stats'] and 'Tactics' in tr['skills'] and 'Magery' not in tr['skills'], 'Master Vey offers combat lessons and no attributes', tr)
-  check(tr['t1'] == 150 and tr['g1'] == 0 and tr['t2'] == 300 and tr['gold'] == 500 - 150 and tr['magery'] == 0, '150 gold buys Tactics 15.0; more gold finishes it at 30.0; he will not teach Magery', tr)
+  check(tr['t1'] == 100 and tr['g1'] == 0 and tr['t2'] == 300 and tr['gold'] == 500 - 200 and tr['magery'] == 0, 'the starting 100 gold buys Tactics 10.0; more gold finishes it at 30.0; he will not teach Magery', tr)
   mage = J("""() => { const S = __SF, P = S.P; const m = S.ents.find(e => e.role === 'mage'); if (!m) return null; P.x = m.x + 1; P.y = m.y; S.talk(m); S.ACT.tab({ t: 'learn' }); return { panel: S.PANEL, rows: [...document.querySelectorAll('#panel .row .nm')].map(e => e.firstChild.textContent.trim()) }; }""")
   check(mage and 'Magery' in mage['rows'] and 'Meditation' in mage['rows'], 'Magister Orrin has a Lessons tab for the magic skills', mage)
   J("() => __SF.closePanel()")
@@ -69,7 +69,7 @@ with sync_playwright() as p:
   # ---------- a real v0.28.1 save migrates to the 49 skills ----------
   if os.path.exists(old):
     pg.goto('file://' + old); pg.wait_for_timeout(600); J('localStorage.clear()'); pg.reload(); pg.wait_for_timeout(600)
-    pg.evaluate("o => __CC.quick(o)", {'name': 'Oldie', 'template': 'advanced', 'stats': [20, 10, 50], 'skills': [['magery', 50], ['healing', 30], ['meditation', 20]]}); pg.wait_for_timeout(900)
+    pg.click('[data-c=prof][data-p="Group healer"]'); pg.fill('#ccn', 'Oldie'); pg.click('[data-c=go]'); pg.wait_for_timeout(900)   # the v0.28.1 build has its own one-page creator
     o = J("""() => { const S = __SF, P = S.P; Object.assign(P.skills, { spellcraft: { v: 452, lock: 'raise' }, focus: { v: 311, lock: 'hold' }, skinning: { v: 205, lock: 'raise' }, foraging: { v: 77, lock: 'lower' }, smithing: { v: 640, lock: 'raise' }, concealment: { v: 123, lock: 'lower' }, taming: { v: 88, lock: 'raise' } });
       P.hotbar[4] = { k: 'act', id: 'lullaby' }; P.hotbar[5] = { k: 'act', id: 'pick' }; P.lowerRank = ['foraging', 'concealment']; S.save(); const s = JSON.parse(localStorage.getItem('shardfall.save.v1'));
       return { v: s.v, sum: Object.values(s.char.skills).reduce((a, x) => a + x.v, 0), n: Object.keys(s.char.skills).length, pool: s.char.skillPool || 0, gold: S.SF.count(P.pack, 'gold'), str: P.str }; }""")

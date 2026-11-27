@@ -42,7 +42,7 @@ with sync_playwright() as p:
   check(r4['pid'] and r5['linked'] and r5['kind'] == 'heal' and r5['healed'], 'a treatment on Wren survives a reload and finishes on Wren')
   # ---- a real v0.16 save migrates once
   pg.goto('file://' + old); pg.wait_for_timeout(600); pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_timeout(600)
-  pg.evaluate("o => __CC.quick(o)", {'name': 'Oldie', 'template': 'swordsman'}); pg.wait_for_timeout(900); pg.evaluate(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'legacy-profile.js')).read())
+  pg.click('[data-c=prof][data-p="Glaive hybrid"]'); pg.fill('#ccn', 'Oldie'); pg.click('[data-c=go]'); pg.wait_for_timeout(900)   # the v0.16 build has its own one-page creator
   o1 = pg.evaluate("""() => { const S = __SF, P = S.P, SF = S.SF; P.skills.blades.v = 300; P.skills.shieldwork.v = 250; P.skills.shieldwork.lock = 'lower'; P.skills.medicine.v = 333; P.skills.brawling.v = 120; P.skills.knives.lock = 'hold'; P.skills.hammers.v = 44;
     P.equip.weapon.quality = 'exceptional'; P.equip.weapon.maker = 'Oldie'; P.equip.weapon.cond = 77; P.equip.armor = SF.newItem('chain', 1, { cond: 90, maxc: 100 });
     P.hotbar = [{ k: 'item', id: 'bandage' }, { k: 'spell', id: 'magery.05' }, { k: 'act', id: 'brace' }, { k: 'item', id: 'draught' }, null, { k: 'act', id: 'track' }, null, null, null]; S.save();

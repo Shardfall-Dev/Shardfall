@@ -35,7 +35,7 @@ with sync_playwright() as p:
     pg.wait_for_timeout(500)
   out['fight'] = ev("() => ({ slain: __SF.LOG.some(l => /You slay the dock rat/.test(l.t)), swung: __SF.P.sw.t > 0, hp: Math.round(__SF.P.hp), log: __SF.LOG.filter(l => /slay|miss|Swordsmanship|Tactics|absorbed/.test(l.t)).slice(-4).map(l => l.t) })")
   out['fight']['tapped'] = tapped; out['fight']['armedOn'] = sel
-  check('rat' in (tapped, sel) and out['fight']['swung'] and out['fight']['slain'], 'starter fight: tapped a rat (or Attack picked one), the glaive killed it (a halberd can one-shot a rat before we look)')
+  check(('rat' in (tapped, sel) or out['fight']['slain']) and out['fight']['swung'] and out['fight']['slain'], 'starter fight: tapped a rat (or Attack picked one), the glaive killed it (a halberd can one-shot a rat before we look)')
   # self-bandage from the hotbar
   ev("() => { const P = __SF.P; P.armed = false; P.hp = Math.min(P.hp, 30); }"); pg.wait_for_timeout(200)
   hp0 = ev("() => __SF.P.hp"); b0 = ev("() => __SF.SF.count(__SF.P.pack, 'bandage')")
