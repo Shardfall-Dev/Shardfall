@@ -32,7 +32,9 @@
 
   // 2) eight facings: approach the player from each screen direction; the latched attack row must be that sector
   const SECT = [90, 135, 180, 225, 270, 315, 0, 45];
-  for (const id of ids) { const rows = [];
+  const timid = id => (S.ECO[id] || {}).temper === 'timid';   // deer and hares never start a fight: tested by fleeing and as pets (section 4)
+  out.timidIds = ids.filter(timid);
+  for (const id of ids) { if (timid(id)) continue; const rows = [];
     for (let s = 0; s < 8; s++) {
       const a = SECT[s] * Math.PI / 180, cx = Math.cos(a), cy = Math.sin(a), vx = (cx + 2 * cy) / 2, vy = (2 * cy - cx) / 2, l = Math.hypot(vx, vy), dist = S.MON[id].reach * .6;
       const m = S.spawnMon(id, -vx / l * dist, -vy / l * dist); m.sect = (s + 4) % 8; m.target = P; m.state = 'chase';
@@ -41,7 +43,7 @@
     out.facing[id] = rows; }
 
   // 3) walk → wind-up → impact → recover in live play, plus the in-game draw call
-  for (const id of ids) { const d = S.MON[id], seen = { walkCols: new Set(), windupCol: null, impactCol: null, recoverCol: null, idleCol: null, rowLocked: true, hits: 0, drawn: false };
+  for (const id of ids) { if (timid(id)) continue; const d = S.MON[id], seen = { walkCols: new Set(), windupCol: null, impactCol: null, recoverCol: null, idleCol: null, rowLocked: true, hits: 0, drawn: false };
     const m = S.spawnMon(id, 5, 0); m.sect = 0;
     // idle pose while standing
     preTick(); S.update(.02); keepAlive(); m.speed = 0; m.state = 'idle'; seen.idleCol = S.bestiaryPose(m).col;
@@ -63,5 +65,32 @@
     }
     seen.walkCols = [...seen.walkCols].sort(); seen.struck = m.impactT != null; seen.hpEvents = dmgSeen;
     out.combat[id] = seen; m.gone = true; void orig; void hp0; void d; }
+
+  // 4) timid wildlife (deer, hares): AI unchanged. (a) it bolts from the player on the walk cycle, its row turned away from the player;
+  //    (b) tamed and ordered to attack, its strike plays impact → recover on a latched row and lands through combat.
+  out.timid = {};
+  for (const id of out.timidIds) { const r = { fleeCols: new Set(), fleeRows: new Set(), away: 0, fleeFrames: 0, fled: false, impactCol: null, recoverCol: null, rowLocked: true, petHits: 0, petStrikes: 0, drawn: false };
+    const m = S.spawnMon(id, 2.2, 1.2); m.sect = 0;
+    for (let i = 0; i < 150; i++) { preTick(); S.update(.02); keepAlive(); const p = S.bestiaryPose(m);
+      if (m.state === 'flee') r.fled = true;
+      if (m.state === 'flee' && p.ph === 'walk') { r.fleeCols.add(p.col); r.fleeRows.add(p.row);
+        const a = Math.atan2(m.y - P.y, m.x - P.x), sx = Math.cos(a) - Math.sin(a), sy = (Math.cos(a) + Math.sin(a)) / 2;   // screen-space bearing from the player
+        const ang = (Math.atan2(sy, sx) * 180 / Math.PI + 360) % 360, toward = SECT.reduce((b, v, k) => Math.abs(((ang - v + 540) % 360) - 180) < Math.abs(((ang - SECT[b] + 540) % 360) - 180) ? k : b, 0);
+        const off = Math.min((p.row - toward + 8) % 8, (toward - p.row + 8) % 8); r.fleeFrames++; if (off <= 2) r.away++; else r.awayFail = r.awayFail || { row: p.row, away: toward, i }; }
+      if (i % 25 === 0) { S.render(); r.drawn = r.drawn || !!m.pose; } }
+    m.gone = true;
+    const pet = S.spawnMon(id, 1.5, 0); pet.kind = 'pet'; pet.order = 'follow'; pet.slots = 1; pet.state = ''; pet.target = null;
+    const foe = S.spawnMon('rat', 3.2, 0), fx = foe.x, fy = foe.y; foe.hp = foe.max = 1e6; pet.order = 'attack'; pet.tgt = foe;   // a sturdy target pinned in place
+    let latched = null, prev = null; const petHp = pet.hp;
+    for (let i = 0; i < 500; i++) { const h = foe.hp, it = pet.impactT; preTick(); S.update(.02); keepAlive(); if (foe.hp < h) r.petHits++; if (pet.impactT !== it) r.petStrikes++; foe.x = fx; foe.y = fy; pet.hp = petHp; const p = S.bestiaryPose(pet);
+      if (p.ph === 'impact' && prev !== 'impact') latched = p.row;
+      if ((p.ph === 'impact' || p.ph === 'recover') && latched !== null && p.row !== latched) r.rowLocked = false;
+      if (p.ph === 'impact') r.impactCol = p.col; if (p.ph === 'recover') r.recoverCol = p.col; prev = p.ph;
+      if (r.recoverCol !== null && r.petStrikes >= 3) break; }
+    r.petCtrl = pet.ctrl; pet.gone = true; foe.gone = true; r.fleeCols = [...r.fleeCols].sort(); r.fleeRows = [...r.fleeRows].sort(); out.timid[id] = r; }
+
+  // 5) fallback: while a sheet is not decoded the creature is still drawn (procedural art), never invisible
+  { const id = out.timidIds[0] || ids[0], keep = S.BSI[id]; delete S.BSI[id]; const m = S.spawnMon(id, 1, 1); let threw = null;
+    try { S.render(); } catch (err) { threw = String(err); } out.fallback = { id, threw, poseSet: !!m.pose }; S.BSI[id] = keep; m.gone = true; }
   return out;
 })()

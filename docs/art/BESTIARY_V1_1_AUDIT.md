@@ -38,4 +38,4 @@ Use original hand-painted, pixel-dithered 2.5D isometric dark fantasy sprite app
 - Build a new version after integration (coordinate version number with latest main); run bestiary, world, combat, magery and mobile smoke tests. Review a lineup at actual native in-game scale before merging.
 
 ## Status
-Audit/implementation specification only. No replacement sprite file has been committed or verified by this document. Do not promote generated drafts into the build until grid, alpha, facing, and animation quality pass visual and technical QA.
+Draft01 (boar, hound, snapper, spider, deer, hare) integrated in v0.28.2; see BESTIARY_V1_1_DRAFT01.md. The other eight replacements are still open. Do not promote generated drafts into the build until grid, alpha, facing, and animation quality pass visual and technical QA.
