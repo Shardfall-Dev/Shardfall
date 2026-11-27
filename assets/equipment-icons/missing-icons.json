@@ -1,0 +1,863 @@
+{
+ "pack": "Shardfall equipment icons",
+ "version": "1.0.0-missing",
+ "format": "PNG, 64x64, transparent background, hand-painted classic fantasy style matching assets/backpack-icons/v1.0.0",
+ "integration": "add the PNGs to the backpack icon atlas (tools/embed_backpack_icons.py) under these ids; the game picks a painted tile before the stand-in automatically",
+ "rules": [
+  "original art only: do not copy Ultima Online or other copyrighted artwork",
+  "metal and hide pieces: paint a neutral base (steel grey, plain tan). The game marks the material with a colour chip on the icon; per-material recolouring of painted tiles is a later step (iron steel grey, copper reddish bronze, golden yellow, shadow iron dark charcoal, verite muted green, valorite blue-grey, mithril pale silver-blue)",
+  "one item per icon, centred, about 6 px margin, light from the top left"
+ ],
+ "count": 67,
+ "items": [
+  {
+   "id": "cloth_cap",
+   "file": "icons_64/cloth_cap.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Clothing",
+   "slot": "head",
+   "tintable": false,
+   "interim": "slot silhouette tinted by material",
+   "description": "Cloth cap (Cloth, head slot): undyed linen/wool, soft folds. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "shirt",
+   "file": "icons_64/shirt.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Clothing",
+   "slot": "shirt",
+   "tintable": false,
+   "interim": "reuses the clothvest tile",
+   "description": "Shirt (Cloth, shirt slot): undyed linen/wool, soft folds. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "trousers",
+   "file": "icons_64/trousers.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Clothing",
+   "slot": "trousers",
+   "tintable": false,
+   "interim": "slot silhouette tinted by material",
+   "description": "Trousers (Cloth, trousers slot): undyed linen/wool, soft folds. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "robe",
+   "file": "icons_64/robe.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Clothing",
+   "slot": "robe",
+   "tintable": false,
+   "interim": "slot silhouette tinted by material",
+   "description": "Robe (Cloth, robe slot): undyed linen/wool, soft folds. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "cloak",
+   "file": "icons_64/cloak.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Clothing",
+   "slot": "cloak",
+   "tintable": false,
+   "interim": "slot silhouette tinted by material",
+   "description": "Cloak (Cloth, cloak slot): undyed linen/wool, soft folds. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "cloth_gloves",
+   "file": "icons_64/cloth_gloves.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Clothing",
+   "slot": "hands",
+   "tintable": false,
+   "interim": "slot silhouette tinted by material",
+   "description": "Cloth gloves (Cloth, hands slot): undyed linen/wool, soft folds. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "tabard",
+   "file": "icons_64/tabard.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Clothing",
+   "slot": "tunic",
+   "tintable": false,
+   "interim": "slot silhouette tinted by material",
+   "description": "Tabard (Cloth, tunic / tabard slot): undyed linen/wool, soft folds. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "leather_cap",
+   "file": "icons_64/leather_cap.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Leather armor",
+   "slot": "head",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Leather cap (Leather, head slot): tan stitched leather, visible seams. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "leather_gorget",
+   "file": "icons_64/leather_gorget.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Leather armor",
+   "slot": "neck",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Leather gorget (Leather, neck slot): tan stitched leather, visible seams. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "leather_tunic",
+   "file": "icons_64/leather_tunic.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Leather armor",
+   "slot": "chest",
+   "tintable": true,
+   "interim": "reuses the leather tile",
+   "description": "Leather tunic (Leather, chest slot): tan stitched leather, visible seams. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "leather_sleeves",
+   "file": "icons_64/leather_sleeves.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Leather armor",
+   "slot": "arms",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Leather sleeves (Leather, arms slot): tan stitched leather, visible seams. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "leather_gloves",
+   "file": "icons_64/leather_gloves.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Leather armor",
+   "slot": "hands",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Leather gloves (Leather, hands slot): tan stitched leather, visible seams. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "leather_leggings",
+   "file": "icons_64/leather_leggings.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Leather armor",
+   "slot": "legs",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Leather leggings (Leather, legs slot): tan stitched leather, visible seams. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "boots",
+   "file": "icons_64/boots.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Leather armor",
+   "slot": "feet",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Boots (Leather, feet slot): tan stitched leather, visible seams. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "shoes",
+   "file": "icons_64/shoes.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Leather armor",
+   "slot": "feet",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Shoes (Leather, feet slot): tan stitched leather, visible seams. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "belt",
+   "file": "icons_64/belt.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Leather armor",
+   "slot": "belt",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Belt (Leather, belt slot): tan stitched leather, visible seams. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "studded_gorget",
+   "file": "icons_64/studded_gorget.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Studded leather armor",
+   "slot": "neck",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Studded gorget (Studded leather, neck slot): tan leather with a grid of round steel studs. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "studded_tunic",
+   "file": "icons_64/studded_tunic.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Studded leather armor",
+   "slot": "chest",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Studded tunic (Studded leather, chest slot): tan leather with a grid of round steel studs. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "studded_sleeves",
+   "file": "icons_64/studded_sleeves.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Studded leather armor",
+   "slot": "arms",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Studded sleeves (Studded leather, arms slot): tan leather with a grid of round steel studs. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "studded_gloves",
+   "file": "icons_64/studded_gloves.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Studded leather armor",
+   "slot": "hands",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Studded gloves (Studded leather, hands slot): tan leather with a grid of round steel studs. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "studded_leggings",
+   "file": "icons_64/studded_leggings.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Studded leather armor",
+   "slot": "legs",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Studded leggings (Studded leather, legs slot): tan leather with a grid of round steel studs. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "bone_helm",
+   "file": "icons_64/bone_helm.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Bone armor",
+   "slot": "head",
+   "tintable": false,
+   "interim": "slot silhouette tinted by material",
+   "description": "Bone helmet (Bone, head slot): pale bone plates lashed with dark leather cords. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "bone_chest",
+   "file": "icons_64/bone_chest.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Bone armor",
+   "slot": "chest",
+   "tintable": false,
+   "interim": "slot silhouette tinted by material",
+   "description": "Bone chest armor (Bone, chest slot): pale bone plates lashed with dark leather cords. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "bone_arms",
+   "file": "icons_64/bone_arms.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Bone armor",
+   "slot": "arms",
+   "tintable": false,
+   "interim": "slot silhouette tinted by material",
+   "description": "Bone arms (Bone, arms slot): pale bone plates lashed with dark leather cords. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "bone_gloves",
+   "file": "icons_64/bone_gloves.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Bone armor",
+   "slot": "hands",
+   "tintable": false,
+   "interim": "slot silhouette tinted by material",
+   "description": "Bone gloves (Bone, hands slot): pale bone plates lashed with dark leather cords. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "bone_legs",
+   "file": "icons_64/bone_legs.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Bone armor",
+   "slot": "legs",
+   "tintable": false,
+   "interim": "slot silhouette tinted by material",
+   "description": "Bone leggings (Bone, legs slot): pale bone plates lashed with dark leather cords. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "ringmail_tunic",
+   "file": "icons_64/ringmail_tunic.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Ringmail",
+   "slot": "chest",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Ringmail tunic (Ringmail, chest slot): steel rings sewn flat on a leather backing. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "ringmail_sleeves",
+   "file": "icons_64/ringmail_sleeves.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Ringmail",
+   "slot": "arms",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Ringmail sleeves (Ringmail, arms slot): steel rings sewn flat on a leather backing. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "ringmail_gloves",
+   "file": "icons_64/ringmail_gloves.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Ringmail",
+   "slot": "hands",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Ringmail gloves (Ringmail, hands slot): steel rings sewn flat on a leather backing. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "ringmail_leggings",
+   "file": "icons_64/ringmail_leggings.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Ringmail",
+   "slot": "legs",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Ringmail leggings (Ringmail, legs slot): steel rings sewn flat on a leather backing. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "chain_coif",
+   "file": "icons_64/chain_coif.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Chainmail",
+   "slot": "head",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Chainmail coif (Chainmail, head slot): interlocking steel mail, soft drape. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "chain_tunic",
+   "file": "icons_64/chain_tunic.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Chainmail",
+   "slot": "chest",
+   "tintable": true,
+   "interim": "reuses the chain tile",
+   "description": "Chainmail tunic (Chainmail, chest slot): interlocking steel mail, soft drape. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "chain_leggings",
+   "file": "icons_64/chain_leggings.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Chainmail",
+   "slot": "legs",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Chainmail leggings (Chainmail, legs slot): interlocking steel mail, soft drape. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "plate_gorget",
+   "file": "icons_64/plate_gorget.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Platemail",
+   "slot": "neck",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Plate gorget (Platemail, neck slot): polished steel plates with rivets and articulated lames. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "plate_chest",
+   "file": "icons_64/plate_chest.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Platemail",
+   "slot": "chest",
+   "tintable": true,
+   "interim": "reuses the plate tile",
+   "description": "Plate chest (Platemail, chest slot): polished steel plates with rivets and articulated lames. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "plate_arms",
+   "file": "icons_64/plate_arms.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Platemail",
+   "slot": "arms",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Plate arms (Platemail, arms slot): polished steel plates with rivets and articulated lames. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "plate_gauntlets",
+   "file": "icons_64/plate_gauntlets.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Platemail",
+   "slot": "hands",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Plate gauntlets (Platemail, hands slot): polished steel plates with rivets and articulated lames. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "plate_leggings",
+   "file": "icons_64/plate_leggings.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Platemail",
+   "slot": "legs",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Plate leggings (Platemail, legs slot): polished steel plates with rivets and articulated lames. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "bascinet",
+   "file": "icons_64/bascinet.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Helmets",
+   "slot": "head",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Bascinet (Helmet, head slot): steel helmet. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "open_helm",
+   "file": "icons_64/open_helm.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Helmets",
+   "slot": "head",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Open helm (Helmet, head slot): steel helmet. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "norse_helm",
+   "file": "icons_64/norse_helm.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Helmets",
+   "slot": "head",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Norse helm (Helmet, head slot): steel helmet. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "closed_helm",
+   "file": "icons_64/closed_helm.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Helmets",
+   "slot": "head",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Closed helm (Helmet, head slot): steel helmet. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "plate_helm",
+   "file": "icons_64/plate_helm.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Helmets",
+   "slot": "head",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Plate helm (Helmet, head slot): steel helmet. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "great_helm",
+   "file": "icons_64/great_helm.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Helmets",
+   "slot": "head",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Great helm (Helmet, head slot): steel helmet. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "dragon_helm",
+   "file": "icons_64/dragon_helm.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Dragon scale armor",
+   "slot": "head",
+   "tintable": false,
+   "interim": "slot silhouette tinted by material",
+   "description": "Dragon helm (Dragon scale, head slot): overlapping crimson dragon scales with dark leather edging. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "dragon_chest",
+   "file": "icons_64/dragon_chest.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Dragon scale armor",
+   "slot": "chest",
+   "tintable": false,
+   "interim": "slot silhouette tinted by material",
+   "description": "Dragon chest (Dragon scale, chest slot): overlapping crimson dragon scales with dark leather edging. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "dragon_arms",
+   "file": "icons_64/dragon_arms.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Dragon scale armor",
+   "slot": "arms",
+   "tintable": false,
+   "interim": "slot silhouette tinted by material",
+   "description": "Dragon arms (Dragon scale, arms slot): overlapping crimson dragon scales with dark leather edging. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "dragon_gloves",
+   "file": "icons_64/dragon_gloves.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Dragon scale armor",
+   "slot": "hands",
+   "tintable": false,
+   "interim": "slot silhouette tinted by material",
+   "description": "Dragon gloves (Dragon scale, hands slot): overlapping crimson dragon scales with dark leather edging. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "dragon_legs",
+   "file": "icons_64/dragon_legs.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Dragon scale armor",
+   "slot": "legs",
+   "tintable": false,
+   "interim": "slot silhouette tinted by material",
+   "description": "Dragon leggings (Dragon scale, legs slot): overlapping crimson dragon scales with dark leather edging. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "wooden_shield",
+   "file": "icons_64/wooden_shield.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Shields",
+   "slot": "shield",
+   "tintable": false,
+   "interim": "slot silhouette tinted by material",
+   "description": "Wooden shield (Shield, off hand slot): shield face-on. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "metal_shield",
+   "file": "icons_64/metal_shield.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Shields",
+   "slot": "shield",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Metal shield (Shield, off hand slot): shield face-on. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "kite_shield",
+   "file": "icons_64/kite_shield.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Shields",
+   "slot": "shield",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Kite shield (Shield, off hand slot): shield face-on. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "heater_shield",
+   "file": "icons_64/heater_shield.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Shields",
+   "slot": "shield",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Heater shield (Shield, off hand slot): shield face-on. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "ring",
+   "file": "icons_64/ring.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Accessories",
+   "slot": "ring",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Ring (Jewelry, ring slot): small metal piece, plain band, no gem. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "bracelet",
+   "file": "icons_64/bracelet.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Accessories",
+   "slot": "bracelet",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Bracelet (Jewelry, bracelet slot): small metal piece, plain band, no gem. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "necklace",
+   "file": "icons_64/necklace.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Accessories",
+   "slot": "necklace",
+   "tintable": true,
+   "interim": "slot silhouette tinted by material",
+   "description": "Necklace (Jewelry, necklace slot): small metal piece, plain band, no gem. Neutral steel/grey base for metal pieces so the game can tint per material."
+  },
+  {
+   "id": "ore_mithril",
+   "file": "icons_64/ore_mithril.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Crafting materials",
+   "interim": "category glyph",
+   "description": "Mithril ore: pale silver-blue ore chunk."
+  },
+  {
+   "id": "ingot_mithril",
+   "file": "icons_64/ingot_mithril.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Crafting materials",
+   "interim": "category glyph",
+   "description": "Mithril ingot: pale silver-blue ingot, lighter tone than valorite."
+  },
+  {
+   "id": "hide_thick",
+   "file": "icons_64/hide_thick.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Crafting materials",
+   "interim": "category glyph",
+   "description": "Thick leather: folded thick brown hide."
+  },
+  {
+   "id": "hide_spined",
+   "file": "icons_64/hide_spined.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Crafting materials",
+   "interim": "category glyph",
+   "description": "Spined leather: green-tinged hide with small spines."
+  },
+  {
+   "id": "hide_horned",
+   "file": "icons_64/hide_horned.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Crafting materials",
+   "interim": "category glyph",
+   "description": "Horned leather: rust-red hide with horn ridges."
+  },
+  {
+   "id": "hide_barbed",
+   "file": "icons_64/hide_barbed.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Crafting materials",
+   "interim": "category glyph",
+   "description": "Barbed leather: purple-black hide with barbs."
+  },
+  {
+   "id": "hide_wolf",
+   "file": "icons_64/hide_wolf.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Crafting materials",
+   "interim": "category glyph",
+   "description": "Wolf hide: grey furred pelt."
+  },
+  {
+   "id": "hide_troll",
+   "file": "icons_64/hide_troll.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Crafting materials",
+   "interim": "category glyph",
+   "description": "Troll hide: mottled olive hide, thick."
+  },
+  {
+   "id": "hide_dragon",
+   "file": "icons_64/hide_dragon.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Crafting materials",
+   "interim": "category glyph",
+   "description": "Dragon hide: crimson scaled hide, rare."
+  },
+  {
+   "id": "bone",
+   "file": "icons_64/bone.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Crafting materials",
+   "interim": "category glyph",
+   "description": "Bone: small bundle of pale bones."
+  },
+  {
+   "id": "dragonscale",
+   "file": "icons_64/dragonscale.png",
+   "size": [
+    64,
+    64
+   ],
+   "family": "Crafting materials",
+   "interim": "category glyph",
+   "description": "Dragon scale: single large crimson scale, rare."
+  }
+ ]
+}

@@ -87,7 +87,7 @@ with sync_playwright() as p:
   r = J(pg, """() => { const S = __SF, P = S.P, rune = P.pack.items.find(i => i.id === 'rune' && i.mark); S.save(); const sv = JSON.parse(localStorage.getItem('shardfall.save.v1')); const [fx, fy] = S.annWarp(611, 219);
     return { v: sv.v, zone: S.zoneAt(Math.floor(P.x), Math.floor(P.y)), stand: S.canStand(P, P.x, P.y), runeZone: S.zoneAt(Math.floor(rune.mark.x), Math.floor(rune.mark.y)), node: sv.nodes.some(n => n[0] === Math.round(fy) * S.GW + Math.round(fx)),
       shut: S.DOORS.filter(d => !d.open).length, shutKey: Object.keys(P.cx.doors), shutZone: (() => { const k = Object.keys(P.cx.doors)[0]; if (!k) return null; const [x, y] = k.split(',').map(Number); return S.zoneAt(x, y); })(), prev: !!localStorage.getItem('shardfall.save.v1.prev5') }; }""")
-  check(r['v'] == 6 and r['zone'] == 'vespar' and r['stand'], 'a v0.22 character standing in Vespar loads standing in Vespar (save v6)', r)
+  check(r['v'] >= 6 and r['zone'] == 'vespar' and r['stand'], 'a v0.22 character standing in Vespar loads standing in Vespar (save v6, or v7 since the v0.25 equipment conversion)', r)
   check(r['runeZone'] == 'mynoc' and r['node'] and r['shut'] == 1 and r['shutZone'] == 'vespar' and r['prev'], 'a rune still points at Mynoc, the Mynoc ore face and the shut Vespar door carry over, the old save is kept', r)
   check(not errs, 'no page errors after the migration', errs[:5]); ctx.close()
   b.close()

@@ -58,7 +58,7 @@ def run(pg, tag, phone):
         else:
             pg.hover(cell(id)); pg.wait_for_timeout(100)
             t = pg.eval_on_selector(cell(id) + ' .bagtip', "e => ({ d: getComputedStyle(e).display, i: e.querySelector('.bagico')?.dataset.icon, w: Math.round(e.querySelector('.bagico')?.getBoundingClientRect().width), t: e.innerText })")
-            want = 'Base damage' if id in WEAPONS else 'Quest'
+            want = 'Damage' if id in WEAPONS else 'Quest'   # v0.25 tooltip: Damage / Speed / Weight lines
             check(t['d'] == 'block' and t['i'] == id and t['w'] == 56 and want in t['t'], f'{tag} hover tooltip for {id}: icon at 56 px, stats intact', t)
     if not phone: pg.hover(cell('wick')); pg.wait_for_timeout(80)
     else: pg.tap(cell('heavycrossbow')); pg.wait_for_timeout(100)
