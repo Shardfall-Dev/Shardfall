@@ -1,0 +1,456 @@
+{
+  "version": "1.0.0",
+  "status": "procedural prototype",
+  "baseRig": "classic-humans-v2",
+  "cell": {
+    "width": 112,
+    "height": 100,
+    "anchorX": 56,
+    "anchorY": 86
+  },
+  "directions": [
+    "S",
+    "SW",
+    "W",
+    "NW",
+    "N",
+    "NE",
+    "E",
+    "SE"
+  ],
+  "definitions": {
+    "cloth_cap": {
+      "family": "cloth",
+      "slot": "head",
+      "primary": "fixed",
+      "fixed": "cloth",
+      "secondary": null
+    },
+    "shirt": {
+      "family": "cloth",
+      "slot": "shirt",
+      "primary": "fixed",
+      "fixed": "cloth",
+      "secondary": null
+    },
+    "trousers": {
+      "family": "cloth",
+      "slot": "trousers",
+      "primary": "fixed",
+      "fixed": "cloth",
+      "secondary": null
+    },
+    "robe": {
+      "family": "cloth",
+      "slot": "robe",
+      "primary": "fixed",
+      "fixed": "cloth",
+      "secondary": null
+    },
+    "cloak": {
+      "family": "cloth",
+      "slot": "cloak",
+      "primary": "fixed",
+      "fixed": "cloth",
+      "secondary": null
+    },
+    "cloth_gloves": {
+      "family": "cloth",
+      "slot": "hands",
+      "primary": "fixed",
+      "fixed": "cloth",
+      "secondary": null
+    },
+    "tabard": {
+      "family": "cloth",
+      "slot": "tunic",
+      "primary": "fixed",
+      "fixed": "cloth",
+      "secondary": null
+    },
+    "leather_cap": {
+      "family": "leather",
+      "slot": "head",
+      "primary": "hide",
+      "fixed": null,
+      "secondary": null
+    },
+    "leather_gorget": {
+      "family": "leather",
+      "slot": "neck",
+      "primary": "hide",
+      "fixed": null,
+      "secondary": null
+    },
+    "leather_tunic": {
+      "family": "leather",
+      "slot": "chest",
+      "primary": "hide",
+      "fixed": null,
+      "secondary": null
+    },
+    "leather_sleeves": {
+      "family": "leather",
+      "slot": "arms",
+      "primary": "hide",
+      "fixed": null,
+      "secondary": null
+    },
+    "leather_gloves": {
+      "family": "leather",
+      "slot": "hands",
+      "primary": "hide",
+      "fixed": null,
+      "secondary": null
+    },
+    "leather_leggings": {
+      "family": "leather",
+      "slot": "legs",
+      "primary": "hide",
+      "fixed": null,
+      "secondary": null
+    },
+    "boots": {
+      "family": "leather",
+      "slot": "feet",
+      "primary": "hide",
+      "fixed": null,
+      "secondary": null
+    },
+    "shoes": {
+      "family": "leather",
+      "slot": "feet",
+      "primary": "hide",
+      "fixed": null,
+      "secondary": null
+    },
+    "belt": {
+      "family": "leather",
+      "slot": "belt",
+      "primary": "hide",
+      "fixed": null,
+      "secondary": null
+    },
+    "studded_gorget": {
+      "family": "studded",
+      "slot": "neck",
+      "primary": "hide",
+      "fixed": null,
+      "secondary": "metal"
+    },
+    "studded_tunic": {
+      "family": "studded",
+      "slot": "chest",
+      "primary": "hide",
+      "fixed": null,
+      "secondary": "metal"
+    },
+    "studded_sleeves": {
+      "family": "studded",
+      "slot": "arms",
+      "primary": "hide",
+      "fixed": null,
+      "secondary": "metal"
+    },
+    "studded_gloves": {
+      "family": "studded",
+      "slot": "hands",
+      "primary": "hide",
+      "fixed": null,
+      "secondary": "metal"
+    },
+    "studded_leggings": {
+      "family": "studded",
+      "slot": "legs",
+      "primary": "hide",
+      "fixed": null,
+      "secondary": "metal"
+    },
+    "bone_helm": {
+      "family": "bone",
+      "slot": "head",
+      "primary": "fixed",
+      "fixed": "bone",
+      "secondary": null
+    },
+    "bone_chest": {
+      "family": "bone",
+      "slot": "chest",
+      "primary": "fixed",
+      "fixed": "bone",
+      "secondary": null
+    },
+    "bone_arms": {
+      "family": "bone",
+      "slot": "arms",
+      "primary": "fixed",
+      "fixed": "bone",
+      "secondary": null
+    },
+    "bone_gloves": {
+      "family": "bone",
+      "slot": "hands",
+      "primary": "fixed",
+      "fixed": "bone",
+      "secondary": null
+    },
+    "bone_legs": {
+      "family": "bone",
+      "slot": "legs",
+      "primary": "fixed",
+      "fixed": "bone",
+      "secondary": null
+    },
+    "ringmail_tunic": {
+      "family": "ringmail",
+      "slot": "chest",
+      "primary": "metal",
+      "fixed": null,
+      "secondary": null
+    },
+    "ringmail_sleeves": {
+      "family": "ringmail",
+      "slot": "arms",
+      "primary": "metal",
+      "fixed": null,
+      "secondary": null
+    },
+    "ringmail_gloves": {
+      "family": "ringmail",
+      "slot": "hands",
+      "primary": "metal",
+      "fixed": null,
+      "secondary": null
+    },
+    "ringmail_leggings": {
+      "family": "ringmail",
+      "slot": "legs",
+      "primary": "metal",
+      "fixed": null,
+      "secondary": null
+    },
+    "chain_coif": {
+      "family": "chain",
+      "slot": "head",
+      "primary": "metal",
+      "fixed": null,
+      "secondary": null
+    },
+    "chain_tunic": {
+      "family": "chain",
+      "slot": "chest",
+      "primary": "metal",
+      "fixed": null,
+      "secondary": null
+    },
+    "chain_leggings": {
+      "family": "chain",
+      "slot": "legs",
+      "primary": "metal",
+      "fixed": null,
+      "secondary": null
+    },
+    "plate_gorget": {
+      "family": "plate",
+      "slot": "neck",
+      "primary": "metal",
+      "fixed": null,
+      "secondary": null
+    },
+    "plate_chest": {
+      "family": "plate",
+      "slot": "chest",
+      "primary": "metal",
+      "fixed": null,
+      "secondary": null
+    },
+    "plate_arms": {
+      "family": "plate",
+      "slot": "arms",
+      "primary": "metal",
+      "fixed": null,
+      "secondary": null
+    },
+    "plate_gauntlets": {
+      "family": "plate",
+      "slot": "hands",
+      "primary": "metal",
+      "fixed": null,
+      "secondary": null
+    },
+    "plate_leggings": {
+      "family": "plate",
+      "slot": "legs",
+      "primary": "metal",
+      "fixed": null,
+      "secondary": null
+    },
+    "bascinet": {
+      "family": "helm",
+      "slot": "head",
+      "primary": "metal",
+      "fixed": null,
+      "secondary": null
+    },
+    "open_helm": {
+      "family": "helm",
+      "slot": "head",
+      "primary": "metal",
+      "fixed": null,
+      "secondary": null
+    },
+    "norse_helm": {
+      "family": "helm",
+      "slot": "head",
+      "primary": "metal",
+      "fixed": null,
+      "secondary": null
+    },
+    "closed_helm": {
+      "family": "helm",
+      "slot": "head",
+      "primary": "metal",
+      "fixed": null,
+      "secondary": null
+    },
+    "plate_helm": {
+      "family": "helm",
+      "slot": "head",
+      "primary": "metal",
+      "fixed": null,
+      "secondary": null
+    },
+    "great_helm": {
+      "family": "helm",
+      "slot": "head",
+      "primary": "metal",
+      "fixed": null,
+      "secondary": null
+    },
+    "dragon_helm": {
+      "family": "dragon",
+      "slot": "head",
+      "primary": "fixed",
+      "fixed": "dragonscale",
+      "secondary": null
+    },
+    "dragon_chest": {
+      "family": "dragon",
+      "slot": "chest",
+      "primary": "fixed",
+      "fixed": "dragonscale",
+      "secondary": null
+    },
+    "dragon_arms": {
+      "family": "dragon",
+      "slot": "arms",
+      "primary": "fixed",
+      "fixed": "dragonscale",
+      "secondary": null
+    },
+    "dragon_gloves": {
+      "family": "dragon",
+      "slot": "hands",
+      "primary": "fixed",
+      "fixed": "dragonscale",
+      "secondary": null
+    },
+    "dragon_legs": {
+      "family": "dragon",
+      "slot": "legs",
+      "primary": "fixed",
+      "fixed": "dragonscale",
+      "secondary": null
+    },
+    "wooden_shield": {
+      "family": "shield",
+      "slot": "shield",
+      "primary": "wood",
+      "fixed": null,
+      "secondary": null
+    },
+    "metal_shield": {
+      "family": "shield",
+      "slot": "shield",
+      "primary": "metal",
+      "fixed": null,
+      "secondary": null
+    },
+    "kite_shield": {
+      "family": "shield",
+      "slot": "shield",
+      "primary": "metal",
+      "fixed": null,
+      "secondary": null
+    },
+    "heater_shield": {
+      "family": "shield",
+      "slot": "shield",
+      "primary": "metal",
+      "fixed": null,
+      "secondary": null
+    },
+    "ring": {
+      "family": "jewelry",
+      "slot": "ring",
+      "primary": "metal",
+      "fixed": null,
+      "secondary": null
+    },
+    "bracelet": {
+      "family": "jewelry",
+      "slot": "bracelet",
+      "primary": "metal",
+      "fixed": null,
+      "secondary": null
+    },
+    "necklace": {
+      "family": "jewelry",
+      "slot": "necklace",
+      "primary": "metal",
+      "fixed": null,
+      "secondary": null
+    },
+    "buckler": {
+      "family": "shield",
+      "slot": "shield",
+      "primary": "wood"
+    },
+    "garment": {
+      "family": "cloth",
+      "slot": "tunic",
+      "fixed": "cloth"
+    }
+  },
+  "colors": {
+    "iron": "#8e8f8a",
+    "dull_copper": "#8a6646",
+    "shadow_iron": "#45454c",
+    "copper": "#c0603e",
+    "bronze": "#c8963e",
+    "golden": "#f2cc3a",
+    "agapite": "#d09090",
+    "verite": "#4aac62",
+    "valorite": "#5a80d8",
+    "mithril": "#c4d6ee",
+    "pine": "#e2c486",
+    "oak": "#8c5c32",
+    "ash": "#bcb69c",
+    "yew": "#9c4c2c",
+    "heartwood": "#8c5cbc",
+    "bloodwood": "#7c2024",
+    "frostwood": "#9cd2f2",
+    "regular": "#9a6a40",
+    "thick": "#6e4a2c",
+    "wolf": "#8c8a80",
+    "spined": "#5a7a4a",
+    "horned": "#a0603a",
+    "troll": "#5e6e52",
+    "barbed": "#6a3a5a",
+    "dragon": "#8a2a22",
+    "cloth": "#c8bca0",
+    "bone": "#e0d6bc",
+    "dragonscale": "#9a2c24"
+  },
+  "atlas": "composite; 16 body/direction rows, frames in columns"
+}
