@@ -137,7 +137,7 @@ function renderEqWin(force) {
   if (!open) { if (!el.hidden) { el.hidden = true; EQW.html = ''; } return; }
   const e = EQ.effective(P);
   let h = `<div class="eqh" data-eqmove><b>${esc(P.name)}</b><span class="note">AR ${f1w(e.ar)} · ${f1w(encumb().wt)}/${f1w(SF.carryCap(P))}</span><button class="x" data-a="eqclose" aria-label="Close equipment">×</button></div><div class="eqb">`;
-  h += `<div class="eqdoll"><div class="eqcol">${EQ_LEFT.map(eqSlotHtml).join('')}</div><div class="eqfig" data-drop="eq:auto"><i class="doll" style="background-image:url(${SCOUT_SRC})"></i>${P.ghost ? '<span class="note">ghost</span>' : ''}</div><div class="eqcol">${EQ_RIGHT.map(eqSlotHtml).join('')}</div></div>`;
+  h += `<div class="eqdoll"><div class="eqcol">${EQ_LEFT.map(eqSlotHtml).join('')}</div><div class="eqfig" data-drop="eq:auto">${(() => { const du = hrDollURL(); return du ? `<img class="doll hrdoll" src="${du}" alt="">` : `<i class="doll" style="background-image:url(${SCOUT_SRC})"></i>`; })()}${P.ghost ? '<span class="note">ghost</span>' : ''}</div><div class="eqcol">${EQ_RIGHT.map(eqSlotHtml).join('')}</div></div>`;
   h += `<div class="eqrow">${EQ_BOTTOM.map(eqSlotHtml).join('')}</div>`;
   const sel = EQW.sel && P.equip[EQW.sel];
   if (EQW.sel) h += `<div class="eqcard">${sel ? itemTip(sel, { compare: false, icon: 40 }) + `<div class="acts">${SF.ITEMS[sel.id].trade || sel.id === 'garment' ? btn('uneq', 'Remove', { s: EQW.sel }) : ''}${SF.WEARABLE(sel.id) && sel.cond !== undefined && sel.cond < (sel.maxc || 100) ? btn('repair', 'Repair', { u: sel.uid }) : ''}${SF.ITEMS[sel.id].trade ? btn('drop', 'Drop', { u: sel.uid }) : ''}</div>` : `<p class="note">${EQ.SLOT[EQW.sel].n}: empty. Drag an item here, or double-click it in the backpack.</p>`}</div>`;
@@ -154,7 +154,7 @@ function placeEqWin() { const el = $('#eqwin'); const p = SETTINGS.eqPos || { x:
   document.addEventListener('pointerup', e => { if (mv && e.pointerId === mv.id) { mv = null; saveSettings(); } }); }
 addEventListener('resize', () => { if (SETTINGS.eqOpen) placeEqWin(); });
 /* called after every equipment change and from the HUD refresh: transient effective stats, the appearance-change hook, the window */
-function eqChanged() { renderEqWin(true); if (PANEL === 'bag' || PANEL === 'gear') renderPanel(); }
+function eqChanged() { hrWarm(P); renderEqWin(true); if (PANEL === 'bag' || PANEL === 'gear') renderPanel(); }
 function eqTick() {
   EQ.refresh(P); const sig = EQ.signature(P);
   if (sig !== EQW.sig) { const first = !EQW.sig; EQW.sig = sig; if (!first) { const look = EQ.appearance(P); simEmit('AppearanceChanged', { actor: aidOf(P), layers: look.map(l => l.asset) }); try { dispatchEvent(new CustomEvent('sf:appearance', { detail: { actor: aidOf(P), layers: look } })); } catch (_) { } } }

@@ -280,8 +280,8 @@ function playerDies(src) {
   simEmit('ActorKilled', { actor: aidOf(P), killer: aidOf(src), x: P.x, y: P.y });
   P.hp = 0; P.ghost = true; P.ghostAt = GT; P.armed = false; P.sel = null; P.prep = null; P.held = null; P.task = null; if (P.bandage) { P.bandDone = P.bandage.id; P.bandage = null; } P.hidden = false; P.poison = null; P.meditating = null; AIM = null; P.batch = null; if (PANEL === 'craft') closePanel();
   const protectedRoad = protAt(P.x, P.y);
-  if (!protectedRoad) { const corpse = SF.deathTransaction(P, GT, { x: P.x, y: P.y });
-  addEnt({ kind: 'corpse', mine: true, name: 'your body', x: P.x, y: P.y, cont: corpse, expires: corpse.expires }); }
+  if (!protectedRoad) { const hr = hrSnapshot(P), corpse = SF.deathTransaction(P, GT, { x: P.x, y: P.y });
+  addEnt({ kind: 'corpse', mine: true, name: 'your body', x: P.x, y: P.y, cont: corpse, expires: corpse.expires, hr }); }
   for (const e of ents) if (e.target === P) { e.target = null; e.state = 'return'; }
   log(`You have died${src ? ' to a ' + (src.name || 'foe') : ''}. ${protectedRoad ? 'Your belongings stay with you on this protected road.' : 'Your tradeable belongings stay on your body for 12 minutes.'}`, '#ff6a5a'); SFXA.cancelPending(); snd('player.death');
   save(); refreshHud(); renderPanel();
@@ -454,7 +454,7 @@ function killMon(m, src) {
   const cont = SF.newContainer('corpse'); for (const k in d.loot) { const q = rnd(d.loot[k][0], d.loot[k][1]); if (q > 0) cont.items.push(lootItem(k, q, 100)); }
   for (const [id, ch] of d.rare || []) if (R() < ch) cont.items.push(lootItem(id, 1, rnd(60, 100)));
   if (m.purse) cont.items.push(SF.newItem('gold', m.purse));
-  const corpse = addEnt({ kind: 'corpse', mon: m.type, sect: m.sect || 0, t0: GT, name: d.n + ' remains', x: m.x, y: m.y, cont, expires: GT + (d.boss ? 600 : 240), skinned: !d.skin });
+  const corpse = addEnt({ kind: 'corpse', mon: m.type, sect: m.sect || 0, t0: GT, name: d.n + ' remains', x: m.x, y: m.y, cont, expires: GT + (d.boss ? 600 : 240), skinned: !d.skin, hr: hrSnapshot(m) });
   if (corpse && (P.sel === m || src === P) && mine) { P.sel = corpse; if (!P.lootHinted) { P.lootHinted = true; log('Tap the bones (or press Interact) beside them to loot.', '#ffe08a'); } }
   for (const e of ents) if (e.target === m) { e.target = null; if (e.kind === 'mon') e.state = 'return'; }
   if (P.sel === m) { P.sel = mine ? null : corpse; P.armed = false; }
@@ -543,8 +543,8 @@ function allyDies(a, src) {
   if (a.ghost) return;                                                                            // death resolves exactly once
   simEmit('ActorKilled', { actor: aidOf(a), killer: aidOf(src), x: a.x, y: a.y });
   a.hp = 0; a.ghost = true; a.ghostAt = GT; a.poison = null; a.foe = null; a.reviveOffer = null;
-  const body = SF.deathTransaction(a, GT, { x: a.x, y: a.y }); body.owner = a.aid;
-  addEnt({ kind: 'corpse', allyBody: a.aid, name: a.name + "'s body", x: a.x, y: a.y, cont: body, expires: body.expires });
+  const hr = hrSnapshot(a), body = SF.deathTransaction(a, GT, { x: a.x, y: a.y }); body.owner = a.aid;
+  addEnt({ kind: 'corpse', allyBody: a.aid, name: a.name + "'s body", x: a.x, y: a.y, cont: body, expires: body.expires, hr });
   for (const e of ents) if (e.target === a) { e.target = null; if (e.kind === 'mon') e.state = 'return'; }
   log(`${a.name} has fallen${src && src.name ? ' to a ' + src.name : ''}. Her ghost waits by her body; bandages (Healing and Anatomy 80) or a resurrection spell can bring her back.`, '#ff8a6a'); sndAt('player.death', a, { gain: .8 });
 }
@@ -1666,10 +1666,10 @@ function drawEnt(e) {
   if (e.kind === 'pet') { g.strokeStyle = '#5aa8ff'; g.lineWidth = 1.5; g.beginPath(); g.ellipse(x, y, 14 * big, 7 * big, 0, 0, 7); g.stroke(); }
   if (P.sel === e && !P.ghost) { g.strokeStyle = relColor(e); g.lineWidth = 2; g.beginPath(); g.ellipse(x, y, 20 * big, 10 * big, 0, 0, 7); g.stroke(); }
   if (e.kind === 'player' && drawForm(g, e, x, y)) { }
-  else if (e.kind === 'player') drawScout(g, e, x, y, P.ghost ? 'ghost' : (P.look.cloak || null));
-  else if (e.kind === 'ally') { if (e.ghost) g.globalAlpha = .75; drawScout(g, e, x, y, e.ghost ? 'ghost' : '#2f7a46'); }
-  else if (e.kind === 'npc') drawScout(g, e, x, y, NPC_COL[e.role] || (e.life && LIFE_COL[e.life.prof]) || '#5a5a5a');
-  else if (e.kind === 'mon' && MON[e.type].scout) drawScout(g, e, x, y, MON[e.type].scout);
+  else if (e.kind === 'player') { if (P.ghost || !hrDraw(g, e, x, y)) drawScout(g, e, x, y, P.ghost ? 'ghost' : (P.look.cloak || null)); }
+  else if (e.kind === 'ally') { if (e.ghost) g.globalAlpha = .75; if (e.ghost || !hrDraw(g, e, x, y)) drawScout(g, e, x, y, e.ghost ? 'ghost' : '#2f7a46'); }
+  else if (e.kind === 'npc') { if (!hrDraw(g, e, x, y)) drawScout(g, e, x, y, NPC_COL[e.role] || (e.life && LIFE_COL[e.life.prof]) || '#5a5a5a'); }
+  else if (e.kind === 'mon' && MON[e.type].scout) { if (!hrDraw(g, e, x, y)) drawScout(g, e, x, y, MON[e.type].scout); }
   else if ((e.kind === 'mon' || (e.kind === 'pet' && e.type)) && BESTIARY.src[e.type]) { drawBestiary(g, e, x, y); }
   else if ((e.kind === 'mon' || (e.kind === 'pet' && e.type)) && MSI[e.type]) { drawSheet(g, e.type, e.sect, sheetFrame(e), x, y); }
   else if (e.kind === 'mon' || (e.kind === 'pet' && e.type)) { const s = beastSprite(e); g.imageSmoothingEnabled = false; g.drawImage(s, Math.round(x - s.ox), Math.round(y - s.oy)); if (e.rooted > GT) { g.fillStyle = 'rgba(120,90,50,.6)'; g.fillRect(x - 12, y - 4, 24, 4); } }
@@ -1679,6 +1679,7 @@ function drawEnt(e) {
 }
 function drawCorpse(e) {
   const g = ctx, x = SX(e.x, e.y), y = SY(e.x, e.y);
+  if (e.hr && hrDrawCorpse(g, e, x, y)) { if (e.cont && e.cont.items.length) { const tw = (Math.sin(GT * 5 + e.x) + 1) / 2; g.fillStyle = `rgba(255,224,120,${.4 + .6 * tw})`; g.fillRect(Math.round(x + 9), Math.round(y - 12), 2, 2); } if (e.mine) { g.fillStyle = '#f0c94a'; g.fillRect(x - 2, y - 30 + Math.sin(GT * 4) * 3, 4, 10); g.beginPath(); g.moveTo(x - 6, y - 20 + Math.sin(GT * 4) * 3); g.lineTo(x + 6, y - 20 + Math.sin(GT * 4) * 3); g.lineTo(x, y - 13 + Math.sin(GT * 4) * 3); g.fill(); } return; }
   if (e.mon && MSI[e.mon]) { drawSheet(g, e.mon, e.sect, GT - (e.t0 || 0) < .3 ? 6 : 7, x, y); if (e.cont && e.cont.items.length) { const tw = (Math.sin(GT * 5 + e.x) + 1) / 2; g.fillStyle = `rgba(255,224,120,${.4 + .6 * tw})`; g.fillRect(Math.round(x + 9), Math.round(y - 12), 2, 2); } return; }
   if (e.mon) { const s = Math.max(.8, Math.min(2, MON[e.mon].size || 1)), px = (a, b, w, h, c) => { g.fillStyle = c; g.fillRect(Math.round(x + a * s), Math.round(y + b * s), Math.ceil(w * s), Math.ceil(h * s)); };
     g.fillStyle = 'rgba(110,10,10,.4)'; g.beginPath(); g.ellipse(x, y, 13 * s, 5 * s, 0, 0, 7); g.fill();
@@ -2475,7 +2476,7 @@ function boot(saved, fresh) {
   if (saved) { try { saved = migrateSave(saved, localStorage.getItem(SAVEKEY)); } catch (e) { console.error(e); } for (const [k, gen, spec, n, max, t] of saved.nodes || []) RES.set(k, { gen, spec: spec || undefined, n, max, t });
     const c = saved.char; P = newChar({ name: c.name, str: c.str, dex: c.dex, int: c.int, skills: {}, look: c.look }); Object.assign(P, c); P.equip = Object.assign(emptyEquip(), P.equip); delete P.equip.armor; SF.setUidBase(saved.uid || 1); GT = saved.gt || 0;
     for (const k of Object.keys(SF.newSkills())) if (!P.skills[k]) P.skills[k] = { v: 0, lock: 'raise' };
-    for (const co of saved.corpses || []) { const cont = SF.newContainer('corpse', 'p1'); cont.items = co.items; cont.diedAt = GT - (co.diedAgo ?? 999); cont.expires = GT + co.left; addEnt({ kind: 'corpse', mine: true, name: 'your body', x: co.x, y: co.y, cont, expires: GT + co.left }); }
+    for (const co of saved.corpses || []) { const cont = SF.newContainer('corpse', 'p1'); cont.items = co.items; cont.diedAt = GT - (co.diedAgo ?? 999); cont.expires = GT + co.left; addEnt({ kind: 'corpse', mine: true, name: 'your body', x: co.x, y: co.y, cont, expires: GT + co.left, hr: hrSnapshotFromItems(co.items, P.look, P.name) }); }
     if (P.ghost && !Number.isFinite(c.ghostAt)) P.ghostAt = GT - 12; }
   else { P = newChar(fresh); starterKit(); }
   P.cx = Object.assign({ survey: {}, pins: [], track: null, mark: false, doors: {} }, P.cx || {}); P.batch = null; applyDoorState();
