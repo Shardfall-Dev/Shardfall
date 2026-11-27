@@ -181,6 +181,41 @@ function grStrip(A, action, dir, ghost, urgent) {
 const NPC_PRESET_OF = { traveller: 'villager', assay: 'banker', qsmith: 'qsmith', banker: 'banker', smith: 'smith', trainer: 'trainer', workshop: 'smith', apothecary: 'apothecary', provisioner: 'villager',
   guard: 'guard', healer: 'healer', outlaw: 'outlaw', student: 'student', fisher: 'villager', dockhand: 'villager', townsfolk: 'villager', miner: 'miner', woodcutter: 'woodcutter', trader: 'banker', weaver: 'villager',
   smuggler: 'smuggler', captain: 'captain' };
+/* NPC wardrobe & faction appearance (#39, src/wardrobe.js SF.WARDROBE) on the layered renderer: the wardrobe decides what a
+   townsperson, guard or human enemy wears (regional guard uniforms by rank, role recipes with palettes, activity states, hostile
+   variants); SF.GEAR draws it. Cosmetic only: nothing here is an item anyone owns, drops or can loot. */
+const WD = { roster: null };
+const WD_SKIN = { fair: 'porcelain', tan: 'tan', olive: 'olive', brown: 'brown', deep: 'deep', drowned: 'olive' };
+const WD_STYLE = { male: { cropped: 'short', parted: 'pageboy', bun: 'short', braid: 'ponytail' }, female: { cropped: 'short', parted: 'pageboy', bun: 'buns', braid: 'pigtails' } };
+const WD_BEARD = { stubble: 'mustache', full: 'long' };
+function wdRoster() {   // guard rank by placement order within a region (population is deterministic, so this is stable across loads)
+  if (WD.roster) return WD.roster; const R = new Map(), n = {};
+  for (const e of ents) if (e.kind === 'npc' && e.role === 'guard') { const reg = SF.WARDROBE.regionOf(e, zoneAt(Math.floor(e.x), Math.floor(e.y))) || '-'; R.set(e, n[reg] = (n[reg] ?? -1) + 1); }
+  return WD.roster = R;
+}
+function wdCtx(e) { const L = e.life; return { zone: zoneAt(Math.floor(e.home ? e.home.x : e.x), Math.floor(e.home ? e.home.y : e.y)), rosterIndex: wdRoster().get(e) || 0, night: typeof lifeNight === 'function' && lifeNight(), watch: !!(L && L.goal && L.goal.act === 'watch') }; }
+function wdLook(D) {
+  const body = D.body === 'female' ? 'female' : 'male', hc = D.hair === 'darkBrown' ? 'darkbrown' : D.hair;
+  return { body, skinTone: WD_SKIN[D.skin] || 'light', hairStyle: (WD_STYLE[body][D.style]) || D.style || 'short', hairColor: hc || 'brown', facialHairStyle: body === 'male' ? (WD_BEARD[D.beard] || D.beard || 'none') : 'none',
+    facialHairColor: hc || 'brown', clothingColor: 'oatmeal', cloak: 'none', clothHex: D.palette && D.palette.p, cloakHex: D.palette && (D.palette.a || D.palette.p) };
+}
+function wdEquip(D) {
+  const eq = {};
+  for (const s in D.pieces) { const p = D.pieces[s]; if (!EQ.SLOT[s] || !SF.ITEMS[p.id]) continue; eq[s] = { id: p.id, uid: 'npc', material: p.material && p.material !== 'cloth' && !SF.ITEMS[p.id].fixedMat ? p.material : undefined, sec: p.sec || undefined, dye: p.dye || undefined }; }
+  if (D.weapon && SF.ITEMS[D.weapon.id]) eq.weapon = { id: D.weapon.id, uid: 'npc', material: D.weapon.material || undefined };
+  if (D.shield && SF.ITEMS[D.shield.id] && !(eq.weapon && GEAR.twoHanded(eq.weapon))) eq.shield = { id: D.shield.id, uid: 'npc', material: D.shield.material || undefined };
+  return eq;
+}
+/* the wardrobe's choice for a non-equipment actor, re-checked twice a second (activity changes slowly); null → the GEAR preset */
+function wdAppearance(e) {
+  if (!SF.WARDROBE || !e.actorId) return null;
+  if (e._wdA !== undefined && GT - (e._wdT || 0) < .5) return e._wdA; e._wdT = GT;
+  const c = wdCtx(e), sig = SF.WARDROBE.outfitState(e, c) + '|' + (c.night && c.watch ? 'w' : '');
+  if (e._wdA !== undefined && e._wdSig === sig) return e._wdA;
+  const D = SF.WARDROBE.resolve(e, c); e._wdSig = sig; e._wdD = D;
+  if (!D || D.source === 'equip') return e._wdA = null;
+  const look = wdLook(D), equip = wdEquip(D); return e._wdA = { R: GEAR.resolve(equip, look), rl: rigLook(look), preset: true, equip, look, wardrobe: D.role + (D.rank ? '/' + D.rank : '') + (D.region ? '@' + D.region : '') };
+}
 function gearOfActor(e) {
   const ghost = !!((e === P && P.ghost) || (e.kind === 'ally' && e.ghost));
   if (e.kind === 'player' || (e.kind === 'ally' && e.equip)) {
@@ -189,6 +224,7 @@ function gearOfActor(e) {
     if (e._gSig !== sig) { e._gSig = sig; e._gA = { R: GEAR.resolve(e.equip, look), rl: rigLook(look) }; }
     return Object.assign(e._gA, { ghost });
   }
+  const wd = e.kind === 'npc' || e.kind === 'mon' ? wdAppearance(e) : null; if (wd) return Object.assign(wd, { ghost });
   if (!e._gA) { const role = e.kind === 'mon' ? e.type : (e.role || (e.life && e.life.prof) || 'villager'), pre = GEAR.PRESETS[NPC_PRESET_OF[role] || 'villager'] || GEAR.PRESETS.villager;
     const look = GEAR.npcLook(e.aid || e.sid || e.name || e.id, role === 'guard' ? { cloth: 'navy' } : null), equip = pre(); e._gA = { R: GEAR.resolve(equip, look), rl: rigLook(look), preset: true, equip, look }; }
   return Object.assign(e._gA, { ghost });

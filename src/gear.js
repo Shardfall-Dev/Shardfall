@@ -65,8 +65,9 @@ GEAR.materials = it => {
 
 const hexOf = m => EQ.matColor(m);
 const lookHex = (list, id) => { const L = SF.CREATION && SF.CREATION[list]; if (!L) return null; const x = L.find(o => o.id === id); return x && x.hex || null; };
-GEAR.clothHex = look => (look && lookHex('CLOTHING', look.clothingColor)) || GEAR.CLOTH_HEX;
-GEAR.cloakHex = look => (look && SF.CREATION && SF.CREATION.cloakHex(look)) || GEAR.CLOAK_HEX;
+// a look may carry its own hex (an NPC's regional or role palette from SF.WARDROBE) in place of a creator colour id
+GEAR.clothHex = look => (look && (look.clothHex || lookHex('CLOTHING', look.clothingColor))) || GEAR.CLOTH_HEX;
+GEAR.cloakHex = look => (look && (look.cloakHex || (SF.CREATION && SF.CREATION.cloakHex(look)))) || GEAR.CLOAK_HEX;
 
 /* one equipped piece as the renderers need it */
 GEAR.piece = (slot, it, look) => {
@@ -74,6 +75,7 @@ GEAR.piece = (slot, it, look) => {
   const mats = GEAR.materials(it), hex = {};
   for (const k of ['metal', 'wood', 'hide']) if (mats[k]) hex[k] = hexOf(mats[k]);
   if (mats.fixed === 'cloth' || d.fam === 'cloth' || it.id === 'garment') hex.cloth = slot === 'cloak' ? GEAR.cloakHex(look) : GEAR.clothHex(look);
+  if (hex.cloth && typeof it.dye === 'string' && /^#[0-9a-f]{6}$/i.test(it.dye)) hex.cloth = it.dye;   // a cosmetic NPC piece dyed by SF.WARDROBE
   if (mats.fixed && mats.fixed !== 'cloth') hex.fixed = hexOf(mats.fixed);
   const fam = d.fam || (isWeapon(it) ? 'weapon' : null);
   // the colour of the piece's main surface (the rig paints one primary tone per segment) and its secondary tone
