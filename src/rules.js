@@ -375,23 +375,33 @@ SF.canStack = (a, b) => SF.ITEMS[a.id].stack && a.id === b.id && (a.q || 0) === 
 SF.addItem = (c, it, cap) => {
   const ex = c.items.find(o => SF.canStack(o, it));
   if (cap) {
-    if (!ex && c.items.length >= cap.slots) return { ok: false, reason: 'no free pack slot (45 stacks)' };
+    if (!ex && c.items.length >= cap.slots) return { ok: false, reason: 'no free slot (' + cap.slots + ' stacks)' };
     if (SF.containerKg(c) + SF.itemKg(it) > cap.kg + 1e-9) return { ok: false, reason: 'too heavy to carry' };
   }
   if (ex) ex.qty += it.qty; else c.items.push(it);
   c.ver++; return { ok: true };
 };
 SF.removeQty = (c, id, qty) => {
+  if (qty === 0) return true; if (!Number.isSafeInteger(qty) || qty < 0) return false;
   if (SF.count(c, id) < qty) return false;
   for (let i = c.items.length - 1; i >= 0 && qty > 0; i--) { const it = c.items[i]; if (it.id !== id) continue; const t = Math.min(qty, it.qty); it.qty -= t; qty -= t; if (it.qty <= 0) c.items.splice(i, 1); }
   c.ver++; return true;
 };
-/* transfer: move qty of the item with uid from -> to. Version guard optional. Conserves units exactly. */
+/* item shape: a known id, a positive safe-integer uid and quantity, and a single unit for anything that does not stack */
+SF.validQty = q => Number.isSafeInteger(q) && q >= 1;
+SF.itemShapeOk = it => !!(it && Number.isSafeInteger(it.uid) && it.uid > 0 && SF.ITEMS[it.id] && SF.validQty(it.qty));
+/* transfer: move qty of the item with uid from -> to. Version guard optional. Conserves units exactly.
+   qty undefined → the whole stack; otherwise a whole number from 1 to the stack size. Anything else, a move into the same
+   container, a partial move of a non-stacking item or a malformed item is refused before anything changes. */
 SF.transfer = (from, to, uid, qty, opt) => {
   opt = opt || {};
+  if (!from || !to || !Array.isArray(from.items) || !Array.isArray(to.items)) return { ok: false, reason: 'no such container' };
+  if (from === to) return { ok: false, reason: 'it is already there' };
   if (opt.fromVer !== undefined && opt.fromVer !== from.ver) return { ok: false, reason: 'container changed, try again' };
   const idx = from.items.findIndex(it => it.uid === uid); if (idx < 0) return { ok: false, reason: 'item is gone' };
-  const it = from.items[idx]; qty = Math.min(qty || it.qty, it.qty);
+  const it = from.items[idx]; if (!SF.itemShapeOk(it)) return { ok: false, reason: 'that item is damaged' };
+  if (qty === undefined) qty = it.qty; else if (!SF.validQty(qty) || qty > it.qty) return { ok: false, reason: 'invalid quantity' };
+  if (qty < it.qty && !SF.ITEMS[it.id].stack) return { ok: false, reason: 'that does not split' };
   const moving = qty === it.qty ? it : Object.assign({}, it, { uid: UID++, qty });
   const r = SF.addItem(to, moving === it ? it : moving, opt.cap);
   if (!r.ok) return r;
