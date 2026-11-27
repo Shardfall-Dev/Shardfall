@@ -17,10 +17,10 @@ EXPECT = {
   'mace.js': {'miss': {'stam': 55, 'cond': 100}, 'hit': {'stamLost': 3, 'cond': 97}, 'creatureStamLost': 3, 'sword': {'stamLost': 0, 'cond': 99.8}, 'toPlayer': {'lost': 23, 'expect': 23}},
   'firstaid.js': {'fullHp': {'spent': 0, 'log': 'You are not hurt.'}, 'self': {'spent': 1, 'dur': 15.0, 'kind': 'heal', 'doneEarly': False, 'healed': 43, 'log': 'You heal yourself for 43 HP.'},
                   'slips': {'healed': 35, 'log': 'You heal yourself for 35 HP (2 slips).'}, 'whileActive': {'stillBandaging': True, 'swung': True, 'done': True}, 'movedWhileBandaging': True,
-                  'other': {'button': 'Bandage Wren', 'dur': 5.0, 'healed': 43, 'log': 'You heal Wren for 43 HP.'}, 'outOfReach': {'healed': False, 'log': 'Wren moved out of reach; the bandage is wasted.'},
+                  'other': {'button': 'Bandage', 'dur': 5.0, 'healed': 43, 'log': 'You heal Wren for 43 HP.'}, 'outOfReach': {'healed': False, 'log': 'Wren moved out of reach; the bandage is wasted.'},
                   'changed': {'healed': True, 'log': 'Wren was poisoned before you finished; this bandage was for wounds.'},
                   'cure': {'dur': 6.0, 'low': {'cured': False, 'log': 'Curing poison needs 60 Healing and 60 Anatomy. The bandage does nothing.'}, 'at60': {'cured': True, 'hpSame': True, 'log': 'You cure Wren of poison.'}, 'fail60': 'You fail to cure the poison.', 'selfDur': 18.0, 'selfCured': True},
-                  'ghost': {'ghost': True, 'body': True, 'armorOnBody': True, 'button': 'Bandage: resurrect Wren', 'dur': 10.0, 'low': {'still': True, 'log': 'Resurrection needs 80 Healing and 80 Anatomy. The ghost stays a ghost.'}, 'fail80': True,
+                  'ghost': {'ghost': True, 'body': True, 'armorOnBody': True, 'button': 'Resurrect', 'dur': 10.0, 'low': {'still': True, 'log': 'Resurrection needs 80 Healing and 80 Anatomy. The ghost stays a ghost.'}, 'fail80': True,
                             'res': {'alive': True, 'hp': 20, 'max': 80, 'armor': 'leather_tunic', 'weapon': 'sword', 'bodyGone': True}}},
 }
 def sub(exp, got, path=''):

@@ -4,11 +4,11 @@ A T2A-era Ultima Online-style 2.5D isometric sandbox RPG for phones, built as a 
 
 ## Play
 
-**Online:** every merge to `main` runs all checks (`.github/workflows/ci.yml`) and, if they pass, publishes the newest build on GitHub Pages (`.github/workflows/pages.yml`): `https://shardfall-dev.github.io/Shardfall/`. **Pages is not enabled yet** on this repository, so the deploy step currently warns and skips. One-time setup by the owner: Settings → Pages → Source: GitHub Actions. Pages on a private repository owned by a personal account needs a paid GitHub plan (Pro), and the site itself is public. On iPhone, Share → Add to Home Screen gives it an app icon.
+**Online:** every merge to `main` runs all checks (`.github/workflows/ci.yml`) and, if they pass, publishes the newest build on GitHub Pages (`.github/workflows/pages.yml`): `https://shardfall-dev.github.io/Shardfall/`. The repository is public and Pages is enabled (source: GitHub Actions). On iPhone, Share → Add to Home Screen gives it an app icon.
 
-**On your computer:** run `python3 -m http.server` in this folder and open `http://localhost:8000/Shardfall_v0.28.2.html`. The game loads its sound and music from `assets/audio/web/`, so it needs to be served like this; opened straight from disk it plays silently. For a single file that plays from disk with sound effects, build `./build.sh 0.28.2 --offline`.
+**On your computer:** run `python3 -m http.server` in this folder and open `http://localhost:8000/Shardfall_v0.29.2.html`. The game loads its sound and music from `assets/audio/web/`, so it needs to be served like this; opened straight from disk it plays silently. For a single file that plays from disk with sound effects, build `./build.sh 0.29.2 --offline`.
 
-**Developer panel:** add `?dev` to the address (for example `http://localhost:8000/Shardfall_v0.28.2.html?dev`) and press the small DEV button. It shows the world's live numbers (creatures by faction, regions, camps and what the ecosystem has been doing), lets you set the time, pause or fast-forward the simulation, send test travellers anywhere and inspect any actor you tap (a creature shows its faction, activity, what it decided and why, its senses, pack, camp and sound). Without `?dev` it does not exist.
+**Developer panel:** add `?dev` to the address (for example `http://localhost:8000/Shardfall_v0.29.2.html?dev`) and press the small DEV button. It shows the world's live numbers (creatures by faction, regions, camps and what the ecosystem has been doing), lets you set the time, pause or fast-forward the simulation, send test travellers anywhere and inspect any actor you tap (a creature shows its faction, activity, what it decided and why, its senses, pack, camp and sound). Without `?dev` it does not exist.
 
 Progress saves to the browser's local storage. If a save cannot be read, the start screen says why and offers to restore the last good save, export the save or delete it; nothing is overwritten silently (copies: `shardfall.save.v1.lastgood`, `.replaced`, `.damaged`). Open the game in one tab at a time: a second tab takes over saving.
 
@@ -24,7 +24,8 @@ Progress saves to the browser's local storage. If a save cannot be read, the sta
 - `assets/music/v1.0.0/` — the Saltmarsh soundtrack: five MIDI sources, MP3 renders and `soundtrack.json`.
 - `src/assets.js` — embedded sprite sheets and art (data URIs; large, not meant for hand-editing).
 - `src/magery-art.js` — the 64 spell signs as one embedded atlas.
-- `src/bestiary-art.js` — the 11 bestiary v1 sheets and their manifest, embedded (generated: `python3 tools/embed_bestiary.py` reads `assets/bestiary/Shardfall_Bestiary_v1.0.0.zip`).
+- `src/bestiary-art.js` — the 17 bestiary sheets and one merged manifest, embedded (generated: `python3 tools/embed_bestiary.py` merges `assets/bestiary/Shardfall_Bestiary_v1.0.0.zip` (11 sheets) and `assets/bestiary/v1.1.0/` (6 sheets, draft01); it rejects duplicate creature ids, wrong sizes, missing alpha and empty cells).
+- `assets/bestiary/v1.1.0/` — bestiary v1.1.0 draft01: boar, marsh hound, mud snapper, mire spider, red deer and brown hare, with `manifest.json`, `validation.json` and `README.txt`; extracted from `assets/bestiary/Shardfall_Bestiary_v1.1.0_draft01.zip`.
 - `src/magic.js` — casting in the world: prepare → hold → release, targets, effects, fields, runes, summons, spellbook panel, hotbar signs.
 - `src/backpack-icons.js` — backpack icon atlas v1.0.1 and its id → rect map, embedded (generated: `python3 tools/embed_backpack_icons.py` reads `assets/backpack-icons/v1.0.0/Shardfall_Backpack_Icons_v1.0.0.zip` and adds the seven PNGs in `assets/backpack-icons/v1.0.1/icons_64/`; the extension step needs Pillow).
 - `src/anniabreen.js` — Anniabreen v1.0: the mainland, Vespar's river islands, Skara Bryn and Moonglen; towns, roads, the Mynoc mine, landmark art, ferries, boats, the public moongates and their map symbols. Since v0.23 it is drawn in its original frame and then stretched (`annStretch`: towns move whole, the wilds between them grow ×1.35; `annWarp` / `annUnwarp` convert).
@@ -35,9 +36,10 @@ Progress saves to the browser's local storage. If a save cannot be read, the sta
 - `src/townlife.js` — town life (Living World phase 4): homes, workplaces and daily schedules for Vespar and Mynoc, residents, resource workers gathering real ore, wood and fish, guard patrols and the night watch, the travelling merchant on the cart road, shop hours, fear of creatures and resuming the day after a load.
 - `src/game.js` — the game: world generation, rendering, input, NPCs, quests, crafting UI, save/load, and the one physical-combat resolver every swing goes through.
 - `src/equipment-ui.js` — the equipment UI: paper doll window, backpack (search, sorts, filters, split and merge, virtualized grid), item tooltips with comparison, drag and drop, context menu, the Armor crafting category.
+- `src/hud-ui.js` — the HUD UI (v0.29): the delayed item tooltip, the item information popup with actions and drop confirmation, one popup manager (Escape order, outside taps never reach the world) and the compact target frame with its retention rules (`TARGET_RETAIN`).
 - `src/tail.html` — closes the game script block and the page.
-- `build.sh` — joins the parts into the game: `./build.sh 0.28.2` → `Shardfall_v0.28.2.html` (web build, 7.1 MB); `./build.sh 0.28.2 --offline` → `Shardfall_v0.28.2_offline.html` (22 MB, every sound inside, not committed). Needs `python3`.
-- `Shardfall_v0.28.2.html` — the current built game.
+- `build.sh` — joins the parts into the game: `./build.sh 0.29.2` → `Shardfall_v0.29.2.html` (web build, 8.3 MB); `./build.sh 0.29.2 --offline` → `Shardfall_v0.29.2_offline.html` (22 MB, every sound inside, not committed). Needs `python3`.
+- `Shardfall_v0.29.2.html` — the current built game.
 - `.github/workflows/pages.yml` — publishes the newest build to GitHub Pages as `index.html`, with the audio beside it.
 - `docs/WORLD_SIMULATION_MASTER.md` — the Living World master roadmap (the full specification). `docs/WORLD_SIMULATION_PROGRESS.md` — what is built, phase by phase, the audit matrix, asset gaps and the next task.
 - `docs/Shardfall_Audio.md` — what plays when, the audio pipeline and sound-release versioning.
@@ -46,25 +48,31 @@ Progress saves to the browser's local storage. If a save cannot be read, the sta
 - `assets/equipment-icons/missing-icons.json` — the 67 icons the equipment pieces and new materials still need (ids, file names, 64×64, descriptions).
 - `docs/combat/STATUS.md` — combat and First Aid: the rules, the weapon table, the save migration, sources and every approximation.
 - `docs/magery/` — the Magery kit: brief (`Magery_Brief.txt`), illustrated book (`Shardfall_Spellbook.html`, `Spellbook.md`), `spells.json`, reference math, and `STATUS.md` (what is in, what differs, what is left).
-- `tests/rules.test.js` — deterministic rules tests: `node tests/rules.test.js Shardfall_v0.28.2.html`
-- `tests/equipment.test.js` — equipment rules tests (slots, layering, carrying capacity, Mithril, exceptional, two-handed, requirements, encumbrance, crafting variants, durability, repair risk, atomic rollback, split/merge, death, migration): `node tests/equipment.test.js Shardfall_v0.28.2.html`
-- `tests/equipment-smoke/run.py` — paper doll in Chrome (C key, double-click, mouse and touch drag, drop validation, two-handed, context menu, tooltips and comparison, search/sort/filter, split/merge, 600 stacks, encumbrance and recovery, region mitigation, broken armor, meditation, window drag, Armor crafting, vendors, save/reload, v6 → v7 migration, phone): `python3 tests/equipment-smoke/run.py Shardfall_v0.28.2.html`
-- `tests/magery.test.js` — Magery rules tests: `node tests/magery.test.js Shardfall_v0.28.2.html`
-- `tests/combat.test.js` — combat and First Aid rules tests: `node tests/combat.test.js Shardfall_v0.28.2.html`
-- `tests/magery-smoke/run.py` — in-browser Magery scenarios (Playwright + Chrome): `python3 tests/magery-smoke/run.py Shardfall_v0.28.2.html`
-- `tests/combat-smoke/run.py` — in-browser combat, archery, First Aid, reload, old-save and phone play-test scenarios: `python3 tests/combat-smoke/run.py Shardfall_v0.28.2.html` (screenshots in `$COMBAT_SHOTS`, default `/tmp/combat-shots`)
-- `tests/backpack-smoke/run.py` — in-browser backpack checks (saved character, three sorts, desktop hover, phone tap, actions after sorting): `python3 tests/backpack-smoke/run.py Shardfall_v0.28.2.html`
-- `tests/backpack-smoke/panels.py` — the seven v1.0.1 icons everywhere items are listed (backpack tile, tooltip and tap card, Character, vendor buy and sell, loot, bank, crafting rows and inputs), weapon profiles unchanged, the wick still lights the Shore Beacon; desktop and two landscape phones: `python3 tests/backpack-smoke/panels.py Shardfall_v0.28.2.html`
-- `tests/backpack-smoke/icons.py` — backpack icon checks (all 161 ids resolve, slot / tooltip / tap card use the same tile, stack counts readable after every sort, desktop and two landscape phones): `python3 tests/backpack-smoke/icons.py Shardfall_v0.28.2.html`
-- `tests/sfx-smoke/run.py` — browser checks for sound, music, doors and footsteps (Playwright + Chrome; serves the web build on a local port): `python3 tests/sfx-smoke/run.py "$PWD/Shardfall_v0.28.2.html"`
-- `tests/anniabreen-smoke/run.py` — Anniabreen walk-through (Playwright + Chrome): a scripted walker drives the joystick through the real update loop and times the routes; mine/smelt/bank, ferries, boats, moongates, doors, touch and mouse over a bridge, reload, save migration, phone map: `python3 tests/anniabreen-smoke/run.py Shardfall_v0.28.2.html [--shots DIR]`
-- `tests/bestiary-smoke/run.py` — bestiary checks in the built game (sheets load, pixel-exact cells, 8 facings, walk / wind-up / impact against the player; preview screenshots when the pack is extracted): `python3 tests/bestiary-smoke/run.py Shardfall_v0.28.2.html [chrome] [screenshot-dir]`
+- `tests/rules.test.js` — deterministic rules tests: `node tests/rules.test.js Shardfall_v0.29.2.html`
+- `tests/equipment.test.js` — equipment rules tests (slots, layering, carrying capacity, Mithril, exceptional, two-handed, requirements, encumbrance, crafting variants, durability, repair risk, atomic rollback, split/merge, death, migration): `node tests/equipment.test.js Shardfall_v0.29.2.html`
+- `tests/equipment-smoke/run.py` — paper doll in Chrome (C key, double-click, mouse and touch drag, drop validation, two-handed, context menu, tooltips and comparison, search/sort/filter, split/merge, 600 stacks, encumbrance and recovery, region mitigation, broken armor, meditation, window drag, Armor crafting, vendors, save/reload, v6 → v7 migration, phone): `python3 tests/equipment-smoke/run.py Shardfall_v0.29.2.html`
+- `tests/magery.test.js` — Magery rules tests: `node tests/magery.test.js Shardfall_v0.29.2.html`
+- `tests/combat.test.js` — combat and First Aid rules tests: `node tests/combat.test.js Shardfall_v0.29.2.html`
+- `tests/magery-smoke/run.py` — in-browser Magery scenarios (Playwright + Chrome): `python3 tests/magery-smoke/run.py Shardfall_v0.29.2.html`
+- `tests/combat-smoke/run.py` — in-browser combat, archery, First Aid, reload, old-save and phone play-test scenarios: `python3 tests/combat-smoke/run.py Shardfall_v0.29.2.html` (screenshots in `$COMBAT_SHOTS`, default `/tmp/combat-shots`)
+- `tests/backpack-smoke/run.py` — in-browser backpack checks (saved character, three sorts, desktop hover, phone tap, actions after sorting): `python3 tests/backpack-smoke/run.py Shardfall_v0.29.2.html`
+- `tests/backpack-smoke/panels.py` — the seven v1.0.1 icons everywhere items are listed (backpack tile, tooltip and tap card, Character, vendor buy and sell, loot, bank, crafting rows and inputs), weapon profiles unchanged, the wick still lights the Shore Beacon; desktop and two landscape phones: `python3 tests/backpack-smoke/panels.py Shardfall_v0.29.2.html`
+- `tests/backpack-smoke/icons.py` — backpack icon checks (all 161 ids resolve, slot / tooltip / tap card use the same tile, stack counts readable after every sort, desktop and two landscape phones): `python3 tests/backpack-smoke/icons.py Shardfall_v0.29.2.html`
+- `tests/ui-smoke/run.py` — the v0.29 inventory and target-frame checks in Chrome (no grid movement or scroll jump at the bottom of a 300-stack pack, 300 ms tooltip on screen, popup lines and actions, compare, equip, split, drop confirmation, Escape and outside taps, rapid inspection, listener count; frame hidden by default, size and position, 44 px close, pass-through body, monster / NPC / deposit / tree / corpse / ally, retention with hysteresis, despawn, kill, removed resource, travel, closing during combat, no idle rebuilds, save and reload; two landscape phones): `python3 tests/ui-smoke/run.py Shardfall_v0.29.2.html [chrome] [screenshot-dir]`
+- `tests/sfx-smoke/run.py` — browser checks for sound, music, doors and footsteps (Playwright + Chrome; serves the web build on a local port): `python3 tests/sfx-smoke/run.py "$PWD/Shardfall_v0.29.2.html"`
+- `tests/anniabreen-smoke/run.py` — Anniabreen walk-through (Playwright + Chrome): a scripted walker drives the joystick through the real update loop and times the routes; mine/smelt/bank, ferries, boats, moongates, doors, touch and mouse over a bridge, reload, save migration, phone map: `python3 tests/anniabreen-smoke/run.py Shardfall_v0.29.2.html [--shots DIR]`
+- `tests/bestiary-smoke/run.py` — bestiary checks for all 17 sheets (geometry of every cell: alpha, no spill, feet on the pivot, real movement; sheets load and draw pixel-exact; 8 facings; walk / wind-up / impact / recover against the player; deer and hares fleeing and striking as pets; fallback to procedural art while a sheet decodes; a phone draw-cost check at 4x CPU slowdown; preview screenshots when the pack is extracted): `python3 tests/bestiary-smoke/run.py Shardfall_v0.29.2.html [chrome] [screenshot-dir]`
 - `tests/inventory.test.js` — inventory conservation regressions (quantities, same-container moves, staged drops, audit and repair of duplicates): `node tests/inventory.test.js Shardfall_v0.28.2.html`
 - `tests/stability-smoke/run.py` — save and reload in Chrome, phone and desktop: dropped piles, opened chests, spell preparation, poison, death, units conserved; damaged, truncated, future and broken saves, restore and export, two tabs, full storage: `python3 tests/stability-smoke/run.py Shardfall_v0.28.2.html`
 - `tests/check-build.py` — every script compiles, the committed build equals `./build.sh` output, audio, music and art manifests are complete: `python3 tests/check-build.py Shardfall_v0.28.2.html`
 - `tests/soak/run.py` — long-duration world simulation (default 3 game days, save and reload half way): step and draw times, heap, actors, path queue, logs, audio caches, errors and failed asset requests: `python3 tests/soak/run.py Shardfall_v0.28.2.html [--days 3]`
-- `tests/world.test.js` — world simulation core tests: `node tests/world.test.js Shardfall_v0.28.2.html`
-- `tests/world-smoke/run.py` — Living World checks in the built game: phase 1 (actor ids, controllers, shared damage, death once, bounded events, save/load identity, v4 → v5 migration, seeded determinism), then `phase2.py` (clock, light, travel graph, journeys by road, boat, moongate and stairs, doors, stuck recovery, search budget, live step rate, developer panel) and `expansion.py` (towns unchanged tile for tile, sites and camps, causeway and islands, long journeys, v0.22 → v0.23 save migration) and `phase3.py` (species profiles and factions, regional populations, predator and prey, creature-against-creature fights, timid wildlife, perception at night and in hiding, graveyards rising at night, persistent camps through a reload, packs, pursuit limits, camp patrols, the spatial index, and a seeded three-day run) and `phase4.py` (homes, workplaces and schedules, a full accelerated day, shop hours, miners on real rock faces, guard patrols and the night watch, the travelling merchant, fear of creatures, crowds spreading out, resuming the day after a reload): `python3 tests/world-smoke/run.py Shardfall_v0.28.2.html`
+- `tests/world.test.js` — world simulation core tests: `node tests/world.test.js Shardfall_v0.29.2.html`
+- `tests/world-smoke/run.py` — Living World checks in the built game: phase 1 (actor ids, controllers, shared damage, death once, bounded events, save/load identity, v4 → v5 migration, seeded determinism), then `phase2.py` (clock, light, travel graph, journeys by road, boat, moongate and stairs, doors, stuck recovery, search budget, live step rate, developer panel) and `expansion.py` (towns unchanged tile for tile, sites and camps, causeway and islands, long journeys, v0.22 → v0.23 save migration) and `phase3.py` (species profiles and factions, regional populations, predator and prey, creature-against-creature fights, timid wildlife, perception at night and in hiding, graveyards rising at night, persistent camps through a reload, packs, pursuit limits, camp patrols, the spatial index, and a seeded three-day run) and `phase4.py` (homes, workplaces and schedules, a full accelerated day, shop hours, miners on real rock faces, guard patrols and the night watch, the travelling merchant, fear of creatures, crowds spreading out, resuming the day after a reload): `python3 tests/world-smoke/run.py Shardfall_v0.29.2.html`
+
+## v0.29.2 — Everything merged: stabilization (v0.28.2, #27) + backpack popups, target frame and wildlife sheets (v0.29.1, #28)
+
+- One build with every open branch together; it replaces PRs #25, #26, #27, #28 and #29. Nothing new beyond what those builds contain.
+- #29 (v0.28.3) fixed the same audit findings as #27 independently; this build keeps #27's fixes (recovery screen, CI, soak) and drops #29's duplicate code.
 
 ## v0.28.2 — Stabilization (no new gameplay)
 
@@ -80,6 +88,49 @@ Fixes from the v0.28.1 technical audit (`docs/audits/v0.28.1-stabilization.md`; 
 - **Steadier.** Bank, shop and trainer buttons check that you are still at the counter. An error in drawing no longer stops the world, and the reverse. Switching away from the game releases held keys and the stick. The sound player's memory stays capped.
 - **Display.** The loot window and backpack show the same weight line (everything you carry against your limit), not the old 45-stack limit; dropped piles and chests no longer say "criminal to loot for NaN s".
 - **Checks.** Every push runs all rules suites, build freshness, asset manifests and every browser suite; Pages deploys only after they pass. New tests: `tests/inventory.test.js`, `tests/stability-smoke/run.py`, `tests/check-build.py`, `tests/soak/run.py`.
+
+## v0.29.1 — Everything merged: backpack popups and target frame (v0.29, #25) + wildlife sheets (v0.28.2, #26)
+
+- One build with both open branches together; it replaces PRs #25 and #26. Nothing new beyond what those two builds contain, described below.
+- Also brings in the v0.28.1 stabilization audit (`docs/audits/v0.28.1-stabilization.md`).
+
+## v0.29 — Backpack popups and a compact target frame
+
+- **The backpack stays still.** Selecting an item no longer puts its card above the grid, so the grid never jumps or scrolls, even at the bottom of a large pack. The tiles, sorts, filters, stack counts, weight bar and the weight-only limit are unchanged.
+- **Item tooltips and popups.**
+  - Desktop: rest the pointer on an item for about 300 ms for a compact tooltip beside the cursor; it never runs off the screen and goes when you move away.
+  - Click (or tap on a phone) for the item's popup beside the tile. It shows only what applies to that item: material, quality, weight, durability, damage or armor, weapon speed, required skill and Strength, magical properties, quantity and a short description where the item has one. Its buttons do what the old card did (Equip, Use, Split half, Split 1, Slot, Repair, Appraise, Drop), plus **Inspect** to compare with what you wear.
+  - On phones the popup has 44 px buttons and never resizes or moves the backpack.
+  - Close it with ×, Escape or a tap outside. A tap on the game world only closes it: you don't walk, target or attack.
+  - **Dropping valuable things asks first:** anything worth 25 gold or more, or exceptional, rare, magical, marked or maker-signed items, from the popup, the right-click menu or the paper doll.
+- **A compact target frame.**
+  - Hidden until you pick something: tap or click a creature, person, deposit, tree, corpse or fishing water, or use Attack, Tab or Interact. Walking past things never opens it, and picking something else replaces it at once.
+  - It sits at the top centre, about 248 px wide on desktop and 208 px on phones, as tall as its contents. The × is a 44 px button, and taps on the rest of the frame pass through to the world.
+  - It shows what matters for each kind of target:
+    - creatures: hostility, what they are doing and a health bar;
+    - townsfolk: role, a quest mark and Talk, Trade or Bank;
+    - deposits and trees: the wood or ore once surveyed, the skill needed, what is left, and Mine or Chop;
+    - remains: Loot, and loot rights on bodies that have them.
+    Rarer actions (Tame, bard songs, Pickpocket, Anatomy, Dismiss) sit behind **⋯**.
+  - **It clears itself** when:
+    - you go beyond the retention distance: 12 tiles for characters and creatures, 5 for resources and objects (`TARGET_RETAIN` in `src/hud-ui.js`);
+    - the target despawns, dies with nothing left to loot, hides, or the resource is removed;
+    - you travel (moongate, stairs, boat) or change level;
+    - you press × or Escape.
+    A one-tile margin and a short grace stop it flickering at the edge, and something picked from further away is kept while you walk to it. These are retention distances only: attack, spell and interaction ranges are unchanged.
+  - **Closing it ends your armed swing** on that target, as the × always did. It never starts an attack, uses an item or stops anything else.
+- **Escape** now closes, in order: the item popup or menu, then the open panel, then cancels a cast, aim, task or armed attack, and then clears the target.
+- No change to items, statistics, combat, the world or the save. Open popups and the target are not saved.
+- New test: `tests/ui-smoke/run.py`. The backpack, equipment and combat browser tests now use the popup, the delayed tooltip and the shorter frame buttons.
+
+## v0.28.2 — Wildlife sheets (bestiary v1.1.0 draft01)
+
+- **Six creatures get painted, animated sprites** in place of their code-drawn stand-ins: the reed boar, marsh hound, mud snapper, mire spider, red deer and brown hare. Each has 8 facings with idle, walk, wind-up and impact poses, at the same size as before.
+  - Their stats, behaviour, spawns, loot, sounds and attack timing are unchanged. Deer and hares still bolt from you.
+  - The other procedural creatures (bear, wreck crab, ash wisp, bell sentinel, the Bellkeeper) and the scout-tinted ones (drowned captain, smuggler, bandit) keep their current look until their sheets are finished. The 11 v1.0 bestiary sheets and the rat and skeleton sheets are untouched.
+- **Tamed creatures with sheets now show their strike** (impact, then recover) when they attack for you. Before, a tamed dire wolf kept walking while it bit.
+- **No invisible creatures while sheets load.** A creature whose sheet has not decoded yet is drawn with its code-drawn art for that moment.
+- **Polymorph forms** use a bestiary sheet when the form has one.
 
 ## v0.28.1 — Life around Vespar (fix)
 

@@ -70,7 +70,7 @@ with sync_playwright() as p:
     check(ap and 'hands' in ap and 'torso' in ap, 'equipping fires the appearance-change event with ordered render layers', ap)
     J(pg, "__SF.unequipTo('hands')")
     # tooltip on hover with comparison
-    pg.hover("#eqwin .eqs[data-s=chest]"); pg.wait_for_timeout(200)
+    pg.hover("#eqwin .eqs[data-s=chest]"); pg.wait_for_timeout(450)   # v0.29: tooltips wait about 300 ms
     tip = pg.inner_text('#itip') if pg.is_visible('#itip') else ''
     check('exceptional mithril plate chest' in tip.lower() and 'Armor protection' in tip and 'Crafted by' in tip and 'Aldric' in tip and 'Estimated value' in tip, 'hover tooltip on the doll: name, protection, crafter, value', tip[:200])
     J(pg, f"(() => {{ const it = __SF.SF.EQ.make('plate_chest'); __SF.SF.addItem(__SF.P.pack, it); window._ic = it.uid; }})()"); J(pg, "__SF.ACT.bag()"); pg.wait_for_timeout(200)
@@ -137,7 +137,7 @@ with sync_playwright() as p:
     check(mv < 1e-6, 'an immobile character cannot walk', mv)
     blocked = J(pg, "(() => { const S = __SF, P = S.P, SF = S.SF; const pile = SF.newContainer('pile'); pile.items.push(SF.newItem('gold', 5)); const r = SF.EQ.pickupItem(P, pile, { uid: pile.items[0].uid }); return r.ok; })()")
     check(blocked is False, 'pickups are refused while over capacity')
-    rec = J(pg, "(() => { const S = __SF, P = S.P, SF = S.SF; const ore = P.pack.items.find(i => i.id === 'ore'); S.ACT.drop({ u: ore.uid, q: 70 }); const x0 = P.x, y0 = P.y; document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', bubbles: true })); for (let i = 0; i < 20; i++) S.update(.05); document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'w', bubbles: true })); return [SF.count(P.pack, 'ore'), S.encumb().stage, Math.hypot(P.x - x0, P.y - y0) > .5, S.ents.some(e => e.pile && e.cont.items.some(i => i.id === 'ore' && i.qty === 70))]; })()")
+    rec = J(pg, "(() => { const S = __SF, P = S.P, SF = S.SF; const ore = P.pack.items.find(i => i.id === 'ore'); S.ACT.drop({ u: ore.uid, q: 70, ok: 1 }); const x0 = P.x, y0 = P.y; document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', bubbles: true })); for (let i = 0; i < 20; i++) S.update(.05); document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'w', bubbles: true })); return [SF.count(P.pack, 'ore'), S.encumb().stage, Math.hypot(P.x - x0, P.y - y0) > .5, S.ents.some(e => e.pile && e.cont.items.some(i => i.id === 'ore' && i.qty === 70))]; })()")
     check(rec[0] == 20 and rec[1] <= 1 and rec[2] and rec[3], 'dropping 70 ore recovers movement; the ore lies on the ground', rec)
     J(pg, "(() => { const P = __SF.P; P.pack.items = P.pack.items.filter(i => i.id !== 'ore'); P.str = 100; })()")
     # combat: region mitigation and durability
@@ -228,10 +228,10 @@ with sync_playwright() as p:
     pb = pg.locator('#panel').bounding_box()
     check(pb['x'] >= box['x'] + box['width'] - 4 or pb['x'] + pb['width'] <= box['x'] + 4, 'phone: the backpack sits beside the doll, not under it', [box, pb])
     pg.tap(f"#panel .bagcell[data-u='{uids['studded_tunic']}']"); pg.wait_for_timeout(200)
-    card = pg.inner_text('#panel .bagcard')
-    check('Armor protection' in card and 'vs ' in card, 'phone: tapping an item shows its stats and the comparison', card[:160])
-    pg.tap('#panel .bagcard [data-a=equip]'); pg.wait_for_timeout(200)
-    check(J(pg, "__SF.P.equip.chest && __SF.P.equip.chest.id") == 'studded_tunic', 'phone: Equip from the tap card')
+    card = pg.inner_text('#ipop'); pg.tap('#ipop [data-a=ipcmp]'); pg.wait_for_timeout(150); card2 = pg.inner_text('#ipop')   # v0.29: item popup, Inspect compares
+    check('Armor protection' in card and 'vs ' in card2, 'phone: tapping an item shows its stats; Inspect adds the comparison', card2[:160])
+    pg.tap('#ipop [data-a=equip]'); pg.wait_for_timeout(200)
+    check(J(pg, "__SF.P.equip.chest && __SF.P.equip.chest.id") == 'studded_tunic', 'phone: Equip from the item popup')
     pg.tap("#eqwin .eqs[data-s=chest]"); pg.wait_for_timeout(200)
     check(pg.is_visible('#eqwin .eqcard') and 'studded tunic' in pg.inner_text('#eqwin .eqcard').lower(), 'phone: tapping a slot shows the piece')
     pg.screenshot(path=f'{shots}/05-phone.png')

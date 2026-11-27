@@ -865,7 +865,7 @@ function petTick(p, dt) {
     if (!t && far > 24) { p.x = P.x - .8; p.y = P.y + .8; }
     if (dd > (t ? d.reach * .9 : .8)) { const s = Math.min(dd, d.speed * MOVE_SCALE * dt); moveBy(p, (goal.x - p.x) / dd * s, (goal.y - p.y) / dd * s); p.speed = s / dt; updateFacing(p, goal.x - p.x, goal.y - p.y); } else p.speed = 0; }
   else p.speed = 0;
-  if (t && dist(p, t) <= d.reach + .2 && los(p, t) && GT > (p.ready || 0)) { p.ready = GT + d.rec + .4; p.state = 'strike'; at(.15, () => p.state = ''); strikeOne(p, t); }
+  if (t && dist(p, t) <= d.reach + .2 && los(p, t) && GT > (p.ready || 0)) { p.ready = GT + d.rec + .4; p.state = 'strike'; p.atkRow = p.sect || 0; p.impactT = GT; at(.15, () => p.state = ''); strikeOne(p, t); }   // atkRow / impactT only drive the bestiary impact → recover pose
   if (p.hp < p.max && !inCombat()) p.hp = Math.min(p.max, p.hp + .5 * dt);
 }
 
@@ -1636,7 +1636,7 @@ function sheetFrame(e) {
   if (e.hitT && GT - e.hitT < .16) return 6; if (e.speed > .3) return Math.floor(GT * 9 + e.id) % 4; return 0;
 }
 function drawSheet(g, type, row, col, x, y) { const im = MSI[type], m = MON_SHEETS[type]; if (!im) return false; g.imageSmoothingEnabled = false; g.drawImage(im, col * m.cw, (row || 0) * m.ch, m.cw, m.ch, Math.round(x - m.fx), Math.round(y - m.fy + 2), m.cw, m.ch); return true; }
-/* ---- Bestiary v1 sheets (src/bestiary-art.js): 160 px cells, rows S..SE, cols stepA, neutral, stepB, wind-up, impact; pivot from the manifest.
+/* ---- Bestiary sheets, v1.0.0 + v1.1.0 merged (src/bestiary-art.js): 160 px cells, rows S..SE, cols stepA, neutral, stepB, wind-up, impact; pivot from the manifest.
    Poses follow the simulation: 'tele' shows wind-up, the strike event (impactT) starts the impact → recover timing, movement plays the walk cycle.
    Facing is latched for the whole attack. Drawn unprocessed (no outline, tint or alpha threshold) so baked rims and glints survive. ---- */
 const BSI = {}; for (const k in BESTIARY.src) { const im = new Image(); im.onload = () => { BSI[k] = im; }; im.onerror = () => console.warn('bestiary sheet failed to load:', k); im.src = BESTIARY.src[k]; }
@@ -1669,9 +1669,11 @@ function drawEnt(e) {
   else if (e.kind === 'player') drawScout(g, e, x, y, P.ghost ? 'ghost' : (P.look.cloak || null));
   else if (e.kind === 'ally') { if (e.ghost) g.globalAlpha = .75; drawScout(g, e, x, y, e.ghost ? 'ghost' : '#2f7a46'); }
   else if (e.kind === 'npc') drawScout(g, e, x, y, NPC_COL[e.role] || (e.life && LIFE_COL[e.life.prof]) || '#5a5a5a');
-  else if (e.kind === 'mon' && MON[e.type].scout) drawScout(g, e, x, y, MON[e.type].scout);
-  else if ((e.kind === 'mon' || (e.kind === 'pet' && e.type)) && BESTIARY.src[e.type]) { drawBestiary(g, e, x, y); }
+  // creature art, best first: a decoded bestiary sheet, a legacy MON_SHEETS sheet, the scout tint, then procedural art.
+  // A sheet that is still decoding (or failed to load) falls through, so a creature is never drawn invisible.
+  else if ((e.kind === 'mon' || (e.kind === 'pet' && e.type)) && BSI[e.type] && drawBestiary(g, e, x, y)) { }
   else if ((e.kind === 'mon' || (e.kind === 'pet' && e.type)) && MSI[e.type]) { drawSheet(g, e.type, e.sect, sheetFrame(e), x, y); }
+  else if (e.kind === 'mon' && MON[e.type].scout) drawScout(g, e, x, y, MON[e.type].scout);
   else if (e.kind === 'mon' || (e.kind === 'pet' && e.type)) { const s = beastSprite(e); g.imageSmoothingEnabled = false; g.drawImage(s, Math.round(x - s.ox), Math.round(y - s.oy)); if (e.rooted > GT) { g.fillStyle = 'rgba(120,90,50,.6)'; g.fillRect(x - 12, y - 4, 24, 4); } }
   else if (e.summon) drawSummon(g, e, x, y);
   else if (e.kind === 'pet') { g.globalAlpha = .85; g.fillStyle = '#7ab060'; g.beginPath(); g.ellipse(x, y - 14, 8, 12, 0, 0, 7); g.fill(); g.fillStyle = '#c8e890'; g.fillRect(x - 4, y - 20, 2, 2); g.fillRect(x + 2, y - 20, 2, 2); g.strokeStyle = '#5a8a40'; g.lineWidth = 2; g.beginPath(); g.moveTo(x - 6, y - 24); g.lineTo(x - 10, y - 36); g.moveTo(x + 5, y - 24); g.lineTo(x + 9, y - 38); g.stroke(); }
@@ -2394,7 +2396,7 @@ addEventListener('keydown', e => { if (!P || e.target.matches('input,select,text
   if (SCREEN || PANEL) {
     if (e.key === 'Escape') { e.preventDefault(); if (SCREEN) closeScreen(); else closePanel(); snd('ui.close'); refreshHud(); }
     return;
-  } if (KM[e.key]) { KEYS[KM[e.key]] = 1; KEYS.any = 1; e.preventDefault(); } if (e.key === 'Shift') KEYS.shift = 1; if (e.key === ' ') { toggleArm(); e.preventDefault(); } if (e.key === 'e' || e.key === 'E') interact(); if (e.key === 'b' || e.key === 'B') firstAid(P); if (/^[1-3]$/.test(e.key)) ACT.slot({ i: +e.key - 1 }); if (e.key === 'Tab') { ACT.cycle(); e.preventDefault(); } if (e.key === 'Escape') { ACT.cancel(); closePanel(); } refreshHud(); });
+  } if (KM[e.key]) { KEYS[KM[e.key]] = 1; KEYS.any = 1; e.preventDefault(); } if (e.key === 'Shift') KEYS.shift = 1; if (e.key === ' ') { toggleArm(); e.preventDefault(); } if (e.key === 'e' || e.key === 'E') interact(); if (e.key === 'b' || e.key === 'B') firstAid(P); if (/^[1-3]$/.test(e.key)) ACT.slot({ i: +e.key - 1 }); if (e.key === 'Tab') { ACT.cycle(); e.preventDefault(); } if (e.key === 'Escape') { escapeWorld(); closePanel(); } refreshHud(); });   // v0.29: cancel first, then clear the target (src/hud-ui.js)
 addEventListener('keyup', e => { if (KM[e.key]) KEYS[KM[e.key]] = 0; if (e.key === 'Shift') KEYS.shift = 0; KEYS.any = KEYS.u || KEYS.d || KEYS.l || KEYS.r; });
 addEventListener('resize', () => { resize(); if (SCREEN === 'map') { sizeMap(); mapFit(); drawMap(); } if (P && VH > VW && !ROTOK) $('#rot').hidden = false; else $('#rot').hidden = true; });
 

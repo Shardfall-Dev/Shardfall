@@ -60,5 +60,6 @@ jobs:
           run bestiary    python3 tests/bestiary-smoke/run.py "$G"
           run sfx         python3 tests/sfx-smoke/run.py "$G"
           run anniabreen  python3 tests/anniabreen-smoke/run.py "$G"
+          run ui          python3 tests/ui-smoke/run.py "$G"
           run world       python3 tests/world-smoke/run.py "$G"
           exit $fail

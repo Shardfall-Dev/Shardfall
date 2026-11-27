@@ -38,7 +38,7 @@ with sync_playwright() as p:
     ctx, pg, errs = page(b, mobile); fresh(pg)
 
     # ---- A03: a dropped pile survives a reload with its time left; it is not duplicated
-    r = J(pg, """() => { const S = __SF, P = S.P, SF = S.SF; SF.addItem(P.pack, SF.newItem('ironbar', 5)); const it = P.pack.items.find(i => i.id === 'ironbar'); S.ACT.drop({ u: it.uid });
+    r = J(pg, """() => { const S = __SF, P = S.P, SF = S.SF; SF.addItem(P.pack, SF.newItem('ironbar', 5)); const it = P.pack.items.find(i => i.id === 'ironbar'); S.ACT.drop({ u: it.uid, ok: 1 });   /* confirmed: v0.29 asks before dropping valuables */
       const pile = S.ents.find(e => e.pile && !e.gone); S.save(); return { ok: !!pile, n: pile && SF.count(pile.cont, 'ironbar'), left: pile && pile.expires - S.GT, inPack: SF.count(P.pack, 'ironbar'), x: pile && pile.x, y: pile && pile.y }; }""")
     before = J(pg, UNITS)
     cont(pg)
