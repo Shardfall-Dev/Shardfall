@@ -116,7 +116,7 @@ with sync_playwright() as p:
   r = J(pg, "() => ({ gt: __SF.GT, n: __SF.WS.reg.size, sz: __SF.WS.bus.size })")
   check(r['gt'] > 2 and r['n'] > 100 and not errs, 'the live loop runs with the new dispatch', {'r': r, 'errs': errs[:5]}); ctx.close()
   b.close()
-import subprocess   # phase 2: clock, light, navigation, developer panel; the world expansion; phase 3: the monster ecosystem
-for extra in ['phase2.py', 'expansion.py', 'phase3.py']:
+import subprocess   # phase 2: clock, light, navigation, developer panel; the world expansion; phase 3: the monster ecosystem; phase 4: living NPCs
+for extra in ['phase2.py', 'expansion.py', 'phase3.py', 'phase4.py']:
   r = subprocess.run([sys.executable, os.path.join(here, extra), f, chrome], capture_output=True, text=True); print(r.stdout.strip() or r.stderr[-800:]); fails += r.returncode != 0
 print('ALL PASS' if not fails else f'{fails} FAILED'); sys.exit(1 if fails else 0)

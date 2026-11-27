@@ -198,4 +198,22 @@ eq([camp2.cleared, camp2.clearedAt, camp2.canSpawn(60)], [true, 9, false], 'clea
 eq(camp2.canSpawn(110), true, 'after recovery the first member returns'); eq(camp2.spawned(110), 'recovering', '…as a replenishment event');
 eq([camp2.canSpawn(115), camp2.canSpawn(120)], [false, true], 'the rest return one by one, a trickle apart');
 for (let t = 120; camp2.alive < 4; t += 10) camp2.spawned(t); eq([camp2.cleared, camp2.alive, camp2.clears], [false, 4, 1], 'recovery always ends: the camp is whole again, never extinct');
+
+// ---- Phase 4: daily schedules, needs, memory (§7)
+const smith = [[22, 5.5, 'sleep', 'home'], [5.5, 6, 'home', 'home'], [6, 12, 'work', 'work'], [12, 13, 'eat', 'hall'], [13, 17.5, 'work', 'work'], [17.5, 20, 'social', 'hall'], [20, 22, 'home', 'home']];
+eq(SIM.validSchedule(smith), true, 'the spec\'s blacksmith day covers 24 hours without overlap');
+eq([SIM.validSchedule(smith.slice(1)), SIM.validSchedule(smith.concat([[7, 8, 'x', 'y']]))], [false, false], 'a gap or an overlap is rejected');
+eq([0, 3, 5.4, 5.6, 6.5, 12.5, 17.6, 21, 23.9].map(h => SIM.scheduleAt(smith, h).act), ['sleep', 'sleep', 'sleep', 'home', 'work', 'eat', 'social', 'home', 'sleep'], 'scheduleAt finds the block, including one that wraps midnight');
+eq([SIM.scheduleAt(smith, 24 + 6.5).act, SIM.scheduleAt(smith, -1).act], ['work', 'sleep'], 'hours wrap around the day');
+eq([SIM.hoursUntil(22, 5.5), SIM.hoursUntil(6, 12)], [7.5, 6], 'hours between two clock times');
+let nd = SIM.newNeeds({ hunger: 0, fatigue: 0 }); SIM.needsTick(nd, 9, 'work');
+eq([r2d(nd.hunger), nd.fatigue > .5, nd.work < .3], [1, true, true], 'hunger fills in ~9 waking hours; fatigue rises; working satisfies the need to work');
+SIM.needsTick(nd, .5, 'eat'); eq(nd.hunger < .1, true, 'a meal brings hunger down');
+SIM.needsTick(nd, 6, 'sleep'); eq(nd.fatigue, 0, 'six hours of sleep restore fatigue');
+SIM.frighten(nd, 1); eq([nd.safety, SIM.urgentNeed(nd)], [1, 'safety'], 'a fright makes safety the urgent need');
+SIM.needsTick(nd, .2, 'home'); eq(nd.safety < .1, true, 'fright fades within a few game minutes');
+const allIn = SIM.needsTick(SIM.newNeeds(), 500, 'walk'); eq(['hunger', 'fatigue', 'social', 'work', 'safety'].every(k => allIn[k] >= 0 && allIn[k] <= 1), true, 'needs stay between 0 and 1');
+const nmem = SIM.newMemory(4); nmem.note(0, 'saw', 'mon:wolf:1'); nmem.note(10, 'saw', 'mon:wolf:1'); eq([nmem.size, nmem.recent(1)[0].n], [1, 2], 'a repeated encounter updates the newest record');
+for (let i = 0; i < 9; i++) nmem.note(100 + i * 100, 'talked with', 'npc:x' + i); eq([nmem.size, nmem.recent(1)[0].who], [4, 'npc:x8'], 'memory keeps only the newest records');
+const nmem2 = SIM.newMemory(4, nmem.save()); eq([nmem2.size, nmem2.knows('talked with', 'npc:x8'), nmem2.knows('saw')], [4, true, false], 'memory survives save and load');
 console.log(fails ? fails + ' FAILED' : 'ALL PASS'); process.exit(fails ? 1 : 0);

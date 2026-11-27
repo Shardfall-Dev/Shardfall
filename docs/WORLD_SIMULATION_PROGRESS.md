@@ -4,7 +4,7 @@ The roadmap is `docs/WORLD_SIMULATION_MASTER.md` (the full specification, unchan
 
 **Status words:** **Tested** — implemented and covered by an automated test that passes. **Implemented** — in the build, checked by hand only. **Partial** — some of the item is in; the rest is listed. **Planned** — not started. **Blocked** — waiting on something named.
 
-**Current build:** v0.26 (`Shardfall_v0.26.html`), branch `integration/v0.26`: phase 3 (`feature/living-world-phase3`, #20, built as v0.25) merged with the equipment and paper doll work (#19, also v0.25, which already contains the missing icons v0.24.1, #18). One PR from `integration/v0.26` replaces #18, #19 and #20; phase 4 branches from it.
+**Current build:** v0.27 (`Shardfall_v0.27.html`), branch `feature/living-world-phase4`, built on `integration/v0.26` (phase 3 merged with the equipment work). Phase 4 is living NPCs.
 
 ---
 
@@ -18,7 +18,7 @@ The spec's development sequence (§29, phases A–G) is numbered 1–7 here. Eac
 | 2 | B | Clock and navigation: fixed 50 ms simulation step, persistent world clock (120 min day), day/night lighting and local lights, A* plus a waypoint graph, doors, stuck recovery, developer debug panel | 1 | **Tested** (v0.22) |
 | 2½ | — | **World expansion** (asked for between phases 2 and 3): Anniabreen stretched ×1.35 between rigid towns, the Southern Reach, 8 camps, 5 sealed dungeon mouths, world 2620 × 1520 | 2 | **Tested** (v0.23) |
 | 3 | C | Population and monster ecosystem: regions and habitats, species profiles as data, roaming, territories, predator/prey, monster-vs-monster factions, creature audio | 1, 2 | **Tested** (v0.25) |
-| 4 | D | Living NPCs: named townsfolk with homes, workplaces and schedules; guards patrolling; merchants travelling; resource workers; basic adventurers | 1, 2, 3 (factions) | Planned |
+| 4 | D | Living NPCs: named townsfolk with homes, workplaces and schedules; guards patrolling; merchants travelling; resource workers; basic adventurers | 1, 2, 3 (factions) | **Tested** (v0.27); adventurers moved to phase 5, which gives NPCs combat |
 | 5 | E | Shared combat and law: NPC-vs-NPC and NPC-vs-monster combat, NPC spellcasting through Magery, actor death and looting, criminal flags, murder counts, guards, witnesses | 1, 3, 4 | Planned |
 | 6 | F | Persistence and optimisation: world-state save (regions, camps, corpses, cargo), simulation tiers A/B/C, spatial index, mobile profiling, regression tests | 1–5 | Planned |
 | 7 | G | Emergent gameplay: merchant ambushes, dungeon expeditions, camp patrols, NPC healing and recovery, basic economy, encounters | 1–6 | Planned |
@@ -466,6 +466,93 @@ v0.26 merges phase 3 with the equipment and paper doll work (#19, which already 
   - Browser: equipment-smoke 67/67, backpack panels 97/97, backpack 32/32, icons 32/32, bestiary 123/123, magery-smoke, anniabreen-smoke, sfx 48/48, and world-smoke 113/113 (phase 3 three more times).
   - Combat-smoke: as before, its old-save step needs `main:Shardfall_v0.16.html`, which a shallow clone does not have.
 
+## Phase 4 — Living NPCs (v0.27) — **Tested**
+
+### What was built
+
+- **Pure core in `src/world.js` (tested in node):**
+  - **Daily schedules.** `SIM.scheduleAt(blocks, hour)` looks up a block; blocks are `[from, to, act, place]` and may wrap midnight. `SIM.validSchedule` checks that the blocks cover all 24 hours with no overlap. `SIM.hoursUntil` measures the gap between two clock times.
+  - **Needs (§7).** These are kept lightweight: hunger, fatigue, social and work run from 0 to 1. They rise with game hours and fall while the matching activity runs.
+    - Hunger fills in about 9 waking hours; a midday meal resets it, and the evening gathering serves as supper.
+    - Fatigue builds over about 17 waking hours; six hours of sleep restore it.
+    - Safety is set by fright and fades within minutes.
+    - `SIM.urgentNeed` picks the need to act on.
+  - **Memory.** `SIM.newMemory` is a small ring of significant encounters (who, what, where, when). A repeat with the same actor updates the newest record, so the ring stays meaningful and bounded. It can be saved.
+- **Town life in the game (`src/townlife.js`):**
+  - **Scope.** Vespar and Mynoc live fully (the spec asks to start with one town). In all four Anniabreen towns the guards patrol. Bankers, healers, ferry and boat crews and Saltmarsh Quay keep their posts around the clock, so the bank, resurrection and travel never close.
+  - **Homes and workplaces.** Each scheduled townsperson lives in a house or cottage of their own town; several may share one, each with a spot of their own. Their workplace is their old post, so trading happens exactly where it did before.
+  - **Professions and schedules (all valid over 24 hours):**
+    - *shop*: tailor, tinker, supplies, fishmonger, mine stores.
+    - *smith*: the forgemistress, on the spec's blacksmith day: up 05:30, forge 06:00–12:00 and 13:00–17:30, the yard 17:30–20:00, home, asleep at 22:00.
+    - *miner*, *woodcutter*, *fisher*: gather, carry the haul to the buyer, eat, gather, sell, meet, sleep.
+    - *dockhand*.
+    - *townsfolk*: home, market, hall.
+  - **Residents (9 named, stable ids, civilians).**
+    - Vespar: Nell the fisherwoman, Garrick the dockhand, Lise, Old Tomas and Corin.
+    - Mynoc: the miners Durn and Kessa, Fennick the woodcutter, and Mabry the cook.
+  - **Places:**
+    - home; work; the hall for meals and the evening (Vespar's hall, Mynoc's forge yard); the market for strolling.
+    - The field: a stocked rock face in Mynoc Mine, a stocked tree outside town, or a spot on Vespar's harbour pier.
+    - The buyer: the mine stores, or the fish hall.
+    - Shelter.
+  - **The controller (CivilianAI, MerchantAI and GuardAI now run `lifeTick`).** Every ~1 s each townsperson scores its options and commits through `SIM.decide` (20 s commitment):
+    - the schedule block;
+    - shelter, when a hostile creature is in sight within 12 m (forced; the fright and the creature go into memory);
+    - an early meal when hungry, an early night when exhausted, a trip to the buyer with full hands.
+    - **Walking.** Journeys use the phase 2 navigator as one local search, sliced over steps and never the travel graph (`navTo(..., { direct: true })`). Townsfolk open and close doors.
+  - **Real resources.** A miner's stroke takes one unit from the same node stock the player mines (`nodeStock`), so a face they work refills on the usual timer. A worker carries up to 8, sells them at the stores for the normal price, and the town's stores record the haul. Every stroke emits a `ResourceGathered` event and every sale an `ItemTransferred` event.
+  - **Guards** walk a round through the shrine and doorways ringed around the town centre, pausing at each. From 19:00 to 06:00 the first guard of each town stands watch at its post. They note the creatures they see; responding is phase 5.
+  - **Tobin, the travelling merchant.** He sells for one in-game hour at a market, then crosses to the other town by the cart road, setting out only between 06:00 and 17:00.
+    - On the road he only talks. If a hostile creature is within 14 m he hurries (35 % faster) and remembers it.
+    - Arriving emits `MerchantArrived`. He spends the night at the market town.
+    - His route is one sliced local search of up to 400,000 nodes, so even the long trip never builds the travel graph.
+  - **Shop hours.** At the counter in working hours, a shopkeeper trades as before. Asleep, they say so. Elsewhere, they tell you when the shop opens. Residents answer with what they are doing, or with a warning if they recently saw something dangerous.
+  - **Resuming.** At boot and after a load every townsperson is placed where the clock says they should be, so the day resumes instead of restarting. Individual NPC state (needs, memory, carried goods) is not saved yet; that is phase 6.
+  - **Crowding (§14).**
+    - Meal, evening and market spots are chosen to avoid other townsfolk.
+    - At a doorway the later walker waits up to 1.2 s for the earlier one.
+    - Townsfolk push apart through the spatial index.
+  - **Developer panel.** A town-life line shows who is doing what, the trader's state and trips, the town stores, frights, strokes and sales. The inspector adds profession, schedule block, what they are doing, the decision and its reason, needs, home, workplace, carried goods, gold and recent memory.
+
+### Tests
+
+- `node tests/world.test.js`, 140 checks (14 new):
+  - The spec's blacksmith day is valid, and a gap or an overlap is rejected.
+  - Block lookup, including blocks that wrap midnight.
+  - Needs rise, fall and stay within bounds; a fright makes safety urgent and fades.
+  - Memory merges repeats, keeps the newest records, and survives save and load.
+- `python3 tests/world-smoke/phase4.py` (called by `world-smoke/run.py`), 25 checks in Chrome:
+  1. **Population:** 25 townsfolk with lives (6 shopkeepers, 9 residents, 9 guards, the trader). Every home is a house in the right town and every schedule is valid. Ids and archetypes are stable, and service NPCs have no routine.
+  2. **A full accelerated day:**
+     - 10:00: all six shopkeepers at their counters and the four workers at work.
+     - 12:36: 13 at the midday meal. 19:00: 14 at the evening gathering.
+     - 23:30 and 03:00: all 15 asleep in their own homes.
+     - No journey failed and nobody was stranded. Needs and memories stay bounded. The stores received ore, wood and fish.
+  3. **Shop hours:** Merrin sells at 09:30. At 23:24 she is asleep and the shop does not open. The bank opens at night.
+  4. **Resource workers:** a miner takes strokes from a real rock face in Mynoc Mine (its stock falls; miners work the deepest faces first), and with full hands carries the ore to the stores and is paid.
+  5. **Guards:** each Vespar guard walks the whole six-point round by day. At night one stands watch at the post while the others patrol.
+  6. **Trader:** Tobin crosses between the towns by the cart road (about 3 minutes) and raises a `MerchantArrived` event. His shop opens only at the market, he does not set out after dark, and no travel graph is built.
+  7. **Danger:** Fennick sees a wolf, heads for shelter and remembers it; once the wolf is gone and the fright fades he goes back to work.
+  8. **Crowds:** 15 townsfolk at the evening gathering stand at least 0.5 m apart.
+  9. **Reload:** after a reload at 23:30 all 15 are at home at once, with the same ids.
+  10. **Cost:** under 1 ms per simulation step.
+
+- **Regression.** Every suite on v0.27:
+  - Node: rules 33, equipment 91, magery 57, combat 79 and world 140 checks, all passing.
+  - Browser: equipment-smoke 67/67, backpack panels 97/97, backpack 32/32, icons 32/32, bestiary 123/123, magery-smoke, sfx 48/48, and world-smoke 139/139 (phases 1–4 and the expansion).
+  - anniabreen-smoke passes, and all its timed walks match v0.26.
+  - Combat-smoke: all scenarios pass, and the phone play-test passes on a re-run (the first run lost a random bandage roll). Its old-save step needs `main:Shardfall_v0.16.html`, which a shallow clone does not have.
+  - **One test change was needed:** the first anniabreen-smoke run found the face nearest the Mynoc forge already mined out by the new miners. Miners now work the deepest faces first and leave the ones by the entrance to visitors.
+- **Performance** (desktop, Saltmarsh Quay, average of 3): `update(0.05)` 0.67 ms (v0.26: 0.54 ms), render by day 3.8 ms and at night 5.0 ms, start-up 2.15 s (unchanged), heap after start about 65 MB (v0.26: about 51 MB; town geometry, node lists and 25 actors with schedules).
+
+### Decisions
+
+- **Two towns live fully; the others only patrol.** The spec asks to start with one town. Skara Bryn and Moonglen are the next step, using the same data.
+- **Services never close.** Bank, healers, travel crews and Saltmarsh Quay keep their posts, so no player is ever stuck at night without a bank or a resurrection.
+- **Shops keep hours.** This is the one deliberate gameplay change: trading at night now means waiting for the morning or going to a town without routines. Banks are unaffected.
+- **Townsfolk cannot be hurt yet.** Creatures do not target NPCs, so fear is about reaction (shelter, hurrying, memory). Combat between NPCs and creatures, and NPC adventurers, are phase 5.
+- **The stores are a ledger.** The haul is recorded, but shops still sell from fixed stock. Prices and supply come with the economy in phase 7.
+
 ## Implementation matrix (audit of v0.20 against the spec)
 
 | Spec § | Area | What exists in v0.20 | Status (latest phase) | Next |
@@ -476,8 +563,8 @@ v0.26 merges phase 3 with the equipment and paper doll work (#19, which already 
 | 4 | Simulation/render separation, timestep, events, seeded RNG | `update(dt)` with frame dt (capped 0.1 s); `render()` separate; `R` swappable (`setRng`); world gen seeded (`mulberry(1999)`); no event log | **Tested:** events, seeded streams, deterministic harness (phase 1); fixed 50 ms step with interpolation (phase 2) | — |
 | 5 | World clock | `hourOfDay()` = `(GT/60 + 9) % 24`: a 24-minute day, starting at 09:00. `GT` is saved, so time already persists. HUD clock exists. | **Tested** (phase 2): 120-minute day, periods, saved, HUD | Offline progression stays off (spec) |
 | 6 | Day/night visuals | `darkness()` overlay with radial holes for the player, `LIGHTS` and blasts. Night Sight sets darkness to 0. Dungeons fixed at 0.8. | **Tested** (phase 2): tinted periods, local lights and glow, partial Night Sight, dungeons apart | Torch items and spell light radii when those exist; night gameplay in phase 3 |
-| 7 | NPC life | 58 static NPCs (Saltmarsh + Anniabreen towns), roles, shops, dialogue lines; no movement or schedules | Classified (civilian/merchant/guard) | Phase 4 |
-| 8 | NPC adventurers | Wren: one hireling with skills, equipment, bandaging, ghost/resurrection, follow/wait | Classified (hireling) | Phase 4 |
+| 7 | NPC life | 58 static NPCs (Saltmarsh + Anniabreen towns), roles, shops, dialogue lines; no movement or schedules | **Tested** (phase 4) in Vespar and Mynoc: homes, workplaces, schedules, needs, memory, nine residents, resource workers on real nodes, shop hours, shelter from danger; guard patrols in all four towns; a travelling merchant | Skara Bryn and Moonglen routines; the economy behind the stores (phase 7) |
+| 8 | NPC adventurers | Wren: one hireling with skills, equipment, bandaging, ghost/resurrection, follow/wait | Classified (hireling) | Phase 5 (they need NPC combat) |
 | 9–10 | Monster ecosystem | `MON` table (23 types) with aggro, leash, speed, loot, skin; `SPAWNS` point spawners with caps and respawn timers; `aiMon` idle/chase/telegraph/strike/recover/return | **Tested** (phase 3): 27 species profiles as data, temperaments, hours, prey, packs and herds, retreat, feeding; deer, hares and bears added | Goblins, zombies, dragons when art exists; orc roles and lich commands with NPC Magery (phase 5) |
 | 11 | Factions | None; creatures target only the player, pets or Wren (or a provoked creature) | **Tested** (phase 3): 20 factions, five levels, symmetric table; creatures fight creatures; hostility is not a crime | Law and notoriety: phase 5 |
 | 12 | Utility AI + state machines | `aiMon` state machine; no utility scoring, personality or hysteresis | **Tested** (phase 3) for creatures: scored options, commitment, hysteresis, forced retreat, reasons in the inspector | Townsfolk and adventurers: phase 4 |
@@ -539,6 +626,8 @@ v0.26 merges phase 3 with the equipment and paper doll work (#19, which already 
 | v0.23 (256 entities) | 1.20 ms | 4.0 ms | 5.4 ms |
 | v0.24 (256 entities, measured again for phase 3) | 1.21 ms | 3.5 ms | 4.6 ms |
 | v0.25 (554 entities, 475 creatures) | 0.49 ms | 3.7 ms | 4.7 ms |
+| v0.26 (556 entities, measured again for phase 4) | 0.54 ms | 4.0 ms | 4.7 ms |
+| v0.27 (564 entities, 25 with routines) | 0.67 ms | 3.8 ms | 5.0 ms |
 
 - Each figure is the average of 3 runs of 4,000 updates and 200 renders.
 - **v0.23 update cost.** It rose from 0.80 to 1.20 ms per step. This is the creature push-apart in `aiMon`, which compares every entity with every other: with 256 entities instead of 212 that is 1.46× the pairs, which matches the measurement. It is still far inside the 50 ms step, but it is the first sign of the quadratic cost the audit flagged. The phase 3 spatial index removes it.
@@ -550,13 +639,11 @@ v0.26 merges phase 3 with the equipment and paper doll work (#19, which already 
 - **v0.25 start-up:** 1.92 s to enter the world (v0.24 measured again: 1.65 s). The habitat survey and the larger first population add about 0.3 s. Heap after start: about 52 MB (v0.24: about 49 MB in the same run).
 - **Phones are not measured yet.** That is phase 6, but the night pass and the graph build are the two numbers to watch.
 
-## Next task (phase 4, first step)
+## Next task (phase 5, first step)
 
-Living NPCs (§7–8), using the actor, decision, perception and index pieces built for creatures:
+Shared combat and law (§18–20), now that creatures and townsfolk both live in the world:
 
-1. Homes and workplaces for the named townsfolk of one town first (Vespar or Mynoc), and a daily schedule on the world clock: sleep, work, eat, socialise, go home. Each townsperson walks on the navigator and opens doors.
-2. Guards patrolling their town on a route, and standing watch at the gates at night.
-3. A merchant travelling between two towns by road, so creatures and bandits can meet travellers.
-4. Crowding at doors and merchants (§14).
-
-The faction table already has citizens, guards and merchants; law, notoriety and guards responding to crimes stay in phase 5.
+1. NPCs as combatants: creatures may target townsfolk and the travelling merchant outside protected ground; guards fight back with the shared resolver; townsfolk flee (they already seek shelter).
+2. Criminal flags and murder counts for the player (§19): unlawful aggression, guards responding inside their jurisdiction, witnesses.
+3. The first NPC adventurers (§8) on the existing skills: buy gear in town, walk to a camp, fight, bandage, return.
+4. NPC death and looting under the same rules as the player.
