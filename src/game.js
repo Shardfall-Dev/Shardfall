@@ -210,12 +210,13 @@ function starterKit() {
 /* equipment and weight (src/equipment.js, SF.EQ). Weight is shown in weight units (SF.WU per authored kg); worn gear counts. */
 const emptyEquip = () => { const e = {}; for (const s of SF.EQ.SLOT_IDS) e[s] = null; return e; };
 const cap = () => SF.EQ.capFor(P);
-const packKg = () => SF.EQ.totalWt(P) / SF.WU;
 const carryWt = () => SF.EQ.totalWt(P);
 const encumb = () => SF.EQ.encumbrance(P);
 const overweight = () => encumb().ratio > 1 + 1e-9;
 const metalTorso = a => { const it = a.equip && (a.equip.chest || a.equip.robe); const d = it && SF.ITEMS[it.id]; return !!(d && d.fam && ['ringmail', 'chain', 'plate', 'dragon'].includes(d.fam)); };
 const fmtWt = v => (Math.round(v * 10) / 10).toFixed(1);
+/* the one carried-weight line every panel shows: everything carried and worn against the carrying limit, in weight units */
+const carriedText = () => { const en = encumb(); return `${fmtWt(en.wt)} / ${fmtWt(en.cap)} weight`; };
 function wear(it, amt) { if (!it || !SF.WEARABLE(it.id)) return; if (it.cond === undefined) { it.cond = 100; it.maxc = 100; } const before = it.cond; it.cond = Math.max(0, it.cond - amt); const lim = .2 * (it.maxc || 100); if (before >= lim && it.cond < lim) log(SF.itemName(it) + ' is badly worn (−15%). Repair it soon.', '#ffb070'); if (before > 0 && it.cond <= 0) log(SF.itemName(it) + ' has broken and gives no benefit.', '#ff6a5a'); }
 const inCombat = () => GT - (P.lastCombat || -99) < 6;
 function give(id, q, extra) { const r = SF.addItem(P.pack, SF.newItem(id, q, extra), cap()); if (!r.ok) { log('Your pack is full: ' + r.reason + '. ' + SF.ITEMS[id].n + ' left on the ground.', '#ffb070'); dropPile(SF.newItem(id, q, extra)); } return r.ok; }
@@ -844,10 +845,10 @@ function update(dt) {
   if (DEV.on) DEV.aiMs = DEV.aiMs * .95 + (performance.now() - aiT0) * .05;
   sndTick();
   if (GT - spawnT > 1) { spawnT = GT; spawnTick(); }
-  if (GT - saveT > 15) { saveT = GT; if (!save() && !P._saveWarn) { P._saveWarn = true; log('Saving failed (browser storage full?). Your last saved game is still safe.', '#ff9a6a'); } }
+  if (GT - saveT > 15) { saveT = GT; save(); }   // save() reports a failure itself, once until a save succeeds again
 }
-/* controllers (master spec §3). The player's controller is the input code above (playerMove, attackTick, prepTick); townsfolk,
-   merchants and guards have no controller tick yet and stand at their posts (Living World Phase D gives them routines). */
+/* controllers (master spec §3). The player's controller is the input code above (playerMove, attackTick, prepTick); creatures run
+   monsterTick and the ecosystem (ecology.js); townsfolk, merchants and guards follow their routines in townlife.js (lifeTick). */
 function monsterTick(e, dt) {
   dt = ecoSkip(e, dt); if (!dt) return;   // distant idle creatures run at a quarter rate (src/ecology.js)
   if (e.stam !== undefined && GT - (e.hitT || -9) > .75) e.stam = Math.min(monT2A(MON[e.type]).dex, e.stam + 3 * dt); const s0 = e.state; aiMon(e, dt); if (e.state !== s0) monSound(e, s0); ecoSoundTick(e);
@@ -864,7 +865,7 @@ function petTick(p, dt) {
     if (!t && far > 24) { p.x = P.x - .8; p.y = P.y + .8; }
     if (dd > (t ? d.reach * .9 : .8)) { const s = Math.min(dd, d.speed * MOVE_SCALE * dt); moveBy(p, (goal.x - p.x) / dd * s, (goal.y - p.y) / dd * s); p.speed = s / dt; updateFacing(p, goal.x - p.x, goal.y - p.y); } else p.speed = 0; }
   else p.speed = 0;
-  if (t && dist(p, t) <= d.reach + .2 && los(p, t) && GT > (p.ready || 0)) { p.ready = GT + d.rec + .4; p.state = 'strike'; at(.15, () => p.state = ''); strikeOne(p, t); }
+  if (t && dist(p, t) <= d.reach + .2 && los(p, t) && GT > (p.ready || 0)) { p.ready = GT + d.rec + .4; p.state = 'strike'; p.atkRow = p.sect || 0; p.impactT = GT; at(.15, () => p.state = ''); strikeOne(p, t); }   // atkRow / impactT only drive the bestiary impact → recover pose
   if (p.hp < p.max && !inCombat()) p.hp = Math.min(p.max, p.hp + .5 * dt);
 }
 
@@ -1244,7 +1245,6 @@ function worldTick(dt) {
   for (let i = TRAPS.length - 1; i >= 0; i--) { const tr = TRAPS[i]; if (tr.until && GT > tr.until) { TRAPS.splice(i, 1); continue; } if (GT < (tr.armedAt || 0)) continue;
     if (tr.owner !== 'P' && !P.ghost && Math.hypot(tr.x - P.x, tr.y - P.y) < .6) { TRAPS.splice(i, 1); springOnPlayer(); continue; }
     if (tr.owner === 'P') for (const m of ents) if (m.kind === 'mon' && alive(m) && Math.hypot(tr.x - m.x, tr.y - m.y) < .7) { TRAPS.splice(i, 1); m.slowUntil = GT + SF.TRAP.slowFor; floater(m.x, m.y, 'snared', '#e8d090'); sndAt('trap.spring', tr); damageMon(m, SF.TRAP.dmg, 'phys', P, { quiet: 1 }); break; } }
-  if (P.prep === null && 0) return;
 }
 function seedTraps() { for (const [cx, cy] of [[232, 288], [318, 304], [395, 284], [300, 288], [360, 178]]) for (let k = 0; k < 2; k++) { const x = cx + (R() - .5) * 8, y = cy + (R() - .5) * 6; if (!BLK[tAt(Math.floor(x), Math.floor(y))]) TRAPS.push({ x, y, owner: 'world', hidden: true, armedAt: 0, until: 0, diff: 40 }); } }
 
@@ -1636,7 +1636,7 @@ function sheetFrame(e) {
   if (e.hitT && GT - e.hitT < .16) return 6; if (e.speed > .3) return Math.floor(GT * 9 + e.id) % 4; return 0;
 }
 function drawSheet(g, type, row, col, x, y) { const im = MSI[type], m = MON_SHEETS[type]; if (!im) return false; g.imageSmoothingEnabled = false; g.drawImage(im, col * m.cw, (row || 0) * m.ch, m.cw, m.ch, Math.round(x - m.fx), Math.round(y - m.fy + 2), m.cw, m.ch); return true; }
-/* ---- Bestiary v1 sheets (src/bestiary-art.js): 160 px cells, rows S..SE, cols stepA, neutral, stepB, wind-up, impact; pivot from the manifest.
+/* ---- Bestiary sheets, v1.0.0 + v1.1.0 merged (src/bestiary-art.js): 160 px cells, rows S..SE, cols stepA, neutral, stepB, wind-up, impact; pivot from the manifest.
    Poses follow the simulation: 'tele' shows wind-up, the strike event (impactT) starts the impact → recover timing, movement plays the walk cycle.
    Facing is latched for the whole attack. Drawn unprocessed (no outline, tint or alpha threshold) so baked rims and glints survive. ---- */
 const BSI = {}; for (const k in BESTIARY.src) { const im = new Image(); im.onload = () => { BSI[k] = im; }; im.onerror = () => console.warn('bestiary sheet failed to load:', k); im.src = BESTIARY.src[k]; }
@@ -1669,9 +1669,11 @@ function drawEnt(e) {
   else if (e.kind === 'player') drawScout(g, e, x, y, P.ghost ? 'ghost' : (P.look.cloak || null));
   else if (e.kind === 'ally') { if (e.ghost) g.globalAlpha = .75; drawScout(g, e, x, y, e.ghost ? 'ghost' : '#2f7a46'); }
   else if (e.kind === 'npc') drawScout(g, e, x, y, NPC_COL[e.role] || (e.life && LIFE_COL[e.life.prof]) || '#5a5a5a');
-  else if (e.kind === 'mon' && MON[e.type].scout) drawScout(g, e, x, y, MON[e.type].scout);
-  else if ((e.kind === 'mon' || (e.kind === 'pet' && e.type)) && BESTIARY.src[e.type]) { drawBestiary(g, e, x, y); }
+  // creature art, best first: a decoded bestiary sheet, a legacy MON_SHEETS sheet, the scout tint, then procedural art.
+  // A sheet that is still decoding (or failed to load) falls through, so a creature is never drawn invisible.
+  else if ((e.kind === 'mon' || (e.kind === 'pet' && e.type)) && BSI[e.type] && drawBestiary(g, e, x, y)) { }
   else if ((e.kind === 'mon' || (e.kind === 'pet' && e.type)) && MSI[e.type]) { drawSheet(g, e.type, e.sect, sheetFrame(e), x, y); }
+  else if (e.kind === 'mon' && MON[e.type].scout) drawScout(g, e, x, y, MON[e.type].scout);
   else if (e.kind === 'mon' || (e.kind === 'pet' && e.type)) { const s = beastSprite(e); g.imageSmoothingEnabled = false; g.drawImage(s, Math.round(x - s.ox), Math.round(y - s.oy)); if (e.rooted > GT) { g.fillStyle = 'rgba(120,90,50,.6)'; g.fillRect(x - 12, y - 4, 24, 4); } }
   else if (e.summon) drawSummon(g, e, x, y);
   else if (e.kind === 'pet') { g.globalAlpha = .85; g.fillStyle = '#7ab060'; g.beginPath(); g.ellipse(x, y - 14, 8, 12, 0, 0, 7); g.fill(); g.fillStyle = '#c8e890'; g.fillRect(x - 4, y - 20, 2, 2); g.fillRect(x + 2, y - 20, 2, 2); g.strokeStyle = '#5a8a40'; g.lineWidth = 2; g.beginPath(); g.moveTo(x - 6, y - 24); g.lineTo(x - 10, y - 36); g.moveTo(x + 5, y - 24); g.lineTo(x + 9, y - 38); g.stroke(); }
@@ -1822,7 +1824,7 @@ function renderTarget() {
     const d2 = MON[t.type]; if (ents.some(e => e.kind === 'pet' && !e.gone)) btns += btn('petcmd', 'Pets attack', { c: 'attack' }, 'on'); if (d2.tame && !d2.boss) btns += btn('abil', 'Tame', { id: 'tame' }); if (SF.count(P.pack, 'lute') && !d2.boss) btns += btn('abil', 'Lullaby', { id: 'lullaby' }) + btn('abil', 'Discord', { id: 'discord' }) + btn('abil', 'Provoke', { id: 'provoke' }); if (d2.purse && t.target !== P) btns += btn('abil', 'Pickpocket', { id: 'pick' }); btns += btn('abil', 'Anatomy', { id: 'anatomy' }); if (t.ward > 0) body += ` <span class="note">ward ${t.ward}</span>`; }
   else if (t.kind === 'pet') { const f = cl(t.hp / t.max, 0, 1); body = `<span class="badge neu">●</span><b>${esc(t.name)}</b> <span class="note">${t.order} · ${t.slots || 1} slot${(t.slots || 1) > 1 ? 's' : ''}</span><div class="bar sm"><i style="width:${f * 100}%;background:#5fd068"></i></div>`; btns = btn('petcmd', 'Follow', { c: 'follow' }) + btn('petcmd', 'Stay', { c: 'stay' }) + (t.type ? btn('abil', 'Treat', { id: 'vet' }) : '') + btn('petcmd', 'Dismiss', { c: 'dismiss' }); }
   else if (t.kind === 'npc') { body = `<span class="badge neu" title="neutral">●</span><b>${esc(t.name)}</b>`; btns = `<button class="btn sm ac" data-a="interact">Talk</button>`; }
-  else if (t.kind === 'corpse') { const ls = t.cont ? SF.lootStatus(t.cont, P.id, GT) : { label: '' }; body = `<b>${esc(t.name)}</b> <span class="note">${t.mine ? ls.label + ' · ' : ''}${t.cont ? t.cont.items.length + ' stacks' : ''} · ${dist(t, P).toFixed(1)} m</span>`; btns = `<button class="btn sm ac" data-a="interact">Open</button>${t.mon && !t.skinned ? '<button class="btn sm" data-a="skin">Skin</button>' : ''}`; }
+  else if (t.kind === 'corpse') { const ls = t.cont && Number.isFinite(t.cont.diedAt) ? SF.lootStatus(t.cont, P.id, GT) : { label: '' }; body = `<b>${esc(t.name)}</b> <span class="note">${t.mine ? ls.label + ' · ' : ''}${t.cont ? t.cont.items.length + ' stacks' : ''} · ${dist(t, P).toFixed(1)} m</span>`; btns = `<button class="btn sm ac" data-a="interact">Open</button>${t.mon && !t.skinned ? '<button class="btn sm" data-a="skin">Skin</button>' : ''}`; }
   else if (t.kind === 'node') { const tier = t.skill === 'fishing' ? 0 : nodeTier(t.x, t.y), rw = t.skill === 'mining' || t.skill === 'woodcutting'; const st = t.skill === 'fishing' ? '' : ' · ' + (rw ? nodeNote(t) : `${nodeStock(t.x, t.y).n} left`) + (isQuayNode(t.x, t.y) ? ' · training' : ''); body = `<b>${esc(cap1(rw ? nodeLabel(t) : t.name))}</b> <span class="note">${SF.SKILL[t.skill].n} · grade ${tier + 1} (needs ${SF.NODE_TIER_MIN[tier]})${st} · ${Math.hypot(t.x + .5 - P.x, t.y + .5 - P.y).toFixed(1)} m</span>`; btns = `<button class="btn sm ac" data-a="interact">Gather</button>` + (rw ? `<button class="btn sm" data-a="survey">${t.skill === 'mining' ? 'Survey' : 'Read grain'}</button>` : ''); }
   const html = `<div class="trow">${body}<button class="x" data-a="desel" aria-label="Clear target">×</button></div>${btns ? '<div class="acts">' + btns + '</div>' : ''}`; if (el._h !== html) { el.innerHTML = html; el._h = html; }
 }
@@ -1867,35 +1869,6 @@ function bagStats(it) {
   return '<div class="baghead">' + bagIcon(it, 56) + '<span>' + esc(lines[0]) + '</span></div>' + lines.slice(1).map(line => '<span>' + esc(line) + '</span>').join('');
 }
 
-function bagPanel() {
-  const items = P.pack.items.slice();
-  const category = it => SF.ITEMS[it.id].cat || 'other';
-  items.sort((a,b) => {
-    if (bagSort === 'Category') {
-      const byType = category(a).localeCompare(category(b));
-      if (byType) return byType;
-    }
-    if (bagSort === 'Quantity' && a.qty !== b.qty) return b.qty - a.qty;
-    return SF.itemName(a).localeCompare(SF.itemName(b)) || a.uid - b.uid;
-  });
-  const kg = packKg(), max = SF.carryKg(P);
-  let h = '<div class="note">' + items.length + '/' + SF.SLOTS + ' stacks · ' + kg.toFixed(1) + '/' + max.toFixed(1) + ' kg · ' + SF.count(P.pack,'gold') + ' gold' + (kg > max ? ' · overweight: walk only' : '') + '</div>';
-  h += '<div class="bagsorts">Sort ' + ['Category','Name','Quantity'].map(s => btn('bagsort',s,{s},s === bagSort ? 'on' : '')).join('') + '</div>';
-  const selected = findU(P.pack, bagUid);
-  if (selected) h += '<div class="bagcard">' + bagStats(selected) + '<div>' + bagActions(selected) + '</div></div>';
-  let group;
-  h += '<div class="baggrid">';
-  for (const it of items) {
-    const cat = category(it);
-    if (bagSort === 'Category' && group !== cat) {
-      group = cat;
-      h += '<b class="baggroup">' + esc(cap1(cat)) + '</b>';
-    }
-    h += '<button class="bagcell" data-a="baginspect" data-u="' + it.uid + '" aria-pressed="' + (selected === it) + '">' + bagIcon(it, 40) + '<small>' + esc(SF.itemName(it)) + '</small>' + (it.qty > 1 ? '<strong>' + it.qty + '</strong>' : '') + '<span class="bagtip" role="tooltip">' + bagStats(it) + '</span></button>';
-  }
-  return ['Backpack', h + (items.length ? '' : 'Your backpack is empty.') + '</div>'];
-}
-
 function bagActions(it) {
   const d = SF.ITEMS[it.id]; let a = '';
   if (d.slot) a += btn('equip', 'Equip', { u: it.uid });
@@ -1911,7 +1884,6 @@ function bagActions(it) {
   return a;
 }
 const PANELS = {
-  bag: bagPanel,
   gear: () => { const t = (k, n) => `<span>${n}</span><span>${P[k]}</span>`; let h = `<div class="kv">${t('str', 'Strength')}${t('dex', 'Dexterity')}${t('int', 'Intellect')}<span>Stat total</span><span>${P.str + P.dex + P.int} / 225</span><span>Health</span><span>${Math.floor(P.hp)} / ${SF.maxHp(P)}</span><span>Stamina</span><span>${Math.floor(P.stam)} / ${SF.maxStam(P)}</span><span>Mana</span><span>${Math.floor(P.mana)} / ${SF.maxMana(P)}</span><span>Armor rating</span><span>${armorVal()}</span><span>Carried</span><span>${fmtWt(carryWt())} / ${fmtWt(SF.carryCap(P))} · ${encumb().n}</span><span>Weapon</span><span>${wDef().fam} · ${wDef().dmg.join('–')} · reach ${wDef().reach} m · swing every ${SF.swingDelay(P.stam, wDef().speed).toFixed(2)} s</span><span>Bound shrine</span><span>${SHRINES.find(s => s.id === P.bound).n}</span><span>Skills</span><span>${f1(SF.totalSkill(P))} / 700.0</span></div><div class="sec">Equipped ${btn('eqwin', 'Paper doll (C)', {}, 'ac')}</div>`;
     for (const s of SF.EQ.SLOT_IDS) { const it = P.equip[s]; if (!it && !['weapon', 'shield', 'chest'].includes(s)) continue; h += `<div class="row"><span class="v" style="width:5.5em">${SF.EQ.SLOT[s].n}</span>${it ? rowIcon(it) : ''}<span class="nm">${it ? esc(iname(it)) : '<span class="note">empty</span>'}</span>${it && SF.WEARABLE(it.id) && it.cond !== undefined && it.cond < (it.maxc || 100) ? btn('repair', 'Repair', { u: it.uid }) : ''}${it && SF.ITEMS[it.id].trade ? btn('uneq', 'Remove', { s }) : ''}</div>`; }
     return ['Character', h + '<p class="note">Stats do not grow by use. Buy points from Master Vey (up to 225 total).</p>']; },
@@ -1923,7 +1895,7 @@ const PANELS = {
   spells: () => spellbookPanel(),
   abilities: () => ['Abilities', `<p class="note">Use now or put an action on a hotbar slot (two bars of four).</p>` + [['bandother', 'Bandage other (Healing: an ally or a player ghost)'], ['anatomy', 'Anatomy (judge a living target)'], ['hide', 'Hide (Concealment)'], ['track', 'Track (Tracking)'], ['meditate', 'Meditate'], ['brace', 'Braced Guard (Parrying 50)'], ['search', 'Search (finds hidden foes and snares)'], ['tame', 'Tame (Taming)'], ['vet', 'Treat pet (Veterinary)'], ['lullaby', 'Lullaby (needs a lute)'], ['discord', 'Discord (needs a lute)'], ['provoke', 'Provoke (needs a lute)'], ['pick', 'Pickpocket a smuggler'], ['coat', 'Coat weapon with venom (Venomcraft 30)'], ['trap', 'Set a snare (Trapcraft)']].map(([id, n]) => `<div class="row"><span class="nm">${n}</span>${ABIL[id] ? btn('abil', 'Use', { id }) : ''}${btn('assign', 'Slot', { k: 'act', id })}</div>`).join('')],
   assign: () => ['Choose a slot', `<p class="note">Assign ${esc(ASSIGN.k === 'spell' ? SF.SPELL[ASSIGN.id].n : ASSIGN.k === 'item' ? SF.ITEMS[ASSIGN.id].n : (ABIL[ASSIGN.id] ? ABIL[ASSIGN.id].n : ASSIGN.id))} to:</p><div class="grid2">${P.hotbar.map((_, i) => btn('setslot', 'Bar ' + (1 + Math.floor(i / 3)) + ' · ' + (i % 3 + 1) + ': ' + esc(slotLabel(P.hotbar[i])[0]), { i })).join('')}</div>`],
-  loot: () => { const c = P.lootOpen; if (!c || c.gone) return null; const ls = c.cont ? SF.lootStatus(c.cont, P.id, GT) : { label: '' }; let h = `<div class="note">${c.mine ? 'Your body · ' : ''}${esc(ls.label || '')} · crumbles in ${Math.ceil((c.expires - GT) / 60)} min · pack ${P.pack.items.length}/${SF.SLOTS}, ${packKg().toFixed(1)}/${SF.carryKg(P).toFixed(1)} kg</div>`;
+  loot: () => { const c = P.lootOpen; if (!c || c.gone) return null; const ls = c.cont && Number.isFinite(c.cont.diedAt) ? SF.lootStatus(c.cont, P.id, GT) : { label: '' }; let h = `<div class="note">${c.mine ? 'Your body · ' : ''}${ls.label ? esc(ls.label) + ' · ' : ''}${c.kind === 'chest' ? 'relocks' : 'crumbles'} in ${Math.ceil((c.expires - GT) / 60)} min · carrying ${carriedText()}</div>`;
     if (!c.cont.items.length) h += '<p class="note">Empty.</p>'; else h += btn('takeall', 'Take all', {}, 'ac');
     for (const it of c.cont.items) h += `<div class="row">${rowIcon(it)}<span class="nm">${esc(iname(it))}</span>${btn('take', 'Take', { u: it.uid })}${it.qty > 1 ? btn('take', 'Half', { u: it.uid, half: 1 }) : ''}</div>`;
     if (c.mon && !c.skinned) h += '<p>' + btn('skin', 'Skin the remains', {}) + '</p>';
@@ -1973,7 +1945,7 @@ const ACT = {
   assign: d => { ASSIGN = { k: d.k, id: d.id }; openPanel('assign'); }, setslot: d => { P.hotbar[+d.i] = ASSIGN; closePanel(); },
   lock: d => { const s = P.skills[d.k]; s.lock = s.lock === 'raise' ? 'hold' : s.lock === 'hold' ? 'lower' : 'raise'; renderPanel(); },
   cast: d => { closePanel(); castSlot(d.s); },
-  take: d => { const c = P.lootOpen; if (!c || dist(c, P) > 2) return log('Move within 2 m.'); const it = findU(c.cont, d.u); if (!it) return; const r = SF.EQ.pickupItem(P, c.cont, { uid: it.uid, qty: d.half ? Math.ceil(it.qty / 2) : it.qty }); if (!r.ok) log(r.reason, '#ffb070'); else if (it.id === 'gold') snd('loot.coin'); renderPanel(); if (c.mine) save(); },
+  take: d => { const c = P.lootOpen; if (!c || dist(c, P) > 2) return log('Move within 2 m.'); const it = findU(c.cont, d.u); if (!it) return; const r = SF.EQ.pickupItem(P, c.cont, { uid: it.uid, qty: d.half ? Math.ceil(it.qty / 2) : it.qty }); if (!r.ok) log(r.reason, '#ffb070'); else if (it.id === 'gold') snd('loot.coin'); renderPanel(); if (c.mine || c.pile || c.kind === 'chest') save(); },
   takeall: () => { const c = P.lootOpen; if (!c || dist(c, P) > 2) return; let n = 0, gold = 0; for (const it of c.cont.items.slice()) { const r = SF.EQ.pickupItem(P, c.cont, { uid: it.uid, qty: it.qty }); if (r.ok) { n++; if (it.id === 'gold') gold++; } else { log('Stopped: ' + r.reason, '#ffb070'); break; } } if (n) snd(gold ? 'loot.coin' : 'loot.rummage'); /* one cue for the whole transfer */ renderPanel(); if (c.mine) save(); },
   skin: () => { const c = P.lootOpen || P.sel; if (c && c.mon && dist(c, P) <= 2) skin(c); else log('Stand by the remains.'); },
   depgold: () => { let g = 0; for (const it of P.pack.items.filter(i => i.id === 'gold')) if (SF.transfer(P.pack, P.bank, it.uid, it.qty).ok) g++; if (g) snd('loot.coin'); save(); renderPanel(); },
@@ -1993,6 +1965,15 @@ const ACT = {
   wipe: () => { const el = $('#panel .pb'); if (!el.querySelector('[data-a=wipe2]')) el.insertAdjacentHTML('beforeend', '<p>Delete this character for good? ' + btn('wipe2', 'Yes, delete', {}, 'on') + '</p>'); }, wipe2: () => { try { localStorage.removeItem(SAVEKEY); deletingSave = true; } catch (e) { return log('Could not delete the saved character.'); } location.reload(); },
   rotok: () => { $('#rot').hidden = true; ROTOK = true; } };
 let ROTOK = false;
+/* counter actions re-check the live situation, not just that a button was drawn: alive, the right panel still open, the same
+   keeper still there and within reach, and for a purchase a whole quantity of something this keeper sells. */
+const COUNTER_ACT = { depgold: 'bank', dep: 'bank', depeq: 'bank', wd: 'bank', buy: 'shop', sell: 'shop', train: 'trainer', stat: 'trainer' };
+function atCounter(kind) { const n = P && P.talkTo; if (!n || !P || P.ghost || PANEL !== kind || n.gone || dist(n, P) > 4) return false;
+  return kind === 'bank' ? !!MERCHANT_ROLES[n.role] : kind === 'trainer' ? n.role === 'trainer' : !!SHOPS[n.role]; }
+for (const k in COUNTER_ACT) { const fn = ACT[k]; ACT[k] = d => { d = d || {};
+  if (!atCounter(COUNTER_ACT[k])) { log('You are no longer at the counter.', '#ffb070'); closePanel(); return; }
+  if (k === 'buy' && (!SF.validQty(+d.n) || !(SHOPS[P.talkTo.role] || []).includes(d.id))) return log('That is not for sale here.', '#ffb070');
+  return fn(d); }; }
 
 /* ================= THE QUAY TRADES (crafting guide build step 1): nodes, survey, crafting preview, Dena and Mara ================= */
 /* ---------- Quay training nodes: permanent common locations in the protected Quay ---------- */
@@ -2415,28 +2396,84 @@ addEventListener('keydown', e => { if (!P || e.target.matches('input,select,text
   if (SCREEN || PANEL) {
     if (e.key === 'Escape') { e.preventDefault(); if (SCREEN) closeScreen(); else closePanel(); snd('ui.close'); refreshHud(); }
     return;
-  } if (KM[e.key]) { KEYS[KM[e.key]] = 1; KEYS.any = 1; e.preventDefault(); } if (e.key === 'Shift') KEYS.shift = 1; if (e.key === ' ') { toggleArm(); e.preventDefault(); } if (e.key === 'e' || e.key === 'E') interact(); if (e.key === 'b' || e.key === 'B') firstAid(P); if (/^[1-3]$/.test(e.key)) ACT.slot({ i: +e.key - 1 }); if (e.key === 'Tab') { ACT.cycle(); e.preventDefault(); } if (e.key === 'Escape') { ACT.cancel(); closePanel(); } refreshHud(); });
+  } if (KM[e.key]) { KEYS[KM[e.key]] = 1; KEYS.any = 1; e.preventDefault(); } if (e.key === 'Shift') KEYS.shift = 1; if (e.key === ' ') { toggleArm(); e.preventDefault(); } if (e.key === 'e' || e.key === 'E') interact(); if (e.key === 'b' || e.key === 'B') firstAid(P); if (/^[1-3]$/.test(e.key)) ACT.slot({ i: +e.key - 1 }); if (e.key === 'Tab') { ACT.cycle(); e.preventDefault(); } if (e.key === 'Escape') { escapeWorld(); closePanel(); } refreshHud(); });   // v0.29: cancel first, then clear the target (src/hud-ui.js)
 addEventListener('keyup', e => { if (KM[e.key]) KEYS[KM[e.key]] = 0; if (e.key === 'Shift') KEYS.shift = 0; KEYS.any = KEYS.u || KEYS.d || KEYS.l || KEYS.r; });
 addEventListener('resize', () => { resize(); if (SCREEN === 'map') { sizeMap(); mapFit(); drawMap(); } if (P && VH > VW && !ROTOK) $('#rot').hidden = false; else $('#rot').hidden = true; });
 
 /* ---------- persistence: one atomic write per save ---------- */
-let deletingSave = false;
-const SAVEKEY = 'shardfall.save.v1';
+/* What persists (v0.28.2): the character (pack, bank, equipment), your body, your dropped piles (with their time left), chests
+   you opened (their remaining contents and the time until they relock and refill), your pets, Wren, resource nodes, the world
+   clock, camps and town life. A spell being prepared counts as interrupted by the reload (reagents back, half the mana spent,
+   exactly as Cancel); a held spell fades (its cost was already paid). Poison resumes where it was. Creature remains and other
+   statuses (boons, hexes, wards, fields, summons) are not saved: see docs/magery/STATUS.md. */
+let deletingSave = false, saveLocked = false, saveFailShown = false;
+const SAVEKEY = 'shardfall.save.v1', SAVE_VERSION = 7, TAB_ID = Math.random().toString(36).slice(2);
 function save() {
-  if (!P || deletingSave) return false; try {
+  if (!P || deletingSave || saveLocked) return false; try {
     const c = {}; for (const k of ['name', 'x', 'y', 'str', 'dex', 'int', 'hp', 'stam', 'mana', 'skills', 'pack', 'bank', 'equip', 'look', 'bound', 'quest', 'freeLessons', 'hotbar', 'ghost', 'ghostAt', 'gainLog', 'recipeN', 'cx', 'skillPool', 'combatMig', 'eqMig', 'bandSeq', 'bandDone', 'lowerRank']) c[k] = P[k];
     c.bandage = bandageSave();
+    c.prepEscrow = P.prep ? { id: P.prep.sp.id, items: P.prep.escrow.items.slice(), mana: P.prep.escrow.mana } : null;
+    c.poisonState = P.poison ? { tier: P.poison.tier, ticks: P.poison.ticks, in: Math.max(0, Math.round((P.poison.next - GT) * 10) / 10) } : null;
     if (P.base) Object.assign(c, P.base); c.magery = { mig: (P.mg && P.mg.mig) || 0 };
     const corpses = ents.filter(e => e.mine && !e.gone).map(e => ({ x: e.x, y: e.y, items: e.cont.items, left: e.expires - GT, diedAgo: GT - e.cont.diedAt }));
-    let maxUid = 0; const scan = it => { if (it && it.uid > maxUid) maxUid = it.uid; }; P.pack.items.forEach(scan); P.bank.items.forEach(scan); Object.values(P.equip).forEach(scan); corpses.forEach(c2 => c2.items.forEach(scan));
+    const piles = ents.filter(e => e.kind === 'corpse' && e.pile && !e.gone && e.cont.items.length && e.expires > GT).map(e => ({ x: e.x, y: e.y, items: e.cont.items, left: Math.round((e.expires - GT) * 10) / 10 }));
+    const chests = []; for (const [k, ch] of CHESTS) if (ch.open && ch.refill > GT) chests.push([k, Math.round((ch.refill - GT) * 10) / 10, ch.cont ? ch.cont.items : []]);
+    let maxUid = 0; const scan = it => { if (it && it.uid > maxUid) maxUid = it.uid; if (it && Array.isArray(it.items)) it.items.forEach(scan); }; P.pack.items.forEach(scan); P.bank.items.forEach(scan); Object.values(P.equip).forEach(scan); corpses.forEach(c2 => c2.items.forEach(scan)); piles.forEach(c2 => c2.items.forEach(scan)); chests.forEach(c2 => c2[2].forEach(scan));
     const pets = ents.filter(e => e.kind === 'pet' && e.type && !e.summon && !e.gone && e.hp > 0).map(e => ({ type: e.type, hp: e.hp, order: e.order === 'stay' ? 'stay' : 'follow', slots: e.slots, name: e.name, dx: e.x - P.x, dy: e.y - P.y }));
     const nodes = []; for (const [k, o] of RES) nodes.push([k, o.gen || 1, o.spec || 0, o.n, o.max || 0, Math.round(o.t * 10) / 10]);
     const ally = allySave(); if (ally) { Object.values(ally.equip || {}).forEach(scan); ally.pack.forEach(scan); if (ally.body) ally.body.items.forEach(scan); }
-    localStorage.setItem(SAVEKEY, JSON.stringify({ v: 7, char: c, corpses, pets, nodes, ally, sim: WS ? WS.save() : null, eco: ecoSave(), life: lifeSave(), uid: maxUid + 1, gt: GT, savedAt: Date.now() }));
-    DEV.lastSave = { ok: true, at: GT }; return true;
-  } catch (e) { DEV.lastSave = { ok: false, at: GT }; return false; }
+    localStorage.setItem(SAVEKEY, JSON.stringify({ v: SAVE_VERSION, char: c, corpses, piles, chests, pets, nodes, ally, sim: WS ? WS.save() : null, eco: ecoSave(), life: lifeSave(), uid: maxUid + 1, gt: GT, savedAt: Date.now(), tab: TAB_ID }));
+    DEV.lastSave = { ok: true, at: GT }; saveFailShown = false; return true;
+  } catch (e) { DEV.lastSave = { ok: false, at: GT, err: String(e && e.name || e) }; if (!saveFailShown) { saveFailShown = true; console.warn('save failed', e); if (typeof log === 'function') log('Your game could not be saved (browser storage is full or blocked). Free some space or export your save.', '#ff6a5a'); } return false; }
 }
-function loadSave() { try { const s = localStorage.getItem(SAVEKEY); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
+/* another tab of the same game wrote the save: stop saving here so the two never overwrite each other's progress */
+addEventListener('storage', e => { if (e.key !== SAVEKEY || !P || saveLocked) return; let o = null; try { o = e.newValue && JSON.parse(e.newValue); } catch (x) { }
+  if (o && o.tab && o.tab !== TAB_ID) { saveLocked = true; log('Shardfall was opened in another tab. This tab has stopped saving; close it or reload it to continue here.', '#ff6a5a'); } });
+/* validateSave: '' when the parsed save is safe to boot, else a plain reason. post: after migration, the full current shape */
+function validateSave(s, post) {
+  if (!s || typeof s !== 'object' || Array.isArray(s)) return 'it is not a Shardfall save';
+  if (!Number.isFinite(s.v) || s.v < 1) return 'it has no save version';
+  if (s.v > SAVE_VERSION) return `it was made by a newer version of Shardfall (save format ${s.v}, this build reads up to ${SAVE_VERSION})`;
+  const c = s.char; if (!c || typeof c !== 'object' || Array.isArray(c)) return 'the character is missing';
+  if (typeof c.name !== 'string' || !c.name.trim()) return 'the character has no name';
+  for (const k of ['x', 'y', 'str', 'dex', 'int']) if (!Number.isFinite(c[k])) return `the character's ${k} is not a number`;
+  for (const k of ['pack', 'bank']) if (!c[k] || typeof c[k] !== 'object' || !Array.isArray(c[k].items)) return `the ${k} is missing`;
+  if (s.gt !== undefined && s.gt !== null && !Number.isFinite(s.gt)) return 'the world time is not a number';
+  if (post) { if (!c.equip || typeof c.equip !== 'object' || Array.isArray(c.equip)) return 'the equipment is missing'; if (!c.skills || typeof c.skills !== 'object') return 'the skills are missing'; }
+  return '';
+}
+/* readSave: { raw, save, problem }. save is set only when it parses and passes the pre-migration check */
+function readSave(key) {
+  let raw = null; try { raw = localStorage.getItem(key || SAVEKEY); } catch (e) { return { raw: null, save: null, problem: 'browser storage is not available' }; }
+  if (!raw) return { raw: null, save: null, problem: '' };
+  let s; try { s = JSON.parse(raw); } catch (e) { return { raw, save: null, problem: 'the save is damaged (it does not read as data)' }; }
+  const problem = validateSave(s); return { raw, save: problem ? null : s, problem };
+}
+function loadSave() { return readSave().save; }
+function backupRaw(suffix, raw) { try { if (raw) localStorage.setItem(SAVEKEY + suffix, raw); return true; } catch (e) { return false; } }
+function exportSave(raw, name) { try { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([raw], { type: 'application/json' })); a.download = name || 'shardfall-save.json'; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0); } catch (e) { console.warn(e); } }
+/* the world-side containers of a save (piles and opened chests) and in-flight spell preparation and poison */
+function worldItemsLoad(saved) {
+  for (const pl of saved.piles || []) { if (!pl || !Array.isArray(pl.items) || !pl.items.length || !(pl.left > 0) || !Number.isFinite(pl.x) || !Number.isFinite(pl.y)) continue;
+    const cont = SF.newContainer('pile'); cont.items = pl.items; addEnt({ kind: 'corpse', pile: true, name: 'dropped items', x: pl.x, y: pl.y, cont, expires: GT + pl.left }); }
+  for (const row of saved.chests || []) { if (!Array.isArray(row)) continue; const [k, left, items] = row; const ch = CHESTS.get(+k); if (!ch || !(left > 0)) continue;
+    ch.open = true; ch.refill = GT + left; ch.cont = SF.newContainer('chest'); ch.cont.items = Array.isArray(items) ? items : []; }
+}
+function statusLoad(c) {
+  const pe = c.prepEscrow; delete P.prepEscrow;
+  if (pe && Array.isArray(pe.items) && Number.isFinite(pe.mana)) {                  // the reload interrupts the preparation, once
+    for (const r of pe.items) if (SF.ITEMS[r]) give(r, 1);
+    const cost = SF.MAGERY.interruptCost(pe.mana); P.mana = Math.min(SF.maxMana(P), Math.max(0, P.mana) + pe.mana - cost);
+    P.spellReadyAt = GT + SF.MAGERY.RECOVERY; log(`The spell you were preparing was interrupted (−${cost} mana; reagents back).`, '#ffb070'); }
+  const ps = c.poisonState; delete P.poisonState; P.poison = null;
+  if (ps && SF.POISON[ps.tier] !== undefined && Number.isSafeInteger(ps.ticks) && ps.ticks > 0) P.poison = { tier: ps.tier, ticks: ps.ticks, next: GT + Math.max(0, Math.min(SF.POISON_GAP, +ps.in || 0)) };
+}
+/* numeric repair after a load: a damaged value never crashes the game */
+function sanitizeChar() {
+  const fin = (v, d) => Number.isFinite(v) ? v : d;
+  P.hp = Math.min(SF.maxHp(P), Math.max(0, fin(P.hp, SF.maxHp(P)))); P.stam = Math.min(SF.maxStam(P), Math.max(0, fin(P.stam, SF.maxStam(P)))); P.mana = Math.min(SF.maxMana(P), Math.max(0, fin(P.mana, SF.maxMana(P))));
+  if (!Array.isArray(P.hotbar)) P.hotbar = []; P.freeLessons = fin(P.freeLessons, 0); P.skillPool = fin(P.skillPool, 0);
+}
 
 /* ---------- boot & creation ---------- */
 const PROFILES = {
@@ -2449,10 +2486,11 @@ const PROFILES = {
 let CC = { name: '', prof: 'Glaive hybrid', s: [55, 45, 50], k: Object.entries(PROFILES['Glaive hybrid'].k), cloak: '' };
 const CLOAKS = ['', '#8a2a2a', '#2a3a8a', '#5a2a6a', '#3a3a3a', '#8a6a2a'];
 function renderCC() {
-  const sv0 = loadSave(), live = SF.SKILLS.filter(s => s[3]); const opts = sel => live.map(s => `<option value="${s[0]}"${s[0] === sel ? ' selected' : ''}>${esc(s[1])}</option>`).join('');
+  const rs = readSave(), sv0 = rs.save, live = SF.SKILLS.filter(s => s[3]); const good = rs.problem ? readSave(SAVEKEY + '.lastgood') : null; const opts = sel => live.map(s => `<option value="${s[0]}"${s[0] === sel ? ' selected' : ''}>${esc(s[1])}</option>`).join('');
   const tot = CC.s.reduce((a, b) => a + b, 0), kt = CC.k.reduce((a, b) => a + b[1], 0);
   $('#ccin').innerHTML = `<div class="cchead"><img src="${SCOUT_SRC}" alt="" class="ccimg"><div><h1>Shardfall</h1><div class="sub">Saltmarsh Quay · offline island slice</div></div></div>
-  ${sv0 ? `<button class="btn ac big" data-c="cont">Continue as ${esc(sv0.char.name)}${sv0.char.ghost ? ' (ghost)' : ''}</button><div class="sub" style="margin:8px 0 0">or create a new character below (replaces the saved one)</div>` : ''}
+  ${sv0 ? `<button class="btn ac big" data-c="cont">Continue as ${esc(sv0.char.name)}${sv0.char.ghost ? ' (ghost)' : ''}</button><div class="sub" style="margin:8px 0 0">or create a new character below (replaces the saved one; the old save is kept as a backup)</div>` : ''}
+  ${rs.problem ? `<div class="warn" id="ccrecover"><b>Your saved game could not be loaded:</b> ${esc(rs.problem)}${CC.bootErr ? ' (' + esc(CC.bootErr) + ')' : ''}. Nothing has been deleted.<div class="chips" style="margin-top:6px">${good && good.save ? `<button class="btn sm ac" data-c="restore">Restore the last good save (${esc(good.save.char.name)})</button>` : ''}${rs.raw ? '<button class="btn sm" data-c="export">Export the save</button><button class="btn sm" data-c="reset">Delete the saved game…</button>' : ''}</div><div class="sub">Creating a new character keeps a copy of the damaged save.</div></div>` : ''}
   <div class="ccgrid"><div><label for="ccn">Name</label><input id="ccn" maxlength="16" value="${esc(CC.name)}" placeholder="e.g. Tess" autocomplete="off">
   <label>Starting idea <span class="note">(editable, no class is locked in)</span></label><div class="chips">${Object.keys(PROFILES).map(p => `<button class="btn sm ${CC.prof === p ? 'ac' : ''}" data-c="prof" data-p="${p}">${p}</button>`).join('')}</div>
   ${PROFILES[CC.prof] ? `<p class="note">At the cap: ${PROFILES[CC.prof].ideal}.</p>` : ''}
@@ -2463,20 +2501,35 @@ function renderCC() {
   <div id="ccerr" class="warn"></div><button class="btn ac big" data-c="go">Enter Saltmarsh Quay</button><p class="note" style="text-align:center">Saves in this browser. Your first two trainer lessons are free.</p>`;
 }
 $('#cc').addEventListener('click', ev => { const b = ev.target.closest('[data-c]'); if (!b || b.tagName === 'SELECT') return; const c = b.dataset.c; CC.name = $('#ccn')?.value ?? CC.name;
-  if (c === 'cont') { const s = loadSave(); if (s) boot(s); return; }
+  if (c === 'cont') { const rs = readSave(); if (rs.save) bootSaved(rs); else renderCC(); return; }
+  if (c === 'export') { const rs = readSave(); if (rs.raw) exportSave(rs.raw); return; }
+  if (c === 'restore') { const g = readSave(SAVEKEY + '.lastgood'); if (g.save) { const cur = readSave(); backupRaw('.damaged', cur.raw); try { localStorage.setItem(SAVEKEY, g.raw); } catch (e) { } CC.bootErr = ''; } renderCC(); return; }
+  if (c === 'reset') { if (!confirm('Delete the saved game for good? Export it first if you might want it back.')) return; try { localStorage.removeItem(SAVEKEY); } catch (e) { } CC.bootErr = ''; renderCC(); return; }
   if (c === 'prof') { CC.prof = b.dataset.p; const p = PROFILES[CC.prof]; CC.s = p.s.slice(); CC.k = Object.entries(p.k); }
   if (c === 'st') { const i = +b.dataset.i, d = +b.dataset.d, nv = CC.s[i] + d, tot = CC.s.reduce((a, x) => a + x, 0) + d; if (nv >= 25 && nv <= 100 && tot <= 150) CC.s[i] = nv; }
   if (c === 'cloak') CC.cloak = b.dataset.v;
-  if (c === 'go') { const err = $('#ccerr'); const name = CC.name.trim().replace(/[^\p{L}\p{N} '\-]/gu, '').slice(0, 16); if (name.length < 2) return err.textContent = 'Choose a name of at least 2 letters.'; const sk = {}; for (const [k, v] of CC.k) sk[k] = (sk[k] || 0) + v; const e = SF.validateCreation({ str: CC.s[0], dex: CC.s[1], int: CC.s[2], skills: sk }); if (e.length) return err.textContent = e.join(' '); if (CC.k.some(([k], i) => CC.k.findIndex(x => x[0] === k) !== i && CC.k[i][1] > 0)) return err.textContent = 'Pick different skills.'; boot(null, { name, str: CC.s[0], dex: CC.s[1], int: CC.s[2], skills: sk, look: { cloak: CC.cloak || null } }); return; }
+  if (c === 'go') { const err = $('#ccerr'); const name = CC.name.trim().replace(/[^\p{L}\p{N} '\-]/gu, '').slice(0, 16); if (name.length < 2) return err.textContent = 'Choose a name of at least 2 letters.'; const sk = {}; for (const [k, v] of CC.k) sk[k] = (sk[k] || 0) + v; const e = SF.validateCreation({ str: CC.s[0], dex: CC.s[1], int: CC.s[2], skills: sk }); if (e.length) return err.textContent = e.join(' '); if (CC.k.some(([k], i) => CC.k.findIndex(x => x[0] === k) !== i && CC.k[i][1] > 0)) return err.textContent = 'Pick different skills.'; { const old = readSave(); if (old.raw) backupRaw(old.problem ? '.damaged' : '.replaced', old.raw); } boot(null, { name, str: CC.s[0], dex: CC.s[1], int: CC.s[2], skills: sk, look: { cloak: CC.cloak || null } }); return; }
   renderCC(); });
 $('#cc').addEventListener('change', ev => { const s = ev.target; if (!s.dataset || !s.dataset.c) return; CC.name = $('#ccn')?.value ?? CC.name; const i = +s.dataset.i; if (s.dataset.c === 'sk') CC.k[i][0] = s.value; if (s.dataset.c === 'kv') CC.k[i][1] = +s.value; CC.prof = 'Custom'; renderCC(); });
+/* bootSaved: migrate a copy, validate the result, keep the raw save as the last good one, then boot. Any failure leaves the stored
+   save untouched and returns to the start screen with the reason, instead of booting into half-migrated data. */
+function bootSaved(rs) {
+  let s;
+  try { s = migrateSave(JSON.parse(rs.raw), rs.raw); const bad = validateSave(s, true); if (bad) throw new Error(bad); }
+  catch (e) { console.error('save could not be loaded', e); try { if (localStorage.getItem(SAVEKEY) !== rs.raw) localStorage.setItem(SAVEKEY, rs.raw); } catch (x) { } CC.bootErr = String(e && e.message || e); showRecovery(); return false; }
+  backupRaw('.lastgood', rs.raw); CC.bootErr = ''; boot(s); return true;
+}
+function showRecovery() { renderCC(); const r = $('#ccrecover'); if (!r) { $('#ccin').insertAdjacentHTML('afterbegin', `<div class="warn" id="ccrecover"><b>Your saved game could not be loaded:</b> ${esc(CC.bootErr)}. Nothing has been deleted.<div class="chips" style="margin-top:6px"><button class="btn sm" data-c="export">Export the save</button><button class="btn sm" data-c="reset">Delete the saved game…</button></div></div>`); } }
 function boot(saved, fresh) {
   genWorld(); buildTiles(); buildMini(); resize();
-  if (saved) { try { saved = migrateSave(saved, localStorage.getItem(SAVEKEY)); } catch (e) { console.error(e); } for (const [k, gen, spec, n, max, t] of saved.nodes || []) RES.set(k, { gen, spec: spec || undefined, n, max, t });
+  if (saved) { for (const row of saved.nodes || []) { if (!Array.isArray(row)) continue; const [k, gen, spec, n, max, t] = row; RES.set(k, { gen, spec: spec || undefined, n, max, t }); }
     const c = saved.char; P = newChar({ name: c.name, str: c.str, dex: c.dex, int: c.int, skills: {}, look: c.look }); Object.assign(P, c); P.equip = Object.assign(emptyEquip(), P.equip); delete P.equip.armor; SF.setUidBase(saved.uid || 1); GT = saved.gt || 0;
     for (const k of Object.keys(SF.newSkills())) if (!P.skills[k]) P.skills[k] = { v: 0, lock: 'raise' };
-    for (const co of saved.corpses || []) { const cont = SF.newContainer('corpse', 'p1'); cont.items = co.items; cont.diedAt = GT - (co.diedAgo ?? 999); cont.expires = GT + co.left; addEnt({ kind: 'corpse', mine: true, name: 'your body', x: co.x, y: co.y, cont, expires: GT + co.left }); }
-    if (P.ghost && !Number.isFinite(c.ghostAt)) P.ghostAt = GT - 12; }
+    for (const co of saved.corpses || []) { if (!co || !Array.isArray(co.items)) continue; const cont = SF.newContainer('corpse', 'p1'); cont.items = co.items; cont.diedAt = GT - (co.diedAgo ?? 999); cont.expires = GT + co.left; addEnt({ kind: 'corpse', mine: true, name: 'your body', x: co.x, y: co.y, cont, expires: GT + co.left }); }
+    if (P.ghost && !Number.isFinite(c.ghostAt)) P.ghostAt = GT - 12;
+    worldItemsLoad(saved); sanitizeChar();
+    { const extra = ents.filter(e => e.kind === 'corpse' && e.cont && (e.mine || e.pile)).map(e => e.cont).concat([...CHESTS.values()].filter(ch => ch.cont).map(ch => ch.cont));
+      const nr = SF.EQ.normalize(P, extra); if (nr.reassigned + nr.fixedQty + nr.removed) console.warn('inventory repaired on load', nr); } }
   else { P = newChar(fresh); starterKit(); }
   P.cx = Object.assign({ survey: {}, pins: [], track: null, mark: false, doors: {} }, P.cx || {}); P.batch = null; applyDoorState();
   if (saved && !canStand(P, P.x, P.y)) { find: for (let r = 1; r <= 12; r++) for (let a = 0; a < 16; a++) { const x = P.x + Math.cos(a / 8 * Math.PI) * r, y = P.y + Math.sin(a / 8 * Math.PI) * r; if (canStand(P, x, y)) { P.x = x; P.y = y; break find; } } }   // never load into a wall or a tree
@@ -2485,7 +2538,7 @@ function boot(saved, fresh) {
   NAV.walk = null; NAV.edge = null; NAV.graph = null; devInit();
   ents.unshift(P); P.sect = P.sect || 0; P.drawn = false; P.sw = SF.newSwing(); P.movedAt = -99; while (P.hotbar.length < 9) P.hotbar.push(null); Q(); ecoLoad(saved && saved.eco); populate(); lifeLoad(saved && saved.life); seedTraps();
   { const al = makeAlly(saved && saved.ally); const bd = saved && saved.ally && saved.ally.body; if (bd && bd.left > 0) { const cont = SF.newContainer('corpse', al.aid); cont.items = bd.items; cont.diedAt = GT - (bd.diedAgo ?? 999); cont.expires = GT + bd.left; addEnt({ kind: 'corpse', allyBody: al.aid, name: al.name + "'s body", x: bd.x, y: bd.y, cont, expires: GT + bd.left }); } }
-  P.bandage = null; if (saved) bandageLoad(saved.char.bandage);          // an application in flight resumes once, never twice
+  P.bandage = null; if (saved) bandageLoad(saved.char.bandage); P.prep = null; P.held = null; if (saved) statusLoad(saved.char);          // an application in flight resumes once, never twice
   if (saved) for (const pt of saved.pets || []) { const d = MON[pt.type]; if (!d) continue; const near = Math.hypot(pt.dx || 0, pt.dy || 0) < 12; addEnt({ kind: 'pet', type: pt.type, name: pt.name || 'your ' + d.n, x: P.x + (near ? pt.dx : 1), y: P.y + (near ? pt.dy : 0), hp: Math.min(pt.hp, d.hp), max: d.hp, state: '', home: { x: P.x, y: P.y }, sect: 0, ward: 0, order: pt.order, slots: pt.slots || 1, target: null }); }
   mageryBoot(saved);
   $('#cc').hidden = true; document.body.classList.toggle('mirror', SETTINGS.mirror);
@@ -2497,11 +2550,28 @@ function boot(saved, fresh) {
   if (VH > VW) $('#rot').hidden = false; save(); refreshHud();
 }
 let last = performance.now(), hudT = 0;
-function loop(t) { const dt = Math.min(.5, (t - last) / 1000); last = t; try { if (!SIMPAUSE) { const r = STEPPER.advance(dt, s => { simStep(s); DEV.steps++; }); ALPHA = r.alpha; } if (DEV.on) devFrame(dt); renderInterp(); if (DEV.open && t - (DEV.panelT || 0) > 300) { DEV.panelT = t; devRender(); } if (P && t - hudT > 120) { hudT = t; refreshHud(); drawMini(); if (PANEL === 'loot' || PANEL === 'shop') renderPanel(); renderLog(); } } catch (e) { console.error(e); } requestAnimationFrame(loop); }
-addEventListener('visibilitychange', () => { if (document.hidden) save(); else { last = performance.now(); STEPPER.reset(); } });   // the world pauses while the game is hidden
+/* frame errors: each stage (simulation, drawing, HUD) is isolated so one failing stage does not stop the others; each distinct
+   error is logged a bounded number of times, and a stage that keeps failing tells the player once. Counts: __SF.FRAME_ERR */
+const FRAME_ERR = { n: 0, by: {}, msgs: new Map(), shown: false };
+function frameErr(stage, e) {
+  const m = stage + ': ' + String(e && e.message || e); FRAME_ERR.n++; const b = FRAME_ERR.by[stage] = FRAME_ERR.by[stage] || { n: 0, streak: 0 }; b.n++; b.streak++;
+  const seen = FRAME_ERR.msgs.get(m) || 0; FRAME_ERR.msgs.set(m, seen + 1); if (FRAME_ERR.msgs.size > 50) FRAME_ERR.msgs.delete(FRAME_ERR.msgs.keys().next().value);
+  if (seen < 3) console.error('[' + stage + ']', e); else if (seen === 3) console.error('[' + stage + '] repeating, further copies not logged:', m);
+  if (b.streak === 120 && !FRAME_ERR.shown && P) { FRAME_ERR.shown = true; try { log('The game keeps hitting an error (' + m + '). Your last save is safe; reloading the page usually clears it.', '#ff6a5a'); } catch (x) { } }
+}
+const frameOk = stage => { const b = FRAME_ERR.by[stage]; if (b) b.streak = 0; };
+function loop(t) { const dt = Math.min(.5, (t - last) / 1000); last = t;
+  try { if (!SIMPAUSE) { const r = STEPPER.advance(dt, s => { simStep(s); DEV.steps++; }); ALPHA = r.alpha; } frameOk('sim'); } catch (e) { frameErr('sim', e); }
+  try { if (DEV.on) devFrame(dt); renderInterp(); if (DEV.open && t - (DEV.panelT || 0) > 300) { DEV.panelT = t; devRender(); } frameOk('draw'); } catch (e) { frameErr('draw', e); }
+  try { if (P && t - hudT > 120) { hudT = t; refreshHud(); drawMini(); if (PANEL === 'loot' || PANEL === 'shop') renderPanel(); renderLog(); } frameOk('hud'); } catch (e) { frameErr('hud', e); }
+  requestAnimationFrame(loop); }
+addEventListener('visibilitychange', () => { if (document.hidden) { resetInput(); save(); } else { last = performance.now(); STEPPER.reset(); resetInput(); } });   // the world pauses while the game is hidden; held keys and the stick are released (their key-up never arrives)
+addEventListener('blur', () => resetInput());
 loadScout(SCOUT_SRC); renderCC(); resize(); requestAnimationFrame(loop);
 /* dev/test hook: put a creature beside the player, e.g. __SF.spawnMon('lich_lord'). Not used by normal play. */
 function spawnMon(type, dx = 3, dy = 0) { const d = MON[type]; if (!d) return null; let x = P.x + dx, y = P.y + dy;
   for (let r = 0; r < 6 && BLK[tAt(Math.floor(x), Math.floor(y))]; r += .5) for (let a = 0; a < 8; a++) { const nx = P.x + dx + Math.cos(a * Math.PI / 4) * r, ny = P.y + dy + Math.sin(a * Math.PI / 4) * r; if (!BLK[tAt(Math.floor(nx), Math.floor(ny))]) { x = nx; y = ny; break; } }
   return addEnt({ kind: 'mon', type, name: d.n, x, y, hp: d.hp, max: d.hp, state: 'idle', home: { x, y }, sect: 0, ward: 0 }); }
-window.__SF = { get WS() { return WS; }, dist, closePanel, lifeSave, LIFE, LIFE_SCHED, lifeTick, lifeResume, lifeInspect, lifeTownGeo, lifeTalk, talk, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
+/* __SF is a development and test hook (the browser suites drive the game through it). It is not a security boundary: anything
+   here is reachable from the console in an offline single-player game, and a multiplayer server must not trust the client. */
+window.__SF = { FRAME_ERR, readSave, validateSave, get WS() { return WS; }, dist, closePanel, lifeSave, LIFE, LIFE_SCHED, lifeTick, lifeResume, lifeInspect, lifeTownGeo, lifeTalk, talk, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };

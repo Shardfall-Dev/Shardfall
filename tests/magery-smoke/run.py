@@ -29,5 +29,5 @@ with sync_playwright() as p:
     out = pg.evaluate(open(os.path.join(here, name)).read()); bad = sub(exp, out) + [f'page error: {e}' for e in errs]
     print(('ok   ' if not bad else 'FAIL ') + name); [print('     ' + x) for x in bad]; fails += len(bad); pg.close()
   b.close()
-r = subprocess.run([sys.executable, os.path.join(here, 'migration.py'), f, chrome], capture_output=True, text=True); print((r.stdout.strip() or r.stderr[-400:])[:300]); fails += r.returncode != 0
+r = subprocess.run([sys.executable, os.path.join(here, 'migration.py'), f, chrome], capture_output=True, text=True); print(r.stdout.strip() or r.stderr[-400:]); fails += r.returncode != 0
 print('ALL PASS' if not fails else f'{fails} FAILED'); sys.exit(1 if fails else 0)

@@ -447,7 +447,7 @@ Requested on 2026-11-26: bigger distances, more camps, and places for dungeons. 
 - **A creature notices the player exactly as far away by day as before.** Sight is its existing aggro radius. Night, sleep and Hiding now shorten it, as the spec asks.
 - **Rats, boars and the other old creatures still stand and fight the player.** Only species with a retreat rule (wolves, hounds, bears, bandits) decline a fight they cannot win or run when badly wounded. Deer and hares always flee.
 - **The pounce and the prey's tiring apply only between creatures.** Telegraphs against the player are unchanged, so a player can still sidestep any creature's wind-up.
-- **Wolves are the bestiary's dire wolves; deer, hares and bears are drawn in code** until sheets exist.
+- **Wolves are the bestiary's dire wolves; bears are drawn in code** until a sheet exists (deer and hares have bestiary v1.1.0 sheets since v0.28.2).
 - **Creatures respawn on load as before; camp clearance is the one thing saved now.** Saving every creature is phase 6 (§26).
 - **The quarter-rate tier for distant idle creatures** is a stopgap so the larger population costs less than the old one did. Phase 6 replaces it with the spec's tiers A/B/C.
 
@@ -639,14 +639,15 @@ v0.26 merges phase 3 with the equipment and paper doll work (#19, which already 
 - **Player:** one 8-direction atlas with walk and attack clips for Sword, Glaive, Hammer, Dagger, Unarmed, Shortbow and Crossbow. NPCs reuse it with tinted cloaks (`scoutSheet`). There are no death, cast, sleep or work clips; deaths cut to a corpse sprite.
 - **Creature sheets:** rat and skeleton (`MON_SHEETS`).
 - **Bestiary v1:** 11 sheets of 160×160 cells in 8 facings, with idle, walk, wind-up and impact. No death, sleep or cast frames. The creatures are orc, ettin, troll, lizardman, gargoyle, earth elemental, giant spider, dire wolf, harpy, slime and the Lich Lord (boss).
-- **Procedural creatures:** boar, marsh hound, mud snapper, wreck crab, mire spider, ash wisp, bell sentinel, drowned captain and the Bellkeeper; since v0.25 also red deer, brown hare and brown bear (stand-ins until sheets exist).
+- **Bestiary v1.1.0 draft01 (v0.28.2):** 6 more sheets on the same grid and animations: reed boar, marsh hound, mud snapper, mire spider, red deer and brown hare. No death frames. `tools/embed_bestiary.py` merges both packs into one manifest.
+- **Procedural creatures:** wreck crab, ash wisp, bell sentinel and the Bellkeeper, and brown bear (since v0.25). The drowned captain, brine smuggler and road bandit are tinted scouts. Boar, marsh hound, mud snapper, mire spider, red deer and brown hare moved to bestiary sheets in v0.28.2; their procedural art remains as the fallback while a sheet decodes.
 - **Sound pack v1.0.0:** 107 events.
   - Creature sounds exist for rat, skeleton and hound (alert, attack, death), plus attack-only takes for boar, crab, spider and wisp.
   - Ambience: surf, wind, rain, hearth, gull, marsh, drip, bell and beacon.
   - Footsteps on 7 surfaces.
 - **Music:** five Saltmarsh tracks, mapped to zones.
 - **Gaps for the spec's roster (asset backlog):**
-  - Sheets for deer, hares and bears (drawn in code for now); bandits as their own look; zombies, dragons/drakes, fire and water elementals, goblins.
+  - Bestiary v1.1.0, remaining sheets: bear, wreck crab, ash wisp, bell sentinel, drowned captain, the Bellkeeper, brine smuggler and road bandit (see `docs/art/BESTIARY_V1_1_AUDIT.md`). Later roster: zombies, dragons/drakes, fire and water elementals, goblins.
   - Death animations for everything.
   - Sleep/eat/work clips for townsfolk.
   - Owl, insect, howl and groan ambience.

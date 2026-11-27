@@ -6,7 +6,12 @@ new = os.path.abspath(sys.argv[1]); chrome = sys.argv[2] if len(sys.argv) > 2 el
 old = sys.argv[3] if len(sys.argv) > 3 else None
 if not old:
   old = os.path.join(tempfile.mkdtemp(), 'Shardfall_v0.16.html'); repo = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-  open(old, 'wb').write(subprocess.run(['git', '-C', repo, 'show', 'main:Shardfall_v0.16.html'], capture_output=True, check=True).stdout)
+  # the v0.16 build is no longer on main: take it from its own commit (70c5d60, "Add a Cancel-cast button ... (v0.16)")
+  for ref in ['70c5d60336a9a341b3350ef416d0e77dfec4c78c', 'main']:
+    got = subprocess.run(['git', '-C', repo, 'show', ref + ':Shardfall_v0.16.html'], capture_output=True)
+    if got.returncode == 0: break
+  else: raise SystemExit('Shardfall_v0.16.html not found in git: git fetch --depth=1 origin 70c5d60336a9a341b3350ef416d0e77dfec4c78c')
+  open(old, 'wb').write(got.stdout)
 errs = []; bad = []; out = {}
 def check(cond, msg):
   if not cond: bad.append(msg)

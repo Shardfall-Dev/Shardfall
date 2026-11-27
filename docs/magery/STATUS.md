@@ -36,7 +36,7 @@ Source brief: `Magery_Brief.txt`. Book: `Shardfall_Spellbook.html` / `Spellbook.
 
 - Restore Life needs other players: the ghost adapter exists, but no second actor in the offline slice. Needs the two-actor test fixture or server replication.
 - Arcane Lock needs owned containers (house chests). Trappable doors and pouches are not in the world yet, so Rune Trap / Far Hand use dungeon chests.
-- Statuses (boons, hexes, wards, fields, gates, summons) are not saved across reloads; only the migration marker and base attributes are.
+- Statuses (boons, hexes, wards, fields, gates, summons) are not saved across reloads; only the migration marker and base attributes are. Since v0.28.2: a spell being **prepared** when the game was saved counts as interrupted on load (reagents or scroll back, half the mana spent, exactly as Cancel, once); a **held** spell fades on load with no refund (its cost was already paid); an impact already committed (a projectile in flight, a delayed hit) is lost with the other transient effects. **Poison** is saved and resumes.
 - No practice-ring rules, PvP aggression records, burst ceiling or outlaw multiplier in the offline slice; those belong to the combat service.
-- Fixed 50 ms simulation ticks: durations round up to 50 ms, but the frame loop still advances by the frame delta.
+- Fixed 50 ms simulation steps (the world stepper since v0.22): durations round up to 50 ms.
 - Creatures do not cast spells yet, so Mirror Ward only matters against your own reflected spells.

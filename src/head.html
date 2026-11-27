@@ -5,7 +5,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="screen-orientation" content="landscape">
-<title>Shardfall v0.28</title>
+<title>Shardfall v0.29.2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=Alegreya+Sans:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -199,9 +199,46 @@ ol.steps{margin:4px 0 6px;padding-left:22px}ol.steps li{margin:3px 0}ol.steps li
 .bagcard div{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}.bagcard .baghead{margin-top:0}
 .baghead{display:flex;align-items:center;gap:9px;margin-bottom:4px}.baghead .bagico,.baghead .bagglyph{border:1px solid #65513a;border-radius:4px;background-color:#221d18}
 .baghead span{font:bold 16px Georgia;color:#f3d89f}
-.bagtip{display:none;position:fixed;z-index:100;bottom:12px;left:50%;transform:translateX(-50%);width:min(265px,85vw);pointer-events:none;box-shadow:0 3px 18px #000}
-@media(hover:hover){.bagcell:hover .bagtip{display:block}}
-.bagcell:focus-visible .bagtip{display:block}
+
+/* v0.29 item tooltip and popup: compact, WoW-style, in the field-kit colours; fixed overlays, so the backpack never moves */
+#ipop{position:fixed;z-index:42;width:262px;max-width:calc(100vw - 12px);max-height:calc(100vh - 12px);overflow:auto;padding:8px 10px 9px;background:linear-gradient(#162139,#0a1122);font-size:13px;overscroll-behavior:contain}
+#ipop[hidden]{display:none}
+#ipop .ipx{position:absolute;right:0;top:0;width:44px;height:44px;min-width:44px;min-height:44px;font-size:24px;line-height:1;color:#e8d8b0}
+#ipop .baghead{padding-right:34px}
+#ipop .tipkv{font-size:12px}
+.ipdesc{margin:5px 0 0;font:italic 13px/1.3 "Alegreya Sans",sans-serif;color:#d9cba8}
+.ipmag{margin-top:5px;font:12px var(--px);color:#9fc8ff}
+#ipop .cmp{border-top:1px solid rgba(184,154,90,.3);padding-top:4px}
+.ipcur{margin-top:4px;font-size:12px}.ipcur summary{cursor:pointer;color:var(--dim);font:12px var(--px)}
+.ipacts{margin-top:7px;gap:5px}#ipop .btn{min-height:32px}
+.ipconfirm{margin-top:7px;padding:7px;border:1px solid #e06a5a;border-radius:6px;background:rgba(80,20,14,.35);display:flex;flex-direction:column;gap:3px}.ipconfirm b{font:700 13px var(--px);color:#ffd0c0}
+#ipop.touch{width:min(300px,calc(100vw - 16px));font-size:14px}#ipop.touch .btn{min-height:44px;min-width:44px;padding:4px 12px;font-size:13px}
+#itip{max-width:min(280px,90vw)}
+@keyframes popin{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+.pop-in{animation:popin .12s ease-out}
+@keyframes tfin{from{opacity:0;transform:translate(-50%,-4px)}to{opacity:1;transform:translate(-50%,0)}}
+@media(prefers-reduced-motion:reduce){.pop-in,#tgt.pop-in{animation:none}}
+
+/* v0.29 target frame: top centre, compact, hidden until you pick something; only its buttons take taps */
+#tgt{left:50%;right:auto;transform:translateX(-50%);top:calc(env(safe-area-inset-top) + 8px);width:248px;min-width:0;max-width:calc(100vw - 16px);padding:3px 4px 6px 9px;font-size:12px;pointer-events:none;z-index:5}
+#tgt.pop-in{animation:tfin .12s ease-out}
+#tgt button{pointer-events:auto}
+#tgt .tf-h{display:flex;align-items:center;gap:6px;min-height:36px;margin:-3px 0 -4px}
+.tf-dot{flex:none;width:9px;height:9px;border-radius:50%;background:#5aa8ff;box-shadow:0 0 0 1px rgba(0,0,0,.6)}
+.tf-dot.red{background:#ff5a48}.tf-dot.grey{background:#b8b8b8}.tf-dot.boss{background:#ff9a40}.tf-dot.self{background:#8ec2ff}.tf-dot.item{background:#c8b48a}.tf-dot.res{background:#7ccf8a}.tf-dot.neu{background:#5aa8ff}
+.tf-n{flex:1;font:600 14px/1.15 var(--px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#f2e8d0}
+#tgt .tf-x{flex:none;width:44px;height:44px;min-width:44px;min-height:44px;margin:-4px -2px -4px 0;padding:0;font:400 26px/1 system-ui;color:#f2dfa8;border-radius:6px}
+#tgt .tf-x:hover,#tgt .tf-more:hover{background:rgba(255,255,255,.08)}
+#tgt .tf-more{flex:none;width:36px;height:36px;margin:-2px -4px -2px 0;padding:0;border:0;border-radius:6px;background:none;font:700 18px/1 system-ui;color:#c8b48a}#tgt .tf-more.on{color:#ffd060;background:rgba(255,208,96,.12)}
+.tf-sub{font:11px/1.3 var(--px);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:4px}
+#tgt .tf-hp{margin:3px 5px 0 0}
+.tf-chips{display:flex;flex-wrap:wrap;gap:3px;margin-top:4px}
+.tf-chip{font:10.5px var(--px);padding:0 5px;border-radius:7px;border:1px solid #3a4a6a;color:#cfd8e8}.tf-chip.warn{border-color:#b0602a;color:#ffb070}.tf-chip.atk{border-color:#e06a5a;color:#ff9a8a}.tf-chip.quest{border-color:#c8a860;color:#ffd23a}
+#tgt .tf-acts{margin-top:5px;gap:4px}
+#tgt .btn,#tgt .tf-acts button{min-height:30px;padding:2px 8px;font-size:11.5px}
+@media(pointer:coarse),(max-height:500px){#tgt{width:208px}#tgt .tf-acts button{min-height:34px}}
+body.portrait #tgt{left:auto;right:8px;transform:none;top:calc(env(safe-area-inset-top) + 104px);width:200px}
+body.portrait #tgt.pop-in{animation:popin .12s ease-out}
 </style></head><body>
 <canvas id="c"></canvas>
 <div id="me" class="panel" data-a="self" title="Tap to target yourself">
@@ -231,5 +268,6 @@ ol.steps{margin:4px 0 6px;padding-left:22px}ol.steps li{margin:3px 0}ol.steps li
 <div id="eqwin" class="panel" hidden></div>
 <div id="itip" class="panel" hidden></div>
 <div id="ctxm" class="panel" hidden></div>
+<div id="ipop" class="panel" role="dialog" aria-label="Item information" hidden></div>
 <div id="rot" hidden><b>Turn your phone sideways</b><div class="note">Shardfall is built for landscape play.</div><button class="btn" data-a="rotok">Play in portrait anyway</button></div>
 <div id="cc"><div id="ccin"></div></div>

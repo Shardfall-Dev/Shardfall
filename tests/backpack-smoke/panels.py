@@ -44,7 +44,7 @@ def icons_ok(got, ids, size, where):
     check(not miss and not bad, f'{where}: {len(ids)} icons, each its own tile at {size} px', (miss, bad[:2]))
 
 def run(pg, tag, phone):
-    # ---------- backpack: tile, tooltip (desktop) or tap card (phone) ----------
+    # ---------- backpack: tile, tooltip (desktop) or tap popup (phone; v0.29 #ipop replaces the inline card) ----------
     pg.evaluate(FILL, NEW); pg.evaluate("__SF.ACT.bag()"); pg.wait_for_timeout(150)
     icons_ok(pg.evaluate(ICONS_IN, '#panel .bagcell > .bagico'), NEW, 40, f'{tag} backpack tiles')
     check(not pg.evaluate("() => document.querySelector('#panel .bagcell > .bagglyph')"), f'{tag} backpack: no category glyph left for the seven')
@@ -52,18 +52,19 @@ def run(pg, tag, phone):
     for id in NEW:
         if phone:
             pg.tap(cell(id)); pg.wait_for_timeout(100)
-            c = pg.evaluate("() => { const c = document.querySelector('#panel .bagcard'); return c && { i: c.querySelector('.baghead .bagico')?.dataset.icon, t: c.innerText }; }")
-            check(c and c['i'] == id, f'{tag} tap card for {id} shows its icon', c)
-            pg.tap(cell(id)); pg.wait_for_timeout(80)   # deselect
+            c = pg.evaluate("() => { const c = document.querySelector('#ipop'); return c && !c.hidden ? { i: c.querySelector('.baghead .bagico')?.dataset.icon, t: c.innerText } : null; }")
+            check(c and c['i'] == id, f'{tag} tap popup for {id} shows its icon', c)
+            pg.tap('#ipop .ipx'); pg.wait_for_timeout(80)   # close (v0.29 popup; on small phones it can cover the tile)
         else:
-            pg.hover(cell(id)); pg.wait_for_timeout(100)
-            t = pg.eval_on_selector(cell(id) + ' .bagtip', "e => ({ d: getComputedStyle(e).display, i: e.querySelector('.bagico')?.dataset.icon, w: Math.round(e.querySelector('.bagico')?.getBoundingClientRect().width), t: e.innerText })")
+            pg.hover(cell(id)); pg.wait_for_timeout(420)   # v0.29: one shared tooltip after about 300 ms
+            t = pg.eval_on_selector('#itip', "e => ({ d: e.hidden ? 'none' : 'block', i: e.querySelector('.bagico')?.dataset.icon, w: Math.round(e.querySelector('.bagico')?.getBoundingClientRect().width), t: e.innerText })")
             want = 'Damage' if id in WEAPONS else 'Quest'   # v0.25 tooltip: Damage / Speed / Weight lines
-            check(t['d'] == 'block' and t['i'] == id and t['w'] == 56 and want in t['t'], f'{tag} hover tooltip for {id}: icon at 56 px, stats intact', t)
-    if not phone: pg.hover(cell('wick')); pg.wait_for_timeout(80)
+            check(t['d'] == 'block' and t['i'] == id and t['w'] == 48 and want in t['t'], f'{tag} hover tooltip for {id}: icon at 48 px, stats intact', t)
+            pg.mouse.move(2, 2); pg.wait_for_timeout(40)
+    if not phone: pg.hover(cell('wick')); pg.wait_for_timeout(420)
     else: pg.tap(cell('heavycrossbow')); pg.wait_for_timeout(100)
     pg.screenshot(path=f'{shots}/{tag}-backpack.png')
-    if phone: pg.tap(cell('heavycrossbow')); pg.wait_for_timeout(80)
+    if phone: pg.tap('#ipop .ipx'); pg.wait_for_timeout(80)
     pg.mouse.move(2, 2)
 
     # ---------- equipment: each weapon equips, keeps its stats, and shows its icon on the Character panel ----------
