@@ -2093,6 +2093,7 @@ function drawEnt(e) {
   if (e.kind === 'pet') { g.strokeStyle = '#5aa8ff'; g.lineWidth = 1.5; g.beginPath(); g.ellipse(x, y, 14 * big, 7 * big, 0, 0, 7); g.stroke(); }
   if (P.sel === e && !P.ghost) { g.strokeStyle = relColor(e); g.lineWidth = 2; g.beginPath(); g.ellipse(x, y, 20 * big, 10 * big, 0, 0, 7); g.stroke(); }
   if (e.kind === 'player' && drawForm(g, e, x, y)) { }
+  else if (drawPaintedActor(g, e, x, y)) { }                                         // Painted Human Candidates v0.1, developer flag only (src/painted-render.js)
   else if (drawGearActor(g, e, x, y)) { }                                            // layered equipment renderer (src/gear-render.js), when on
   else if (e.kind === 'player') drawScout(g, e, x, y, P.ghost ? 'ghost' : P.look);
   else if (e.kind === 'ally') { if (e.ghost) g.globalAlpha = .75; drawScout(g, e, x, y, e.ghost ? 'ghost' : '#2f7a46'); }

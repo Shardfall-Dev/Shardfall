@@ -1,0 +1,33 @@
+{
+  "pack": "Shardfall_Painted_Candidates_v0.1",
+  "reviewer": "Claude (visual review at 4x on contact sheets, 2026-11-27); pending human art review",
+  "note": "Manual verdicts the automatic checks cannot make (facing, pose, cropping) and the visual call on borderline background remnants. Keys are body/Action/DIR/frame; a trailing * covers every frame of that row. tools/painted_candidates.py merges these with the automatic checks into qa.json.",
+  "reject": {
+    "male/Idle/NE/*": "facing: right-facing profile with the face visible (reads as E/SE), not a back three-quarter NE view",
+    "male/Walk/NE/*": "facing: right-facing profile with the face visible (reads as E/SE), not NE",
+    "male/Cast/NE/*": "facing: right-facing profile with the face visible (reads as E/SE), not NE",
+    "male/Unarmed_Attack/NE/*": "facing: right-facing profile with the face visible (reads as E/SE), not NE",
+    "female/Idle/NE/*": "facing: right-facing profile with the face visible (reads as E/SE), not NE",
+    "female/Walk/NE/*": "facing: right-facing profile with the face visible (reads as E/SE), not NE",
+    "female/Cast/NE/*": "facing: right-facing profile with the face visible (reads as E/SE), not NE",
+    "female/Unarmed_Attack/NE/*": "facing: right-facing profile with the face visible (reads as E/SE), not NE",
+    "male/Walk/NW/*": "facing: chest and face toward the viewer (reads as SW/W), not a back three-quarter NW view",
+    "male/Unarmed_Attack/NW/00": "facing: chest toward the viewer (reads as SW), not NW",
+    "female/Unarmed_Attack/NW/*": "facing: chest toward the viewer (reads as SW), not NW",
+    "female/Unarmed_Attack/S/*": "pose: arms at rest in all three candidates; no strike is visible",
+    "male/Cast/E/02": "cropping: the top of the head is cut off and the raised arm is broken",
+    "female/Idle/E/02": "alpha: dark background remnant behind the rear leg (visible at 1x)",
+    "female/Idle/SW/00": "alpha: dark background remnant behind the rear leg (visible at 1x)",
+    "female/Walk/N/01": "alpha: dark background remnant between the legs (visible at 1x)"
+  },
+  "accept_despite_metric": {
+    "male/Idle/SE/00": "dark-pixel count comes from leg shading; no remnant visible",
+    "male/Idle/SE/01": "dark-pixel count comes from leg shading; no remnant visible",
+    "male/Cast/N/02": "dark-pixel count comes from leg shading; no remnant visible"
+  },
+  "warnings": {
+    "*/Idle/{SW,W,NW,NE,E,SE}": "Idle side views are painted mid-stride, so idle and walk read alike from the side",
+    "*/Cast": "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease",
+    "male/Cast/*": "male Cast and Unarmed_Attack poses are very close; the cast gesture reads as a punch"
+  }
+}
