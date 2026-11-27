@@ -9,3 +9,8 @@ export function paperdollSVG(options={}){
 export function frameSVG(options={}){return R.frameSVG(options)}
 export function atlasSVG(options={}){return R.atlasSVG(options)}
 export function appearanceKey(options={}){return JSON.stringify([options.body,options.skin,options.style,options.hair,options.beard,options.cloth,options.weapon,!!options.shield,options.wardrobe?resolveWardrobe(options.wardrobe):null,Object.entries(options.equip||{}).sort(([a],[b])=>a.localeCompare(b)).map(([slot,it])=>[slot,it.id,it.material,it.sec,it.cond===0])])}
+
+// Transparent cosmetic-only frame or atlas. Export each depth phase separately for a layered compositor.
+// Baseline shirt/trousers are inherited and cannot be exported as isolated cosmetic overlays yet.
+export function garmentFrameSVG(garment,options={}){return R.frameSVG({...options,wardrobe:{...(options.wardrobe||{}),garments:[garment]},wardrobeOnly:true})}
+export function garmentAtlasSVG(garment,options={}){return R.atlasSVG({...options,wardrobe:{...(options.wardrobe||{}),garments:[garment]},wardrobeOnly:true})}
