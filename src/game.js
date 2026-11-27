@@ -74,7 +74,7 @@ function simAdopt(e) {
 function simEmit(type, d) { if (!WS) return null; try { return WS.bus.emit(type, d); } catch (err) { console.error(err); return null; } }
 const aidOf = e => e ? e === P ? (P.actorId || 'player') : e.actorId || null : null;
 const addEnt = o => { o.id = NID++; o.speed = 0; ents.push(o); simAdopt(o); return o; };
-const rmEnt = e => { const i = ents.indexOf(e); if (i >= 0) ents.splice(i, 1); e.gone = true; if (WS && e.actorId && WS.reg.get(e.actorId) === e) { WS.drop(e); simEmit('ActorRemoved', { actor: e.actorId, dead: !!e.dead }); } };
+const rmEnt = e => { const i = ents.indexOf(e); if (i >= 0) ents.splice(i, 1); e.gone = true; if (e._gk !== undefined) ECOS.grid.remove(e); if (e.kind === 'mon' && e.sp && !e.dead) ecoLeft(e); if (WS && e.actorId && WS.reg.get(e.actorId) === e) { WS.drop(e); simEmit('ActorRemoved', { actor: e.actorId, dead: !!e.dead }); } };
 const alive = e => e && !e.gone && !e.dead;
 function relColor(e) { if (e === P || e.kind === 'npc' || e.kind === 'pet' || e.kind === 'ally') return '#5aa8ff'; if (e.kind === 'mon') return MON[e.type].boss ? '#ff9a40' : '#c0c0c0'; return '#d8d0c0'; }
 
@@ -432,7 +432,8 @@ function damageMon(m, amt, kind, src, hx) {
   m.hp -= amt; simEmit('ActorDamaged', { actor: aidOf(m), source: aidOf(src), amount: amt, kind: kind || 'phys', x: m.x, y: m.y }); floater(m.x, m.y, String(amt), kind === 'spell' ? '#c8a0ff' : kind === 'poison' ? '#7be07b' : '#ffd27a'); hitSound(m, kind, src, hx, m.hp <= 0); if (src === P || (src && (src.kind === 'pet' || src.kind === 'ally'))) P.lastCombat = GT;
   m.pacified = 0; if (m.rooted > GT) m.rooted = 0;
   if (m.hidden) m.hidden = false;
-  if (!m.target || m.target === P && src && (src.kind === 'pet' || src.kind === 'ally') && R() < .3 || (m.provoked && m.provoked < GT)) { m.target = src.kind ? src : P; m.provoked = 0; m.state = m.state === 'idle' || m.state === 'return' ? 'chase' : m.state; }
+  if (!m.target || m.target === P && src && (src.kind === 'pet' || src.kind === 'ally') && R() < .3 || (m.provoked && m.provoked < GT)) { m.target = src.kind ? src : P; m.chaseKind = 'attack'; m.provoked = 0; m.state = m.state === 'idle' || m.state === 'return' ? 'chase' : m.state; }
+  if (m.hp > 0) ecoHurt(m, src);
   if (m.hp <= 0) killMon(m, src);
 }
 
@@ -440,46 +441,62 @@ function killMon(m, src) {
   if (m._killed) return; m._killed = true;                                                       // death resolves exactly once: one corpse, one loot roll
   simEmit('ActorKilled', { actor: aidOf(m), killer: aidOf(src), species: m.type || null, x: m.x, y: m.y });
   if (CRE[m.type] && SFXA.has(CRE[m.type] + '.death')) sndAt(CRE[m.type] + '.death', m, { prio: 4 });
-  m.dead = true; rmEnt(m); if (m.sp) m.sp.n--; const d = MON[m.type];
+  m.dead = true; rmEnt(m); ecoDied(m, src); if (m.sp) m.sp.n--; const d = MON[m.type]; const mine = src === P || (src && (src.kind === 'pet' || src.kind === 'ally'));
   if (m.kind === 'pet') { log((m.name || d.n) + ' has died.', '#ff6a5a'); return; }
   if (m.quest) questCrabKilled();
   const cont = SF.newContainer('corpse'); for (const k in d.loot) { const q = rnd(d.loot[k][0], d.loot[k][1]); if (q > 0) cont.items.push(SF.newItem(k, q, SF.WEARABLE(k) ? { cond: 100, maxc: 100 } : null)); }
   for (const [id, ch] of d.rare || []) if (R() < ch) cont.items.push(SF.newItem(id, 1, { cond: rnd(60, 100), maxc: 100 }));
   if (m.purse) cont.items.push(SF.newItem('gold', m.purse));
   const corpse = addEnt({ kind: 'corpse', mon: m.type, sect: m.sect || 0, t0: GT, name: d.n + ' remains', x: m.x, y: m.y, cont, expires: GT + (d.boss ? 600 : 240), skinned: !d.skin });
-  if (corpse && (P.sel === m || src === P)) { P.sel = corpse; if (!P.lootHinted) { P.lootHinted = true; log('Tap the bones (or press Interact) beside them to loot.', '#ffe08a'); } }
+  if (corpse && (P.sel === m || src === P) && mine) { P.sel = corpse; if (!P.lootHinted) { P.lootHinted = true; log('Tap the bones (or press Interact) beside them to loot.', '#ffe08a'); } }
   for (const e of ents) if (e.target === m) { e.target = null; if (e.kind === 'mon') e.state = 'return'; }
-  if (P.sel === m) { P.sel = null; P.armed = false; } log((d.boss ? 'You have felled ' : 'You slay the ') + d.n + '.', '#ffe08a'); if (d.boss) { say(P, d.fallLine || 'The bell falls silent.'); }
+  if (P.sel === m) { P.sel = mine ? null : corpse; P.armed = false; }
+  if (mine) { log((d.boss ? 'You have felled ' : 'You slay the ') + d.n + '.', '#ffe08a'); if (d.boss) { say(P, d.fallLine || 'The bell falls silent.'); } }
+  else if (src && src.kind === 'mon' && dist(m, P) < 22) log(`A ${MON[src.type].n} kills a ${d.n}.`, '#b6a68a');   // creatures fight each other (Living World phase 3)
 }
 
 /* ---------- monsters: telegraph → committed strike → recovery ---------- */
 function aiMon(m, dt) {
-  const d = MON[m.type]; m.speed = 0; let t = m.target;
-  if (t && (t.gone || t.dead || t.ghost || (t === P && (P.ghost || P.hidden)) || (m.provoked && GT > m.provoked && t.kind === 'mon'))) { m.target = t = null; m.provoked = 0; if (m.state !== 'idle') m.state = 'return'; }
-  const seeP = () => !P.ghost && !P.hidden && !(m.pacified > GT) && (!protAt(P.x, P.y) || m.quest) && dist(m, P) < d.aggro && los(m, P);
-  const home = Math.hypot(m.x - m.home.x, m.y - m.home.y);
+  const d = MON[m.type], pr = ecoP(m.type); m.speed = 0; let t = m.target;
+  if (t && (t.gone || t.dead || t.ghost || (t === P && (P.ghost || P.hidden)) || (m.provoked && GT > m.provoked && t.kind === 'mon' && !ecoEnemy(m, t)))) { m.target = t = null; m.provoked = 0; if (m.state !== 'idle' && m.state !== 'flee') m.state = 'return'; }
+  const seeP = () => !(m.pacified > GT) && ecoSeesPlayer(m);   // perception (Living World phase 3): night, sleep and Hiding count; only enemies and territorial creatures
+  let anchor, home, hunting, pursuit; const frame = () => { anchor = m.anchor || m.home; home = Math.hypot(m.x - anchor.x, m.y - anchor.y); hunting = m.chaseKind === 'hunt'; pursuit = (pr.pur || d.leash) * (hunting ? 2 : 1); }; frame();   // a hunt may run further than a territorial chase
   const step = (tx, ty, spd, away) => { if (m.rooted > GT) return; let dx = tx - m.x, dy = ty - m.y; if (away) { dx = -dx; dy = -dy; } const l = Math.hypot(dx, dy); if (l < .05) return; const s = Math.min(l, spd * MOVE_SCALE * (m.slowUntil > GT ? .75 : 1) * dt); const mv = moveBy(m, dx / l * s, dy / l * s); if (mv < s * .3) moveBy(m, -dy / l * s, dx / l * s); m.speed = mv / dt; updateFacing(m, dx, dy); };
   if (d.ward && d.wardEvery && GT > (m.wardAt || 0) && m.state === 'chase') { m.wardAt = GT + d.wardEvery; m.ward = d.ward; say(m, '*the bell hums: ward*'); }
-  if (m.hidden && dist(m, P) < 2.4 && !P.ghost && !P.hidden) { m.hidden = false; m.target = P; m.state = 'tele'; m.st = GT; say(m, 'Ambush!'); }
+  if (m.hidden && dist(m, P) < 2.4 && !P.ghost && !P.hidden && ecoEnemy(m, P)) { m.hidden = false; m.target = P; m.state = 'tele'; m.st = GT; if (m.sortie) ecoSortieEnd(m); say(m, 'Ambush!'); }
+  if (m.state !== 'tele' && m.state !== 'strike') { ecoThink(m); t = m.target; frame(); }   // the decision may have chosen a new target
   switch (m.state) {
-    case 'idle': if (m.hidden) break; if (seeP()) { m.target = P; m.state = 'chase'; break; } if (m.pacified > GT) break; if (!m.wt || GT > m.wt) { m.wt = GT + 3 + R() * 5; m.wx = m.home.x + (R() - .5) * 8; m.wy = m.home.y + (R() - .5) * 8; } if (Math.hypot(m.wx - m.x, m.wy - m.y) > .4) step(m.wx, m.wy, d.speed * .35); break;
+    case 'idle': if (m.hidden && !m.sortie) break; if (seeP()) { m.target = P; m.state = 'chase'; if (m.sortie) ecoSortieEnd(m); m.anchor = m.anchor || { x: m.x, y: m.y }; break; } if (m.pacified > GT) break; ecoIdle(m, dt, step); break;
     case 'chase': {
+      if (m.sortie) ecoSortieEnd(m);
       if (m.pacified > GT) { m.state = 'idle'; m.target = null; break; }
-      if (!t || home > d.leash || (t === P && !(dist(m, P) < d.leash && los(m, P)))) { m.state = 'return'; m.target = null; break; }
+      if (!t || home > pursuit || (t === P && !(dist(m, P) < d.leash && los(m, P))) || (t !== P && dist(m, t) > Math.max(d.leash, 14) * (hunting ? 1.3 : 1))) { m.state = 'return'; m.target = null; break; }
       const dd = dist(m, t); const far = d.ranged2 && dd > d.reach + .5 && dd <= d.ranged2.range;
       if (d.ranged && dd < (d.keep || 0) - .5) { step(t.x, t.y, d.speed, true); break; }
       if (far && GT > (m.r2At || 0) && los(m, t)) { m.state = 'tele'; m.st = GT; m.mode = 'r2'; m.aim = { x: t.x, y: t.y }; faceToward(m, t.x, t.y); break; }
       if (dd <= d.reach * .92 && (!d.ranged || los(m, t))) { m.state = 'tele'; m.st = GT; m.mode = d.aoe ? 'aoe' : d.ranged ? 'shot' : 'melee'; m.aim = { x: t.x, y: t.y }; faceToward(m, t.x, t.y); }
-      else step(t.x, t.y, d.speed);
+      else step(t.x, t.y, d.speed * (hunting ? 1.25 : 1));   // a hunting predator puts on a burst
     } break;
-    case 'tele': { const tt = m.mode === 'r2' ? d.ranged2.tele : d.tele; if (t && m.mode !== 'aoe') faceToward(m, t.x, t.y); if (m.atkSt !== m.st) { m.atkSt = m.st; m.atkRow = m.sect || 0; } if (GT - m.st >= tt) { m.state = 'strike'; m.st = GT; m.impactT = GT; monStrike(m, t); } } break;
+    case 'tele': { const tt = m.mode === 'r2' ? d.ranged2.tele : d.tele; if (t && m.mode !== 'aoe') faceToward(m, t.x, t.y);
+      if (hunting && t && t.kind === 'mon' && m.mode === 'melee' && dist(m, t) > d.reach * .6) { step(t.x, t.y, d.speed * 1.25); faceToward(m, t.x, t.y); }   /* a pounce: a hunter keeps after fleeing prey through its wind-up (creature prey only; the player can still sidestep a telegraph) */ if (m.atkSt !== m.st) { m.atkSt = m.st; m.atkRow = m.sect || 0; } if (GT - m.st >= tt) { m.state = 'strike'; m.st = GT; m.impactT = GT; monStrike(m, t); } } break;
     case 'strike': if (GT - m.st > .15) { m.state = 'rec'; m.st = GT; } break;
     case 'rec': if (GT - m.st >= d.rec * (monT2A(d).dex + 100) / (stamOf(m) + 100)) m.state = m.target ? 'chase' : 'return'; break;   // a winded creature recovers slower (same stamina term as the swing formula)
-    case 'return': step(m.home.x, m.home.y, d.speed); m.hp = Math.min(m.max, m.hp + m.max * .15 * dt); if (home < 1.2) { m.state = 'idle'; m.hp = m.max; if (d.hideChance && R() < d.hideChance) m.hidden = true; } if (seeP() && home < d.leash * .6) { m.target = P; m.state = 'chase'; } break;
+    case 'flee': {   // run from a threat until it is out of sight or the scare wears off, then go home (§10: retreat, return to habitat)
+      const th = m.threat, gone = !th || th.gone || th.dead || th.ghost, dd = gone ? 99 : dist(m, th), safe = Math.max(d.aggro * 1.4, (pr.flight || 6) * 1.6);
+      if (gone || (GT > m.fleeUntil && dd > safe) || dd > safe * 1.8) { m.state = 'return'; m.threat = null; m.fleeT0 = 0; if (m.mind) m.mind.act = null; break; }
+      if (!m.fleeT0 || GT - m.fleeT0 > 20) m.fleeT0 = GT; const x0 = m.x, y0 = m.y; step(th.x, th.y, d.speed * (pr.temper === 'timid' ? (GT - m.fleeT0 < 3 ? 1 : .7) : .85), true);   // prey tires after its first sprint
+      if (Math.hypot(m.x - x0, m.y - y0) < .01 * dt * 60) step(m.home.x, m.home.y, d.speed);   // cornered: break for home
+    } break;
+    case 'return': {
+      const hd = Math.hypot(m.x - m.home.x, m.y - m.home.y), hurtLately = GT - (m.hitT ?? -99) < 4;
+      if (hd > 20) { if (!m.nav || m.nav.goal.name !== 'home' || m.nav.state === 'failed') { if (!m.nav || m.nav.state !== 'failed' || GT > (m.navRetry || 0)) { const k = hd > 55 ? 50 / hd : 1, g = k < 1 ? navSnap(Math.floor(m.x + (m.home.x - m.x) * k), Math.floor(m.y + (m.home.y - m.y) * k), 4).map(v => v + .5) : [m.home.x, m.home.y]; ecoNav(m, g[0], g[1], { doors: false, avoidProt: true, speed: d.speed * .8, name: 'home' }); m.navRetry = GT + 6; /* legs of at most 50 m: never a continent-wide path */ } } if (m.nav && m.nav.state === 'moving') navStep(m, dt); else { if (m.nav && m.nav.state === 'done') m.nav = null; step(m.home.x, m.home.y, d.speed); } }
+      else { m.nav = null; step(m.home.x, m.home.y, d.speed); }
+      if (!hurtLately) m.hp = Math.min(m.max, m.hp + m.max * .15 * dt);
+      if (hd < 1.2) { m.state = 'idle'; m.anchor = null; m.chaseKind = null; m.fleeDone = false; m.nav = null; if (!hurtLately) m.hp = m.max; if (d.hideChance && R() < d.hideChance) m.hidden = true; }
+      if (seeP() && Math.hypot(m.x - m.home.x, m.y - m.home.y) < d.leash * .6) { m.target = P; m.state = 'chase'; m.nav = null; } } break;
   }
-  for (const o of ents) if (o !== m && (o.kind === 'mon' || o.kind === 'pet') && !o.gone) { const dx = m.x - o.x, dy = m.y - o.y, l = Math.hypot(dx, dy); if (l > 0 && l < .7) moveBy(m, dx / l * .02, dy / l * .02); }
+  ecoSeparate(m);
 }
-
 /* resolve a committed creature attack against whatever it targets: the player, a pet, or a provoked creature */
 function monStrike(m, t) {
   const d = MON[m.type]; if (!t || t.gone || t.dead) return;
@@ -566,19 +583,7 @@ function allyCommand(c) {
 }
 function allySave() { const a = allyOf(); if (!a) return null; return { x: a.x, y: a.y, hp: a.hp, stam: a.stam, ghost: !!a.ghost, ghostLeft: a.ghost ? Math.max(0, SF.ALLY_GHOST_WAIT - (GT - a.ghostAt)) : undefined, order: a.order, poison: a.poison || null, skills: a.skills, equip: a.equip, pack: a.pack.items,
   body: (() => { const b = ents.find(e => e.allyBody === a.aid && !e.gone); return b ? { x: b.x, y: b.y, items: b.cont.items, left: b.expires - GT, diedAgo: GT - b.cont.diedAt } : null; })() }; }
-function spawnTick() {
-  for (const s of SPAWNS) {
-    if (s.n >= s.max || GT < s.next) continue; s.next = GT + (s.delay || 6 + R() * 6);
-    for (let k = 0; k < 14; k++) {
-      const x = s.x + (R() - .5) * 2 * s.r, y = s.y + (R() - .5) * 2 * s.r; const tx = Math.floor(x), ty = Math.floor(y);
-      if (BLK[tAt(tx, ty)] || [T.WA, T.BR, T.SD, T.SU].includes(tAt(tx, ty)) || protAt(tx, ty) || zoneAt(tx, ty) === 'camp') continue; if (P && Math.hypot(x - P.x, y - P.y) < (s.boss ? 4 : 12)) continue;
-      const n = Math.min(s.pack || 1, s.max - s.n);
-      for (let i = 0; i < n; i++) { const d = MON[s.type]; const m = addEnt({ kind: 'mon', type: s.type, name: d.n, x: x + i * .8, y: y + i * .5, hp: d.hp, max: d.hp, state: 'idle', home: { x, y }, sp: s, sect: rnd(0, 7), ward: d.ward && !d.wardEvery ? d.ward : 0, hidden: d.hideChance && R() < d.hideChance, purse: d.purse ? rnd(d.purse[0], d.purse[1]) : 0 }); s.n++; void m; }
-      break;
-    }
-  }
-}
-
+/* spawnTick (populations, camps, regions) lives in src/ecology.js since Living World phase 3 */
 /* ---------- magic: prepare → hold → release lives in src/magic.js (castSlot, prepTick, releaseHeld, interruptPrep, TIMERS/at) ---------- */
 
 /* ---------- abilities: bandage, consumables, hide, track, meditate ---------- */
@@ -794,7 +799,7 @@ function populate() {
   for (const [x, y] of [[129.5, 297.5], [129.5, 303.5], [116.5, 260.5], [116.5, 340.5], [55.5, 285.5]]) npc('guard', 'Quay warden', x, y);
   const c = ZONES.camp; npc('healer', 'Old Fenna, camp healer', c.cx + 2.5, c.cy + 1.5); npc('campbank', 'Crow, camp strongbox', c.cx - 3.5, c.cy - 3.5); npc('outlaw', 'Mags, fence', c.cx + 3.5, c.cy - 3.5);
   annPopulate(npc);
-  for (let i = 0; i < 12; i++) { for (const s of SPAWNS) s.next = 0; spawnTick(); }
+  for (let i = 0; i < 12; i++) { for (const s of SPAWNS) s.next = 0; spawnTick(true); }
 }
 const SHOPS = { provisioner: ['hatchet', 'pickaxe', 'knife', 'rod', 'tongs', 'sewkit', 'cloth', 'vial', 'bandage', 'lanternoil', 'cookedmeat', 'clothvest', 'lute', 'lockpick', 'repairkit'], smith: ['dagger', 'kryss', 'spear', 'sword', 'battleaxe', 'glaive', 'mace', 'waraxe', 'hammer', 'ironbar', 'leather', 'chain', 'plate', 'buckler'], workshop: ['shortbow', 'crossbow', 'heavycrossbow', 'arrow', 'bolt', 'pine', 'buckler', 'strap', 'trapkit', 'repairkit'], apothecary: ['reedash', 'shelldust', 'marshroot', 'lanternoil', 'blacksalt', 'vial', 'draught', 'antidote', 'manatonic', 'stamtonic', 'cinder'], outlaw: ['bandage', 'draught', 'arrow', 'cookedmeat', 'cloth', 'vial', 'reedash', 'marshroot', 'knife', 'dagger', 'lockpick', 'venom', 'trapkit'] };
 Object.assign(SHOPS, ANN_SHOPS);
@@ -822,7 +827,7 @@ function update(dt) {
     if (!inCombat() && !P.poison) P.hp = Math.min(SF.maxHp(P), P.hp + (P.fed > GT ? 1 : .1) * dt);
     if (P.poison && GT >= P.poison.next) { P.poison.next = GT + SF.POISON_GAP; damagePlayer(SF.POISON[P.poison.tier], null, 'poison'); if (P.poison && --P.poison.ticks <= 0) P.poison = null; }
   }
-  navTick(); const aiT0 = DEV.on ? performance.now() : 0;
+  navTick(); ecoTick(); const aiT0 = DEV.on ? performance.now() : 0;
   for (const e of ents.slice()) {                                    // every actor is driven by its controller; corpses are objects that decay
     if (e.gone || e === P) continue;
     if (e.kind === 'corpse') { if (GT > e.expires) { if (e.mine) log('Your body has crumbled to dust, and everything on it is gone.', '#ff6a5a'); rmEnt(e); if (P.lootOpen === e) { closePanel(); P.lootOpen = null; } } continue; }
@@ -836,7 +841,8 @@ function update(dt) {
 /* controllers (master spec §3). The player's controller is the input code above (playerMove, attackTick, prepTick); townsfolk,
    merchants and guards have no controller tick yet and stand at their posts (Living World Phase D gives them routines). */
 function monsterTick(e, dt) {
-  if (e.stam !== undefined && GT - (e.hitT || -9) > .75) e.stam = Math.min(monT2A(MON[e.type]).dex, e.stam + 3 * dt); const s0 = e.state; aiMon(e, dt); if (e.state !== s0) monSound(e, s0);
+  dt = ecoSkip(e, dt); if (!dt) return;   // distant idle creatures run at a quarter rate (src/ecology.js)
+  if (e.stam !== undefined && GT - (e.hitT || -9) > .75) e.stam = Math.min(monT2A(MON[e.type]).dex, e.stam + 3 * dt); const s0 = e.state; aiMon(e, dt); if (e.state !== s0) monSound(e, s0); ecoSoundTick(e);
   if (e.poison && GT >= e.poison.next) { e.poison.next = GT + SF.POISON_GAP; damageMon(e, SF.POISON[e.poison.tier], 'poison'); if (e.poison && --e.poison.ticks <= 0) e.poison = null; }
 }
 const CONTROL = { CivilianAI: (e, dt) => townTick(e, dt), MerchantAI: (e, dt) => townTick(e, dt), GuardAI: (e, dt) => townTick(e, dt), MonsterAI: monsterTick, AnimalAI: monsterTick, CriminalAI: monsterTick, PetAI: (e, dt) => petTick(e, dt), SummonAI: (e, dt) => petTick(e, dt), HirelingAI: (e, dt) => allyTick(e, dt) };
@@ -976,6 +982,7 @@ function genWorld() {
   for (let px = 240; px < 410; px += 26) for (const py of [88, 108]) for (let i = 0; i < 14; i++) for (let j = 0; j < 12; j++) { if (tAt(px + i, py + j) === T.WA) continue; const e = i === 0 || j === 0 || i === 13 || j === 11; if (e && !(i === 6 || i === 7)) tSet(px + i, py + j, T.FN); else if (!e) tSet(px + i, py + j, T.G); }
   placeQuayNodes();
   genAnniabreen(carve, disc); genFrontier(carve, disc);
+  ecoGenerate();   // Living World phase 3: habitat regions, wildlife spawners, camps (own seeded stream: the map is unchanged)
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const t = map[y * W + x]; if (t === T.LP) LIGHTS.push({ x, y, r: 5 }); if (t === T.FG) LIGHTS.push({ x, y, r: 4 }); if (t === T.AK) LIGHTS.push({ x, y, r: 4 }); }
 }
 const RES = new Map();
@@ -1173,7 +1180,7 @@ const TASKS = {
     if (any) gain('search', 45); log(found ? `You uncover ${found} hidden thing${found > 1 ? 's' : ''}.` : 'You find nothing hidden nearby.', found ? '#ffe08a' : undefined); FX.push({ k: 'ring', x: P.x, y: P.y, c: '#ffe08a', t0: GT, dur: .8 }); },
   tame: t => { const m = t.m, d = MON[m.type]; if (!alive(m) || dist(m, P) > SF.TAME.range + .5) return log('The creature is no longer close enough.');
     const need = d.strong ? 2 : 1; if (petSlotsUsed() + need > SF.TAME.slots) return log(`No free control slots (${d.n} needs ${need}).`, '#ffb070');
-    gain('taming', d.tame); if (R() < SF.opposed(sv('taming'), d.tame)) { m.kind = 'pet'; if (m.sp) { m.sp.n--; m.sp = null; } m.order = 'follow'; m.slots = need; m.name = 'your ' + d.n; m.state = ''; m.target = null; m.hidden = false; for (const e of ents) if (e.target === m) { e.target = null; e.state = 'return'; } P.sel = m; log(`The ${d.n} accepts you. It follows on command.`, '#7ee08a'); }
+    gain('taming', d.tame); if (R() < SF.opposed(sv('taming'), d.tame)) { m.kind = 'pet'; if (m.sp) { m.sp.n--; if (m.sp.camp) m.sp.camp.removed(); m.sp = null; } if (m.sortie) ecoSortieEnd(m); m.leader = null; m.order = 'follow'; m.slots = need; m.name = 'your ' + d.n; m.state = ''; m.target = null; m.hidden = false; for (const e of ents) if (e.target === m) { e.target = null; e.state = 'return'; } P.sel = m; log(`The ${d.n} accepts you. It follows on command.`, '#7ee08a'); }
     else { log('It shies away from you.'); if (R() < d.bite) { m.target = P; m.state = 'chase'; log('It turns on you!', '#ff8a6a'); } } },
   vet: t => { const p = t.p; if (p.gone || dist(p, P) > SF.VET.range + .3) return log('Your pet moved away.'); gain('veterinary', 40); if (R() < SF.opposed(sv('veterinary'), 30)) { const b = p.hp; p.hp = Math.min(p.max, p.hp + SF.VET.heal(sv('veterinary'))); floater(p.x, p.y, '+' + Math.round(p.hp - b), '#7ee08a'); } else log('The treatment does not take.'); },
   bard: t => { const m = t.m; if (!alive(m)) return; const diff = cl(MON[m.type].diff, 25, 75);
@@ -1583,11 +1590,32 @@ function beastArt(g, type, fr, atk) {
   if (type === 'bellkeeper') { g.fillStyle = shade(c, -35); g.fillRect(-14, -14, 10, 14 + ph); g.fillRect(4, -14, 10, 14 - ph); g.fillStyle = c; g.beginPath(); g.moveTo(-26, -14); g.quadraticCurveTo(-24, -60, 0, -66); g.quadraticCurveTo(24, -60, 26, -14); g.closePath(); g.fill(); g.fillStyle = shade(c, 35); g.beginPath(); g.moveTo(-18, -20); g.quadraticCurveTo(-16, -54, -4, -60); g.lineTo(-8, -20); g.fill(); g.fillStyle = shade(c, -45); g.fillRect(-26, -18, 52, 5); g.fillStyle = '#3a2a10'; g.beginPath(); g.arc(0, -10 + atk * 4, 6, 0, 7); g.fill(); g.fillStyle = '#ffcc40'; g.fillRect(-10, -44, 6, 4); g.fillRect(4, -44, 6, 4); g.fillStyle = shade(c, -20); g.fillRect(-36, -50 + atk * 12, 10, 30); g.fillRect(26, -50 - atk * 14, 10, 30); }
   if (type === 'hound') { g.strokeStyle = c; g.lineWidth = 3; g.beginPath(); g.moveTo(-13, -16); g.quadraticCurveTo(-22, -20, -24, -12 + ph); g.stroke(); leg(-9, -11, 11, 1); leg(-4, -11, 11, -1); leg(6, -11, 11, -1); leg(11, -11, 11, 1); g.fillStyle = c; g.beginPath(); g.ellipse(0, -16, 15, 7, 0, 0, 7); g.fill(); g.fillStyle = shade(c, 30); g.beginPath(); g.ellipse(-2, -20, 10, 3, 0, 0, 7); g.fill(); g.fillStyle = shade(c, -30); for (let i = -10; i < 8; i += 4) g.fillRect(i, -15, 2, 4); g.fillStyle = c; g.beginPath(); g.ellipse(17 + atk * 4, -21 + atk * 3, 7, 5.5, -.2, 0, 7); g.fill(); g.beginPath(); g.ellipse(23 + atk * 4, -19 + atk * 3, 5, 3, 0, 0, 7); g.fill(); g.fillStyle = shade(c, -30); g.beginPath(); g.moveTo(13 + atk * 4, -25); g.lineTo(15 + atk * 4, -32); g.lineTo(18 + atk * 4, -25); g.fill(); g.fillStyle = '#ffd24a'; g.fillRect(19 + atk * 4, -23 + atk * 3, 2, 2); if (atk) { g.fillStyle = '#fff'; g.fillRect(24 + atk * 4, -17 + atk * 3, 3, 2); } }
 }
+/* Living World phase 3 wildlife (src/ecology.js): drawn in code in the kit's palette until sheets exist (asset backlog) */
+function wildArt(g, type, fr, atk) {
+  const ph = [0, 1, 0, -1][fr], c = MON[type].col;
+  const leg = (x, y, l, o, w) => { g.strokeStyle = shade(c, -40); g.lineWidth = w || 2.5; g.beginPath(); g.moveTo(x, y); g.lineTo(x + ph * 2.5 * o, y + l); g.stroke(); };
+  if (type === 'deer') { leg(-10, -18, 18, 1); leg(-6, -18, 18, -1); leg(7, -18, 18, -1); leg(11, -18, 18, 1);
+    g.fillStyle = c; g.beginPath(); g.ellipse(0, -22, 15, 7.5, 0, 0, 7); g.fill(); g.fillStyle = '#efe2c8'; g.beginPath(); g.ellipse(-14, -23, 3, 3.5, 0, 0, 7); g.fill();
+    g.fillStyle = shade(c, 22); g.beginPath(); g.ellipse(1, -26, 10, 3, 0, 0, 7); g.fill(); g.fillStyle = shade(c, -15); for (const [x, y] of [[-6, -21], [-1, -24], [4, -21]]) g.fillRect(x, y, 2, 2);
+    g.fillStyle = c; g.beginPath(); g.moveTo(10, -26); g.lineTo(16 + atk * 2, -38); g.lineTo(21 + atk * 2, -36); g.lineTo(15, -22); g.fill(); g.beginPath(); g.ellipse(20 + atk * 3, -38, 6, 3.6, -.3, 0, 7); g.fill();
+    g.fillStyle = '#111'; g.fillRect(21 + atk * 3, -40, 2, 2); g.fillRect(25 + atk * 3, -37, 2, 1.5);
+    g.strokeStyle = '#d8c8a0'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(18, -41); g.lineTo(15, -50); g.moveTo(16, -46); g.lineTo(11, -49); g.moveTo(21, -41); g.lineTo(24, -51); g.moveTo(23, -47); g.lineTo(28, -49); g.stroke(); }
+  if (type === 'hare') { const hop = Math.abs(ph) * 3; g.fillStyle = shade(c, -20); g.beginPath(); g.ellipse(-6, -4 - hop * .3, 5, 3, 0, 0, 7); g.fill();
+    g.fillStyle = c; g.beginPath(); g.ellipse(0, -8 - hop, 9, 6, 0, 0, 7); g.fill(); g.fillStyle = '#f0e8dc'; g.beginPath(); g.arc(-9, -9 - hop, 2.6, 0, 7); g.fill();
+    g.fillStyle = c; g.beginPath(); g.ellipse(8, -12 - hop, 4.5, 4, 0, 0, 7); g.fill(); g.beginPath(); g.ellipse(6, -21 - hop, 1.8, 6, -.2, 0, 7); g.fill(); g.beginPath(); g.ellipse(9, -21 - hop, 1.8, 6, .15, 0, 7); g.fill();
+    g.fillStyle = '#d8a8a0'; g.fillRect(6, -24 - hop, 1, 4); g.fillStyle = '#111'; g.fillRect(10, -14 - hop, 1.6, 1.6); }
+  if (type === 'bear') { leg(-12, -14, 13, 1, 5); leg(-5, -14, 13, -1, 5); leg(7, -14, 13, -1, 5); leg(13, -14, 13, 1, 5);
+    g.fillStyle = c; g.beginPath(); g.ellipse(0, -22, 20, 13, 0, 0, 7); g.fill(); g.fillStyle = shade(c, 18); g.beginPath(); g.ellipse(-3, -29, 13, 4, 0, 0, 7); g.fill();
+    g.fillStyle = shade(c, -18); g.beginPath(); g.ellipse(-4, -33, 9, 5, 0, 0, 7); g.fill();
+    g.fillStyle = c; g.beginPath(); g.ellipse(20 + atk * 5, -24 + atk * 2, 9.5, 8, 0, 0, 7); g.fill(); g.beginPath(); g.arc(15 + atk * 5, -32 + atk * 2, 3, 0, 7); g.arc(23 + atk * 5, -32 + atk * 2, 3, 0, 7); g.fill();
+    g.fillStyle = '#c8a880'; g.beginPath(); g.ellipse(27 + atk * 5, -21 + atk * 2, 4.5, 3.5, 0, 0, 7); g.fill(); g.fillStyle = '#111'; g.fillRect(29 + atk * 5, -23 + atk * 2, 2.5, 2); g.fillRect(21 + atk * 5, -27 + atk * 2, 2, 2);
+    if (atk) { g.fillStyle = '#f0ead8'; g.fillRect(26 + atk * 5, -18 + atk * 2, 4, 2); } }
+}
 function beastSprite(e) {
   const mv = e.speed > .3, fr = mv ? Math.floor(GT * 9) % 4 : 0, atk = e.state === 'strike' ? 1 : 0, face = (SECT_ANG[e.sect || 0] > 90 && SECT_ANG[e.sect || 0] < 270) ? -1 : 1;
   const k = e.type + fr + atk + face; let s = SPR.get(k); if (s) return s;
-  const dm = { bellkeeper: [180, 150, 90, 140], sentinel: [100, 100, 50, 92] }[e.type] || [72, 60, 36, 54];
-  const c = document.createElement('canvas'); c.width = dm[0]; c.height = dm[1]; const g = c.getContext('2d'); g.translate(dm[2], dm[3]); g.scale(face * 1.25, 1.25); beastArt(g, e.type, fr, atk);
+  const dm = { bellkeeper: [180, 150, 90, 140], sentinel: [100, 100, 50, 92], bear: [100, 84, 46, 72], deer: [80, 84, 40, 76] }[e.type] || [72, 60, 36, 54];
+  const c = document.createElement('canvas'); c.width = dm[0]; c.height = dm[1]; const g = c.getContext('2d'); g.translate(dm[2], dm[3]); g.scale(face * 1.25, 1.25); if (e.type === 'deer' || e.type === 'hare' || e.type === 'bear') wildArt(g, e.type, fr, atk); else beastArt(g, e.type, fr, atk);
   s = outlined(pixelize(c)); s.ox = dm[2] + 1; s.oy = dm[3] + 1; SPR.set(k, s); return s;
 }
 const NPC_COL = { traveller: '#3a6a5a', assay: '#4a6a7a', qsmith: '#7a3a22', banker: '#2a3a8a', smith: '#6a4a2a', trainer: '#8a2a2a', workshop: '#6a6a2a', apothecary: '#5a2a6a', provisioner: '#8a6a2a', guard: '#5a5a62', healer: '#d8d0c0', outlaw: '#3a2a22' };
@@ -2368,7 +2396,7 @@ function save() {
     const pets = ents.filter(e => e.kind === 'pet' && e.type && !e.summon && !e.gone && e.hp > 0).map(e => ({ type: e.type, hp: e.hp, order: e.order === 'stay' ? 'stay' : 'follow', slots: e.slots, name: e.name, dx: e.x - P.x, dy: e.y - P.y }));
     const nodes = []; for (const [k, o] of RES) nodes.push([k, o.gen || 1, o.spec || 0, o.n, o.max || 0, Math.round(o.t * 10) / 10]);
     const ally = allySave(); if (ally) { [ally.equip.weapon, ally.equip.shield, ally.equip.armor].forEach(scan); ally.pack.forEach(scan); if (ally.body) ally.body.items.forEach(scan); }
-    localStorage.setItem(SAVEKEY, JSON.stringify({ v: 6, char: c, corpses, pets, nodes, ally, sim: WS ? WS.save() : null, uid: maxUid + 1, gt: GT, savedAt: Date.now() }));
+    localStorage.setItem(SAVEKEY, JSON.stringify({ v: 6, char: c, corpses, pets, nodes, ally, sim: WS ? WS.save() : null, eco: ecoSave(), uid: maxUid + 1, gt: GT, savedAt: Date.now() }));
     DEV.lastSave = { ok: true, at: GT }; return true;
   } catch (e) { DEV.lastSave = { ok: false, at: GT }; return false; }
 }
@@ -2419,7 +2447,7 @@ function boot(saved, fresh) {
   WS = SIM.create({ clock: () => GT, saved: saved && saved.sim, onError: e => console.error(e) }); simAdopt(P);   // actor ids continue from the save
   if (saved && !(saved.sim && saved.sim.clock)) WS.clock.setHour(GT, (GT / 60 + 9) % 24);   // older saves keep the hour they were at; from now on a day lasts 120 minutes
   NAV.walk = null; NAV.edge = null; NAV.graph = null; devInit();
-  ents.unshift(P); P.sect = P.sect || 0; P.drawn = false; P.sw = SF.newSwing(); P.movedAt = -99; while (P.hotbar.length < 9) P.hotbar.push(null); Q(); populate(); seedTraps();
+  ents.unshift(P); P.sect = P.sect || 0; P.drawn = false; P.sw = SF.newSwing(); P.movedAt = -99; while (P.hotbar.length < 9) P.hotbar.push(null); Q(); ecoLoad(saved && saved.eco); populate(); seedTraps();
   { const al = makeAlly(saved && saved.ally); const bd = saved && saved.ally && saved.ally.body; if (bd && bd.left > 0) { const cont = SF.newContainer('corpse', al.aid); cont.items = bd.items; cont.diedAt = GT - (bd.diedAgo ?? 999); cont.expires = GT + bd.left; addEnt({ kind: 'corpse', allyBody: al.aid, name: al.name + "'s body", x: bd.x, y: bd.y, cont, expires: GT + bd.left }); } }
   P.bandage = null; if (saved) bandageLoad(saved.char.bandage);          // an application in flight resumes once, never twice
   if (saved) for (const pt of saved.pets || []) { const d = MON[pt.type]; if (!d) continue; const near = Math.hypot(pt.dx || 0, pt.dy || 0) < 12; addEnt({ kind: 'pet', type: pt.type, name: pt.name || 'your ' + d.n, x: P.x + (near ? pt.dx : 1), y: P.y + (near ? pt.dy : 0), hp: Math.min(pt.hp, d.hp), max: d.hp, state: '', home: { x: P.x, y: P.y }, sect: 0, ward: 0, order: pt.order, slots: pt.slots || 1, target: null }); }
@@ -2440,7 +2468,7 @@ loadScout(SCOUT_SRC); renderCC(); resize(); requestAnimationFrame(loop);
 function spawnMon(type, dx = 3, dy = 0) { const d = MON[type]; if (!d) return null; let x = P.x + dx, y = P.y + dy;
   for (let r = 0; r < 6 && BLK[tAt(Math.floor(x), Math.floor(y))]; r += .5) for (let a = 0; a < 8; a++) { const nx = P.x + dx + Math.cos(a * Math.PI / 4) * r, ny = P.y + dy + Math.sin(a * Math.PI / 4) * r; if (!BLK[tAt(Math.floor(nx), Math.floor(ny))]) { x = nx; y = ny; break; } }
   return addEnt({ kind: 'mon', type, name: d.n, x, y, hp: d.hp, max: d.hp, state: 'idle', home: { x, y }, sect: 0, ward: 0 }); }
-window.__SF = { get WS() { return WS; }, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
+window.__SF = { get WS() { return WS; }, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
 
 }
 </script>

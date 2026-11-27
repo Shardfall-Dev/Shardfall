@@ -6,9 +6,9 @@ A T2A-era Ultima Online-style 2.5D isometric sandbox RPG for phones, built as a 
 
 **Online:** every merge to `main` publishes the newest build on GitHub Pages (`.github/workflows/pages.yml`; one-time setup: Settings → Pages → Source: GitHub Actions. Pages on a private repository needs a paid GitHub plan, and the site itself is public): `https://shardfall-dev.github.io/Shardfall/`. On iPhone, Share → Add to Home Screen gives it an app icon.
 
-**On your computer:** run `python3 -m http.server` in this folder and open `http://localhost:8000/Shardfall_v0.24.html`. The game loads its sound and music from `assets/audio/web/`, so it needs to be served like this; opened straight from disk it plays silently. For a single file that plays from disk with sound effects, build `./build.sh 0.24 --offline`.
+**On your computer:** run `python3 -m http.server` in this folder and open `http://localhost:8000/Shardfall_v0.25.html`. The game loads its sound and music from `assets/audio/web/`, so it needs to be served like this; opened straight from disk it plays silently. For a single file that plays from disk with sound effects, build `./build.sh 0.25 --offline`.
 
-**Developer panel:** add `?dev` to the address (for example `http://localhost:8000/Shardfall_v0.24.html?dev`) and press the small DEV button. It shows the world's live numbers, lets you set the time, pause or fast-forward the simulation, send test travellers anywhere and inspect any actor you tap. Without `?dev` it does not exist.
+**Developer panel:** add `?dev` to the address (for example `http://localhost:8000/Shardfall_v0.25.html?dev`) and press the small DEV button. It shows the world's live numbers (creatures by faction, regions, camps and what the ecosystem has been doing), lets you set the time, pause or fast-forward the simulation, send test travellers anywhere and inspect any actor you tap (a creature shows its faction, activity, what it decided and why, its senses, pack, camp and sound). Without `?dev` it does not exist.
 
 Progress saves to the browser's local storage.
 
@@ -30,27 +30,43 @@ Progress saves to the browser's local storage.
 - `src/frontier.js` — the world expansion (v0.23): the Southern Reach and the Long Causeway, Southwatch, eight camps and five sealed dungeon mouths, their art, zones and provisional camp spawners.
 - `src/world.js` — the world simulation core (`SIM`): stable actor ids, archetypes and controllers, the structured event log, seeded streams, the fixed step, the world clock and light curve, A* and the travel graph. No DOM; tested in node like the rules.
 - `src/living.js` — the Living World runtime in the game: the 50 ms step loop and interpolation, light and local lights, walkability, the travel graph from roads, piers, gates and stairs, the navigator (doors, stuck recovery) and the developer panel (`?dev`).
+- `src/ecology.js` — the monster ecosystem (Living World phase 3): species profiles as data, factions, perception, decisions, roaming, packs, predator and prey, creature-against-creature fights, camp sorties, regional populations and persistent camps, graveyards that rise at night, creature sound, and the new procedural wildlife (deer, hares, bears).
 - `src/game.js` — the game: world generation, rendering, input, NPCs, quests, crafting UI, save/load, and the one physical-combat resolver every swing goes through.
-- `build.sh` — joins the parts into the game: `./build.sh 0.24` → `Shardfall_v0.24.html` (web build, 7.0 MB); `./build.sh 0.24 --offline` → `Shardfall_v0.24_offline.html` (22 MB, every sound inside, not committed). Needs `python3`.
-- `Shardfall_v0.24.html` — the current built game.
+- `build.sh` — joins the parts into the game: `./build.sh 0.25` → `Shardfall_v0.25.html` (web build, 7.1 MB); `./build.sh 0.25 --offline` → `Shardfall_v0.25_offline.html` (22 MB, every sound inside, not committed). Needs `python3`.
+- `Shardfall_v0.25.html` — the current built game.
 - `.github/workflows/pages.yml` — publishes the newest build to GitHub Pages as `index.html`, with the audio beside it.
 - `docs/WORLD_SIMULATION_MASTER.md` — the Living World master roadmap (the full specification). `docs/WORLD_SIMULATION_PROGRESS.md` — what is built, phase by phase, the audit matrix, asset gaps and the next task.
 - `docs/Shardfall_Audio.md` — what plays when, the audio pipeline and sound-release versioning.
 - `docs/Shardfall_Crafting_Guide.md` — the crafting design guide the build follows.
 - `docs/combat/STATUS.md` — combat and First Aid: the rules, the weapon table, the save migration, sources and every approximation.
 - `docs/magery/` — the Magery kit: brief (`Magery_Brief.txt`), illustrated book (`Shardfall_Spellbook.html`, `Spellbook.md`), `spells.json`, reference math, and `STATUS.md` (what is in, what differs, what is left).
-- `tests/rules.test.js` — deterministic rules tests: `node tests/rules.test.js Shardfall_v0.24.html`
-- `tests/magery.test.js` — Magery rules tests: `node tests/magery.test.js Shardfall_v0.24.html`
-- `tests/combat.test.js` — combat and First Aid rules tests: `node tests/combat.test.js Shardfall_v0.24.html`
-- `tests/magery-smoke/run.py` — in-browser Magery scenarios (Playwright + Chrome): `python3 tests/magery-smoke/run.py Shardfall_v0.24.html`
-- `tests/combat-smoke/run.py` — in-browser combat, archery, First Aid, reload, old-save and phone play-test scenarios: `python3 tests/combat-smoke/run.py Shardfall_v0.24.html` (screenshots in `$COMBAT_SHOTS`, default `/tmp/combat-shots`)
-- `tests/backpack-smoke/run.py` — in-browser backpack checks (saved character, three sorts, desktop hover, phone tap, actions after sorting): `python3 tests/backpack-smoke/run.py Shardfall_v0.24.html`
-- `tests/backpack-smoke/icons.py` — backpack icon checks (all 154 ids resolve, slot / tooltip / tap card use the same tile, stack counts readable after every sort, desktop and two landscape phones): `python3 tests/backpack-smoke/icons.py Shardfall_v0.24.html`
-- `tests/sfx-smoke/run.py` — browser checks for sound, music, doors and footsteps (Playwright + Chrome; serves the web build on a local port): `python3 tests/sfx-smoke/run.py "$PWD/Shardfall_v0.24.html"`
-- `tests/anniabreen-smoke/run.py` — Anniabreen walk-through (Playwright + Chrome): a scripted walker drives the joystick through the real update loop and times the routes; mine/smelt/bank, ferries, boats, moongates, doors, touch and mouse over a bridge, reload, save migration, phone map: `python3 tests/anniabreen-smoke/run.py Shardfall_v0.24.html [--shots DIR]`
-- `tests/bestiary-smoke/run.py` — bestiary checks in the built game (sheets load, pixel-exact cells, 8 facings, walk / wind-up / impact against the player; preview screenshots when the pack is extracted): `python3 tests/bestiary-smoke/run.py Shardfall_v0.24.html [chrome] [screenshot-dir]`
-- `tests/world.test.js` — world simulation core tests: `node tests/world.test.js Shardfall_v0.24.html`
-- `tests/world-smoke/run.py` — Living World checks in the built game: phase 1 (actor ids, controllers, shared damage, death once, bounded events, save/load identity, v4 → v5 migration, seeded determinism), then `phase2.py` (clock, light, travel graph, journeys by road, boat, moongate and stairs, doors, stuck recovery, search budget, live step rate, developer panel) and `expansion.py` (towns unchanged tile for tile, sites and camps, causeway and islands, long journeys, v0.22 → v0.23 save migration): `python3 tests/world-smoke/run.py Shardfall_v0.24.html`
+- `tests/rules.test.js` — deterministic rules tests: `node tests/rules.test.js Shardfall_v0.25.html`
+- `tests/magery.test.js` — Magery rules tests: `node tests/magery.test.js Shardfall_v0.25.html`
+- `tests/combat.test.js` — combat and First Aid rules tests: `node tests/combat.test.js Shardfall_v0.25.html`
+- `tests/magery-smoke/run.py` — in-browser Magery scenarios (Playwright + Chrome): `python3 tests/magery-smoke/run.py Shardfall_v0.25.html`
+- `tests/combat-smoke/run.py` — in-browser combat, archery, First Aid, reload, old-save and phone play-test scenarios: `python3 tests/combat-smoke/run.py Shardfall_v0.25.html` (screenshots in `$COMBAT_SHOTS`, default `/tmp/combat-shots`)
+- `tests/backpack-smoke/run.py` — in-browser backpack checks (saved character, three sorts, desktop hover, phone tap, actions after sorting): `python3 tests/backpack-smoke/run.py Shardfall_v0.25.html`
+- `tests/backpack-smoke/icons.py` — backpack icon checks (all 154 ids resolve, slot / tooltip / tap card use the same tile, stack counts readable after every sort, desktop and two landscape phones): `python3 tests/backpack-smoke/icons.py Shardfall_v0.25.html`
+- `tests/sfx-smoke/run.py` — browser checks for sound, music, doors and footsteps (Playwright + Chrome; serves the web build on a local port): `python3 tests/sfx-smoke/run.py "$PWD/Shardfall_v0.25.html"`
+- `tests/anniabreen-smoke/run.py` — Anniabreen walk-through (Playwright + Chrome): a scripted walker drives the joystick through the real update loop and times the routes; mine/smelt/bank, ferries, boats, moongates, doors, touch and mouse over a bridge, reload, save migration, phone map: `python3 tests/anniabreen-smoke/run.py Shardfall_v0.25.html [--shots DIR]`
+- `tests/bestiary-smoke/run.py` — bestiary checks in the built game (sheets load, pixel-exact cells, 8 facings, walk / wind-up / impact against the player; preview screenshots when the pack is extracted): `python3 tests/bestiary-smoke/run.py Shardfall_v0.25.html [chrome] [screenshot-dir]`
+- `tests/world.test.js` — world simulation core tests: `node tests/world.test.js Shardfall_v0.25.html`
+- `tests/world-smoke/run.py` — Living World checks in the built game: phase 1 (actor ids, controllers, shared damage, death once, bounded events, save/load identity, v4 → v5 migration, seeded determinism), then `phase2.py` (clock, light, travel graph, journeys by road, boat, moongate and stairs, doors, stuck recovery, search budget, live step rate, developer panel) and `expansion.py` (towns unchanged tile for tile, sites and camps, causeway and islands, long journeys, v0.22 → v0.23 save migration) and `phase3.py` (species profiles and factions, regional populations, predator and prey, creature-against-creature fights, timid wildlife, perception at night and in hiding, graveyards rising at night, persistent camps through a reload, packs, pursuit limits, camp patrols, the spatial index, and a seeded three-day run): `python3 tests/world-smoke/run.py Shardfall_v0.25.html`
+
+## v0.25 — The living wilderness (Living World phase 3: the monster ecosystem)
+
+- **Creatures live their own lives.** Every species has a profile: faction, habitat, waking hours, temperament, senses, territory, how far it will chase, what it hunts, whether it lives alone, in a pack or in a camp, and when it gives up a fight.
+  - **Wolves hunt deer.** Packs move together behind a leader, chase down prey, and stay to feed on a kill. Hungry hunters track prey by scent; a fed one leaves the herds alone for a while.
+  - **Deer and hares** are new, peaceful wildlife on the plains and in the woods. They graze and wander, bolt from wolves and from you, run together as a herd, and drift back home once it is quiet. **Bears** are new too: solitary, territorial and strong.
+  - **Monsters fight each other.** Orcs, the undead, wolves, trolls and lizardmen each have their enemies. Skeletons attack anything living; orcs hunt wildlife and fight lizardmen and trolls. None of this needs the player. Killing a hostile creature is never a crime.
+  - **Night changes things.** Skeletons are dormant by day and roam at night, and the graveyards fill with extra dead after dark that sink back to their graves at dawn. Wolves and hounds are dusk hunters with night vision. Most other creatures see only half as far at night, and deer and hares sleep in the small hours.
+  - **Creatures see and hear, they do not know.** They notice what is in their sight (shorter at night, much shorter asleep) or what moves within earshot, and they call their kind for help. **Hiding works against all of them.**
+  - **Pursuit limits.** A creature chases only so far from its ground, then walks home (along a real path when it is far).
+- **Camps remember.** The eight camps and the dungeon-mouth guards are persistent populations. Orcs send patrols down their trail toward the road, and bandits go out to watch it. Clear a camp and it stays empty (through a reload too) for about 25 minutes, then members return one at a time until it is whole again.
+- **A fuller world.** About 470 creatures at the start (was about 210), spread over ~100 habitat regions: forests, plains, mountains, swamps, graveyards, camps and dungeon levels. They spawn only out of sight (never within 22 m of you), never in towns, and no wolves, bears, trolls or orcs live in the Saltmarsh starter area. Distant idle creatures think at a quarter rate, so a simulation step still costs about half a millisecond.
+- **Creature sound.** Every species with a sound plays it when it spots its prey or its enemy, attacks or dies. Dire wolves use the marsh hound's voice, bears the boar's and giant spiders the mire spider's (documented stand-ins). Nearby creatures call now and then, and at night you may hear wolves in the distance. Species with no sound yet stay silent rather than borrow a wrong one.
+- **Developer panel (`?dev`):** creatures by faction, regions with counts and caps, every camp (alive / cap, cleared, recovering, on a sortie), ecosystem counters, a faction matrix, and per-creature decisions with their reasons. The perception overlay shows sight and hearing; the territory overlay shows territory and pursuit limit.
+- The save gains a small `eco` block (camp clearances); older saves load unchanged.
 
 ## v0.24 — everything merged into one build
 
