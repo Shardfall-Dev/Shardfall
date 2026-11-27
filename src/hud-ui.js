@@ -205,7 +205,7 @@ function tfModel(t) {
     if (ents.some(e => e.kind === 'pet' && !e.gone)) m.acts += btn('petcmd', 'Pets attack', { c: 'attack' }, 'on');
     if (d.tame && !d.boss) m.more += btn('abil', 'Tame', { id: 'tame' }); if (SF.count(P.pack, 'lute') && !d.boss) m.more += btn('abil', 'Lullaby', { id: 'lullaby' }) + btn('abil', 'Discord', { id: 'discord' }) + btn('abil', 'Provoke', { id: 'provoke' });
     if (d.purse && t.target !== P) m.more += btn('abil', 'Pickpocket', { id: 'pick' }); m.more += btn('abil', 'Anatomy', { id: 'anatomy' }); }
-  else if (t.kind === 'npc') { const [nm, role] = npcLabel(t), q = questObjective(); m.dot = t.role === 'outlaw' ? 'red' : 'blue'; m.name = nm; m.sub.push(role); m.sub.push(dm); if (q && q.at === t) m.chips.push(['! Quest', 'quest']);
+  else if (t.kind === 'npc') { const [nm, role] = npcLabel(t), q = questObjective(); m.dot = t.role === 'outlaw' ? 'red' : 'blue'; m.name = nm; m.sub.push(role); m.sub.push(dm); if (q && q.at === t) m.chips.push(['! Quest', 'quest']); if (t.downed) m.chips.push(['Knocked down', 'warn']); else if (t.npcFight && t.hp < t.max) m.bar = hpBar(t.hp / t.max); if (t.foe && alive(t.foe)) m.chips.push(['⚔ Fighting', 'atk']);
     m.acts = `<button class="btn sm ac" data-a="interact">${npcAction(t)}</button>`; }
   else if (t.kind === 'corpse') { m.dot = 'item'; m.name = t.name; const ls = t.cont && Number.isFinite(t.cont.diedAt) ? SF.lootStatus(t.cont, P.id, GT) : null;   // loot rights exist only on bodies that carry them (player bodies today) if (t.cont) m.sub.push(t.cont.items.length ? t.cont.items.length + ' stack' + (t.cont.items.length === 1 ? '' : 's') : 'empty'); m.sub.push(dm);
     if (ls && (t.mine || !ls.lawful)) m.chips.push([cap1(ls.label), ls.lawful ? '' : 'warn']);

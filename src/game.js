@@ -299,7 +299,7 @@ function resurrect(where) {
    The rules (hit chance, dice, damage stages, swing timer, archery) live in src/rules.js; this block adapts them to actors. */
 const isAlly = e => !!e && e.kind === 'ally';
 const isPlayerLike = e => e === P || isAlly(e);
-const fighterAlive = e => !!e && (e === P ? !P.ghost : isAlly(e) ? !e.ghost && !e.gone : alive(e));
+const fighterAlive = e => !!e && (e === P ? !P.ghost : isAlly(e) ? !e.ghost && !e.gone : e.kind === 'npc' ? npcUp(e) : alive(e));   // townsfolk fight only with a profile (phase 5) and not while knocked down
 const skOf = (a, k) => a === P ? sv(k) : a.skills && a.skills[k] ? a.skills[k].v / 10 : 0;
 let SHOTID = 0;
 /* creature numbers the T2A rules need: natural armor rating, strength and dexterity (tuning, see docs/combat/STATUS.md) */
@@ -313,7 +313,7 @@ const wDef = () => weaponOfActor(P);
 const weaponLabel = a => { const w = weaponOfActor(a), it = a.equip && a.equip.weapon; return w === SF.WEAPONS.unarmed ? (it ? SF.itemName(it) + ' (broken)' : 'Fists') : SF.itemName(it); };
 /* everything a blow needs from one side, read fresh for every swing */
 function fighter(a) {
-  if (isPlayerLike(a)) {
+  if (isPlayerLike(a) || npcCombatant(a)) {   // townsfolk fight like Wren: weapon, skills and worn armor (src/npcfight.js)
     const w = weaponOfActor(a), it = w === SF.WEAPONS.unarmed ? null : a.equip.weapon, sh = a.equip.shield;
     // armor is resolved per blow on the struck body region (applyBlow → regionHit); armorAR here is the expected summary for display
     return { a, player: true, w, it, atk: skOf(a, w.skill), def: skOf(a, w.skill), tactics: skOf(a, 'tactics'), anatomy: skOf(a, 'anatomy'), str: a.str,
@@ -348,7 +348,7 @@ function swingSound(a, w) {
 function noHarmSound(t, parried) { const ev = parried ? 'block.shield' : 'hit.armor'; if (t === P) snd(ev, { gain: .5, key: 'impP' }); else sndAt(ev, t, { gain: .5, key: 'imp' + t.id }); }
 const wardSound = t => { if (sndOnce('veil' + (t.id || 'P'), .6)) { if (t === P) snd('magic.ward', { gain: .6 }); else sndAt('magic.ward', t, { gain: .6 }); } };
 /* the shared damage entry: a swing, a shot, a spell or a creature's blow reaches any actor (player, hireling, creature, pet) through here */
-function damageActor(t, amt, kind, src, hx) { if (t === P) return damagePlayer(amt, src === P ? null : src, kind, hx); if (isAlly(t)) return damageAlly(t, amt, src, kind, hx); return damageMon(t, amt, kind, src, hx); }
+function damageActor(t, amt, kind, src, hx) { if (t === P) return damagePlayer(amt, src === P ? null : src, kind, hx); if (isAlly(t)) return damageAlly(t, amt, src, kind, hx); if (t && t.kind === 'npc') return damageNpc(t, amt, kind, src, hx); return damageMon(t, amt, kind, src, hx); }
 /* one landed blow. A = attacker view (taken at the swing or the release), t = recipient. Returns the stage record. */
 function applyBlow(A, t, opt) {
   opt = opt || {}; if (!fighterAlive(t)) return null; const a = A.a, D = fighter(t);
@@ -460,13 +460,14 @@ function killMon(m, src) {
   for (const e of ents) if (e.target === m) { e.target = null; if (e.kind === 'mon') e.state = 'return'; }
   if (P.sel === m) { P.sel = mine ? null : corpse; P.armed = false; }
   if (mine) { log((d.boss ? 'You have felled ' : 'You slay the ') + d.n + '.', '#ffe08a'); if (d.boss) { say(P, d.fallLine || 'The bell falls silent.'); } }
-  else if (src && src.kind === 'mon' && dist(m, P) < 22) log(`A ${MON[src.type].n} kills a ${d.n}.`, '#b6a68a');   // creatures fight each other (Living World phase 3)
+  else if (src && src.kind === 'mon' && dist(m, P) < 22) log(`A ${MON[src.type].n} kills a ${d.n}.`, '#b6a68a');
+  else if (src && src.kind === 'npc' && dist(m, P) < 22) log(`${(src.name || 'A guard').split(',')[0]} kills the ${d.n}.`, '#b6a68a');   // guards fight back (phase 5)   // creatures fight each other (Living World phase 3)
 }
 
 /* ---------- monsters: telegraph → committed strike → recovery ---------- */
 function aiMon(m, dt) {
   const d = MON[m.type], pr = ecoP(m.type); m.speed = 0; let t = m.target;
-  if (t && (t.gone || t.dead || t.ghost || (t === P && (P.ghost || P.hidden)) || (m.provoked && GT > m.provoked && t.kind === 'mon' && !ecoEnemy(m, t)))) { m.target = t = null; m.provoked = 0; if (m.state !== 'idle' && m.state !== 'flee') m.state = 'return'; }
+  if (t && (t.gone || t.dead || t.ghost || (t === P && (P.ghost || P.hidden)) || (t.kind === 'npc' && !ecoTargetable(m, t)) || (m.provoked && GT > m.provoked && t.kind === 'mon' && !ecoEnemy(m, t)))) { m.target = t = null; m.provoked = 0; if (m.state !== 'idle' && m.state !== 'flee') m.state = 'return'; }
   const seeP = () => !(m.pacified > GT) && ecoSeesPlayer(m);   // perception (Living World phase 3): night, sleep and Hiding count; only enemies and territorial creatures
   let anchor, home, hunting, pursuit; const frame = () => { anchor = m.anchor || m.home; home = Math.hypot(m.x - anchor.x, m.y - anchor.y); hunting = m.chaseKind === 'hunt'; pursuit = (pr.pur || d.leash) * (hunting ? 2 : 1); }; frame();   // a hunt may run further than a territorial chase
   const step = (tx, ty, spd, away) => { if (m.rooted > GT) return; let dx = tx - m.x, dy = ty - m.y; if (away) { dx = -dx; dy = -dy; } const l = Math.hypot(dx, dy); if (l < .05) return; const s = Math.min(l, spd * MOVE_SCALE * (m.slowUntil > GT ? .75 : 1) * dt); const mv = moveBy(m, dx / l * s, dy / l * s); if (mv < s * .3) moveBy(m, -dy / l * s, dx / l * s); m.speed = mv / dt; updateFacing(m, dx, dy); };
@@ -1668,6 +1669,7 @@ function drawEnt(e) {
   if (e.kind === 'player' && drawForm(g, e, x, y)) { }
   else if (e.kind === 'player') drawScout(g, e, x, y, P.ghost ? 'ghost' : (P.look.cloak || null));
   else if (e.kind === 'ally') { if (e.ghost) g.globalAlpha = .75; drawScout(g, e, x, y, e.ghost ? 'ghost' : '#2f7a46'); }
+  else if (e.kind === 'npc' && e.downed) { g.save(); g.globalAlpha = .85; g.translate(x, y - 4); g.rotate(-1.4); g.translate(-x, -y); drawScout(g, e, x, y, NPC_COL[e.role] || (e.life && LIFE_COL[e.life.prof]) || '#5a5a5a'); g.restore(); }   // knocked down (phase 5)
   else if (e.kind === 'npc') drawScout(g, e, x, y, NPC_COL[e.role] || (e.life && LIFE_COL[e.life.prof]) || '#5a5a5a');
   // creature art, best first: a decoded bestiary sheet, a legacy MON_SHEETS sheet, the scout tint, then procedural art.
   // A sheet that is still decoding (or failed to load) falls through, so a creature is never drawn invisible.
@@ -2574,4 +2576,4 @@ function spawnMon(type, dx = 3, dy = 0) { const d = MON[type]; if (!d) return nu
   return addEnt({ kind: 'mon', type, name: d.n, x, y, hp: d.hp, max: d.hp, state: 'idle', home: { x, y }, sect: 0, ward: 0 }); }
 /* __SF is a development and test hook (the browser suites drive the game through it). It is not a security boundary: anything
    here is reachable from the console in an offline single-player game, and a multiplayer server must not trust the client. */
-window.__SF = { FRAME_ERR, readSave, validateSave, get WS() { return WS; }, dist, closePanel, lifeSave, LIFE, LIFE_SCHED, lifeTick, lifeResume, lifeInspect, lifeTownGeo, lifeTalk, talk, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
+window.__SF = { FRAME_ERR, los, NPCF, NPC_FIGHT, NPC_DOWN_TIME, npcArm, damageNpc, npcEngage, npcCombatant, npcUp, npcSave, ecoTargetable, readSave, validateSave, get WS() { return WS; }, dist, closePanel, lifeSave, LIFE, LIFE_SCHED, lifeTick, lifeResume, lifeInspect, lifeTownGeo, lifeTalk, talk, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
