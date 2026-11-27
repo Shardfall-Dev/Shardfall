@@ -63,9 +63,9 @@ function lifeTownGeo(id) {
   return LIFE.towns[id] = G;
 }
 /* a free spot near a place: crowds spread out instead of stacking on one tile (§14) */
-function lifeSpot(e, c, r) {
-  let best = null, bd = -1;
-  for (let k = 0; k < 10; k++) { const a = (k / 10 + (e.id % 7) * .13) * Math.PI * 2, rr = r * (.4 + .6 * ((k * 7 + e.id) % 10) / 10), x = c.x + Math.cos(a) * rr, y = c.y + Math.sin(a) * rr;
+function lifeSpot(e, c, r, salt) {   // salt: a different spot each call (a stroller's next stop), not the same first free one
+  let best = null, bd = -1; salt = salt || 0;
+  for (let k = 0; k < 10; k++) { const a = (k / 10 + (e.id % 7) * .13 + salt * .381) * Math.PI * 2, rr = r * (.4 + .6 * ((k * 7 + e.id + salt * 3) % 10) / 10), x = c.x + Math.cos(a) * rr, y = c.y + Math.sin(a) * rr;
     if (!canStand({ kind: 'npc' }, x, y)) continue; let near = 9; for (const o of LIFE.npcs) if (o !== e && !o.gone && o.life.goal && o.life.goal.x !== undefined) near = Math.min(near, Math.hypot(o.life.goal.x - x, o.life.goal.y - y));
     if (near > bd) { bd = near; best = { x, y }; } if (near > 1.4) break; }
   return best || { x: c.x, y: c.y };
@@ -188,7 +188,7 @@ function lifeDo(e, dt) {
   if (!there) { if (!e.nav || e.nav.state !== 'moving') { if (!e.nav || e.nav.state === 'done') lifeGo(e, g); } return; }
   L.doing = g.act;
   if (g.act === 'sleep') { if (P && dist(e, P) < 14 && GT > (L.zAt || 0)) { L.zAt = GT + 7; say(e, 'Zzz…'); } return; }
-  if (g.act === 'wander' && GT > (L.wAt || 0)) { L.wAt = GT + 12 + (e.id % 9) * 2; const G = lifeTownGeo(L.town), p = lifeSpot(e, G.market, G.market.r); g.x = p.x; g.y = p.y; lifeGo(e, g); return; }
+  if (g.act === 'wander' && GT > (L.wAt || 0)) { L.wAt = GT + 12 + (e.id % 9) * 2; const G = lifeTownGeo(L.town), p = lifeSpot(e, G.market, G.market.r, L.wn = (L.wn || 0) + 1); g.x = p.x; g.y = p.y; lifeGo(e, g); return; }
   if (g.act === 'gather') return lifeGather(e, dt);
   if (g.act === 'trade' && L.carry > 0) return lifeSell(e);
   if (g.act === 'social' || g.act === 'eat') { if (GT > (L.chatAt || 0)) { L.chatAt = GT + 25 + (e.id % 13) * 3; const o = LIFE.npcs.find(o => o !== e && !o.gone && o.life.goal && o.life.doing === g.act && dist(o, e) < 3.5);

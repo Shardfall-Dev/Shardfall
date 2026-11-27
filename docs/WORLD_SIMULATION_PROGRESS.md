@@ -667,6 +667,7 @@ v0.26 merges phase 3 with the equipment and paper doll work (#19, which already 
 | v0.25 (554 entities, 475 creatures) | 0.49 ms | 3.7 ms | 4.7 ms |
 | v0.26 (556 entities, measured again for phase 4) | 0.54 ms | 4.0 ms | 4.7 ms |
 | v0.27 (564 entities, 25 with routines) | 0.67 ms | 3.8 ms | 5.0 ms |
+| v0.28.1 (≈1,020 entities, ≈945 creatures; update only, one run of 1,000 steps after boot, v0.28 in the same run: 1.04 ms) | 1.84 ms | — | — |
 
 - Each figure is the average of 3 runs of 4,000 updates and 200 renders.
 - **v0.23 update cost.** It rose from 0.80 to 1.20 ms per step. This is the creature push-apart in `aiMon`, which compares every entity with every other: with 256 entities instead of 212 that is 1.46× the pairs, which matches the measurement. It is still far inside the 50 ms step, but it is the first sign of the quadratic cost the audit flagged. The phase 3 spatial index removes it.

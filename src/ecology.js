@@ -216,11 +216,14 @@ function ecoSortieEnd(m) { const s = m.sortie; if (!s) return; m.sortie = null; 
    persistent: SIM.newCamp records clearance, which is saved. Wilderness cells get wildlife by habitat from their own seeded
    stream, so the map itself is unchanged. */
 const ECO_CELL = 150;
-const ECO_BIOME = {
-  forest:   { cap: 6, mix: g => [['deer', 3, 3], ['hare', 1, 1]].concat(g.wild ? (g.h % 3 === 0 ? [['dire_wolf', 3, 3]] : g.h % 4 === 1 ? [['bear', 1, 1]] : []) : []) },
-  plains:   { cap: 4, mix: g => [['hare', 2, 1]].concat(g.h % 2 ? [] : [['deer', 2, 2]]) },
-  swamp:    { cap: 3, mix: g => g.wild ? [['slime', 2, 1], ['hare', 1, 1]] : [['hare', 1, 1]] },
-  mountain: { cap: 4, mix: g => g.wild ? [['bear', 1, 1], g.h % 2 ? ['dire_wolf', 2, 2] : ['hare', 2, 1]] : [['hare', 2, 1]] } };
+const ECO_BIOME = {   // g.wild: a cell with no town ground in it; g.edge: a cell that borders a town (outside the starter slice) — the classic
+                     // town-edge pests and small hunters (rats, hounds, boars, mire spiders) live there, kept well back from protected ground
+  forest:   { cap: 6, mix: g => [['deer', 3, 3], ['hare', 1, 1], ['boar', 1, 1]].concat(g.wild ? (g.h % 3 === 0 ? [['dire_wolf', 3, 3]] : g.h % 4 === 1 ? [['bear', 1, 1]] : []) : g.edge ? [['boar', 2, 1], ['hound', 2, 2]] : []) },
+  plains:   { cap: 4, mix: g => [['hare', 2, 1]].concat(g.h % 2 ? [] : [['deer', 2, 2]], g.wild && g.h % 3 === 0 ? [['hound', 3, 3]] : [], g.edge ? [['rat', 3, 1], ['hound', 2, 2]] : []) },
+  swamp:    { cap: 3, mix: g => g.wild ? [['slime', 2, 1], ['hare', 1, 1], ['spider', 1, 1]] : g.edge ? [['spider', 2, 1], ['snapper', 1, 1], ['hare', 1, 1]] : [['hare', 1, 1]] },
+  mountain: { cap: 4, mix: g => g.wild ? [['bear', 1, 1], g.h % 2 ? ['dire_wolf', 2, 2] : ['hare', 2, 1]] : g.edge ? [['hare', 2, 1], ['hound', 2, 2]] : [['hare', 2, 1]] } };
+const ECO_EDGE_GAP = 28;   // hostile spawn points in a town-edge cell stand at least this far from protected ground
+const ecoFarFromProt = (x, y, d) => { for (const r of [d, d * .5]) for (let k = 0; k < 16; k++) { const a = k / 16 * 6.283; if (protAt(x + Math.cos(a) * r, y + Math.sin(a) * r)) return false; } return !protAt(x, y); };
 function ecoGenerate() {
   ecoSpecies(); ECOS.regions.clear(); ECOS.camps.clear();
   const rng = SIM.stream(1999, 'population'), C = ECO_CELL, nx = Math.ceil(W / C), ny = Math.ceil(H / C);
@@ -236,12 +239,15 @@ function ecoGenerate() {
     }
     if (land < tot * .3) continue; const open = land - prot - site; if (open < tot * .2) continue;
     const biome = swamp / open > .12 ? 'swamp' : rock / open > .08 ? 'mountain' : tree / open > .045 ? 'forest' : grass / open > .5 ? 'plains' : null; if (!biome) continue;
-    const starter = x0 < SW && y0 < SW, g = { wild: !starter && prot === 0, h: (cx * 7 + cy * 13 + (rng() * 1000 | 0)) };
+    const starter = x0 < SW && y0 < SW, g = { wild: !starter && prot === 0, edge: !starter && prot > 0, h: (cx * 7 + cy * 13 + (rng() * 1000 | 0)) };
     const pool = spots[biome].length ? spots[biome] : spots.plains.length ? spots.plains : spots.forest; if (!pool.length) continue;
     const id = 'wild:' + cx + ',' + cy; ECOS.regions.set(id, { id, kind: biome, name: biome + ' ' + cx + ',' + cy, x: x0 + C / 2, y: y0 + C / 2 });
+    const far = g.edge ? pool.filter(([x, y]) => ecoFarFromProt(x, y, ECO_EDGE_GAP)) : pool;
     for (const [type, max, pack] of ECO_BIOME[biome].mix(g)) {
-      const [sx, sy] = pool[Math.floor(rng() * pool.length)];
-      SPAWNS.push({ type, x: sx + .5, y: sy + .5, r: 26, max, pack, n: 0, next: 0, region: id, eco: 1, biome });
+      const hostile = ecoP(type).temper !== 'timid', from = hostile && g.edge ? far : pool; if (!from.length) continue;
+      // outside the starter slice each group has two homes in the cell, so the land between towns is not one herd per 150 m
+      for (let c = starter ? 1 : 2; c > 0; c--) { const [sx, sy] = from[Math.floor(rng() * from.length)];
+        SPAWNS.push({ type, x: sx + .5, y: sy + .5, r: 26, max, pack, n: 0, next: 0, region: id, eco: 1, biome }); }
     }
   }
   // regions for the spawners that already existed: camps, graveyards, dungeon levels, the old wilderness points
