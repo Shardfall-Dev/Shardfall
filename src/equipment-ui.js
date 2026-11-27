@@ -25,6 +25,8 @@ bagIcon = function (it, size) {
   if (!d.fam) return baseBagIcon(it, size);
   const m = SF.matOf(it), col = EQ.matColor(d.fixedMat || m), chip = isDefaultMat(d, m) ? '' : `<b class="matchip" style="background:${col}"></b>`;
   const r = BAG_ICONS.rect[it.id] || (d.icon && BAG_ICONS.rect[d.icon]);
+  const gu = !r && gearIconUrl(it);   // no painted icon of its own: its piece of the new equipment art, in its materials (when on)
+  if (gu) return `<i class="bagico gearico" aria-hidden="true" data-icon="${esc(it.id)}" style="width:${size}px;height:${size}px;background-image:url(${gu});background-size:contain;background-position:center">${chip}</i>`;
   if (r) { const k = size / r[2]; return `<i class="bagico" aria-hidden="true" data-icon="${esc(it.id)}" style="width:${size}px;height:${size}px;background-size:${BAG_ICONS.w * k}px ${BAG_ICONS.h * k}px;background-position:${-r[0] * k}px ${-r[1] * k}px">${chip}</i>`; }
   return `<i class="bagglyph eqglyph" aria-hidden="true" data-icon="${esc(it.id)}" style="width:${size}px;height:${size}px">${eqSvg(d.slot, col, Math.round(size * .86))}${chip}</i>`;
 };
@@ -139,8 +141,8 @@ function renderEqWin(force) {
   const open = !!(P && SETTINGS.eqOpen && !SCREEN); document.body.classList.toggle('eqopen', open);
   if (!open) { if (!el.hidden) { el.hidden = true; EQW.html = ''; } return; }
   const e = EQ.effective(P);
-  let h = `<div class="eqh" data-eqmove><b>${esc(P.name)}</b><span class="note">AR ${f1w(e.ar)} · ${f1w(encumb().wt)}/${f1w(SF.carryCap(P))}</span><button class="x" data-a="eqclose" aria-label="Close equipment">×</button></div><div class="eqb">`;
-  h += `<div class="eqdoll"><div class="eqcol">${EQ_LEFT.map(eqSlotHtml).join('')}</div><div class="eqfig" data-drop="eq:auto"><i class="doll" style="background-image:url(${dollSrc()})"></i>${P.ghost ? '<span class="note">ghost</span>' : ''}</div><div class="eqcol">${EQ_RIGHT.map(eqSlotHtml).join('')}</div></div>`;
+  let h = `<div class="eqh" data-eqmove><b>${esc(P.name)}</b><span class="note">AR ${f1w(e.ar)} · ${f1w(encumb().wt)}/${f1w(SF.carryCap(P))}</span><button class="gtog${gearOn() ? ' on' : ''}" data-a="gearart" aria-pressed="${gearOn()}" title="Medieval equipment art (preview): layered paper doll and world sprites">New art</button><button class="x" data-a="eqclose" aria-label="Close equipment">×</button></div><div class="eqb">`;
+  h += `<div class="eqdoll"><div class="eqcol">${EQ_LEFT.map(eqSlotHtml).join('')}</div><div class="eqfig" data-drop="eq:auto">${(gearOn() && gearDollSrc(P)) ? `<img class="gdoll" src="${gearDollSrc(P)}" alt="${esc(P.name)} in the equipment worn" draggable="false">` : `<i class="doll" style="background-image:url(${dollSrc()})"></i>`}${P.ghost ? '<span class="note">ghost</span>' : ''}</div><div class="eqcol">${EQ_RIGHT.map(eqSlotHtml).join('')}</div></div>`;
   h += `<div class="eqrow">${EQ_BOTTOM.map(eqSlotHtml).join('')}</div>`;
   const sel = EQW.sel && P.equip[EQW.sel];
   if (EQW.sel) h += `<div class="eqcard">${sel ? itemTip(sel, { compare: false, icon: 40 }) + `<div class="acts">${SF.ITEMS[sel.id].trade || sel.id === 'garment' ? btn('uneq', 'Remove', { s: EQW.sel }) : ''}${SF.WEARABLE(sel.id) && sel.cond !== undefined && sel.cond < (sel.maxc || 100) ? btn('repair', 'Repair', { u: sel.uid }) : ''}${SF.ITEMS[sel.id].trade ? btn('drop', 'Drop', { u: sel.uid }) : ''}</div>` : `<p class="note">${EQ.SLOT[EQW.sel].n}: empty. Drag an item here, or double-click it in the backpack.</p>`}</div>`;
@@ -382,7 +384,7 @@ craftDetail = craftDetail2; PANELS.craft = craftPanel2;
 
 /* ---------- actions ---------- */
 Object.assign(ACT, {
-  eqwin: () => toggleEqWin(), eqclose: () => toggleEqWin(false),
+  eqwin: () => toggleEqWin(), eqclose: () => toggleEqWin(false), gearart: () => setGearArt(!gearOn()),
   eqsel: d => { EQW.sel = EQW.sel === d.s ? null : d.s; renderEqWin(true); },
   bagfilter: d => { BAG.filter = d.f; BAG.rows = [0, 18]; renderPanel(); },
   bagsort: d => { bagSort = d.s; BAG.rows = [0, 18]; renderPanel(); },
