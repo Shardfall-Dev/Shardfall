@@ -68,7 +68,7 @@ SIM.newRegistry = newRegistry;
    Listeners see every event; only non-transient types are kept, in a ring of `cap` records, so the log never grows
    without bound. Movement is transient: it is never kept. */
 SIM.EVENT_TYPES = ['ActorSpawned', 'ActorRemoved', 'ActorMoved', 'ActorDamaged', 'ActorHealed', 'ActorKilled', 'CombatStarted', 'CombatEnded',
-  'ItemTransferred', 'ItemCrafted', 'CrimeCommitted', 'CrimeWitnessed', 'ResourceGathered', 'MerchantArrived', 'CampCleared', 'PopulationReplenished'];
+  'ItemTransferred', 'ItemCrafted', 'CrimeCommitted', 'CrimeWitnessed', 'ResourceGathered', 'MerchantArrived', 'CampCleared', 'PopulationReplenished', 'AppearanceChanged'];   // AppearanceChanged: v0.25 equipment, for the future layered sprites
 SIM.TRANSIENT = { ActorMoved: 1 };
 function newBus(opt) {
   opt = opt || {}; const cap = opt.cap || 256, clock = opt.clock || (() => 0), known = new Set(SIM.EVENT_TYPES);

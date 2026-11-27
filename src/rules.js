@@ -12,10 +12,15 @@ SF.clamp = clamp; SF.roundHalfUp = roundHalfUp;
 SF.STAT_MIN = 10; SF.STAT_MAX = 100; SF.STAT_CAP = 225; SF.CREATE_STATS = 150; SF.CREATE_STAT_MIN = 25;
 SF.SKILL_MAX = 1000; SF.SKILL_CAP = 7000; SF.CREATE_SKILLS = 100; SF.CREATE_SKILL_MAX = 50;   // tenths
 SF.maxHp = c => Math.floor(50 + 0.5 * c.str);
-SF.maxStam = c => c.dex;
+SF.maxStam = c => Math.max(1, c.dex + (c.eqDex || 0));   // eqDex: transient equipment Dexterity modifier (SF.EQ.refresh), never saved
 SF.maxMana = c => c.int;
-SF.carryKg = c => 22 + 0.33 * c.str;
-SF.SLOTS = 45;
+/* weight: items keep their authored mass (kg) internally; the game shows and balances in weight units (SF.WU per kg).
+   Carrying capacity is Strength-based (UO-inspired, configurable): 40 + 3.5 × STR weight units. The backpack has no slot limit. */
+SF.WU = 2.5;
+SF.CARRY = { base: 40, perStr: 3.5 };
+SF.carryCap = c => SF.CARRY.base + SF.CARRY.perStr * c.str;            // weight units
+SF.carryKg = c => SF.carryCap(c) / SF.WU;
+SF.SLOTS = Infinity;                                                      // no backpack stack limit (v0.25)
 SF.WALK = 4.1; SF.SPRINT = 5.3; SF.SPRINT_DRAIN = 7; SF.STAM_REGEN = 5; SF.STAM_REGEN_COMBAT = 3; SF.STAM_DELAY = 0.75;
 
 /* ---------------- skills (41) ---------------- */
@@ -285,7 +290,7 @@ SF.SPELL_RANGE = 9; SF.HOLD_TIME = 3; SF.SPELL_RECOVERY = .35; SF.PREP_DRIFT = .
 SF.spellSuccess = (spellcraft, min) => clamp(.80, .99, .80 + .004 * (spellcraft - min));
 SF.spellDamage = (base, focus, ward) => roundHalfUp(base * (.75 + .005 * focus) * (1 - .003 * ward));
 SF.interruptCost = mp => Math.ceil(mp / 2);
-SF.manaRegen = (med, armor) => (1 + .022 * med) * (1 - (SF.ARMOR_MANA[armor] || 0));
+SF.manaRegen = (med, armor) => (1 + .022 * med) * (1 - (typeof armor === 'number' ? clamp(0, 1, armor) : (SF.ARMOR_MANA[armor] || 0)));   // armor: a suit key (legacy) or the equipment's meditation interference 0–1
 SF.MEDITATE_BONUS = 4; SF.MEDITATE_DELAY = 3; SF.MEDITATE_SETTLE = .6;
 
 /* ---------------- items ---------------- */
@@ -362,7 +367,7 @@ SF.setUidBase = n => { UID = Math.max(UID, n); };
 SF.newItem = (id, qty, extra) => Object.assign({ uid: UID++, id, qty: qty || 1 }, extra || {});
 SF.newContainer = (kind, owner) => ({ cid: 'c' + (UID++), kind, owner: owner || null, items: [], ver: 0 });
 SF.itemKg = it => SF.ITEMS[it.id].kg * it.qty;
-SF.containerKg = c => c.items.reduce((a, it) => a + SF.itemKg(it), 0);
+SF.containerKg = c => c.items.reduce((a, it) => a + SF.itemKg(it) + (it.items ? SF.containerKg(it) : 0), 0);   // nested containers count their contents
 SF.count = (c, id) => c.items.reduce((a, it) => a + (it.id === id ? it.qty : 0), 0);
 SF.canStack = (a, b) => SF.ITEMS[a.id].stack && a.id === b.id && (a.q || 0) === (b.q || 0) && !a.maker && !b.maker;
 
@@ -459,7 +464,8 @@ SF.craft = (ch, r, rng, cap) => {
 SF.METALS = [
   ['iron', 'Iron', 0, 0, '#8e8f8a', 1.00, 1.00], ['dull_copper', 'Dull Copper', 65, 40, '#8a6646', 1.15, 1.00], ['shadow_iron', 'Shadow Iron', 70, 45, '#45454c', 1.25, 1.08],
   ['copper', 'Copper', 75, 50, '#c0603e', 1.10, .90], ['bronze', 'Bronze', 80, 60, '#c8963e', 1.30, 1.05], ['golden', 'Golden', 85, 65, '#f2cc3a', 1.05, .80],
-  ['agapite', 'Agapite', 90, 75, '#d09090', 1.35, 1.00], ['verite', 'Verite', 95, 85, '#4aac62', 1.20, .82], ['valorite', 'Valorite', 99, 95, '#5a80d8', 1.45, .95]];
+  ['agapite', 'Agapite', 90, 75, '#d09090', 1.35, 1.00], ['verite', 'Verite', 95, 85, '#4aac62', 1.20, .82], ['valorite', 'Valorite', 99, 95, '#5a80d8', 1.45, .95],
+  ['mithril', 'Mithril', 100, 98, '#c4d6ee', 1.30, .45]];   // v0.25: the lightest craftable metal (equipment spec §8)
 SF.METAL = {}; for (const [id, n, mine, smith, col, dur, mass] of SF.METALS) SF.METAL[id] = { id, n, mine, smith, col, dur, mass, kind: 'metal' };
 // [id, display, fell & mill gate, finished-work gate, colour cue, durability multiplier, finished mass multiplier]
 SF.WOODS = [
@@ -509,7 +515,12 @@ SF.repairPlan = it => {
   if (nm < floor) return { ok: false, nm, reason: `too worn to repair: the next maximum (${nm}) would be under ${floor}. Replace it.` };
   return { ok: true, nm };
 };
-SF.repair = it => { const p = SF.repairPlan(it); if (!p.ok) return { ok: false, reason: p.reason }; it.maxc = p.nm; it.cond = p.nm; return { ok: true, maxc: p.nm }; };
+/* each repair may cost maximum durability: the risk falls with the repairer's skill (configurable). Without a skill the loss is certain (legacy). */
+SF.REPAIR = { base: 1.2, perSkill: .01, minRisk: .2 };
+SF.repairRisk = skill => skill === undefined ? 1 : clamp(SF.REPAIR.minRisk, 1, SF.REPAIR.base - SF.REPAIR.perSkill * skill);
+SF.repair = (it, opt) => { opt = opt || {}; const p = SF.repairPlan(it); if (!p.ok) return { ok: false, reason: p.reason };
+  const mx = it.maxc === undefined ? 100 : it.maxc, lose = (opt.rng || Math.random)() < SF.repairRisk(opt.skill); const nm = lose ? p.nm : mx;
+  it.maxc = nm; it.cond = nm; return { ok: true, maxc: nm, lost: lose ? mx - nm : 0 }; };
 
 /* ---------------- work tools: 100 uses, one per resolved attempt that needs the tool ---------------- */
 SF.WORK_TOOLS = { hatchet: 1, pickaxe: 1, rod: 1, tongs: 1, sewkit: 1, knife: 1 };
@@ -524,7 +535,7 @@ SF.REGIONS = [
   { stock: 8,  refill: 120, ore: { iron: 100 }, wood: { pine: 100 } },
   { stock: 10, refill: 300, ore: { iron: 52, dull_copper: 22, shadow_iron: 14, copper: 12 }, wood: { pine: 70, oak: 30 } },
   { stock: 12, refill: 480, ore: { iron: 24, dull_copper: 12, shadow_iron: 12, copper: 18, bronze: 16, golden: 10, agapite: 8 }, wood: { pine: 30, oak: 30, ash: 25, yew: 15 } },
-  { stock: 16, refill: 720, ore: { iron: 10, copper: 10, bronze: 14, golden: 16, agapite: 22, verite: 20, valorite: 8 }, wood: { pine: 8, oak: 8, ash: 14, yew: 22, heartwood: 16, bloodwood: 16, frostwood: 16 } }];
+  { stock: 16, refill: 720, ore: { iron: 10, copper: 10, bronze: 14, golden: 16, agapite: 22, verite: 20, valorite: 8, mithril: 3 }, wood: { pine: 8, oak: 8, ash: 14, yew: 22, heartwood: 16, bloodwood: 16, frostwood: 16 } }];
 SF.rollTable = (tab, rng) => { const ks = Object.keys(tab), tot = ks.reduce((a, k) => a + tab[k], 0); let r = rng() * tot; for (const k of ks) { r -= tab[k]; if (r < 0) return k; } return ks[ks.length - 1]; };
 SF.matGate = (m, use) => use === 'mine' ? SF.METAL[m].mine : use === 'smith' ? SF.METAL[m].smith : use === 'fell' ? SF.WOOD[m].fell : SF.WOOD[m].work;
 SF.commonOf = skill => skill === 'mining' ? 'iron' : 'pine';
@@ -542,18 +553,18 @@ SF.recipeMat = (r, m) => r.prim ? (m || r.defMat) : (r.fixedMat || null);
 SF.QUALITY_CATS = { weapon: 1, shield: 1, armor: 1 };
 SF.craftTime = r => r.time || ({ weapon: 2, shield: 2, armor: 3 }[SF.ITEMS[r.out].cat] || SF.CRAFT_TIME);
 /* plan: everything the preview shows, computed without touching the pack */
-SF.craftPlan = (ch, pack, r, mat) => {
-  const sk = SF.sv(ch, r.skill), m = SF.recipeMat(r, mat), gate = SF.workGate(r, m), effMin = Math.max(r.min, gate);
+SF.craftPlan = (ch, pack, r, mat, sec) => {
+  const sk = SF.sv(ch, r.skill), m = SF.recipeMat(r, mat), s2 = r.sec ? (sec || r.defSec) : null, gate = SF.workGate(r, m), effMin = Math.max(r.min, gate);
   const diff = r.diff !== undefined ? (!r.prim || m === r.defMat ? r.diff : Math.max(r.diff, Math.min(100, gate + 15))) : Math.min(100, effMin + 15);
   const chance = clamp(.10, .98, .55 + (sk - diff) / 80);
   const quality = !!SF.QUALITY_CATS[SF.ITEMS[r.out].cat];
   const exc = quality ? clamp(0, .45, (sk - effMin - 10) / 100 + (sk >= 100 ? .20 : 0)) : 0;
-  const lines = SF.recipeLines(r).map(ln => { const li = SF.lineItem(ln, m); const have = li.mat ? SF.countMat(pack, li.id, li.mat) : SF.count(pack, li.id); return { id: li.id, mat: li.mat, qty: ln.qty, have, fail: Math.ceil(ln.qty * SF.CRAFT_FAIL_LOSS) }; });
+  const lines = SF.recipeLines(r).map(ln => { const li = SF.lineItem(ln, m, s2); const have = li.mat ? SF.countMat(pack, li.id, li.mat) : SF.count(pack, li.id); return { id: li.id, mat: li.mat, qty: ln.qty, have, fail: Math.ceil(ln.qty * SF.CRAFT_FAIL_LOSS) }; });
   const missing = lines.filter(l => l.have < l.qty);
   let reason = '';
   if (sk < effMin) reason = gate > r.min ? `${SF.matName(m)} needs ${SF.SKILL[r.skill].n} ${gate}` : `needs ${SF.SKILL[r.skill].n} ${r.min}`;
   else if (missing.length) reason = 'missing ' + missing.map(l => (l.qty - l.have) + ' ' + SF.ITEMS[l.id].n.toLowerCase()).join(', ');
-  return { r, mat: m, sk, gate, effMin, diff, chance, quality, exc, perExc: chance * exc, lines, missing, ok: !reason, reason };
+  return { r, mat: m, sec: s2, sk, gate, effMin, diff, chance, quality, exc, perExc: chance * exc, lines, missing, ok: !reason, reason };
 };
 SF.removeLine = (c, l, n) => l.mat ? SF.removeMat(c, l.id, l.mat, n) : SF.removeQty(c, l.id, n);
 SF.ingotBasis = plan => plan.lines.filter(l => SF.ITEMS[l.id].cat === 'metal' && SF.ITEMS[l.id].mat && l.id !== 'ironshard').reduce((a, l) => a + l.qty, 0);
@@ -585,7 +596,7 @@ SF.craftAttempt = (ch, pack, plan, rng, cap, opt) => {
   return { ok: true, success: true, exceptional, items };
 };
 /* compatibility wrapper for the old call shape */
-SF.craft = (ch, r, rng, cap, mat) => { const p = SF.craftPlan(ch, ch.pack, r, mat); const res = SF.craftAttempt(ch, ch.pack, p, rng, cap, {}); return res.ok ? res : { ok: false, reason: res.reason }; };
+SF.craft = (ch, r, rng, cap, mat, sec) => { const p = SF.craftPlan(ch, ch.pack, r, mat, sec); const res = SF.craftAttempt(ch, ch.pack, p, rng, cap, {}); return res.ok ? res : { ok: false, reason: res.reason }; };
 
 /* recipe registry: shape the existing smith rows, add fittings and coloured smelting, then rebuild the index */
 Object.assign(SF.RECIPE.ironbar, { cat: 'Smelt', name: 'Smelt iron bar' });
