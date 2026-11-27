@@ -129,7 +129,11 @@ with sync_playwright() as p:
     check(co and co['key'] == pre and co['frozen'] and co['n'] > 0, 'death: the corpse keeps the exact look the player died in; the items are in the corpse (loot unchanged)', co)
     for t in [.1, .3, .5, .9]:
         J(pg, f"(() => {{ for (let i = 0; i < 2; i++) __SF.update(.05); __SF.render(); }})()")
-    check(J(pg, "(() => { const c = __SF.ents.find(e => e.kind === 'corpse' && e.mine); return __GEAR.strips.strips.has(c.gear.key + '#death#' + (c.sect || 0)) && __GEAR.strips.strips.has(c.gear.key + '#corpse#' + (c.sect || 0)); })()"), 'the corpse falls in the death animation, then lies in the corpse pose')
+    HAS = "(() => { const c = __SF.ents.find(e => e.kind === 'corpse' && e.mine); return __GEAR.strips.strips.has(c.gear.key + '#death#' + (c.sect || 0)) && __GEAR.strips.strips.has(c.gear.key + '#corpse#' + (c.sect || 0)); })()"
+    for _ in range(60):   # strips are built within a per-frame budget: on a slow runner give it a few more frames
+        if J(pg, HAS): break
+        J(pg, "(() => { __SF.update(.05); __SF.render(); })()"); pg.wait_for_timeout(50)
+    check(J(pg, HAS), 'the corpse falls in the death animation, then lies in the corpse pose')
     J(pg, "(() => { __SF.P.x += 3; __SF.render(); })()")   # the ghost steps aside for the picture
     sc = J(pg, "(() => { const c = __SF.ents.find(e => e.kind === 'corpse' && e.mine); return __SF.screenOf(c); })()")
     pg.screenshot(path=f'{shots}/corpse.png', clip={'x': sc['x'] - 100, 'y': sc['y'] - 90, 'width': 200, 'height': 130})
