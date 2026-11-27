@@ -296,20 +296,33 @@ EQ.signature = ch => EQ.SLOT_IDS.map(s => { const it = ch.equip && ch.equip[s]; 
 /* ---------------- validated commands (atomic; the shape an authoritative server would accept) ---------------- */
 // Each command takes the actor state and plain arguments and returns { ok, reason, ... }. On any failure the actor's pack and
 // equipment are restored exactly (same item objects, same quantities), so nothing is lost or duplicated.
-EQ.snapshot = ch => ({ items: ch.pack.items.slice(), qty: ch.pack.items.map(i => i.qty), equip: Object.assign({}, ch.equip), ver: ch.pack.ver });
-EQ.restore = (ch, s) => { ch.pack.items.splice(0, ch.pack.items.length, ...s.items); s.items.forEach((it, i) => { it.qty = s.qty[i]; }); for (const k of Object.keys(ch.equip)) delete ch.equip[k]; Object.assign(ch.equip, s.equip); ch.pack.ver = s.ver + 1; };
-EQ.tx = (ch, fn) => {
-  const s = EQ.snapshot(ch); let r;
+EQ.snapshot = ch => ({ items: ch.pack.items.slice(), qty: ch.pack.items.map(i => i.qty), equip: Object.assign({}, ch.equip), ver: ch.pack.ver,
+  bank: ch.bank ? { items: ch.bank.items.slice(), qty: ch.bank.items.map(i => i.qty), ver: ch.bank.ver } : null });
+EQ.restore = (ch, s) => { ch.pack.items.splice(0, ch.pack.items.length, ...s.items); s.items.forEach((it, i) => { it.qty = s.qty[i]; }); for (const k of Object.keys(ch.equip)) delete ch.equip[k]; Object.assign(ch.equip, s.equip); ch.pack.ver = s.ver + 1;
+  if (s.bank && ch.bank) { ch.bank.items.splice(0, ch.bank.items.length, ...s.bank.items); s.bank.items.forEach((it, i) => { it.qty = s.bank.qty[i]; }); ch.bank.ver = s.bank.ver + 1; } };
+/* tx: run fn on the actor; it is kept only if the audit finds no problem that was not already there (an old malformed record elsewhere
+   never locks up unrelated commands). r.out (optional) is an item leaving the actor; it is audited with them. commit(r), optional, is the
+   only place an outside side effect (the world) may happen: it runs after the audit and must return true, or everything is undone. */
+EQ.tx = (ch, fn, commit) => {
+  const s = EQ.snapshot(ch), pre = new Set(EQ.audit(ch).problems); let r;
   try { r = fn(); } catch (e) { r = { ok: false, reason: 'internal error: ' + e.message }; }
-  if (r && r.ok) { const a = EQ.audit(ch); if (!a.ok) r = { ok: false, reason: 'duplicate item ' + a.dups.join(',') }; }
+  if (r && r.ok) { const a = EQ.audit(ch, r.out ? [{ items: [r.out] }] : null), fresh = a.problems.filter(p => !pre.has(p));
+    if (r.out && !fresh.length) { const held = new Set(); const add = it => { if (!it) return; held.add(it.uid); if (Array.isArray(it.items)) it.items.forEach(add); };
+      ch.pack.items.forEach(add); (ch.bank ? ch.bank.items : []).forEach(add); for (const k in ch.equip || {}) add(ch.equip[k]);
+      const leaving = []; const lv = it => { leaving.push(it.uid); if (Array.isArray(it.items)) it.items.forEach(lv); }; lv(r.out);
+      const clash = leaving.find(u => held.has(u)); if (clash !== undefined) { fresh.push('duplicate ' + clash); a.dups.push(clash); } }
+    if (fresh.length) r = { ok: false, reason: fresh[0].startsWith('duplicate') ? 'duplicate item ' + a.dups.join(',') : 'item check failed: ' + fresh[0] }; }
+  if (r && r.ok && commit) { let c; try { c = commit(r); } catch (e) { c = false; } if (c === false) r = { ok: false, reason: r.commitReason || 'failed' }; }
   if (!r || !r.ok) { EQ.restore(ch, s); return r || { ok: false, reason: 'failed' }; }
-  ch.pack.ver++; return r;
+  delete r.out; delete r.commitReason; ch.pack.ver++; return r;
 };
-/* every item instance exists exactly once across pack (nested), bank and equipment */
+/* every item instance exists exactly once across pack (nested), bank, equipment and any extra containers, with a sound shape */
 EQ.audit = (ch, extra) => {
-  const seen = new Set(), dups = []; const see = it => { if (!it) return; if (seen.has(it.uid)) dups.push(it.uid); seen.add(it.uid); if (it.items) it.items.forEach(see); };
-  (ch.pack ? ch.pack.items : []).forEach(see); (ch.bank ? ch.bank.items : []).forEach(see); for (const s in ch.equip || {}) see(ch.equip[s]); for (const c of extra || []) c.items.forEach(see);
-  return { ok: !dups.length, dups };
+  const seen = new Set(), dups = [], problems = [];
+  const see = it => { if (!it) return; const bad = SF.itemProblem(it); if (bad) problems.push(bad + ' @' + (it && it.uid));
+    if (seen.has(it.uid)) { dups.push(it.uid); problems.push('duplicate ' + it.uid); } seen.add(it.uid); if (Array.isArray(it.items)) it.items.forEach(see); };
+  (ch.pack ? ch.pack.items : []).forEach(see); (ch.bank ? ch.bank.items : []).forEach(see); for (const s in ch.equip || {}) see(ch.equip[s]); for (const c of extra || []) (c.items || []).forEach(see);
+  return { ok: !problems.length, dups, problems };
 };
 EQ.find = (ch, uid) => { uid = +uid; const i = ch.pack.items.findIndex(it => it.uid === uid); if (i >= 0) return { where: 'pack', item: ch.pack.items[i], index: i }; for (const s in ch.equip || {}) if (ch.equip[s] && ch.equip[s].uid === uid) return { where: 'equip', slot: s, item: ch.equip[s] }; return null; };
 EQ.canEquip = (ch, it, slot) => {
@@ -339,17 +352,19 @@ EQ.equipItem = (ch, a) => EQ.tx(ch, () => {
 EQ.unequipItem = (ch, a) => EQ.tx(ch, () => { const it = ch.equip[a.slot]; if (!it) return { ok: false, reason: 'nothing is worn there' }; ch.equip[a.slot] = null; ch.pack.items.push(it); return { ok: true, uid: it.uid, slot: a.slot }; });
 /* moveItem / pickupItem: container to container through the conserving transfer, with the carrying-capacity check when cap is given */
 EQ.moveItem = (from, to, a) => SF.transfer(from, to, +a.uid, a.qty, { cap: a.cap, fromVer: a.fromVer });
-EQ.pickupItem = (ch, from, a) => { if (a.qty !== undefined && !(a.qty > 0)) return { ok: false, reason: 'nothing to take' }; return SF.transfer(from, ch.pack, +a.uid, a.qty, { cap: EQ.capFor(ch) }); };
-/* dropItem: out of the pack or a slot; place(item) puts it in the world and must return true, or the drop is undone */
+EQ.pickupItem = (ch, from, a) => SF.transfer(from, ch.pack, +a.uid, a.qty, { cap: EQ.capFor(ch) });
+/* dropItem: out of the pack or a slot; place(item) puts it in the world and must return true, or the drop is undone.
+   place runs only after the actor passes the audit with the dropped item counted, so the world never receives a duplicate. */
 EQ.dropItem = (ch, a, place) => EQ.tx(ch, () => {
+  if (a.qty !== undefined && a.qty !== null && !SF.validQty(a.qty)) return { ok: false, reason: 'not a valid amount' };
   const f = EQ.find(ch, a.uid); if (!f) return { ok: false, reason: 'item is gone' }; const it = f.item, d = SF.ITEMS[it.id];
+  if (!d) return { ok: false, reason: 'that item is damaged' };
   if (!d.trade) return { ok: false, reason: 'that cannot be dropped' };
-  const q = Math.min(it.qty, Math.max(1, Math.floor(a.qty || it.qty))); let out = it;
-  if (q < it.qty) { out = SF.newItem(it.id, q, EQ.copyFields(it)); it.qty -= q; }
+  const q = a.qty === undefined || a.qty === null ? it.qty : Math.min(it.qty, a.qty); let out = it;
+  if (q < it.qty) { if (!d.stack) return { ok: false, reason: 'that cannot be split' }; out = SF.newItem(it.id, q, EQ.copyFields(it)); it.qty -= q; }
   else if (f.where === 'pack') ch.pack.items.splice(ch.pack.items.indexOf(it), 1); else ch.equip[f.slot] = null;
-  if (place && place(out) === false) return { ok: false, reason: 'there is no room to drop it here' };
-  return { ok: true, item: out, qty: q, from: f.where === 'equip' ? f.slot : 'pack' };
-});
+  return { ok: true, item: out, out, qty: q, from: f.where === 'equip' ? f.slot : 'pack', commitReason: 'there is no room to drop it here' };
+}, r => place ? place(r.item) !== false : true);
 EQ.copyFields = it => { const o = {}; for (const k in it) if (k !== 'uid' && k !== 'qty') o[k] = it[k] && typeof it[k] === 'object' ? JSON.parse(JSON.stringify(it[k])) : it[k]; return o; };
 /* splitStack / mergeStacks inside one container */
 EQ.splitStack = (c, a) => { const it = c.items.find(i => i.uid === +a.uid); const q = Math.floor(a.qty); if (!it) return { ok: false, reason: 'item is gone' }; if (!SF.ITEMS[it.id].stack || !(q >= 1 && q < it.qty)) return { ok: false, reason: 'cannot split that' };

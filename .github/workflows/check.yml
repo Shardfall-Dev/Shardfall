@@ -1,0 +1,59 @@
+# Checks every pull request and every push to main: the committed build matches src/, and every node test suite passes on it.
+# The browser (Playwright) suites need Chrome and run by hand; see README.md.
+name: Check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Find the newest build
+        run: |
+          GAME=$(ls Shardfall_v*.html | grep -v _offline | sort -V | tail -n 1)
+          V=${GAME#Shardfall_v}; V=${V%.html}
+          echo "GAME=$GAME" >> "$GITHUB_ENV"; echo "V=$V" >> "$GITHUB_ENV"; echo "Checking $GAME"
+
+      - name: The committed build matches src/
+        run: |
+          ./build.sh "$V"
+          git diff --exit-code --stat -- "$GAME" || { echo "::error::$GAME is out of date: run ./build.sh $V and commit it"; exit 1; }
+
+      - name: Every script block in the build parses
+        run: |
+          mkdir -p /tmp/blocks
+          python3 -c "import re,sys; [open(f'/tmp/blocks/{i}.js','w').write(b) for i,b in enumerate(re.findall(r'<script>([\s\S]*?)</script>', open(sys.argv[1]).read()))]" "$GAME"
+          for f in /tmp/blocks/*.js; do node --check "$f"; done; echo "$(ls /tmp/blocks | wc -l) blocks parse"
+
+      - name: Node test suites
+        run: |
+          for t in rules equipment magery combat world inventory; do
+            echo "== $t"; node "tests/$t.test.js" "$GAME"
+          done
+
+      - name: Asset manifests resolve
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          m = json.load(open('assets/audio/manifest.json'))
+          missing = []
+          def walk(o):
+              if isinstance(o, dict):
+                  for v in o.values(): walk(v)
+              elif isinstance(o, list):
+                  for v in o: walk(v)
+              elif isinstance(o, str) and o.endswith('.wav'):
+                  p = o if os.path.exists(o) else os.path.join('assets/audio', o)
+                  if not os.path.exists(p): missing.append(o)
+          walk(m)
+          print(len(missing), 'missing audio takes'); sys.exit(1 if missing else 0)
+          PY

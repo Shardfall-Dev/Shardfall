@@ -386,12 +386,29 @@ SF.removeQty = (c, id, qty) => {
   for (let i = c.items.length - 1; i >= 0 && qty > 0; i--) { const it = c.items[i]; if (it.id !== id) continue; const t = Math.min(qty, it.qty); it.qty -= t; qty -= t; if (it.qty <= 0) c.items.splice(i, 1); }
   c.ver++; return true;
 };
-/* transfer: move qty of the item with uid from -> to. Version guard optional. Conserves units exactly. */
+/* a quantity a command may carry: a whole number of units, at least 1 and safely countable */
+SF.validQty = q => typeof q === 'number' && Number.isSafeInteger(q) && q >= 1;
+/* an item record's shape: a known id, a whole positive quantity and a numeric uid (non-stackables may hold more than 1 in old saves) */
+SF.itemProblem = it => {
+  if (!it || typeof it !== 'object') return 'not an item';
+  if (!Number.isSafeInteger(it.uid)) return 'bad uid';
+  if (!SF.ITEMS[it.id]) return 'unknown item ' + it.id;
+  if (!SF.validQty(it.qty)) return 'bad quantity ' + it.qty;
+  return null;
+};
+/* transfer: move qty of the item with uid from -> to. Version guard optional. Conserves units exactly.
+   qty omitted (undefined or null) = the whole stack; otherwise a whole number ≥ 1 (more than the stack moves the stack).
+   Nothing changes unless the move succeeds. */
 SF.transfer = (from, to, uid, qty, opt) => {
   opt = opt || {};
+  if (!from || !to || !Array.isArray(from.items) || !Array.isArray(to.items)) return { ok: false, reason: 'no such container' };
+  if (from === to) return { ok: false, reason: 'it is already there' };
   if (opt.fromVer !== undefined && opt.fromVer !== from.ver) return { ok: false, reason: 'container changed, try again' };
+  if (qty !== undefined && qty !== null && !SF.validQty(qty)) return { ok: false, reason: 'not a valid amount' };
   const idx = from.items.findIndex(it => it.uid === uid); if (idx < 0) return { ok: false, reason: 'item is gone' };
-  const it = from.items[idx]; qty = Math.min(qty || it.qty, it.qty);
+  const it = from.items[idx]; const bad = SF.itemProblem(it); if (bad) return { ok: false, reason: 'that item is damaged (' + bad + ')' };
+  qty = qty === undefined || qty === null ? it.qty : Math.min(qty, it.qty);
+  if (qty < it.qty && !SF.ITEMS[it.id].stack) return { ok: false, reason: 'that cannot be split' };
   const moving = qty === it.qty ? it : Object.assign({}, it, { uid: UID++, qty });
   const r = SF.addItem(to, moving === it ? it : moving, opt.cap);
   if (!r.ok) return r;

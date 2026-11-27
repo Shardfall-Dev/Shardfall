@@ -1,5 +1,6 @@
 # Publish the game on GitHub Pages every time main changes.
 # The newest Shardfall_vX.Y.html becomes the site's front page (index.html); the sound and music it loads go beside it.
+# It deploys only after the Check workflow (build matches src/, every node suite) passes.
 # One-time setup: repository Settings → Pages → Source: "GitHub Actions".
 name: Deploy to GitHub Pages
 
@@ -18,7 +19,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check:
+    uses: ./.github/workflows/check.yml
+
   deploy:
+    needs: check
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -26,12 +31,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check the build
+      - name: Find the build
         run: |
           GAME=$(ls Shardfall_v*.html | grep -v _offline | sort -V | tail -n 1)
           echo "GAME=$GAME" >> "$GITHUB_ENV"
-          node tests/rules.test.js "$GAME"
-          node tests/magery.test.js "$GAME"
 
       - name: Assemble the site
         run: |

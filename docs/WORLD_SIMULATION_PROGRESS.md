@@ -679,6 +679,10 @@ v0.26 merges phase 3 with the equipment and paper doll work (#19, which already 
 - **v0.25 start-up:** 1.92 s to enter the world (v0.24 measured again: 1.65 s). The habitat survey and the larger first population add about 0.3 s. Heap after start: about 52 MB (v0.24: about 49 MB in the same run).
 - **Phones are not measured yet.** That is phase 6, but the night pass and the graph build are the two numbers to watch.
 
+## Stabilization (v0.28.3)
+
+Before phase 5, the v0.28.1 audit's inventory and save findings were fixed (A01–A07; A08 needs Pages enabled in the repository settings). See `docs/audits/v0.28.3-resolution.md`. Save additions are additive (`piles`, `chests`, `char.prepEscrow`, `char.poisonSv`); the save version stays 7.
+
 ## Next task (phase 5, first step)
 
 Shared combat and law (§18–20), now that creatures and townsfolk both live in the world:

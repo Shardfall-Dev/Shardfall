@@ -212,6 +212,8 @@ const emptyEquip = () => { const e = {}; for (const s of SF.EQ.SLOT_IDS) e[s] = 
 const cap = () => SF.EQ.capFor(P);
 const packKg = () => SF.EQ.totalWt(P) / SF.WU;
 const carryWt = () => SF.EQ.totalWt(P);
+/* the one carried-weight line every panel shows: weight units (pack + worn) against capacity, and the encumbrance stage when burdened */
+const carryNote = () => { const en = SF.EQ.encumbrance(P), f = v => (Math.round(v * 10) / 10).toString(); return `${f(en.wt)} / ${f(en.cap)} weight` + (en.stage ? ' · ' + en.n.toLowerCase() : ''); };
 const encumb = () => SF.EQ.encumbrance(P);
 const overweight = () => encumb().ratio > 1 + 1e-9;
 const metalTorso = a => { const it = a.equip && (a.equip.chest || a.equip.robe); const d = it && SF.ITEMS[it.id]; return !!(d && d.fam && ['ringmail', 'chain', 'plate', 'dragon'].includes(d.fam)); };
@@ -1879,7 +1881,7 @@ function bagPanel() {
     return SF.itemName(a).localeCompare(SF.itemName(b)) || a.uid - b.uid;
   });
   const kg = packKg(), max = SF.carryKg(P);
-  let h = '<div class="note">' + items.length + '/' + SF.SLOTS + ' stacks · ' + kg.toFixed(1) + '/' + max.toFixed(1) + ' kg · ' + SF.count(P.pack,'gold') + ' gold' + (kg > max ? ' · overweight: walk only' : '') + '</div>';
+  let h = '<div class="note">' + items.length + ' stack' + (items.length === 1 ? '' : 's') + ' · ' + carryNote() + ' · ' + SF.count(P.pack,'gold') + ' gold' + (kg > max ? ' · overweight: walk only' : '') + '</div>';
   h += '<div class="bagsorts">Sort ' + ['Category','Name','Quantity'].map(s => btn('bagsort',s,{s},s === bagSort ? 'on' : '')).join('') + '</div>';
   const selected = findU(P.pack, bagUid);
   if (selected) h += '<div class="bagcard">' + bagStats(selected) + '<div>' + bagActions(selected) + '</div></div>';
@@ -1923,7 +1925,7 @@ const PANELS = {
   spells: () => spellbookPanel(),
   abilities: () => ['Abilities', `<p class="note">Use now or put an action on a hotbar slot (two bars of four).</p>` + [['bandother', 'Bandage other (Healing: an ally or a player ghost)'], ['anatomy', 'Anatomy (judge a living target)'], ['hide', 'Hide (Concealment)'], ['track', 'Track (Tracking)'], ['meditate', 'Meditate'], ['brace', 'Braced Guard (Parrying 50)'], ['search', 'Search (finds hidden foes and snares)'], ['tame', 'Tame (Taming)'], ['vet', 'Treat pet (Veterinary)'], ['lullaby', 'Lullaby (needs a lute)'], ['discord', 'Discord (needs a lute)'], ['provoke', 'Provoke (needs a lute)'], ['pick', 'Pickpocket a smuggler'], ['coat', 'Coat weapon with venom (Venomcraft 30)'], ['trap', 'Set a snare (Trapcraft)']].map(([id, n]) => `<div class="row"><span class="nm">${n}</span>${ABIL[id] ? btn('abil', 'Use', { id }) : ''}${btn('assign', 'Slot', { k: 'act', id })}</div>`).join('')],
   assign: () => ['Choose a slot', `<p class="note">Assign ${esc(ASSIGN.k === 'spell' ? SF.SPELL[ASSIGN.id].n : ASSIGN.k === 'item' ? SF.ITEMS[ASSIGN.id].n : (ABIL[ASSIGN.id] ? ABIL[ASSIGN.id].n : ASSIGN.id))} to:</p><div class="grid2">${P.hotbar.map((_, i) => btn('setslot', 'Bar ' + (1 + Math.floor(i / 3)) + ' · ' + (i % 3 + 1) + ': ' + esc(slotLabel(P.hotbar[i])[0]), { i })).join('')}</div>`],
-  loot: () => { const c = P.lootOpen; if (!c || c.gone) return null; const ls = c.cont ? SF.lootStatus(c.cont, P.id, GT) : { label: '' }; let h = `<div class="note">${c.mine ? 'Your body · ' : ''}${esc(ls.label || '')} · crumbles in ${Math.ceil((c.expires - GT) / 60)} min · pack ${P.pack.items.length}/${SF.SLOTS}, ${packKg().toFixed(1)}/${SF.carryKg(P).toFixed(1)} kg</div>`;
+  loot: () => { const c = P.lootOpen; if (!c || c.gone) return null; const ls = c.cont ? SF.lootStatus(c.cont, P.id, GT) : { label: '' }; let h = `<div class="note">${c.mine ? 'Your body · ' : ''}${esc(ls.label || '')} · crumbles in ${Math.ceil((c.expires - GT) / 60)} min · carrying ${carryNote()}</div>`;
     if (!c.cont.items.length) h += '<p class="note">Empty.</p>'; else h += btn('takeall', 'Take all', {}, 'ac');
     for (const it of c.cont.items) h += `<div class="row">${rowIcon(it)}<span class="nm">${esc(iname(it))}</span>${btn('take', 'Take', { u: it.uid })}${it.qty > 1 ? btn('take', 'Half', { u: it.uid, half: 1 }) : ''}</div>`;
     if (c.mon && !c.skinned) h += '<p>' + btn('skin', 'Skin the remains', {}) + '</p>';
@@ -2426,17 +2428,45 @@ function save() {
   if (!P || deletingSave) return false; try {
     const c = {}; for (const k of ['name', 'x', 'y', 'str', 'dex', 'int', 'hp', 'stam', 'mana', 'skills', 'pack', 'bank', 'equip', 'look', 'bound', 'quest', 'freeLessons', 'hotbar', 'ghost', 'ghostAt', 'gainLog', 'recipeN', 'cx', 'skillPool', 'combatMig', 'eqMig', 'bandSeq', 'bandDone', 'lowerRank']) c[k] = P[k];
     c.bandage = bandageSave();
+    // a spell being prepared holds mana and reagents in escrow: saved so a reload settles it by the interrupt rule (never a free refund)
+    c.prepEscrow = P.prep ? { sp: P.prep.sp.id, mana: P.prep.escrow.mana, items: P.prep.escrow.items.slice() } : null;
+    c.poisonSv = P.poison ? { tier: P.poison.tier, ticks: P.poison.ticks, nextIn: Math.max(0, P.poison.next - GT) } : null;
     if (P.base) Object.assign(c, P.base); c.magery = { mig: (P.mg && P.mg.mig) || 0 };
     const corpses = ents.filter(e => e.mine && !e.gone).map(e => ({ x: e.x, y: e.y, items: e.cont.items, left: e.expires - GT, diedAgo: GT - e.cont.diedAt }));
-    let maxUid = 0; const scan = it => { if (it && it.uid > maxUid) maxUid = it.uid; }; P.pack.items.forEach(scan); P.bank.items.forEach(scan); Object.values(P.equip).forEach(scan); corpses.forEach(c2 => c2.items.forEach(scan));
+    const piles = ents.filter(e => e.pile && !e.gone && e.cont.items.length && e.expires > GT).map(e => ({ x: e.x, y: e.y, items: e.cont.items, left: e.expires - GT }));
+    const chests = []; for (const [k, ch] of CHESTS) if (ch.open && ch.refill > GT) chests.push([k, Math.round((ch.refill - GT) * 10) / 10, ch.cont ? ch.cont.items : []]);
+    let maxUid = 0; const scan = it => { if (!it) return; if (it.uid > maxUid) maxUid = it.uid; if (Array.isArray(it.items)) it.items.forEach(scan); }; P.pack.items.forEach(scan); P.bank.items.forEach(scan); Object.values(P.equip).forEach(scan); corpses.forEach(c2 => c2.items.forEach(scan)); piles.forEach(p2 => p2.items.forEach(scan)); chests.forEach(ch => ch[2].forEach(scan));
     const pets = ents.filter(e => e.kind === 'pet' && e.type && !e.summon && !e.gone && e.hp > 0).map(e => ({ type: e.type, hp: e.hp, order: e.order === 'stay' ? 'stay' : 'follow', slots: e.slots, name: e.name, dx: e.x - P.x, dy: e.y - P.y }));
     const nodes = []; for (const [k, o] of RES) nodes.push([k, o.gen || 1, o.spec || 0, o.n, o.max || 0, Math.round(o.t * 10) / 10]);
     const ally = allySave(); if (ally) { Object.values(ally.equip || {}).forEach(scan); ally.pack.forEach(scan); if (ally.body) ally.body.items.forEach(scan); }
-    localStorage.setItem(SAVEKEY, JSON.stringify({ v: 7, char: c, corpses, pets, nodes, ally, sim: WS ? WS.save() : null, eco: ecoSave(), life: lifeSave(), uid: maxUid + 1, gt: GT, savedAt: Date.now() }));
+    localStorage.setItem(SAVEKEY, JSON.stringify({ v: 7, char: c, corpses, piles, chests, pets, nodes, ally, sim: WS ? WS.save() : null, eco: ecoSave(), life: lifeSave(), uid: maxUid + 1, gt: GT, savedAt: Date.now() }));
     DEV.lastSave = { ok: true, at: GT }; return true;
   } catch (e) { DEV.lastSave = { ok: false, at: GT }; return false; }
 }
-function loadSave() { try { const s = localStorage.getItem(SAVEKEY); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
+/* loadSave: the save if it can be trusted, else null. A save that is there but unreadable is reported (SAVE_BAD) and never treated as
+   "no save": it is copied once to SAVEKEY + '.bad' before a new character may replace it, so nothing is lost silently. */
+let SAVE_BAD = null;
+function saveProblem(s) {
+  if (!s || typeof s !== 'object' || Array.isArray(s)) return 'not a saved game';
+  if (!Number.isFinite(s.v) || s.v < 1) return 'no save version';
+  if (s.v > 7) return 'made by a newer version of Shardfall (save v' + s.v + ')';
+  const c = s.char; if (!c || typeof c !== 'object') return 'the character is missing';
+  if (typeof c.name !== 'string' || !c.name.trim()) return 'the character has no name';
+  for (const k of ['x', 'y', 'str', 'dex', 'int']) if (!Number.isFinite(c[k])) return 'the character\'s ' + k + ' is not a number';
+  if (!c.pack || !Array.isArray(c.pack.items)) return 'the backpack is missing';
+  if (c.bank && !Array.isArray(c.bank.items)) return 'the bank is damaged';
+  return null;
+}
+function loadSave() {
+  SAVE_BAD = null; let raw = null; try { raw = localStorage.getItem(SAVEKEY); } catch (e) { SAVE_BAD = 'storage is not available'; return null; }
+  if (!raw) return null;
+  try { const b = JSON.parse(localStorage.getItem(SAVEKEY + '.broken') || 'null'); if (b && b.fp === saveFp(raw)) { SAVE_BAD = b.why; return null; } } catch (e) { }   // this exact save already failed to load
+  let s; try { s = JSON.parse(raw); } catch (e) { SAVE_BAD = 'the saved data is truncated or damaged'; return null; }
+  const bad = saveProblem(s); if (bad) { SAVE_BAD = bad; return null; } return s;
+}
+const saveFp = raw => { let h = 2166136261; for (let i = 0; i < raw.length; i++) { h ^= raw.charCodeAt(i); h = Math.imul(h, 16777619); } return raw.length + ':' + (h >>> 0); };
+function markSaveBroken(why) { try { const raw = localStorage.getItem(SAVEKEY); if (raw) localStorage.setItem(SAVEKEY + '.broken', JSON.stringify({ fp: saveFp(raw), why })); } catch (e) { } keepBadSave(); deletingSave = true; location.reload(); }   // no save-on-unload may overwrite it
+function keepBadSave() { try { const raw = localStorage.getItem(SAVEKEY); if (raw && !localStorage.getItem(SAVEKEY + '.bad')) localStorage.setItem(SAVEKEY + '.bad', raw); return true; } catch (e) { return false; } }
 
 /* ---------- boot & creation ---------- */
 const PROFILES = {
@@ -2452,6 +2482,7 @@ function renderCC() {
   const sv0 = loadSave(), live = SF.SKILLS.filter(s => s[3]); const opts = sel => live.map(s => `<option value="${s[0]}"${s[0] === sel ? ' selected' : ''}>${esc(s[1])}</option>`).join('');
   const tot = CC.s.reduce((a, b) => a + b, 0), kt = CC.k.reduce((a, b) => a + b[1], 0);
   $('#ccin').innerHTML = `<div class="cchead"><img src="${SCOUT_SRC}" alt="" class="ccimg"><div><h1>Shardfall</h1><div class="sub">Saltmarsh Quay · offline island slice</div></div></div>
+  ${SAVE_BAD ? `<p class="warn">Your saved character could not be loaded: ${esc(SAVE_BAD)}. It has not been deleted. Creating a new character keeps a copy of it in this browser (${esc(SAVEKEY)}.bad).</p>` : ''}
   ${sv0 ? `<button class="btn ac big" data-c="cont">Continue as ${esc(sv0.char.name)}${sv0.char.ghost ? ' (ghost)' : ''}</button><div class="sub" style="margin:8px 0 0">or create a new character below (replaces the saved one)</div>` : ''}
   <div class="ccgrid"><div><label for="ccn">Name</label><input id="ccn" maxlength="16" value="${esc(CC.name)}" placeholder="e.g. Tess" autocomplete="off">
   <label>Starting idea <span class="note">(editable, no class is locked in)</span></label><div class="chips">${Object.keys(PROFILES).map(p => `<button class="btn sm ${CC.prof === p ? 'ac' : ''}" data-c="prof" data-p="${p}">${p}</button>`).join('')}</div>
@@ -2467,15 +2498,20 @@ $('#cc').addEventListener('click', ev => { const b = ev.target.closest('[data-c]
   if (c === 'prof') { CC.prof = b.dataset.p; const p = PROFILES[CC.prof]; CC.s = p.s.slice(); CC.k = Object.entries(p.k); }
   if (c === 'st') { const i = +b.dataset.i, d = +b.dataset.d, nv = CC.s[i] + d, tot = CC.s.reduce((a, x) => a + x, 0) + d; if (nv >= 25 && nv <= 100 && tot <= 150) CC.s[i] = nv; }
   if (c === 'cloak') CC.cloak = b.dataset.v;
-  if (c === 'go') { const err = $('#ccerr'); const name = CC.name.trim().replace(/[^\p{L}\p{N} '\-]/gu, '').slice(0, 16); if (name.length < 2) return err.textContent = 'Choose a name of at least 2 letters.'; const sk = {}; for (const [k, v] of CC.k) sk[k] = (sk[k] || 0) + v; const e = SF.validateCreation({ str: CC.s[0], dex: CC.s[1], int: CC.s[2], skills: sk }); if (e.length) return err.textContent = e.join(' '); if (CC.k.some(([k], i) => CC.k.findIndex(x => x[0] === k) !== i && CC.k[i][1] > 0)) return err.textContent = 'Pick different skills.'; boot(null, { name, str: CC.s[0], dex: CC.s[1], int: CC.s[2], skills: sk, look: { cloak: CC.cloak || null } }); return; }
+  if (c === 'go') { const err = $('#ccerr'); const name = CC.name.trim().replace(/[^\p{L}\p{N} '\-]/gu, '').slice(0, 16); if (name.length < 2) return err.textContent = 'Choose a name of at least 2 letters.'; const sk = {}; for (const [k, v] of CC.k) sk[k] = (sk[k] || 0) + v; const e = SF.validateCreation({ str: CC.s[0], dex: CC.s[1], int: CC.s[2], skills: sk }); if (e.length) return err.textContent = e.join(' '); if (CC.k.some(([k], i) => CC.k.findIndex(x => x[0] === k) !== i && CC.k[i][1] > 0)) return err.textContent = 'Pick different skills.'; if (SAVE_BAD && !keepBadSave()) return err.textContent = 'Could not keep a copy of the damaged save, so it was not replaced.'; boot(null, { name, str: CC.s[0], dex: CC.s[1], int: CC.s[2], skills: sk, look: { cloak: CC.cloak || null } }); return; }
   renderCC(); });
 $('#cc').addEventListener('change', ev => { const s = ev.target; if (!s.dataset || !s.dataset.c) return; CC.name = $('#ccn')?.value ?? CC.name; const i = +s.dataset.i; if (s.dataset.c === 'sk') CC.k[i][0] = s.value; if (s.dataset.c === 'kv') CC.k[i][1] = +s.value; CC.prof = 'Custom'; renderCC(); });
 function boot(saved, fresh) {
   genWorld(); buildTiles(); buildMini(); resize();
-  if (saved) { try { saved = migrateSave(saved, localStorage.getItem(SAVEKEY)); } catch (e) { console.error(e); } for (const [k, gen, spec, n, max, t] of saved.nodes || []) RES.set(k, { gen, spec: spec || undefined, n, max, t });
+  if (saved) { try { saved = migrateSave(saved, localStorage.getItem(SAVEKEY)); } catch (e) { console.error(e); P = null; return markSaveBroken('it could not be brought up to date (' + e.message + ')'); }
+    const bad = saveProblem(saved); if (bad) { P = null; return markSaveBroken(bad); }
+    for (const [k, gen, spec, n, max, t] of saved.nodes || []) RES.set(k, { gen, spec: spec || undefined, n, max, t });
     const c = saved.char; P = newChar({ name: c.name, str: c.str, dex: c.dex, int: c.int, skills: {}, look: c.look }); Object.assign(P, c); P.equip = Object.assign(emptyEquip(), P.equip); delete P.equip.armor; SF.setUidBase(saved.uid || 1); GT = saved.gt || 0;
     for (const k of Object.keys(SF.newSkills())) if (!P.skills[k]) P.skills[k] = { v: 0, lock: 'raise' };
     for (const co of saved.corpses || []) { const cont = SF.newContainer('corpse', 'p1'); cont.items = co.items; cont.diedAt = GT - (co.diedAgo ?? 999); cont.expires = GT + co.left; addEnt({ kind: 'corpse', mine: true, name: 'your body', x: co.x, y: co.y, cont, expires: GT + co.left }); }
+    for (const pl of saved.piles || []) if (Array.isArray(pl.items) && pl.items.length && pl.left > 0) { const cont = SF.newContainer('pile'); cont.items = pl.items; addEnt({ kind: 'corpse', pile: true, name: 'dropped items', x: pl.x, y: pl.y, cont, expires: GT + pl.left }); }
+    for (const [k, left, items] of saved.chests || []) { const ch = CHESTS.get(+k); if (!ch || !(left > 0)) continue; ch.open = true; ch.refill = GT + left; ch.cont = SF.newContainer('chest'); ch.cont.items = Array.isArray(items) ? items : []; }
+    P.poison = c.poisonSv && c.poisonSv.ticks > 0 ? { tier: c.poisonSv.tier, ticks: c.poisonSv.ticks, next: GT + (c.poisonSv.nextIn || 0) } : null; delete P.poisonSv;
     if (P.ghost && !Number.isFinite(c.ghostAt)) P.ghostAt = GT - 12; }
   else { P = newChar(fresh); starterKit(); }
   P.cx = Object.assign({ survey: {}, pins: [], track: null, mark: false, doors: {} }, P.cx || {}); P.batch = null; applyDoorState();
@@ -2488,6 +2524,11 @@ function boot(saved, fresh) {
   P.bandage = null; if (saved) bandageLoad(saved.char.bandage);          // an application in flight resumes once, never twice
   if (saved) for (const pt of saved.pets || []) { const d = MON[pt.type]; if (!d) continue; const near = Math.hypot(pt.dx || 0, pt.dy || 0) < 12; addEnt({ kind: 'pet', type: pt.type, name: pt.name || 'your ' + d.n, x: P.x + (near ? pt.dx : 1), y: P.y + (near ? pt.dy : 0), hp: Math.min(pt.hp, d.hp), max: d.hp, state: '', home: { x: P.x, y: P.y }, sect: 0, ward: 0, order: pt.order, slots: pt.slots || 1, target: null }); }
   mageryBoot(saved);
+  if (saved && saved.char.prepEscrow && !P.ghost) {   // saved mid-preparation: settled as an interrupt (reagents back, half the mana spent), exactly once
+    const e = saved.char.prepEscrow; for (const r of e.items || []) if (SF.ITEMS[r]) SF.addItem(P.pack, SF.newItem(r, 1));
+    P.mana = Math.min(SF.maxMana(P), P.mana + (e.mana || 0) - SF.MAGERY.interruptCost(e.mana || 0)); P.pack.ver++;
+    log('The spell you were preparing came apart when you left (−' + SF.MAGERY.interruptCost(e.mana || 0) + ' mana).', '#ffb070'); }
+  delete P.prepEscrow;
   $('#cc').hidden = true; document.body.classList.toggle('mirror', SETTINGS.mirror);
   log('Welcome to Saltmarsh Quay, ' + P.name + '. Bank what you cannot afford to lose.', '#ffe08a');
   log('Left stick moves; the Sprint button runs. Tap to target. Attack arms your swings. Interact gathers, loots and talks.', '#b6a68a');
