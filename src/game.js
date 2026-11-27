@@ -2297,6 +2297,14 @@ function bagStats(it) {
   return '<div class="baghead">' + bagIcon(it, 56) + '<span>' + esc(lines[0]) + '</span></div>' + lines.slice(1).map(line => '<span>' + esc(line) + '</span>').join('');
 }
 
+function itemSkill(k, u, worn) {
+  const it = findU(P.pack, u) || (worn ? Object.values(P.equip).find(x => x && x.uid === u) : null); if (!it) return; closePanel();
+  if (k === 'picklock') return lockUse(it);
+  if (k === 'untrap') return untrapUse(it);
+  if (k === 'lockup') { it.locked = true; it.lockLvl = it.lockLvl || 20; P.pack.ver++; snd('door.unlock', { key: 'P', gain: .5 }); return log(`You lock the box (lock ${it.lockLvl}).`); }
+  if (k === 'arm') { it.armed = true; it.power = it.power || 20; P.pack.ver++; return log(`You arm the box's trap (power ${it.power}).`); }
+  if (ITEM_SKILL[k]) return ITEM_SKILL[k](it);
+}
 function bagActions(it) {
   const d = SF.ITEMS[it.id]; let a = '';
   if (d.slot) a += btn('equip', 'Equip', { u: it.uid });
@@ -3085,7 +3093,6 @@ function loop(t) { const dt = Math.min(.5, (t - last) / 1000); last = t;
   requestAnimationFrame(loop); }
 addEventListener('visibilitychange', () => { if (document.hidden) { resetInput(); save(); } else { last = performance.now(); STEPPER.reset(); resetInput(); } });   // the world pauses while the game is hidden; held keys and the stick are released (their key-up never arrives)
 addEventListener('blur', () => resetInput());
-loadScout(SCOUT_SRC); ccRender(); resize(); requestAnimationFrame(loop);
 /* dev/test hook: put a creature beside the player, e.g. __SF.spawnMon('lich_lord'). Not used by normal play. */
 function spawnMon(type, dx = 3, dy = 0) { const d = MON[type]; if (!d) return null; let x = P.x + dx, y = P.y + dy;
   for (let r = 0; r < 6 && BLK[tAt(Math.floor(x), Math.floor(y))]; r += .5) for (let a = 0; a < 8; a++) { const nx = P.x + dx + Math.cos(a * Math.PI / 4) * r, ny = P.y + dy + Math.sin(a * Math.PI / 4) * r; if (!BLK[tAt(Math.floor(nx), Math.floor(ny))]) { x = nx; y = ny; break; } }
