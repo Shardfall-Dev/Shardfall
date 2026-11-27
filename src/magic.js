@@ -36,9 +36,9 @@ function castSlot(id, opt) {
   if (!sp.legacy) {
     if (!scroll && !knownSpells().has(id)) { if (!SF.count(P.pack, 'spellbook')) return log('You need your spellbook to cast ' + sp.n + '.', '#ffb070'); return log(sp.n + ' is not in your spellbook' + (SF.count(P.pack, sp.scroll) ? ' — read the scroll from your pack, or learn it.' : '.'), '#ffb070'); }
     if (scroll && !SF.count(P.pack, sp.scroll)) return log('You have no scroll of ' + sp.n + '.', '#ffb070');
-    if (!scroll && M < sp.min) return log(`${sp.n} needs Spellcraft ${sp.min}.`, '#ffb070');
-    if (scroll && MG.scrollChance(sp, M) <= 0) return log(`The scroll's words slip away from you (Spellcraft above ${MG.scrollGate(sp)} needed).`, '#ffb070');
-  } else if (M < sp.min) return log(`${sp.n} needs Spellcraft ${sp.min}.`, '#ffb070');
+    if (!scroll && M < sp.min) return log(`${sp.n} needs Magery ${sp.min}.`, '#ffb070');
+    if (scroll && MG.scrollChance(sp, M) <= 0) return log(`The scroll's words slip away from you (Magery above ${MG.scrollGate(sp)} needed).`, '#ffb070');
+  } else if (M < sp.min) return log(`${sp.n} needs Magery ${sp.min}.`, '#ffb070');
   const items = scroll ? [sp.scroll] : sp.regs;
   const miss = items.filter(r => !SF.count(P.pack, r)); if (miss.length) return log('Missing reagents: ' + miss.map(r => SF.ITEMS[r].n).join(', ') + '.', '#ffb070');
   if (P.mana < sp.mp) return log('Not enough mana.', '#ffb070');
@@ -282,7 +282,7 @@ function chestSpell(sp, pt, M, E) {
   if (sp.effect === 'lock') { log('Arcane Lock seals only a container you own. This chest is not yours.', '#ffb070'); return false; }
   if (sp.effect === 'trap') { if (c.rtrap) { log('That latch already carries a rune trap.'); return true; } c.rtrap = { M, E, by: P.name }; FX.push({ k: 'ring', x: cpos.x, y: cpos.y, c: '#ff8a40', t0: GT, dur: .6 }); log('A spark settles into the latch.', '#ffb070'); return true; }
   if (sp.effect === 'disarm') { if (!c.rtrap) { log('There is no rune trap on that latch.'); return true; } c.rtrap = null; FX.push({ k: 'ring', x: cpos.x, y: cpos.y, c: '#c8c8c8', t0: GT, dur: .6 }); log('You pull the spark from the latch.', '#7ee08a'); return true; }
-  if (sp.effect === 'unlock') { if (c.open && GT <= c.refill) { log('That chest is already open.'); return true; } const need = c.mlock || MLOCK_REQ[c.tier] || 70; if (M < need) { log(`The seal is too strong (Spellcraft ${need}).`, '#ffb070'); return true; } c.open = true; c.refill = GT + 600; c.cont = chestLoot(c.tier); c.mlock = 0; log('The lock gives way. Any trap on it is still armed.', '#ffe08a'); return true; }
+  if (sp.effect === 'unlock') { if (c.open && GT <= c.refill) { log('That chest is already open.'); return true; } const need = c.mlock || MLOCK_REQ[c.tier] || 70; if (M < need) { log(`The seal is too strong (Magery ${need}).`, '#ffb070'); return true; } c.open = true; c.refill = GT + 600; c.cont = chestLoot(c.tier); c.mlock = 0; log('The lock gives way. Any trap on it is still armed.', '#ffe08a'); return true; }
   if (sp.effect === 'object_use') { FX.push({ k: 'ring', x: cpos.x, y: cpos.y, c: '#c8e0ff', t0: GT, dur: .6 }); if (c.rtrap) springRuneTrap(c, true); else log('The far hand touches the latch. Nothing happens.'); return true; }
   return true;
 }

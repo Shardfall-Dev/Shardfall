@@ -2,7 +2,7 @@
 /* Shardfall Magery module — the 64 spells of the Eight Circles. Pure, renderer-free, network-free.
    Extends the rules module (SF) with SF.MAGERY. Brief: docs/magery/Magery_Brief.txt. Book: docs/magery/Spellbook.md.
    SPELL_DATA below is docs/magery/spells.json verbatim (tests/magery.test.js checks they match).
-   Symbols: M = Spellcraft, E = Spell Focus, R = recipient's Wardcraft, all 0–100. C = circle 1..8. */
+   Symbols: M = Magery, E = Evaluating Intelligence, R = recipient's Resisting Spells, all 0–100. C = circle 1..8. */
 (function (root) {
 'use strict';
 const SF = root.SF; if (!SF) throw new Error('magery.js needs the rules module (SF) first');

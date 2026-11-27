@@ -32,6 +32,7 @@ jobs:
           echo "GAME=$GAME" >> "$GITHUB_ENV"
           node tests/rules.test.js "$GAME"
           node tests/magery.test.js "$GAME"
+          node tests/skills.test.js "$GAME"
 
       - name: Assemble the site
         run: |

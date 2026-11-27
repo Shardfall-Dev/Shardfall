@@ -1,5 +1,7 @@
 # Magery integration — status (v0.16)
 
+> v0.30.0: the magic skills now carry their classic names — Spellcraft is **Magery**, Spell Focus is **Evaluating Intelligence**, Wardcraft is **Resisting Spells** (see `docs/skills/STATUS.md`). Formulas below are unchanged; Magery gains now follow circle windows, and resistible creature spells also teach Resisting Spells.
+
 Source brief: `Magery_Brief.txt`. Book: `Shardfall_Spellbook.html` / `Spellbook.md`. Data: `spells.json` (embedded verbatim in `src/magery.js`; `tests/magery.test.js` checks they match).
 
 ## Where the code lives
