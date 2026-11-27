@@ -130,7 +130,8 @@ with sync_playwright() as pw:
     J(page, f"(() => {{ __SF.P.sel = {R}; __SF.toggleArm(); }})()"); page.wait_for_timeout(900); J(page, "__SF.P.armed = false")
     pl = played(page)
     check('rat alerts on aggro', 'rat.alert' in pl, pl)
-    check('a whiff: draw, then the swing alone (no impact)', 'weapon.draw' in pl and 'swing.sword' in pl and not [e for e in pl if e.startswith('hit.')], pl)
+    # the rooted rat may still strike the player in this window: its blow plays hit.* with player.hurt, which is not an impact of our swing
+    check('a whiff: draw, then the swing alone (no impact)', 'weapon.draw' in pl and 'swing.sword' in pl and len([e for e in pl if e.startswith('hit.')]) <= pl.count('player.hurt'), pl)
     tele = J(page, "window.__tries.filter(e => /attack|warn/.test(e))")
     check('rat telegraph plays its attack cue (distinct from the strike)', 'rat.attack' in pl, tele)
     J(page, "__SF.setRng(() => 0); __SF.P.skills.swordsmanship.v = 1000"); page.wait_for_timeout(1500); clear(page)
@@ -249,3 +250,4 @@ with sync_playwright() as pw:
     check('older save without door state loads; every door open', J(page2, "__SF.DOORS.every(d => d.open)") and not errs2, errs2[:3])
     ctx.close(); br.close()
 print(json.dumps({'pass': sum(r[1] for r in RESULTS), 'fail': sum(not r[1] for r in RESULTS)}))
+sys.exit(1 if any(not r[1] for r in RESULTS) else 0)

@@ -48,5 +48,5 @@ with sync_playwright() as p:
 open(os.path.join(os.environ.get('COMBAT_REPORT_DIR', '/tmp'), 'combat-smoke-report.json'), 'w').write(json.dumps(report, indent=1))
 for extra in ['reload.py', 'playtest.py']:
   args = [sys.executable, os.path.join(here, extra), f, chrome] + sys.argv[3:4]
-  r = subprocess.run(args, capture_output=True, text=True); print((r.stdout.strip() or r.stderr[-600:])[:1500]); fails += r.returncode != 0
+  r = subprocess.run(args, capture_output=True, text=True); print(r.stdout.strip() or r.stderr[-600:]); fails += r.returncode != 0
 print('ALL PASS' if not fails else f'{fails} FAILED'); sys.exit(1 if fails else 0)
