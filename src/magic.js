@@ -51,7 +51,7 @@ function castSlot(id, opt) {
   say(P, sp.chant); FX.push({ k: 'msign', e: P, id: sp.id, t0: GT, dur: delay + sp.prep + .2 });   // preparing is quiet; magic.prepare plays when it holds
 }
 function interruptPrep(msg) {
-  if (!P.prep) return; const pr = P.prep, c = MG.interruptCost(pr.sp.mp); P.prep = null;
+  if (!P.prep) return; const pr = P.prep, c = MG.interruptCost(pr.sp.mp); P.prep = null; P._hbreak = GT;   // _hbreak: the visual cast-break flinch (src/humans.js)
   for (const r of pr.escrow.items) give(r, 1);                                   // reagents (or scroll) come back
   P.mana = Math.min(SF.maxMana(P), P.mana + pr.escrow.mana - c);                   // half the mana, rounded up, is spent
   log(msg + ` (−${c} mana)`, '#ffb070'); P.spellReadyAt = GT + MG.RECOVERY; snd('magic.fizzle', { key: 'P' });

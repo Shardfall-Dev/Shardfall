@@ -5,7 +5,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="screen-orientation" content="landscape">
-<title>Shardfall v0.29.2</title>
+<title>Shardfall v0.30</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=Alegreya+Sans:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -123,6 +123,11 @@ body.portrait #ghost{left:8px;top:calc(env(safe-area-inset-top) + 112px);width:c
 .eqs .dur{position:absolute;left:2px;bottom:2px;height:3px;border-radius:2px}
 .eqs.twohand{opacity:.6}.eqs .two{position:relative;display:block}.eqs .two small{position:absolute;right:-4px;bottom:-5px;font:700 9px var(--px);color:#f2dfa8}
 .eqfig{display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid rgba(184,154,90,.35);border-radius:6px;background:radial-gradient(circle at 50% 42%,rgba(95,196,192,.14),transparent 70%);min-height:150px;overflow:hidden}
+.doll2{display:block;width:190px;height:190px;max-width:100%;pointer-events:none}
+@media(max-height:460px){.doll2{width:112px;height:112px}}
+.ccprev{display:flex;align-items:center;justify-content:center;gap:10px;margin:4px 0}.ccprev img{width:216px;height:216px;background:radial-gradient(ellipse at 50% 80%,rgba(95,196,192,.16),transparent 65%);border:1px solid rgba(184,154,90,.35);border-radius:8px}
+.ccprev img{max-width:42vw}@media(max-height:460px){.ccprev img{width:150px;height:150px}}
+.cchflag{display:flex!important;align-items:center;gap:8px;font:500 13px var(--px)!important;margin-top:14px!important}.cchflag input{width:auto!important}
 .doll{display:block;width:96px;height:96px;background-repeat:no-repeat;background-position:0 0;image-rendering:pixelated;transform:scale(1.7);transform-origin:center 62%;pointer-events:none}
 .eqcard{margin-top:6px;padding:6px;border:1px solid rgba(184,154,90,.4);border-radius:6px;background:rgba(0,0,0,.25);font-size:12.5px}
 .eqcard .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}.eqcard .baghead span{font-size:13px}

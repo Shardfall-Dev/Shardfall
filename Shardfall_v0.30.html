@@ -5,7 +5,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="screen-orientation" content="landscape">
-<title>Shardfall v0.29.2</title>
+<title>Shardfall v0.30</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=Alegreya+Sans:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -123,6 +123,11 @@ body.portrait #ghost{left:8px;top:calc(env(safe-area-inset-top) + 112px);width:c
 .eqs .dur{position:absolute;left:2px;bottom:2px;height:3px;border-radius:2px}
 .eqs.twohand{opacity:.6}.eqs .two{position:relative;display:block}.eqs .two small{position:absolute;right:-4px;bottom:-5px;font:700 9px var(--px);color:#f2dfa8}
 .eqfig{display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid rgba(184,154,90,.35);border-radius:6px;background:radial-gradient(circle at 50% 42%,rgba(95,196,192,.14),transparent 70%);min-height:150px;overflow:hidden}
+.doll2{display:block;width:190px;height:190px;max-width:100%;pointer-events:none}
+@media(max-height:460px){.doll2{width:112px;height:112px}}
+.ccprev{display:flex;align-items:center;justify-content:center;gap:10px;margin:4px 0}.ccprev img{width:216px;height:216px;background:radial-gradient(ellipse at 50% 80%,rgba(95,196,192,.16),transparent 65%);border:1px solid rgba(184,154,90,.35);border-radius:8px}
+.ccprev img{max-width:42vw}@media(max-height:460px){.ccprev img{width:150px;height:150px}}
+.cchflag{display:flex!important;align-items:center;gap:8px;font:500 13px var(--px)!important;margin-top:14px!important}.cchflag input{width:auto!important}
 .doll{display:block;width:96px;height:96px;background-repeat:no-repeat;background-position:0 0;image-rendering:pixelated;transform:scale(1.7);transform-origin:center 62%;pointer-events:none}
 .eqcard{margin-top:6px;padding:6px;border:1px solid rgba(184,154,90,.4);border-radius:6px;background:rgba(0,0,0,.25);font-size:12.5px}
 .eqcard .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}.eqcard .baghead span{font-size:13px}
@@ -1596,6 +1601,509 @@ if (typeof module !== 'undefined' && module.exports) module.exports = EQ;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
 </script>
 <script>
+/* Shardfall appearance module (SF.LOOK) — classic humans v2 (docs/humans/STATUS.md).
+   Pure, renderer-free, network-free: no DOM, no Canvas, no Math.random. Runs in the browser and in node for tests.
+   Appearance is cosmetic only. Nothing here is read by combat, skills, stats, movement, collision, targeting or loot.
+   - the appearance record a character keeps in its save ({ v, body, skin, hair, hairColor, beard, cloth, cloak? })
+   - normalize / migrate old looks without rerolling, seeded randomize, validation
+   - profession presets and persistent, seeded NPC looks (same NPC → same look on every load)
+   - the render figure: base look + visible equipment (EQ.appearance tints) → one stable description and cache key
+   - every weapon in SF.WEAPONS → its animation family and weapon geometry; spell → casting gesture; tool → gathering motion
+   - the visual animation priority: death > hit/interrupt > attack/cast/tool > ready > run/walk > idle */
+(function (root) {
+'use strict';
+const SF = root.SF;
+const LOOK = {};
+LOOK.VERSION = 1;
+
+/* ---------- options (ids are stable; colours live here so the creator, world and paper doll agree) ---------- */
+LOOK.BODIES = ['male', 'female'];
+LOOK.SKIN = { fair: '#ca9a72', tan: '#ac7854', olive: '#937450', brown: '#815338', deep: '#684333' };
+LOOK.HAIR = { black: '#302a25', darkBrown: '#493327', brown: '#65452e', auburn: '#914a32', blond: '#b69a58', grey: '#8b8981', white: '#c5c1b6' };
+LOOK.HAIRSTYLES = ['bald', 'cropped', 'short', 'parted', 'long', 'ponytail', 'bun', 'braid'];
+LOOK.BEARDS = ['none', 'stubble', 'goatee', 'short', 'full'];
+LOOK.CLOTH = { linen: '#ac9776', cream: '#c6bda5', brown: '#78513a', rust: '#95573c', ochre: '#a17b39', forest: '#4d6845', teal: '#436b69', navy: '#3b5676', purple: '#6d5279', burgundy: '#823e38', charcoal: '#50504b', black: '#393a39' };
+LOOK.NAMES = {
+  skin: { fair: 'Fair', tan: 'Tan', olive: 'Olive', brown: 'Brown', deep: 'Deep' },
+  hair: { black: 'Black', darkBrown: 'Dark brown', brown: 'Brown', auburn: 'Auburn', blond: 'Blond', grey: 'Grey', white: 'White' },
+  hairStyle: { bald: 'Bald', cropped: 'Cropped', short: 'Short', parted: 'Parted', long: 'Long', ponytail: 'Ponytail', bun: 'Bun', braid: 'Braid' },
+  beard: { none: 'None', stubble: 'Stubble', goatee: 'Goatee', short: 'Short beard', full: 'Full beard' },
+  cloth: { linen: 'Linen', cream: 'Cream', brown: 'Brown', rust: 'Rust', ochre: 'Ochre', forest: 'Forest', teal: 'Teal', navy: 'Navy', purple: 'Purple', burgundy: 'Burgundy', charcoal: 'Charcoal', black: 'Black' } };
+const keys = o => Object.keys(o);
+
+/* ---------- seeded numbers (string hash → mulberry32); never Math.random, so a seed always gives the same look ---------- */
+LOOK.hash = s => { let h = 2166136261 >>> 0; s = String(s); for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h >>> 0; };
+LOOK.rng = seed => { let a = (typeof seed === 'number' ? seed : LOOK.hash(seed)) >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; }; };
+const pick = (r, arr) => arr[Math.floor(r() * arr.length) % arr.length];
+const pickW = (r, pairs) => { let tot = 0; for (const [, w] of pairs) tot += w; let x = r() * tot; for (const [v, w] of pairs) { if ((x -= w) < 0) return v; } return pairs[pairs.length - 1][0]; };
+
+/* ---------- the saved appearance record ---------- */
+LOOK.valid = l => !!l && LOOK.BODIES.includes(l.body) && !!LOOK.SKIN[l.skin] && !!LOOK.HAIR[l.hairColor] && LOOK.HAIRSTYLES.includes(l.hair) && LOOK.BEARDS.includes(l.beard) && !!LOOK.CLOTH[l.cloth] && (l.body === 'male' || l.beard === 'none');
+/* random appearance from a seed: a fresh "Randomize" in the creator and the default for old saves that never had one */
+LOOK.random = (seed, o) => {
+  const r = LOOK.rng(seed), body = (o && o.body) || (r() < .5 ? 'male' : 'female');
+  const hair = body === 'female' ? pickW(r, [['long', 3], ['ponytail', 2], ['bun', 2], ['braid', 2], ['short', 1], ['cropped', .5]]) : pickW(r, [['short', 3], ['cropped', 2], ['parted', 2], ['long', 1], ['bald', 1], ['ponytail', .5]]);
+  const hairColor = pickW(r, [['black', 2], ['darkBrown', 3], ['brown', 3], ['auburn', 1.5], ['blond', 1.5], ['grey', .6], ['white', .3]]);
+  return { v: LOOK.VERSION, body, skin: pick(r, keys(LOOK.SKIN)), hair, hairColor, beard: body === 'female' ? 'none' : pickW(r, [['none', 3], ['stubble', 2], ['goatee', 1], ['short', 2], ['full', 1.5]]), cloth: pick(r, keys(LOOK.CLOTH)) };
+};
+/* normalize: the one migration path. Keeps every valid field, fills only what is missing or unknown from a seeded default,
+   keeps unknown extra fields (and the legacy cloak colour) untouched, and is idempotent: normalize(normalize(x)) equals normalize(x).
+   Old saves (look = { cloak }) get a stable look from the character's name, written back into the save — never rerolled on load. */
+LOOK.normalize = (look, seed) => {
+  const l = Object.assign({}, look && typeof look === 'object' ? look : {}), d = LOOK.random('look:' + (seed || 'adventurer'), LOOK.BODIES.includes(l.body) ? { body: l.body } : null);
+  if (!LOOK.BODIES.includes(l.body)) l.body = d.body;
+  if (!LOOK.SKIN[l.skin]) l.skin = d.skin;
+  if (!LOOK.HAIRSTYLES.includes(l.hair)) l.hair = d.hair;
+  if (!LOOK.HAIR[l.hairColor]) l.hairColor = d.hairColor;
+  if (!LOOK.BEARDS.includes(l.beard)) l.beard = l.body === 'female' ? 'none' : d.beard;
+  if (l.body === 'female') l.beard = 'none';
+  if (!LOOK.CLOTH[l.cloth]) l.cloth = d.cloth;
+  if (l.cloak !== undefined && l.cloak !== null && !/^#[0-9a-f]{6}$/i.test(String(l.cloak))) l.cloak = null;
+  l.v = LOOK.VERSION; return l;
+};
+/* validation for an untrusted appearance (creator, and later a server): '' when valid, else the reason */
+LOOK.check = l => {
+  if (!l || typeof l !== 'object') return 'no appearance';
+  if (!LOOK.BODIES.includes(l.body)) return 'unknown body';
+  if (!LOOK.SKIN[l.skin]) return 'unknown skin tone';
+  if (!LOOK.HAIRSTYLES.includes(l.hair)) return 'unknown hairstyle';
+  if (!LOOK.HAIR[l.hairColor]) return 'unknown hair colour';
+  if (!LOOK.BEARDS.includes(l.beard)) return 'unknown facial hair';
+  if (l.body === 'female' && l.beard !== 'none') return 'facial hair is for the male body';
+  if (!LOOK.CLOTH[l.cloth]) return 'unknown clothing colour';
+  return '';
+};
+
+/* ---------- weapons → animation family and weapon geometry (authoritative ids from SF.WEAPONS) ----------
+   family is the body motion the rig plays; geom is the drawn weapon shape. The flags (two, ammo, skill) stay in SF.WEAPONS;
+   grip (1h/2h) is read from SF.WEAPONS[id].two, never guessed from the name. */
+LOOK.WEAPON_ANIM = {
+  unarmed:       { family: 'unarmed',  geom: 'fist',          group: 'wrestling' },
+  sword:         { family: 'slash1h',  geom: 'sword',         group: 'sword1h' },
+  glaive:        { family: 'polearm',  geom: 'halberd',       group: 'polearm' },
+  battleaxe:     { family: 'chop2h',   geom: 'battleaxe',     group: 'axe2h' },
+  hatchet:       { family: 'chop2h',   geom: 'hatchet',       group: 'axe2h', tool: 'chopwood' },
+  knife:         { family: 'slash1h',  geom: 'knife',         group: 'dagger' },
+  pickaxe:       { family: 'chop1h',   geom: 'pickaxe',       group: 'axe1h', tool: 'mine' },
+  hammer:        { family: 'blunt2h',  geom: 'warhammer',     group: 'warhammer' },
+  mace:          { family: 'blunt1h',  geom: 'mace',          group: 'mace' },
+  waraxe:        { family: 'chop1h',   geom: 'axe',           group: 'axe1h' },
+  dagger:        { family: 'thrust1h', geom: 'dagger',        group: 'dagger' },
+  kryss:         { family: 'thrust1h', geom: 'kryss',         group: 'fencing' },
+  spear:         { family: 'thrust2h', geom: 'spear',         group: 'spear' },
+  shortbow:      { family: 'bow',      geom: 'bow',           group: 'bow' },
+  crossbow:      { family: 'crossbow', geom: 'crossbow',      group: 'crossbow' },
+  heavycrossbow: { family: 'hcrossbow', geom: 'heavycrossbow', group: 'heavycrossbow' } };
+/* geometry the rig can draw for items that do not exist yet (greatswords, staves, longbows, …): ready for future weapons */
+LOOK.FUTURE_GEOMS = ['greatsword', 'broadsword', 'katana', 'rapier', 'doubleaxe', 'maul', 'club', 'shortspear', 'bardiche', 'staff', 'quarterstaff', 'longbow', 'wand'];
+LOOK.FUTURE_FAMILY = { greatsword: 'slash2h', broadsword: 'slash1h', katana: 'slash1h', rapier: 'thrust1h', doubleaxe: 'chop2h', maul: 'blunt2h', club: 'blunt1h', shortspear: 'thrust1h', bardiche: 'polearm', staff: 'staff', quarterstaff: 'staff', longbow: 'bow', wand: 'cast1h' };
+LOOK.weaponAnim = id => LOOK.WEAPON_ANIM[id] || null;
+/* the ids in SF.WEAPONS without a mapping: must be empty for a release (tests fail otherwise; never mapped silently) */
+LOOK.unmapped = () => SF && SF.WEAPONS ? Object.keys(SF.WEAPONS).filter(id => !LOOK.WEAPON_ANIM[id]) : [];
+LOOK.twoHanded = id => !!(SF && SF.WEAPONS && SF.WEAPONS[id] && SF.WEAPONS[id].two);
+/* gathering: the tool motion by skill; the tool is drawn even when it rides in the pack */
+LOOK.TOOL_ANIM = { mining: { family: 'mine', geom: 'pickaxe' }, lumberjacking: { family: 'chopwood', geom: 'hatchet' }, woodcutting: { family: 'chopwood', geom: 'hatchet' }, fishing: { family: 'fish', geom: 'fishingpole' } };
+LOOK.toolAnim = skill => LOOK.TOOL_ANIM[skill] || { family: 'craft', geom: null };
+/* crafting motion by station or recipe category */
+LOOK.craftAnim = kind => /smith|forge|anvil|smelt|armor/i.test(String(kind || '')) ? { family: 'smith', geom: 'smithhammer' } : { family: 'craft', geom: null };
+/* spells share three body gestures; the spell's own effect art is separate (src/magic.js). Staff → staff gesture,
+   circles 1–4 one hand, circles 5–8 and field/area spells two hands. */
+LOOK.castGesture = (sp, weaponGeom) => {
+  if (weaponGeom === 'staff' || weaponGeom === 'quarterstaff') return 'caststaff';
+  if (!sp) return 'cast1h';
+  return (sp.circle || 1) >= 5 || sp.field || sp.area || sp.aoe ? 'cast2h' : 'cast1h';
+};
+
+/* ---------- visual animation state (priority): pure, from simulation facts only ----------
+   s: { dead, deadAt, interruptAt, hitAt, attack:{family,t0,tc,rec}, cast:{gesture,t0,t1,phase}, tool:{family}, ready, moving, running, now }
+   returns { action, t } with t ∈ [0,1] the phase through the action (looped actions use the caller's phase). */
+LOOK.CONTACT = .55;   // the share of an attack's frames up to the moment of contact
+LOOK.state = s => {
+  const now = s.now;
+  if (s.dead) { const t = s.deadAt == null ? 1 : Math.min(1, (now - s.deadAt) / .7); return { action: t >= 1 ? 'corpse' : 'death', t }; }
+  if (s.interruptAt != null && now - s.interruptAt < .35) return { action: 'hit', t: (now - s.interruptAt) / .35 };
+  const busy = s.attack || s.cast || s.tool;
+  if (!busy && s.hitAt != null && now - s.hitAt < .3) return { action: 'hit', t: (now - s.hitAt) / .3 };
+  if (s.attack) { const a = s.attack, C = LOOK.CONTACT;
+    const t = now < a.tc ? C * Math.max(0, now - a.t0) / Math.max(.01, a.tc - a.t0) : C + (1 - C) * Math.min(1, (now - a.tc) / Math.max(.05, a.rec || .35));
+    return { action: a.family, t: Math.max(0, Math.min(1, t)) }; }
+  if (s.cast) { const c = s.cast; let t;
+    if (c.phase === 'prep') t = .5 * Math.max(0, Math.min(1, (now - c.t0) / Math.max(.05, c.t1 - c.t0)));
+    else if (c.phase === 'hold') t = .5;
+    else t = .5 + .5 * Math.max(0, Math.min(1, (now - c.t0) / .4));
+    return { action: c.gesture, t }; }
+  if (s.tool) return { action: s.tool.family, t: null };
+  if (s.blocking) return { action: 'block', t: null };
+  if (s.moving) return { action: s.running ? 'run' : 'walk', t: null };
+  if (s.ready) return { action: 'ready', t: null };
+  return { action: 'idle', t: null };
+};
+
+/* ---------- profession presets: starting defaults for NPCs (identity, AI and gender stay the NPC's own) ----------
+   outfit: torso layer (tunic, apron, robe, leather, studded, ringmail, chain, plate); legs: leg armor; helm; tabard: guard colours;
+   weapon: carried geometry (always shown) — work tools appear only while working. clothPool: the palette the seed picks from. */
+LOOK.PRESETS = {
+  guard:      { outfit: 'chain', legs: 'chain', arms: 'chain', helm: 'openhelm', tabard: true, weapon: 'glaive', boots: true },
+  captainGuard: { outfit: 'plate', legs: 'plate', arms: 'plate', helm: 'closedhelm', tabard: true, weapon: 'sword', shield: 'heater' },
+  ranger:     { outfit: 'leather', legs: 'leather', arms: 'leather', helm: 'leathercap', weapon: 'shortbow', clothPool: ['forest', 'brown', 'ochre'] },
+  blacksmith: { outfit: 'apron', apron: '#5a3d28', bareArms: true, clothPool: ['brown', 'charcoal', 'rust'], tool: 'smithhammer' },
+  miner:      { outfit: 'apron', apron: '#4e4238', helm: 'cap', clothPool: ['charcoal', 'brown', 'ochre'], tool: 'pickaxe' },
+  lumberjack: { outfit: 'tunic', clothPool: ['forest', 'brown', 'rust', 'ochre'], tool: 'hatchet' },
+  merchant:   { outfit: 'tunic', vest: true, clothPool: ['burgundy', 'navy', 'purple', 'teal', 'ochre'], hatChance: .3 },
+  banker:     { outfit: 'robe', clothPool: ['navy', 'black', 'burgundy'] },
+  mage:       { outfit: 'robe', hood: true, clothPool: ['purple', 'navy', 'black', 'teal'], weapon: 'staff' },
+  healer:     { outfit: 'robe', clothPool: ['cream', 'linen'] },
+  priest:     { outfit: 'robe', clothPool: ['cream', 'black', 'charcoal'] },
+  scribe:     { outfit: 'robe', clothPool: ['teal', 'navy', 'brown'] },
+  sailor:     { outfit: 'tunic', stripes: true, clothPool: ['linen', 'navy', 'teal', 'cream'], cap: 'cap', tool: 'fishingpole' },
+  farmer:     { outfit: 'tunic', clothPool: ['ochre', 'linen', 'brown', 'forest'], hatChance: .5 },
+  villager:   { outfit: 'tunic', clothPool: ['linen', 'cream', 'brown', 'rust', 'ochre', 'forest', 'teal'] },
+  innkeeper:  { outfit: 'apron', apron: '#d6ccb4', clothPool: ['brown', 'rust', 'burgundy'] },
+  trainer:    { outfit: 'studded', legs: 'leather', arms: 'studded', weapon: 'sword', shield: 'buckler', clothPool: ['burgundy', 'charcoal'] },
+  bandit:     { outfit: 'leather', legs: 'leather', arms: 'leather', helm: 'hood', clothPool: ['charcoal', 'brown', 'black', 'rust'], weapons: ['dagger', 'sword', 'waraxe', 'mace', 'knife'] },
+  smuggler:   { outfit: 'tunic', vest: true, legs: null, helm: 'hood', clothPool: ['burgundy', 'charcoal', 'black'], weapons: ['dagger', 'kryss', 'sword'] },
+  captain:    { outfit: 'studded', legs: 'leather', arms: 'leather', coat: true, cloak: '#2d4a52', clothPool: ['teal', 'navy'], weapon: 'sword', drowned: true, scale: 1.1 },
+  sellsword:  { outfit: 'leather', legs: 'leather', arms: 'studded', weapon: 'sword', shield: 'buckler', clothPool: ['forest', 'brown', 'teal'] },
+  student:    { outfit: 'robe', clothPool: ['teal', 'navy', 'purple', 'cream'] } };
+/* game roles and Living World professions → preset */
+LOOK.ROLE_PRESET = {
+  guard: 'guard', quaywarden: 'captainGuard', smith: 'blacksmith', qsmith: 'blacksmith', miner: 'miner', banker: 'banker', campbank: 'bandit', outlaw: 'bandit',
+  trainer: 'trainer', workshop: 'ranger', fletcher: 'ranger', ranger: 'ranger', apothecary: 'scribe', reagents: 'scribe', provisioner: 'merchant', trader: 'merchant',
+  tailor: 'merchant', tinker: 'merchant', assay: 'merchant', stable: 'farmer', fishmonger: 'sailor', healer: 'healer', innkeeper: 'innkeeper', mage: 'mage',
+  scholar: 'scribe', boat: 'sailor', packet: 'sailor', ferry: 'sailor', traveller: 'villager', resident: 'villager' };
+LOOK.PROF_PRESET = { fisher: 'sailor', dockhand: 'sailor', townsfolk: 'villager', miner: 'miner', woodcutter: 'lumberjack', trader: 'merchant', weaver: 'villager', student: 'student', guard: 'guard', astronomer: 'mage', smith: 'blacksmith', innkeeper: 'innkeeper', scholar: 'scribe' };
+LOOK.MON_PRESET = { bandit: 'bandit', smuggler: 'smuggler', captain: 'captain' };
+/* which creatures are human and drawn by the human renderer; every other creature keeps its own art */
+LOOK.isHumanMon = type => !!LOOK.MON_PRESET[type];
+/* town colours for guard tabards */
+LOOK.TOWN_COLOURS = { quay: '#2f5d6a', vespar: '#3b5676', mynoc: '#823e38', skara: '#4d6845', moonglen: '#6d5279', college: '#6d5279', southwatch: '#8a6a2a' };
+/* gender from the existing NPC definitions (names and titles); unnamed NPCs (guards, wardens) take it from their seed */
+const FEMALE = /\b(sister|mother|lady|dame|forgemistress|fisherwoman|ferrywoman|woman)\b|^(odile|mara|dena|maud|fenna|mags|sela|rhea|wenna|ewe|moira|maeve|ysolde|iska|brega|adda|merrin|nell|lise|kessa|mabry|mira|sorrel|nettle|wren|tess)\b/i;
+const MALE = /\b(brother|master|magister|ferryman|quaywarden)\b|^(harl|vey|pell|gus|brann|crow|hobb|ivo|quill|hollis|tam|cray|ash|lune|rowan|orrin|tollin|bram|hale|venn|dorn|pip|tobin|fen|garrick|tomas|corin|durn|fennick|bryn|tibbet)\b/i;
+LOOK.genderOf = (name, r) => { const n = String(name || '').replace(/^(old|captain|archivist|astronomer|ranger-captain)\s+/i, ''); if (FEMALE.test(n) || FEMALE.test(name || '')) return 'female'; if (MALE.test(n) || MALE.test(name || '')) return 'male'; return r && r() < .3 ? 'female' : 'male'; };
+LOOK.presetFor = d => (d.kind === 'mon' && LOOK.MON_PRESET[d.type]) || (d.prof && LOOK.PROF_PRESET[d.prof]) || (d.role && LOOK.ROLE_PRESET[d.role]) || 'villager';
+/* a persistent NPC look from a stable seed string (name + role + ordinal, fixed at world population) */
+LOOK.npcLook = d => {
+  const preset = LOOK.presetFor(d), P0 = LOOK.PRESETS[preset], r = LOOK.rng('npc:' + d.seed), body = d.body || LOOK.genderOf(d.name, r);
+  const base = LOOK.random('npcface:' + d.seed, { body });
+  if (/^old\b/i.test(d.name || '')) base.hairColor = pick(r, ['grey', 'white']);
+  if (P0.drowned) base.skin = 'fair';
+  const cloth = P0.clothPool ? pick(r, P0.clothPool) : pick(r, keys(LOOK.CLOTH));
+  const weapon = P0.weapons ? pick(r, P0.weapons) : P0.weapon || null;
+  return Object.assign(base, { cloth, preset, weapon, town: d.town || null, hat: P0.hatChance && r() < P0.hatChance ? 'cap' : null, tone: r() });
+};
+
+/* ---------- the render figure: everything the rig draws, as one stable record ----------
+   ch: a character with .equip (player, hireling) or null for NPCs (preset gear). Cloth garments take the character's
+   clothing colour; armor and shields take their material colour from EQ.appearance (the crafting materials). */
+const ARMOR_FAMS = ['leather', 'studded', 'bone', 'ringmail', 'chain', 'plate', 'dragon'];
+const HELM_OF = { cloth_cap: 'cap', leather_cap: 'leathercap', bone_helm: 'bonehelm', chain_coif: 'coif', bascinet: 'openhelm', open_helm: 'openhelm', norse_helm: 'openhelm', closed_helm: 'closedhelm', great_helm: 'greathelm', plate_helm: 'closedhelm', dragon_helm: 'closedhelm' };
+const SHIELD_OF = { buckler: 'buckler', wooden_shield: 'round', metal_shield: 'round', kite_shield: 'kite', heater_shield: 'heater' };
+const shadeHex = (c, k) => '#' + [1, 3, 5].map(i => Math.max(0, Math.min(255, Math.round(parseInt(c.slice(i, i + 2), 16) * k))).toString(16).padStart(2, '0')).join('');
+LOOK.figure = (look, ch, o) => {
+  o = o || {}; const l = LOOK.normalize(look, o.seed), cloth = LOOK.CLOTH[l.cloth];
+  const f = { body: l.body, skin: LOOK.SKIN[l.skin], hair: LOOK.HAIR[l.hairColor], style: l.hair, beard: l.body === 'female' ? 'none' : l.beard,
+    cloth, pants: shadeHex(cloth, .62), torso: 'tunic', torsoCol: cloth, arms: null, armsCol: null, legs: null, legsCol: null, hands: null, handsCol: null,
+    boots: '#49382a', helm: null, helmCol: null, cloak: null, tabard: null, apron: null, vest: false, stripes: false, robe: null, hood: false,
+    shield: null, shieldCol: null, weapon: o.weapon || null, ghost: !!o.ghost, scale: 1 };
+  if (l.cloak && /^#/.test(l.cloak)) f.cloak = l.cloak;
+  if (ch && ch.equip && SF && SF.EQ && SF.EQ.appearance) {
+    for (const a of SF.EQ.appearance(ch)) {
+      const it = ch.equip[a.slot]; const d = it && SF.ITEMS[it.id]; if (!d) continue; const fam = d.fam, tint = a.tint || '#9aa0a8', cl = fam === 'cloth';
+      if (a.slot === 'shirt') { if (f.torso === 'tunic') f.torsoCol = cloth; }
+      else if (a.slot === 'trousers') f.pants = shadeHex(cloth, .62);
+      else if (a.slot === 'robe') { f.robe = cloth; }
+      else if (a.slot === 'tunic') f.tabard = cloth;
+      else if (a.slot === 'cloak') f.cloak = f.cloak || shadeHex(cloth, .85);
+      else if (a.slot === 'chest' && ARMOR_FAMS.includes(fam)) { f.torso = fam; f.torsoCol = tint; }
+      else if (a.slot === 'arms' && ARMOR_FAMS.includes(fam)) { f.arms = fam; f.armsCol = tint; }
+      else if (a.slot === 'legs' && ARMOR_FAMS.includes(fam)) { f.legs = fam; f.legsCol = tint; }
+      else if (a.slot === 'hands') { f.hands = cl ? 'cloth' : fam; f.handsCol = cl ? shadeHex(cloth, .8) : tint; }
+      else if (a.slot === 'feet') f.boots = shadeHex(tint, .62);
+      else if (a.slot === 'neck' && ARMOR_FAMS.includes(fam) && f.torso === 'tunic') { f.gorget = tint; }
+      else if (a.slot === 'head') { f.helm = HELM_OF[it.id] || (cl ? 'cap' : 'openhelm'); f.helmCol = cl ? shadeHex(cloth, .85) : tint; }
+      else if (a.slot === 'shield') { f.shield = SHIELD_OF[it.id] || 'round'; f.shieldCol = tint; }
+    }
+    const w = ch.equip.weapon; if (!o.weapon && w && LOOK.WEAPON_ANIM[w.id]) f.weapon = LOOK.WEAPON_ANIM[w.id].geom;
+  } else if (l.preset) {
+    const p = LOOK.PRESETS[l.preset] || {}, steel = '#9aa3a6', town = LOOK.TOWN_COLOURS[l.town] || null;
+    if (p.outfit && p.outfit !== 'tunic' && p.outfit !== 'apron' && p.outfit !== 'robe') { f.torso = p.outfit; f.torsoCol = ['chain', 'ringmail', 'plate'].includes(p.outfit) ? steel : p.outfit === 'studded' ? '#6e4a2c' : '#7a5236'; }
+    if (p.outfit === 'robe') f.robe = cloth; if (p.outfit === 'apron') f.apron = p.apron || '#5a3d28';
+    if (p.arms) { f.arms = p.arms; f.armsCol = ['chain', 'ringmail', 'plate'].includes(p.arms) ? steel : '#6e4a2c'; }
+    if (p.legs) { f.legs = p.legs; f.legsCol = ['chain', 'ringmail', 'plate'].includes(p.legs) ? steel : '#5e4030'; }
+    if (p.helm === 'hood') f.hood = true; else if (p.helm) { f.helm = p.helm; f.helmCol = p.helm === 'cap' || p.helm === 'leathercap' ? shadeHex(cloth, .8) : steel; }
+    if (!f.helm && (l.hat || p.cap)) { f.helm = 'cap'; f.helmCol = shadeHex(cloth, .75); }
+    if (p.hood) f.hood = true; if (p.vest) f.vest = true; if (p.stripes) f.stripes = true; if (p.bareArms) f.bareArms = true;
+    if (p.tabard) f.tabard = town || '#3b5676'; if (p.cloak) f.cloak = p.cloak; if (p.coat) f.coat = true;
+    if (p.shield) { f.shield = p.shield; f.shieldCol = p.shield === 'buckler' ? '#8a8f90' : town || '#6e7a7c'; }
+    if (p.drowned) f.skin = '#8e9a8a'; if (p.scale) f.scale = p.scale;
+    if (!o.weapon && l.weapon) f.weapon = LOOK.WEAPON_ANIM[l.weapon] ? LOOK.WEAPON_ANIM[l.weapon].geom : l.weapon;
+  }
+  if (f.robe) { f.torso = f.torso === 'tunic' ? 'robe' : f.torso; }
+  if (o.noShield || (f.weapon && LOOK.twoHandedGeom(f.weapon))) f.shield = null;   // a two-handed weapon hides an incompatible shield
+  return f;
+};
+const TWO_GEOMS = ['halberd', 'battleaxe', 'hatchet', 'warhammer', 'spear', 'bow', 'crossbow', 'heavycrossbow', 'greatsword', 'doubleaxe', 'maul', 'bardiche', 'staff', 'quarterstaff', 'longbow', 'pickaxe_mine'];
+LOOK.twoHandedGeom = g => TWO_GEOMS.includes(g);
+/* stable cache key for a figure (order-independent, short) */
+LOOK.figKey = f => { const ks = Object.keys(f).sort(); let s = ''; for (const k of ks) { const v = f[k]; if (k === 'key' || v === null || v === false || v === undefined) continue; s += k + '=' + v + ';'; } return s; };
+
+SF.LOOK = LOOK;
+if (typeof module !== 'undefined' && module.exports) module.exports = LOOK;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+</script>
+<script>
+/* Shardfall classic human rig (SFRIG) — the articulated procedural human, v2.1.
+   Ported from asset-packs/classic-humans-v2/classic-human-rig-v2.mjs (v2.0, provisional art; the pack itself is unchanged) and extended:
+   armor layers (leather, studded, bone, ringmail, chain, plate, dragon), robes, aprons, tabards, cloaks, hoods, helmets, shields,
+   gloves and boots in material colours; a separate, recognisable motion for every weapon family (slash 1h/2h, chop 1h/2h, blunt 1h/2h,
+   thrust 1h/2h, polearm, staff, bow, crossbow, heavy crossbow, wrestling, shield block), three casting gestures, gathering and crafting;
+   carry and ready poses so long weapons are held upright and bows sit in the off hand.
+   THIS IS A FUNCTIONAL PROTOTYPE, NOT FINAL PAINTED ART. It fixes the animation, layer and anchor contracts the painted atlases replace.
+   Pure: builds SVG strings only (no DOM), so node tests can check frame bounds. Input is a figure from SF.LOOK.figure(). */
+(function (root) {
+'use strict';
+const DIRECTIONS = ['S', 'SW', 'W', 'NW', 'N', 'NE', 'E', 'SE'];          // = the game's sect order (rows S,SW,W,NW,N,NE,E,SE)
+const CELL = { width: 144, height: 144, anchorX: 72, anchorY: 112 };      // ground anchor: the point between the feet. v2.0 used 112×100 (56,86),
+                                                                          // which clipped overhead polearms and fallen bodies; same scale, more margin
+const ANIMATIONS = { idle: 4, walk: 8, run: 8, ready: 4, unarmed: 8, slash1h: 8, slash2h: 8, chop1h: 8, chop2h: 8, blunt1h: 8, blunt2h: 8, thrust1h: 8, thrust2h: 8,
+  polearm: 8, staff: 8, bow: 8, crossbow: 8, hcrossbow: 8, cast1h: 8, cast2h: 8, caststaff: 8, block: 6, hit: 4, death: 8, corpse: 1, mine: 8, chopwood: 8, smith: 8, craft: 8, bandage: 8, fish: 8 };
+const LOOPED = ['idle', 'walk', 'run', 'ready', 'block', 'mine', 'chopwood', 'smith', 'craft', 'bandage', 'fish'];
+const FPS = { idle: 3, walk: 10, run: 14, ready: 3, block: 6, mine: 7, chopwood: 7, smith: 9, craft: 6, bandage: 6, fish: 4 };
+const TWO_HAND = ['slash2h', 'chop2h', 'blunt2h', 'thrust2h', 'polearm', 'staff', 'mine', 'chopwood', 'crossbow', 'hcrossbow'];
+const LONG = ['halberd', 'spear', 'staff', 'quarterstaff', 'bardiche', 'shortspear', 'fishingpole'];
+const SHOULDERED = ['battleaxe', 'doubleaxe', 'warhammer', 'maul', 'greatsword'];
+const BOWS = ['bow', 'longbow'], XBOWS = ['crossbow', 'heavycrossbow'];
+const v = (x, y, z) => [x, y, z], add = (a, b) => a.map((x, i) => x + b[i]), scale = (a, k) => a.map(x => x * k), mix = (a, b, t) => a.map((x, i) => x + (b[i] - x) * t),
+  unit = a => scale(a, 1 / (Math.hypot(a[0], a[1], a[2]) || 1)),
+  seq = (a, t) => { const u = Math.max(0, Math.min(a.length - 1, t * (a.length - 1))), i = Math.floor(u); const A = a[i], B = a[Math.min(i + 1, a.length - 1)]; return typeof A === 'number' ? A + (B - A) * (u - i) : mix(A, B, u - i); };
+const shade = (c, k) => '#' + [1, 3, 5].map(i => Math.max(0, Math.min(255, Math.round(parseInt(c.slice(i, i + 2), 16) * k))).toString(16).padStart(2, '0')).join('');
+const dark = '#2c241d', steel = '#a6aeb0', edge = '#e0e0d3', wood = '#775036';
+
+/* ---------- motion: keyframed attacks (6 keys: rest, wind-up, peak, CONTACT (t≈.6), follow-through, rest) ----------
+   r: weapon hand; a: weapon axis from the grip; l: off hand (null = two-handed grip on the shaft or a guard pose);
+   step: lead-foot lunge; crouch: body height; twist: shoulders forward/back. Coordinates: x right, y forward, z up. */
+const K = {
+  unarmed:  { r: [v(9, 8, 38), v(9, 2, 42), v(8, 0, 43), v(2, 21, 44), v(6, 12, 41), v(9, 8, 38)], a: [v(0, 1, .2)], l: [v(-6, 10, 42)], step: [0, 0, 0, 4, 3, 0], twist: [0, -2, -3, 5, 3, 0] },
+  slash1h:  { r: [v(9, 8, 37), v(14, -4, 48), v(12, -2, 52), v(-2, 20, 42), v(-11, 10, 33), v(9, 8, 37)], a: [v(0, 1, 1), v(.6, -.6, .8), v(.9, -.2, .6), v(-.7, 1, 0), v(-1, .2, -.4), v(0, 1, 1)], l: [v(-8, 6, 34)], step: [0, 0, 0, 3, 3, 0], twist: [0, -3, -4, 4, 3, 0] },
+  slash2h:  { r: [v(6, 8, 38), v(8, -6, 60), v(6, -8, 62), v(2, 18, 40), v(-6, 14, 22), v(6, 8, 38)], a: [v(0, .5, 1), v(.3, -.8, .6), v(.2, -1, .3), v(0, 1, -.2), v(-.4, .6, -1), v(0, .5, 1)], step: [0, 0, -1, 6, 6, 0], crouch: [0, 1, 1, -3, -4, 0], twist: [0, -4, -5, 5, 4, 0] },
+  chop1h:   { r: [v(9, 7, 36), v(9, -4, 55), v(8, -6, 58), v(6, 18, 32), v(7, 13, 24), v(9, 7, 36)], a: [v(0, .5, 1), v(0, -.8, 1), v(0, -1, .4), v(0, 1, -.5), v(0, .8, -1), v(0, .5, 1)], l: [v(-8, 7, 35)], step: [0, 0, 0, 3, 3, 0], twist: [0, -2, -3, 3, 2, 0] },
+  chop2h:   { r: [v(5, 7, 36), v(4, -6, 60), v(3, -9, 62), v(2, 20, 24), v(2, 16, 16), v(5, 7, 36)], a: [v(0, .5, 1), v(0, -.7, 1), v(0, -1, .2), v(0, 1, -.7), v(0, .6, -1), v(0, .5, 1)], step: [0, 0, -2, 6, 6, 0], crouch: [0, 1, 1, -4, -5, 0] },
+  blunt1h:  { r: [v(9, 7, 38), v(12, 0, 52), v(12, -2, 54), v(7, 15, 38), v(8, 11, 34), v(9, 7, 38)], a: [v(0, .6, 1), v(.3, -.5, 1), v(.4, -.8, .6), v(0, 1, -.3), v(0, .9, -.6), v(0, .6, 1)], l: [v(-8, 8, 36)], step: [0, 0, 0, 2, 2, 0], twist: [0, -1, -2, 2, 1, 0] },
+  blunt2h:  { r: [v(5, 7, 36), v(12, -6, 56), v(13, -8, 58), v(2, 20, 18), v(2, 18, 14), v(5, 7, 36)], a: [v(0, .5, 1), v(.5, -.6, 1), v(.6, -.8, .6), v(0, .9, -1), v(0, .7, -1), v(0, .5, 1)], step: [0, 0, 0, 5, 5, 0], crouch: [0, 1, 1, -6, -6, 0], twist: [0, -3, -4, 3, 3, 0] },
+  thrust1h: { r: [v(9, 7, 36), v(9, -3, 38), v(8, -5, 39), v(4, 25, 40), v(6, 16, 38), v(9, 7, 36)], a: [v(0, 1, .08)], l: [v(-8, 4, 38)], step: [0, -1, -2, 7, 5, 0], twist: [0, -2, -3, 4, 2, 0] },
+  thrust2h: { r: [v(6, 4, 34), v(7, -6, 34), v(7, -8, 34), v(2, 26, 40), v(3, 18, 38), v(6, 4, 34)], a: [v(0, 1, .15)], step: [0, -1, -2, 8, 6, 0], crouch: [0, 0, -1, -2, -1, 0], twist: [0, -2, -3, 4, 2, 0] },
+  polearm:  { r: [v(8, 6, 40), v(12, -6, 58), v(10, -8, 60), v(-4, 22, 38), v(-10, 14, 28), v(8, 6, 40)], a: [v(0, .3, 1), v(.5, -.5, 1), v(.4, -.9, .4), v(-.6, 1, -.3), v(-.9, .4, -.6), v(0, .3, 1)], step: [0, 0, -1, 6, 6, 0], crouch: [0, 1, 1, -3, -3, 0], twist: [0, -3, -4, 4, 3, 0] },
+  staff:    { r: [v(8, 6, 38), v(12, -2, 44), v(13, -4, 46), v(-6, 18, 40), v(-12, 10, 36), v(8, 6, 38)], a: [v(0, .4, 1), v(.8, -.4, .3), v(.9, -.4, .1), v(-.8, .8, .1), v(-1, .2, .2), v(0, .4, 1)], step: [0, 0, 0, 4, 3, 0], twist: [0, -3, -3, 3, 2, 0] },
+  bow:      { r: [v(-1, 17, 44), v(1, 10, 45), v(3, 3, 45), v(3, 2, 45), v(6, -1, 46), v(6, 4, 40)], a: [v(0, 0, 1)], l: [v(-3, 19, 44)], twist: [0, 0, -1, -1, 0, 0] },
+  crossbow: { r: [v(3, 10, 45), v(3, 10, 45), v(3, 10, 45), v(3, 7, 46), v(3, 8, 45), v(3, 10, 45)], a: [v(0, 1, .05), v(0, 1, .05), v(0, 1, .05), v(0, 1, .4), v(0, 1, .2), v(0, 1, .05)], twist: [0, 0, 0, -2, -1, 0] },
+  hcrossbow: { r: [v(4, 9, 40), v(4, 9, 40), v(4, 9, 40), v(4, 4, 42), v(4, 6, 41), v(4, 9, 40)], a: [v(0, 1, .02), v(0, 1, .02), v(0, 1, .02), v(0, 1, .55), v(0, 1, .3), v(0, 1, .02)], step: [0, 0, 0, -3, -2, 0], crouch: [-2, -2, -2, -1, -2, -2], wide: 1 },
+  cast1h:   { r: [v(9, 3, 32), v(8, 9, 43), v(12, 6, 56), v(4, 19, 47), v(9, 3, 32)], a: [v(0, .2, 1)], l: [v(-8, 3, 30)] },
+  cast2h:   { r: [v(9, 3, 32), v(8, 9, 43), v(12, 6, 56), v(4, 19, 47), v(9, 3, 32)], a: [v(0, .2, 1)], l: [v(-9, 3, 32), v(-8, 9, 43), v(-12, 6, 56), v(-4, 19, 47), v(-9, 3, 32)], twist: [0, 0, -1, 2, 0] },
+  caststaff: { r: [v(9, 3, 34), v(9, 6, 40), v(10, 4, 50), v(6, 16, 46), v(9, 3, 34)], a: [v(0, .2, 1), v(0, .1, 1), v(0, 0, 1), v(0, 1, .6), v(0, .2, 1)], l: [v(-9, 3, 32), v(-9, 8, 42), v(-10, 6, 52), v(-4, 18, 46), v(-9, 3, 32)] },
+  mine:     { r: [v(5, 6, 36), v(5, -2, 58), v(4, -4, 60), v(3, 20, 12), v(3, 18, 10), v(5, 6, 36)], a: [v(0, .5, 1), v(0, -.7, 1), v(0, -1, .3), v(0, 1, -.8), v(0, .8, -1), v(0, .5, 1)], crouch: [-1, 0, 0, -6, -6, -1] },
+  chopwood: { r: [v(10, 4, 34), v(14, -6, 44), v(14, -8, 45), v(0, 18, 34), v(-4, 16, 32), v(10, 4, 34)], a: [v(0, .3, 1), v(.8, -.6, .2), v(.9, -.5, .1), v(-.6, 1, 0), v(-.8, .8, 0), v(0, .3, 1)], twist: [0, -3, -4, 3, 3, 0] },
+  smith:    { r: [v(9, 8, 34), v(9, 4, 48), v(9, 3, 50), v(7, 14, 28), v(7, 13, 28), v(9, 8, 34)], a: [v(0, .5, 1), v(0, -.6, 1), v(0, -.7, .8), v(0, 1, -.4), v(0, 1, -.4), v(0, .5, 1)], l: [v(-5, 12, 28)], crouch: [0, 0, 0, -1, -1, 0] } };
+function pose(ac, t, f) {
+  let hip = v(0, 0, 29), sh = v(0, 0, 48), head = v(0, 0, 56), feet = [v(-4, 1, 1), v(4, -1, 1)], hands = [v(-10, 1, 28), v(10, 1, 28)], el, axis = v(0, .7, -.6);
+  const q = Math.sin(t * Math.PI), p = Math.sin(t * 2 * Math.PI), wp = f.weapon, bow = BOWS.includes(wp), xbow = XBOWS.includes(wp), long = LONG.includes(wp), shoul = SHOULDERED.includes(wp);
+  let l = hands[0], r = hands[1], twoGrip = false, offGrip = false;
+  const carry = (ready) => {   // where the weapon rides when the body is not attacking: idle, walking, running, ready
+    if (!wp || wp === 'fist') return;
+    if (bow) { l = ready ? v(-4, 13, 38) : add(l, v(1, 2, 2)); axis = v(0, ready ? .2 : 0, 1); return; }
+    if (xbow) { r = ready ? v(3, 10, 44) : v(8, 6, 32); axis = v(0, 1, ready ? .05 : .1); l = add(r, scale(unit(axis), 8)); l[0] -= 4; offGrip = true; return; }
+    if (long) { r = ready ? v(7, 7, 36) : add(r, v(-1, 2, 3)); axis = ready ? v(0, .6, 1) : v(0, .12, 1); if (ready) twoGrip = true; return; }
+    if (shoul) { r = ready ? v(6, 8, 38) : v(8, 2, 40); axis = ready ? v(0, .5, 1) : v(0, -.6, .8); if (ready) twoGrip = true; return; }
+    if (ready) { r = v(9, 8, 37); axis = v(0, .5, 1); } else axis = v(0, .7, -.6);
+  };
+  if (ac === 'idle') { sh[2] += .35 * p; head[2] += .35 * p; carry(false); }
+  else if (ac === 'walk' || ac === 'run') {
+    const stride = ac === 'run' ? 12 : 7;
+    feet = feet.map((ft, i) => v(ft[0], p * stride * (i ? 1 : -1), 1 + Math.max(0, p * (i ? 1 : -1)) * 4));
+    hands = hands.map((h, i) => v(h[0], p * stride * (i ? -1 : 1) * .8, 29)); l = hands[0]; r = hands[1];
+    const bob = Math.abs(p); sh[2] += bob; hip[2] += bob; head[2] += bob;
+    if (ac === 'run') { sh[1] = 4; head[1] = 6; hip[1] = 1; }
+    carry(false);
+  }
+  else if (ac === 'death' || ac === 'corpse') {
+    const k = ac === 'corpse' ? 1 : Math.min(1, t * 1.35);
+    hip = v(0, -5 * k, 29 * (1 - k) + 3 * k); sh = v(0, -19 * k, 48 * (1 - k) + 5 * k); head = v(0, -27 * k, 56 * (1 - k) + 5 * k);
+    l = v(-11, -17 * k, 28 * (1 - k) + 2 * k); r = v(11, -15 * k, 28 * (1 - k) + 2 * k); feet = [v(-4, 10 * k, 1), v(4, 8 * k, 1)];
+    return { hip, sh, head, feet, hands: [l, r], el: [mix(v(-10, -13 * k, 38 * (1 - k) + 3 * k), l, .3), mix(v(10, -12 * k, 38 * (1 - k) + 3 * k), r, .3)], axis: v(0, 1, 0), twoGrip: false, down: k };
+  }
+  else {
+    feet = [v(-5, 5, 1), v(5, -5, 1)]; l = v(-8, 7, 35); r = v(9, 8, 37);
+    const k = K[ac];
+    if (ac === 'ready' || ac === 'block' || ac === 'hit') {
+      carry(true); if (!wp || wp === 'fist') { r = v(8, 9, 40); l = v(-7, 9, 41); }
+      if (ac === 'ready') { sh[2] += .3 * p; head[2] += .3 * p; }
+      if (ac === 'block') { l = v(-3, 13 + q, 44 + 2 * q); sh[2] -= 1 + q; head[2] -= 1 + q; hip[2] -= 1 + .5 * q; sh[1] -= q; }
+      if (ac === 'hit') { sh[1] = -5 * q; head[1] = -7 * q; hip[1] = -2 * q; }
+    }
+    else if (k) {
+      r = seq(k.r, t); axis = seq(k.a, t); if (k.l) l = seq(k.l, t);
+      const st = k.step ? seq(k.step, t) : 0, cr = k.crouch ? seq(k.crouch, t) : 0, tw = k.twist ? seq(k.twist, t) : 0;
+      feet[0] = add(feet[0], v(0, st, 0)); if (k.wide) feet = [v(-7, 4 + st, 1), v(7, -6 + st, 1)];
+      hip[2] += cr; sh[2] += cr; head[2] += cr; sh[1] += tw; head[1] += tw * 1.2;
+      if (TWO_HAND.includes(ac) || ((ac === 'slash1h' || ac === 'chop1h' || ac === 'blunt1h' || ac === 'thrust1h') && SHOULDERED.concat(LONG).includes(wp))) twoGrip = true;
+      if (ac === 'crossbow' || ac === 'hcrossbow') { l = add(r, scale(unit(axis), 8)); l[0] -= 4; offGrip = true; twoGrip = false; }
+    }
+    else if (ac === 'bandage') { r = v(-1, 11, 34 + 4 * q); l = v(-4, 11, 36); }
+    else if (ac === 'craft') { r = v(3, 11, 31 + 2 * p); l = v(-3, 11, 31 - 2 * p); sh[1] = 1.5; head[1] = 2.5; }
+    else if (ac === 'fish') { r = v(6, 10, 37 + 8 * q); axis = v(0, 1, .8 + q); }
+  }
+  if (twoGrip) { l = add(r, scale(unit(axis), -8)); l[0] -= 3; }
+  el = [mix(v(-11, 1, 39), l, .30), mix(v(11, 1, 39), r, .30)];
+  return { hip, sh, head, feet, hands: [l, r], el, axis: unit(axis), twoGrip, offGrip, down: 0 };
+}
+
+/* ---------- one frame ---------- */
+function frameSVG(f, o) {
+  o = o || {}; const ac = ANIMATIONS[o.action] ? o.action : 'idle', n = ANIMATIONS[ac], fr = Math.max(0, Math.min(n - 1, Math.floor(o.frame || 0)));
+  const t = o.t != null ? Math.max(0, Math.min(1, o.t)) : LOOPED.includes(ac) ? fr / n : n > 1 ? fr / (n - 1) : 1;
+  const di = DIRECTIONS.includes(o.direction) ? DIRECTIONS.indexOf(o.direction) : typeof o.direction === 'number' ? ((o.direction % 8) + 8) % 8 : 0;
+  const angle = di * Math.PI / 4, d = [-Math.sin(angle), Math.cos(angle)], s = [d[1], -d[0]];
+  const fig = Object.assign({}, f); if (o.weapon !== undefined) fig.weapon = o.weapon;
+  if (['bandage', 'craft'].includes(ac)) fig.weapon = null;
+  const female = fig.body === 'female', w = female ? 5.8 : 7.2, hipW = female ? .86 : .72, p = pose(ac, t, fig), front = d[1] >= 0;
+  const cloth = fig.cloth || '#ac9776', skin = fig.skin || '#ca9a72', hair = fig.hair || '#65452e', style = fig.style || 'short';
+  const proj = a => [CELL.anchorX + a[0] * s[0] + a[1] * d[0], CELL.anchorY - a[2] + .45 * (a[0] * s[1] + a[1] * d[1])], depth = a => .45 * (a[0] * s[1] + a[1] * d[1]);
+  const r1 = x => Math.round(x * 10) / 10, pt = a => proj(a).map(r1).join(',');
+  const raw = (a, b, wd, c, x) => { const [X1, Y1] = proj(a).map(r1), [X2, Y2] = proj(b).map(r1); return '<line x1="' + X1 + '" y1="' + Y1 + '" x2="' + X2 + '" y2="' + Y2 + '" stroke-linecap="round" stroke="' + c + '" stroke-width="' + wd + '"' + (x || '') + '/>'; };
+  const line = (a, b, wd, c) => raw(a, b, wd + 1.5, dark) + raw(a, b, wd, c) + raw(a, b, Math.max(.5, wd * .23), shade(c, 1.22), ' transform="translate(-.45 -.45)"');
+  const poly = (ps, c, sw) => '<polygon points="' + ps.map(pt).join(' ') + '" fill="' + c + '" stroke="' + dark + '" stroke-width="' + (sw || .8) + '" stroke-linejoin="round"/>';
+  const ell = (a, rx, ry, c, sw) => { const [X, Y] = proj(a).map(r1); return '<ellipse cx="' + X + '" cy="' + Y + '" rx="' + rx + '" ry="' + ry + '" fill="' + c + '" stroke="' + dark + '" stroke-width="' + (sw == null ? .7 : sw) + '"/>'; };
+  const shapes = [], put = (z, a) => { if (a) shapes.push([z, a]); };
+  const ARM = { leather: 1, studded: 1, bone: 1, ringmail: 1, chain: 1, plate: 1, dragon: 1 };
+  const metal = fam => fam === 'chain' || fam === 'ringmail' || fam === 'plate' || fam === 'dragon';
+  // pattern on a limb segment: rings for chain/ringmail, studs, plate highlights
+  const texture = (a, b, fam, c) => { if (fam === 'chain' || fam === 'ringmail') return raw(a, b, 1.6, shade(c, 1.35), ' stroke-dasharray="' + (fam === 'chain' ? '.6 .9' : '.2 1.6') + '"');
+    if (fam === 'studded') return raw(a, b, 1.1, '#cfc6a6', ' stroke-dasharray=".2 2.2"'); if (fam === 'plate' || fam === 'dragon') return raw(a, b, .9, shade(c, 1.45), ' transform="translate(-.6 -.4)"'); if (fam === 'bone') return raw(a, b, 1.2, shade(c, .7), ' stroke-dasharray=".8 1.6"'); return ''; };
+  // cloak: behind the body seen from the front, over it seen from the back
+  if (fig.cloak && !['death', 'corpse'].includes(ac)) {
+    const sw2 = (ac === 'run' ? 5 : ac === 'walk' ? 2.5 : 1), top = (x) => add(p.sh, v(x, -3, 0)), bot = (x) => add(p.hip, v(x * 1.5, -4 - sw2, -24));
+    const cl = poly([top(-w - .5), top(w + .5), bot(w + 1.5), bot(-w - 1.5)], shade(fig.cloak, front ? .72 : 1));
+    put(front ? -30 : 18, cl + (front ? '' : raw(add(p.sh, v(0, -3.2, -1)), add(p.hip, v(0, -4.5 - sw2, -22)), .8, shade(fig.cloak, .7))));
+  }
+  // legs, boots; leg armor; the robe hides the legs
+  for (let i = 0; i < 2; i++) {
+    const k = i ? 1 : -1, h = add(p.hip, v(k * 3.2, 0, 0)), ft = p.feet[i], knee = mix(h, ft, .53); knee[1] += 2;
+    const legFam = fig.legs && ARM[fig.legs] ? fig.legs : null, legC = legFam ? fig.legsCol : fig.pants || shade(cloth, .53), boot = fig.boots || '#49382a';
+    let g = line(h, knee, female ? 5 : 5.8, legC) + line(knee, add(ft, v(0, 0, 4)), 4.8, shade(legC, .9)) + line(add(ft, v(0, 0, 4)), ft, 4.7, boot) + line(ft, add(ft, v(0, 3, 0)), 5, boot);
+    if (legFam) g += texture(h, knee, legFam, legC) + texture(knee, add(ft, v(0, 0, 5)), legFam, legC) + (metal(legFam) ? ell(knee, 2.1, 1.7, shade(legC, 1.1), .5) : '');
+    put(-12 + depth(h), g);
+  }
+  // arms: sleeve or arm armor, then hand or glove
+  for (let i = 0; i < 2; i++) {
+    const k = i ? 1 : -1, shp = add(p.sh, v(k * (w + .5), 0, -1)), elb = p.el[i], hand = p.hands[i];
+    const armFam = fig.arms && ARM[fig.arms] ? fig.arms : null, armC = armFam ? fig.armsCol : fig.bareArms ? skin : (fig.robe || (ARM[fig.torso] && fig.torso !== 'leather' ? shade(cloth, .91) : fig.torso === 'leather' || fig.torso === 'studded' ? shade(cloth, .91) : fig.torsoCol || cloth));
+    const glove = fig.hands ? fig.handsCol : skin;
+    let g = line(shp, elb, 4.7, armC) + line(elb, hand, 3.8, armFam ? shade(armC, .95) : fig.bareArms ? skin : armC === skin ? skin : (fig.robe ? fig.robe : skin)) + ell(hand, 2, 2.2, glove);
+    if (!armFam && !fig.bareArms && !fig.robe) g = line(shp, elb, 4.7, armC) + line(elb, mix(elb, hand, .45), 3.9, armC) + line(mix(elb, hand, .45), hand, 3.6, skin) + ell(hand, 2, 2.2, glove);
+    if (armFam) g += texture(shp, elb, armFam, armC) + texture(elb, hand, armFam, armC) + (metal(armFam) ? ell(add(shp, v(0, 0, 1)), 3, 2.4, shade(armC, 1.08), .6) : '');
+    put(depth(shp) * 1.5 + depth(hand) * .6 + (k * s[1] > .05 ? 2 : -2), g);
+  }
+  // torso: four planes coloured by the chest layer, then the front details
+  const torsoFam = ARM[fig.torso] ? fig.torso : null, tc = torsoFam ? fig.torsoCol : fig.robe ? fig.robe : fig.torsoCol || cloth;
+  const top = (x, y) => add(p.sh, v(x, y, 0)), bottom = (x, y) => add(p.hip, v(x, y, 0));
+  const planes = [[[top(-w, -2.8), top(w, -2.8), bottom(w * hipW, -2.5), bottom(-w * hipW, -2.5)], .74, v(0, -2.8, 0)], [[top(-w, 2.8), top(w, 2.8), bottom(w * hipW, 2.5), bottom(-w * hipW, 2.5)], 1, v(0, 2.8, 0)],
+    [[top(-w, -2.8), top(-w, 2.8), bottom(-w * hipW, 2.5), bottom(-w * hipW, -2.5)], 1.14, v(-w, 0, 0)], [[top(w, -2.8), top(w, 2.8), bottom(w * hipW, 2.5), bottom(w * hipW, -2.5)], .83, v(w, 0, 0)]];
+  let tor = planes.sort((a, b) => depth(a[2]) - depth(b[2])).map(([ps, k]) => poly(ps, shade(tc, k))).join('');
+  const fy = front ? 3 : -3, F = (x, z, base) => add(base || p.sh, v(x, fy, z));
+  if (torsoFam === 'chain' || torsoFam === 'ringmail') for (let z = -2; z >= -16; z -= 3) tor += raw(F(-w + 1, z), F(w - 1, z), 1.5, shade(tc, 1.35), ' stroke-dasharray="' + (torsoFam === 'chain' ? '.6 .9' : '.2 1.5') + '"');
+  if (torsoFam === 'studded') for (let z = -3; z >= -16; z -= 4) tor += raw(F(-w + 1.5, z), F(w - 1.5, z), 1.2, '#d8cfae', ' stroke-dasharray=".2 2.4"');
+  if (torsoFam === 'leather' || torsoFam === 'studded') tor += raw(F(0, -1), F(0, -17), .6, shade(tc, .6));
+  if (torsoFam === 'plate' || torsoFam === 'dragon') { tor += raw(F(0, -1.5), F(0, -16), 1.1, shade(tc, 1.5)) + raw(F(-w + 1, -9), F(w - 1, -9), .7, shade(tc, .7));
+    put(depth(top(-w, 0)) * 1.5 + 2.5, ell(top(-w - .5, 0), 3.4, 2.6, shade(tc, 1.05), .6)); put(depth(top(w, 0)) * 1.5 + 2.5, ell(top(w + .5, 0), 3.4, 2.6, shade(tc, 1.05), .6)); }
+  if (torsoFam === 'bone') for (let z = -3; z >= -15; z -= 4) tor += raw(F(-w + 1, z), F(w - 1, z), 1.3, shade(tc, .75));
+  if (fig.stripes && !torsoFam) for (let z = -3; z >= -15; z -= 4) tor += raw(F(-w + .8, z), F(w - .8, z), 1.2, shade(cloth, 1.35));
+  if (fig.vest && front) tor += poly([F(-w + .6, -.5), F(-1.2, -1), F(-1.5, -17, p.sh), F(-w * hipW + .5, 1, p.hip)], shade(cloth, .55)) + poly([F(w - .6, -.5), F(1.2, -1), F(1.5, -17, p.sh), F(w * hipW - .5, 1, p.hip)], shade(cloth, .55));
+  if (fig.gorget) tor += line(F(-2.5, -1), F(2.5, -1), 2.4, fig.gorget);
+  // skirts and over-garments: robe to the ankles, coat tails, apron, tabard
+  if (fig.robe) tor += poly([F(-w * hipW, 1, p.hip), F(w * hipW, 1, p.hip), F(w + 2.5, -25, p.hip), F(-w - 2.5, -25, p.hip)], shade(fig.robe, .9)) + raw(F(0, 0, p.hip), F(0, -24, p.hip), .6, shade(fig.robe, .65));
+  if (fig.coat) tor += poly([F(-w * hipW, 1, p.hip), F(w * hipW, 1, p.hip), F(w + 1.5, -15, p.hip), F(-w - 1.5, -15, p.hip)], shade(cloth, .8));
+  else if (!fig.robe && !torsoFam) tor += poly([F(-w * hipW, 1, p.hip), F(w * hipW, 1, p.hip), F(w * hipW + 1, -5, p.hip), F(-w * hipW - 1, -5, p.hip)], shade(tc, .92));   // tunic skirt
+  if (fig.apron && front) tor += poly([F(-3, -4), F(3, -4), F(5, -14, p.hip), F(-5, -14, p.hip)], fig.apron) + raw(F(-3, -4), F(-w + .5, -1), .7, shade(fig.apron, .6)) + raw(F(3, -4), F(w - .5, -1), .7, shade(fig.apron, .6));
+  if (fig.tabard) tor += poly([F(-3.2, -.5), F(3.2, -.5), F(3.6, -12, p.hip), F(-3.6, -12, p.hip)], fig.tabard) + raw(F(0, -4), F(0, -10), 1.2, shade(fig.tabard, 1.6)) + raw(F(-1.6, -6.5), F(1.6, -6.5), 1.2, shade(fig.tabard, 1.6));
+  tor += line(add(p.hip, v(-w * hipW, fy, 2)), add(p.hip, v(w * hipW, fy, 2)), 2.1, '#5a3f2a');   // belt
+  if (front && !fig.tabard && !fig.apron) tor += ell(add(p.hip, v(0, 3, 2)), 1.4, 1, '#b19b69', .5);
+  if (front && !torsoFam && !fig.robe && !fig.tabard && !fig.apron && !fig.vest) tor += raw(add(p.sh, v(-2, 3, -1)), add(p.sh, v(0, 3, -6)), 1, shade(tc, .57)) + raw(add(p.sh, v(2, 3, -1)), add(p.sh, v(0, 3, -6)), 1, shade(tc, 1.23));
+  put(.3, tor);
+  // head: neck, face, hair (hidden under full helmets and hoods), beard, helmet
+  const h = p.head, full = ['closedhelm', 'greathelm'].includes(fig.helm), covered = full || fig.hood || fig.helm === 'coif';
+  let ha = line(add(h, v(0, 0, -7)), add(h, v(0, 0, -3)), 3.8, fig.helm === 'coif' ? fig.helmCol : skin) + ell(h, female ? 4.7 : 5.1, 6.1, skin);
+  if (!covered && style !== 'bald') {
+    if (['long', 'braid', 'ponytail'].includes(style)) ha = ell(add(h, v(0, -2, -4)), 4.5, 8, hair) + ha;
+    if (['bun', 'ponytail'].includes(style)) ha = ell(add(h, v(0, -4, 1)), 2.8, 3.2, hair) + ha;
+    ha += ell(add(h, v(0, -.8, 2.8)), 5, style === 'cropped' ? 2 : 3.3, hair) + raw(add(h, v(-3, -.5, 3)), add(h, v(2, -.5, 4.6)), .9, shade(hair, 1.35));
+    if (!front) ha += ell(add(h, v(0, -1, -.8)), 4.7, 4.6, hair);
+    if (style === 'parted' && front) ha += line(add(h, v(-2, 2, 4)), add(h, v(0, 2, 1)), 1.6, hair);
+    if (style === 'braid') ha += line(add(h, v(2, -3, -1)), add(h, v(2, -4, -12)), 2.6, hair);
+  }
+  if (front && !full) {
+    ha += ell(add(h, v(-1.6, 3, .1)), .5, .5, dark, 0) + ell(add(h, v(1.6, 3, .1)), .5, .5, dark, 0) + raw(add(h, v(0, 3, -1)), add(h, v(0, 4, -2)), .8, shade(skin, 1.15));
+    if (fig.beard && fig.beard !== 'none' && !covered) ha += ell(add(h, v(0, 3, -3)), fig.beard === 'goatee' ? 1.5 : fig.beard === 'stubble' ? 3 : 3.1, fig.beard === 'full' ? 3 : fig.beard === 'stubble' ? 1.2 : 1.6, fig.beard === 'stubble' ? shade(hair, 1.1) : shade(hair, .82), fig.beard === 'stubble' ? 0 : .7);
+  }
+  if (fig.hood) { const hc = shade(cloth, .78); ha = ell(add(h, v(0, -1.2, -1.5)), 6.4, 8.2, hc) + ha; ha += ell(add(h, v(0, -.6, 2.6)), 5.8, 3.8, hc); if (!front) ha += ell(add(h, v(0, -1, -.5)), 5.8, 6.6, hc); }
+  if (fig.helm) { const c = fig.helmCol || '#828b8d';
+    if (fig.helm === 'cap' || fig.helm === 'leathercap') ha += ell(add(h, v(0, -.5, 3.4)), fig.helm === 'cap' ? 5.3 : 5.6, fig.helm === 'cap' ? 2.8 : 3.4, c);
+    else if (fig.helm === 'coif') { ha = ell(add(h, v(0, -1, -1)), 6.2, 8, c) + ha.replace(/^/, ''); ha += ell(add(h, v(0, -.6, 2.4)), 5.7, 3.9, c) + raw(add(h, v(-4.5, -.5, 1)), add(h, v(4.5, -.5, 1)), 1.2, shade(c, 1.35), ' stroke-dasharray=".6 .9"'); }
+    else if (fig.helm === 'openhelm') ha += ell(add(h, v(0, 0, 3)), 5.6, 3.5, c) + (front ? line(add(h, v(0, 2, 4)), add(h, v(0, 3, -1)), 1.4, edge) : '');
+    else if (fig.helm === 'bonehelm') ha += ell(add(h, v(0, 0, 3)), 5.8, 3.8, c) + line(add(h, v(-4, 0, 4)), add(h, v(-6, 0, 8)), 1.4, shade(c, .9)) + line(add(h, v(4, 0, 4)), add(h, v(6, 0, 8)), 1.4, shade(c, .9));
+    else { ha += ell(add(h, v(0, 0, .5)), 5.7, 7, c) + ell(add(h, v(0, 0, 3.5)), 5.2, 3, shade(c, 1.12), .4); if (front) ha += raw(add(h, v(-3, 3.2, .6)), add(h, v(3, 3.2, .6)), 1, dark) + raw(add(h, v(0, 3.4, -1)), add(h, v(0, 3.4, -5)), .6, shade(c, .6)); if (fig.helm === 'greathelm') ha += ell(add(h, v(0, 0, -4.5)), 5.5, 2.2, shade(c, .9), .5); }
+  }
+  put(30 + depth(h), ha);
+  // weapon (bows in the off hand), shield on the off arm
+  const wp = fig.weapon;
+  if (wp && wp !== 'fist' && !['death', 'corpse'].includes(ac)) {
+    const bow = BOWS.includes(wp), g = bow ? p.hands[0] : p.hands[1], a = p.axis, at = k => add(g, scale(a, k)), c = unit(v(-a[2], .1, a[0] || .3)); let art = '';
+    if (bow) { const L = wp === 'longbow' ? 18 : 14, ba = ac === 'bow' ? v(0, 0, 1) : a, top2 = add(g, scale(ba, L)), bot = add(g, scale(ba, -L)), mid = add(g, v(0, 3, 0)), draw = ac === 'bow' ? p.hands[1] : g;
+      art = line(top2, mid, 1.7, wood) + line(mid, bot, 1.7, wood) + raw(top2, draw, .65, '#d1c5a5') + raw(draw, bot, .65, '#d1c5a5'); if (ac === 'bow' && t < .62) art += line(draw, add(g, v(0, 12, 0)), .8, edge); }
+    else if (XBOWS.includes(wp)) { const H = wp === 'heavycrossbow', L = H ? 12 : 8; art = line(at(-6), at(H ? 15 : 13), H ? 4 : 3.2, wood) + line(add(at(7), v(-L, 0, 0)), at(10), H ? 2.4 : 1.9, steel) + line(at(10), add(at(7), v(L, 0, 0)), H ? 2.4 : 1.9, steel) + raw(add(at(7), v(-L, 0, 0)), at(0), .7, edge) + raw(at(0), add(at(7), v(L, 0, 0)), .7, edge) + (H ? line(at(1), at(-3), 2.2, steel) : ''); }
+    else if (['dagger', 'knife', 'kryss', 'sword', 'broadsword', 'katana', 'rapier', 'greatsword'].includes(wp)) { const L = { dagger: 9, knife: 8, kryss: 15, sword: 20, broadsword: 21, katana: 23, rapier: 22, greatsword: 29 }[wp], b = wp === 'rapier' || wp === 'kryss' ? 1 : wp === 'broadsword' ? 2.5 : wp === 'knife' ? 2.1 : 1.7;
+      art = line(at(wp === 'greatsword' ? -9 : -5), at(3), 2.1, wood) + (wp === 'knife' ? '' : line(add(at(3), scale(c, -4)), add(at(3), scale(c, 4)), 1.7, steel)) + poly([add(at(4), scale(c, -b)), at(L), add(at(4), scale(c, b))], steel) + raw(at(5), at(L - 1), .7, edge); }
+    else { const L = { axe: 17, battleaxe: 24, doubleaxe: 24, mace: 16, warhammer: 24, maul: 24, club: 18, spear: 33, shortspear: 23, halberd: 31, bardiche: 30, staff: 30, quarterstaff: 28, wand: 13, pickaxe: 20, hatchet: 15, smithhammer: 13, fishingpole: 36 }[wp] || 18;
+      art = line(at(-Math.min(12, L * .38)), at(L), wp === 'wand' ? 1.3 : 2.2, wood);
+      if (['axe', 'battleaxe', 'doubleaxe', 'halberd', 'bardiche', 'hatchet', 'pickaxe'].includes(wp)) { const tip = at(L - 2), wing = wp === 'pickaxe' ? 8 : ['battleaxe', 'doubleaxe'].includes(wp) ? 7 : 5;
+        art += wp === 'pickaxe' ? line(add(tip, scale(c, wing)), add(tip, scale(c, -wing)), 2, steel) : poly([at(L - 7), add(tip, scale(c, wing)), add(at(L + 1), scale(c, wing)), at(L + 1)], steel);
+        if (wp === 'doubleaxe') art += poly([at(L - 7), add(tip, scale(c, -wing)), add(at(L + 1), scale(c, -wing)), at(L + 1)], steel); }
+      if (['spear', 'shortspear', 'halberd', 'bardiche'].includes(wp)) art += poly([add(at(L - 6), scale(c, -2.3)), at(L + 4), add(at(L - 6), scale(c, 2.3))], edge);
+      if (['mace', 'club', 'maul', 'warhammer', 'smithhammer'].includes(wp)) art += line(add(at(L - 2), scale(c, -3.3)), add(at(L - 2), scale(c, 3.3)), wp === 'maul' || wp === 'warhammer' ? 6 : 4.7, wp === 'club' ? wood : steel) + (wp === 'mace' ? ell(at(L), 2.6, 2.6, steel, .6) : '');
+      if (['staff', 'wand'].includes(wp)) art += ell(at(L), 1.8, 2.1, '#b9a16c');
+      if (wp === 'fishingpole') art += raw(at(L), add(at(L), v(0, 4, -14)), .6, '#b7b2a1'); }
+    put(depth(g) + 7, art);
+  }
+  if (fig.shield && !['death', 'corpse', 'bow', 'crossbow', 'hcrossbow', 'slash2h', 'chop2h', 'blunt2h', 'thrust2h', 'polearm', 'staff', 'caststaff', 'mine', 'chopwood'].includes(ac) && !p.twoGrip && !p.offGrip) {
+    const g = add(p.hands[0], v(-1, 2, 0)), sc = fig.shieldCol || '#7f6845', fx = x => add(g, v(x, 0, 0)), Z = (x, z) => add(g, v(x, 1, z));
+    let art;
+    if (fig.shield === 'buckler') art = ell(g, 3.6, 3.9, sc) + ell(g, 1.3, 1.4, steel, .5);
+    else if (fig.shield === 'kite') art = poly([Z(-4.5, 6), Z(4.5, 6), Z(4, -2), Z(0, -11), Z(-4, -2)], sc) + raw(Z(0, 5), Z(0, -9), 1, shade(sc, 1.4));
+    else if (fig.shield === 'heater') art = poly([Z(-5, 6), Z(5, 6), Z(4.6, -1.5), Z(0, -8), Z(-4.6, -1.5)], sc) + raw(Z(-3.5, 4.8), Z(3.5, 4.8), 1, shade(sc, 1.4)) + raw(Z(0, 5.5), Z(0, -6.5), 1, shade(sc, 1.4));
+    else art = ell(fx(0), 5.6, 7.2, shade(sc, .8)) + ell(fx(0), 4.4, 5.9, sc) + ell(fx(0), 1.7, 1.9, steel);
+    put(depth(g) + (front ? 8 : -8), art);
+  }
+  if (ac === 'bandage') put(20, ell(p.hands[0], 2.7, 2.1, '#d8cbb1'));
+  const sc = fig.scale && fig.scale !== 1 ? fig.scale : 1, body = shapes.sort((a, b) => a[0] - b[0]).map(x => x[1]).join('');
+  const inner = sc === 1 ? body : '<g transform="translate(' + CELL.anchorX + ' ' + CELL.anchorY + ') scale(' + sc + ') translate(' + (-CELL.anchorX) + ' ' + (-CELL.anchorY) + ')">' + body + '</g>';
+  return o.inner ? inner : '<svg xmlns="http://www.w3.org/2000/svg" width="' + CELL.width + '" height="' + CELL.height + '" viewBox="0 0 ' + CELL.width + ' ' + CELL.height + '">' + inner + '</svg>';
+}
+/* one direction of one action: n frames side by side, rendered at k × the cell size (the game draws them 1:1) */
+function stripSVG(f, action, direction, k, o) {
+  const ac = ANIMATIONS[action] ? action : 'idle', n = ANIMATIONS[ac]; k = k || 1; let parts = '';
+  for (let i = 0; i < n; i++) parts += '<g transform="translate(' + (i * CELL.width) + ' 0)">' + frameSVG(f, Object.assign({}, o || {}, { action: ac, frame: i, direction, inner: true })) + '</g>';
+  const W = Math.ceil(n * CELL.width * k), H = Math.ceil(CELL.height * k);
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + (n * CELL.width) + ' ' + CELL.height + '" shape-rendering="geometricPrecision">' + parts + '</svg>';
+}
+/* atlas in the pack's layout (columns = frames; rows = 8 directions) for one figure and action — the export the painted art replaces */
+function atlasSVG(f, action) { const ac = ANIMATIONS[action] ? action : 'idle', n = ANIMATIONS[ac]; let parts = ''; for (let r = 0; r < 8; r++) for (let i = 0; i < n; i++) parts += '<g transform="translate(' + (i * CELL.width) + ' ' + (r * CELL.height) + ')">' + frameSVG(f, { action: ac, frame: i, direction: r, inner: true }) + '</g>'; return '<svg xmlns="http://www.w3.org/2000/svg" width="' + n * CELL.width + '" height="' + 8 * CELL.height + '">' + parts + '</svg>'; }
+/* frame index for a phase t ∈ [0,1] (one-shot actions) or a time in seconds (looped actions) */
+function frameAt(action, t, seconds) { const n = ANIMATIONS[action] || 1; if (LOOPED.includes(action)) return Math.floor((seconds || 0) * (FPS[action] || 8)) % n; return Math.max(0, Math.min(n - 1, Math.floor((t == null ? 1 : t) * n * .999))); }
+const RIG = { VERSION: '2.1.0', DIRECTIONS, CELL, ANIMATIONS, LOOPED, FPS, frameSVG, stripSVG, atlasSVG, frameAt, pose };
+root.SFRIG = RIG;
+if (typeof module !== 'undefined' && module.exports) module.exports = RIG;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+</script>
+<script>
 /* Shardfall world simulation core (SIM) — Living World Phase 1 (docs/WORLD_SIMULATION_PROGRESS.md).
    Pure, renderer-free, network-free: no DOM, no Canvas, no timers, no Math.random. Runs in the browser (globalThis.SIM)
    and in node for tests (module.exports). The game (src/game.js) owns the entities; SIM gives them:
@@ -2309,7 +2817,7 @@ function castSlot(id, opt) {
   say(P, sp.chant); FX.push({ k: 'msign', e: P, id: sp.id, t0: GT, dur: delay + sp.prep + .2 });   // preparing is quiet; magic.prepare plays when it holds
 }
 function interruptPrep(msg) {
-  if (!P.prep) return; const pr = P.prep, c = MG.interruptCost(pr.sp.mp); P.prep = null;
+  if (!P.prep) return; const pr = P.prep, c = MG.interruptCost(pr.sp.mp); P.prep = null; P._hbreak = GT;   // _hbreak: the visual cast-break flinch (src/humans.js)
   for (const r of pr.escrow.items) give(r, 1);                                   // reagents (or scroll) come back
   P.mana = Math.min(SF.maxMana(P), P.mana + pr.escrow.mana - c);                   // half the mana, rounded up, is spent
   log(msg + ` (−${c} mana)`, '#ffb070'); P.spellReadyAt = GT + MG.RECOVERY; snd('magic.fizzle', { key: 'P' });
@@ -4473,6 +4981,210 @@ function lifeLoad(saved) {
   if (saved.stock) for (const k in saved.stock) LIFE.stock[k] = Object.assign(LIFE.stock[k] || {}, saved.stock[k]);
   const t = LIFE.trader; if (t && saved.trader && LIFE.towns[saved.trader.town]) { const L = t.life, G = LIFE.towns[saved.trader.town], p = lifeSpot(t, G.market, 5); L.town = t.town = saved.trader.town; L.legs = saved.trader.legs || 0; L.gold = saved.trader.gold ?? L.gold; L.phase = 'selling'; L.until = 0; lifeTeleport(t, p); t.home = { x: p.x, y: p.y }; }
 }
+
+/* ================= HUMANS v2 (v0.30): one renderer for every human — player, hireling, townsfolk, guards, merchants, trainers,
+   travellers, bandits, smugglers and the drowned captain. docs/humans/STATUS.md.
+   Visual only. It reads simulation facts (movement, swings, telegraphs, casts, tasks, hits, deaths) and never writes gameplay state:
+   the only fields it sets on entities start with _h (look caches and animation phase) and are never saved.
+   Behind a feature flag until the painted atlases pass visual review: ?humans=v2 (or the Menu / creator toggle) turns it on,
+   ?humans=old turns it off. With the flag off the game draws exactly as v0.29.2.
+   Sprites: the procedural rig (src/human-rig.js) builds one strip per figure × action × direction, rasterised once at native size,
+   trimmed and kept in a bounded LRU cache; nothing is rasterised in the draw call itself, the build queue runs a few strips per frame. ---- */
+const LOOK = SF.LOOK;
+const HUM = { cache: new Map(), px: 0, maxPx: 7e6, queue: [], inflight: 0, tick: 0, K: 1.1, built: 0, evicted: 0, fallbacks: 0, buildMs: 0, maxBuildMs: 0, perFrame: 3, maxInflight: 6 };
+let HUM_FLAG = null;
+function humOn() {
+  if (HUM_FLAG === null) { const q = /[?&]humans=([a-z0-9]+)/i.exec(location.search || ''); HUM_FLAG = q ? /^(v2|on|1|new)$/i.test(q[1]) : !!(typeof SETTINGS !== 'undefined' && SETTINGS.humansV2); }
+  return HUM_FLAG;
+}
+function humSetFlag(on) { HUM_FLAG = !!on; if (typeof SETTINGS !== 'undefined') { SETTINGS.humansV2 = !!on; saveSettings(); } }
+/* which entities the human renderer draws: every human; creatures keep their own art */
+function humIsHuman(e) { return e.kind === 'player' || e.kind === 'npc' || e.kind === 'ally' || (e.kind === 'mon' && LOOK.isHumanMon(e.type)); }
+/* the persistent appearance of an NPC or human creature: from a seed fixed at world population (name + role + ordinal),
+   so it is the same after leaving the area and after every reload; never stored, never rerolled */
+function humAssignSeeds() {
+  const seen = {}; for (const e of ents) if (e.kind === 'npc' && !e._hseed) { const k = e.name + '|' + e.role; seen[k] = (seen[k] || 0) + 1; e._hseed = k + '#' + seen[k]; }
+}
+function humBaseLook(e) {
+  if (e._hlook) return e._hlook;
+  if (e.kind === 'npc') e._hlook = LOOK.npcLook({ seed: e._hseed || (e.name + '|' + e.role), name: e.name, role: e.role, prof: e.life && e.life.prof, town: e.town || (e.life && e.life.town) || humTownOf(e), kind: 'npc' });
+  else if (e.kind === 'ally') e._hlook = LOOK.npcLook({ seed: 'ally:' + (e.aid || e.name), name: e.name, role: 'sellsword', kind: 'npc' });
+  else if (e.kind === 'mon') e._hlook = LOOK.npcLook({ seed: 'mon:' + e.type + ':' + (e.actorId || e.aid || e.id), name: MON[e.type] && MON[e.type].n, kind: 'mon', type: e.type });
+  return e._hlook;
+}
+function humTownOf(e) { const n = String(e.name || '').toLowerCase(); for (const t of ['vespar', 'mynoc', 'skara', 'moonglen', 'college', 'quay']) if (n.includes(t)) return t; return null; }
+/* the render figure for an entity, recomputed only when its look or visible equipment changes */
+function humFigure(e) {
+  let sig;
+  if (e === P) { const app = SF.EQ.appearance(P); sig = JSON.stringify(P.look) + '|' + app.map(a => a.asset + a.tint).join(',') + '|' + (P.equip.weapon ? P.equip.weapon.id : '') + '|' + !!P.ghost; }
+  else if (e.kind === 'ally') { const app = SF.EQ.appearance(e); sig = app.map(a => a.asset + a.tint).join(',') + '|' + (e.equip && e.equip.weapon ? e.equip.weapon.id : '') + '|' + !!e.ghost; }
+  else sig = 'npc';
+  if (e._hfig && e._hsig === sig) return e._hfig;
+  let f;
+  if (e === P) { P.look = LOOK.normalize(P.look, P.name); f = LOOK.figure(P.look, P, { seed: P.name, ghost: P.ghost }); if (!P.equip.weapon) f.weapon = null; }
+  else if (e.kind === 'ally') { f = LOOK.figure(humBaseLook(e), e, { ghost: e.ghost }); }
+  else f = LOOK.figure(humBaseLook(e), null);
+  f.key = LOOK.figKey(f); e._hfig = f; e._hsig = sig; return f;
+}
+/* ---- animation state: simulation facts → LOOK.state (priority death > hit/interrupt > attack/cast/tool > ready > move > idle) ---- */
+const HUM_SWING_LEAD = .12, HUM_REC = .38;
+function humAnim(e, f) {
+  const s = { now: GT, moving: e.speed > .3, running: false, hitAt: e.lastHit ?? e.hitT ?? null };
+  const walk = SF.WALK * MOVE_SCALE; s.running = s.moving && e.speed > walk * 1.2;
+  const wid = e === P ? wDef().id : e.kind === 'ally' ? (e.equip && e.equip.weapon ? e.equip.weapon.id : 'unarmed') : (humBaseLook(e).weapon || 'unarmed');
+  const wa = LOOK.weaponAnim(wid) || LOOK.weaponAnim('unarmed');
+  if (e._hswing != null && GT - e._hswing < HUM_SWING_LEAD + HUM_REC) s.attack = { family: wa.family, t0: e._hswing, tc: e._hswing + HUM_SWING_LEAD, rec: HUM_REC };
+  if (e._hblock != null && GT - e._hblock < .4) s.blocking = true;
+  if (e === P) {
+    s.interruptAt = Math.max(P._hbreak ?? -99, P._htaskbreak ?? -99); if (s.interruptAt < 0) s.interruptAt = null;
+    const gesture = sp => LOOK.castGesture(sp, f.weapon);
+    if (P.prep && GT >= P.prep.t0) s.cast = { gesture: gesture(P.prep.sp), phase: 'prep', t0: P.prep.t0, t1: P.prep.t1 };
+    else if (P.held) s.cast = { gesture: gesture(P.held.sp), phase: 'hold' };
+    else if (P.once && P.once.clip === 'CastRelease' && GT - P.once.t0 < .45) s.cast = { gesture: gesture(P._hlastSpell), phase: 'release', t0: P.once.t0 };
+    if (P.prep) P._hlastSpell = P.prep.sp; else if (P.held) P._hlastSpell = P.held.sp;
+    if (P.task && P.task.kind === 'gather' && P.task.node) s.tool = LOOK.toolAnim(P.task.node.skill);
+    else if (P.task && P.task.kind === 'skin') s.tool = { family: 'craft', geom: null };
+    else if (P.batch) { const r = SF.RECIPE[P.batch.rid]; s.tool = LOOK.craftAnim(r && (r.station + ' ' + (r.cat || ''))); }
+    else if (P.bandage) s.tool = { family: 'bandage', geom: null };
+    s.ready = !!(P.drawn || P.drawing || P.armed);
+  } else if (e.kind === 'ally') { s.ready = !!e.foe; }
+  else if (e.kind === 'mon') {
+    const d = MON[e.type] || {}, tele = (e.mode === 'r2' && d.ranged2 ? d.ranged2.tele : d.tele) || .5;
+    if (e.state === 'tele') s.attack = { family: wa.family, t0: e.st, tc: e.st + tele, rec: HUM_REC };
+    else if (e.state === 'strike') s.attack = { family: wa.family, t0: GT - .01, tc: GT, rec: HUM_REC };
+    else if (e.state === 'rec' && GT - (e.st || 0) < HUM_REC) s.attack = { family: wa.family, t0: e.st - .2, tc: e.st, rec: HUM_REC };
+    s.ready = !!e.target; s.hitAt = e.hitT ?? null;
+  } else if (e.life && !s.moving) {
+    const L = e.life, prof = L.prof;
+    if (L.doing === 'gather') s.tool = prof === 'miner' ? LOOK.toolAnim('mining') : prof === 'woodcutter' ? LOOK.toolAnim('lumberjacking') : prof === 'fisher' ? LOOK.toolAnim('fishing') : null;
+    else if (L.doing === 'work' && (prof === 'smith' || e.role === 'smith' || e.role === 'qsmith')) s.tool = LOOK.craftAnim('smith');
+  }
+  const st = LOOK.state(s); st.tool = s.tool || null; return st;
+}
+/* ---- strip cache ---- */
+function humStrip(f, action, dir, tool) {
+  const key = f.key + '|' + action + '|' + dir + '|' + (tool || ''); let s = HUM.cache.get(key);
+  if (s) { s.used = HUM.tick; return s.ready ? s : null; }
+  s = { ready: false, used: HUM.tick, px: 0 }; HUM.cache.set(key, s); HUM.queue.push({ key, f, action, dir, tool }); return null;
+}
+function humBuild(job) {
+  const s = HUM.cache.get(job.key); if (!s) return; const t0 = performance.now();
+  const f = job.tool !== undefined && job.tool !== '' ? Object.assign({}, job.f, { weapon: job.tool === 'none' ? null : job.tool }) : job.f;
+  const svg = SFRIG.stripSVG(f, job.action, job.dir, HUM.K), im = new Image(); HUM.inflight++;
+  im.onload = () => { HUM.inflight--; try { humPack(s, im, job, f); } catch (err) { console.warn('human strip failed', err); HUM.cache.delete(job.key); } HUM.buildMs += performance.now() - t0; };
+  im.onerror = () => { HUM.inflight--; HUM.cache.delete(job.key); };
+  im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+/* draw the strip once, trim every frame to its pixels, pack them side by side; ghosts get the pale blue wash */
+function humPack(s, im, job, f) {
+  const C = SFRIG.CELL, K = HUM.K, n = SFRIG.ANIMATIONS[job.action] || 1, cw = Math.ceil(C.width * K), ch = Math.ceil(C.height * K);
+  const tmp = document.createElement('canvas'); tmp.width = Math.ceil(n * C.width * K); tmp.height = ch; const tg = tmp.getContext('2d'); tg.drawImage(im, 0, 0, tmp.width, tmp.height);
+  const d = tg.getImageData(0, 0, tmp.width, tmp.height), a = d.data, W = tmp.width;
+  for (let i = 0; i < a.length; i += 4) { if (a[i + 3] < 48) { a[i + 3] = 0; continue; } if (f.ghost) { const l = (a[i] + a[i + 1] + a[i + 2]) / 3; a[i] = l * .7 + 60; a[i + 1] = l * .8 + 80; a[i + 2] = l + 110; a[i + 3] = Math.min(a[i + 3], 150); } }
+  tg.putImageData(d, 0, 0);
+  const rects = []; let total = 0, H = 1;
+  for (let k = 0; k < n; k++) {
+    const X0 = Math.floor(k * C.width * K); let x0 = cw, y0 = ch, x1 = -1, y1 = -1;
+    for (let y = 0; y < ch; y++) for (let x = 0; x < cw && X0 + x < W; x++) if (a[(y * W + X0 + x) * 4 + 3]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    if (x1 < 0) { x0 = 0; y0 = 0; x1 = 0; y1 = 0; }
+    const r = { sx: total, w: x1 - x0 + 1, h: y1 - y0 + 1, srcX: X0 + x0, srcY: y0, ox: x0 - C.anchorX * K, oy: y0 - C.anchorY * K }; rects.push(r); total += r.w; H = Math.max(H, r.h);
+  }
+  const out = document.createElement('canvas'); out.width = Math.max(1, total); out.height = H; const og = out.getContext('2d');
+  for (const r of rects) og.drawImage(tmp, r.srcX, r.srcY, r.w, r.h, r.sx, 0, r.w, r.h);
+  s.canvas = out; s.rects = rects; s.px = out.width * out.height; s.ready = true; HUM.px += s.px; HUM.built++; humEvict();
+}
+function humEvict() {
+  if (HUM.px <= HUM.maxPx) return; const list = [...HUM.cache.entries()].filter(([, s]) => s.ready && s.used < HUM.tick).sort((a, b) => a[1].used - b[1].used);
+  for (const [k, s] of list) { if (HUM.px <= HUM.maxPx * .8) break; HUM.cache.delete(k); HUM.px -= s.px; HUM.evicted++; }
+}
+/* the build queue: a few strips per frame, never inside the draw call */
+function humPump() {
+  HUM.tick++; let started = 0;
+  while (HUM.queue.length && HUM.inflight < HUM.maxInflight && started < HUM.perFrame) { const job = HUM.queue.shift(); const t = performance.now(); humBuild(job); HUM.maxBuildMs = Math.max(HUM.maxBuildMs, performance.now() - t); started++; }
+}
+/* ---- drawing ---- */
+function humPhase(e, action) {
+  const now = GT, dt = Math.max(0, Math.min(.25, now - (e._hgt ?? now))); e._hgt = now;
+  let rate = 1; if (action === 'walk') rate = cl(e.speed / (SF.WALK * MOVE_SCALE), .6, 1.6); else if (action === 'run') rate = cl(e.speed / (SF.SPRINT * MOVE_SCALE), .7, 1.4);
+  e._hph = (e._hph || ((e.id || 0) % 7) * .13) + dt * rate; return e._hph;
+}
+function drawHuman(g, e, x, y) {
+  if (!humOn() || typeof SFRIG === 'undefined') return false;
+  const f = humFigure(e), st = humAnim(e, f), dir = e.sect || 0, ph = humPhase(e, st.action);
+  const tool = st.tool ? (st.tool.geom || 'none') : (st.action === 'bandage' || st.action === 'craft' ? 'none' : '');
+  const frame = SFRIG.frameAt(st.action, st.t, ph);
+  let s = humStrip(f, st.action, dir, tool);
+  if (!s) {   // not built yet: the same figure's idle in this direction, then any direction, then the old sprite (first frames only)
+    HUM.fallbacks++; s = humStrip(f, 'idle', dir, '');
+    for (let k = 1; !s && k < 8; k++) { const c = HUM.cache.get(f.key + '|idle|' + ((dir + k) % 8) + '|'); if (c && c.ready) s = c; }
+    if (!s) { for (let k = 0; k < 8; k++) humStrip(f, 'idle', k, ''); return false; }
+    const r = s.rects[0]; g.imageSmoothingEnabled = false; g.drawImage(s.canvas, r.sx, 0, r.w, r.h, Math.round(x + r.ox), Math.round(y + r.oy), r.w, r.h); return true;
+  }
+  const r = s.rects[Math.min(frame, s.rects.length - 1)];
+  g.imageSmoothingEnabled = false; g.drawImage(s.canvas, r.sx, 0, r.w, r.h, Math.round(x + r.ox), Math.round(y + r.oy), r.w, r.h);
+  if (e.rooted > GT) { g.fillStyle = 'rgba(120,90,50,.6)'; g.fillRect(x - 12, y - 4, 24, 4); }
+  return true;
+}
+/* corpses of humans: the death fall from the corpse's creation time, then the body, in the appearance the person died in.
+   Corpse visuals never touch the container or the loot. */
+function humCorpseFigure(e) {
+  if (e._hfig) return e._hfig;
+  if (e.hfig) return (e._hfig = e.hfig);
+  if (e.mine && P) { const f = LOOK.figure(LOOK.normalize(P.look, P.name), null, { seed: P.name }); f.key = LOOK.figKey(f); return (e._hfig = f); }
+  if (e.allyBody) { const a = ents.find(o => o.aid === e.allyBody); if (a) { const f = LOOK.figure(humBaseLook(a), null); f.weapon = null; f.key = LOOK.figKey(f); return (e._hfig = f); } }
+  return null;
+}
+function humSnapshot(e) { if (!humIsHuman(e)) return null; const f = Object.assign({}, humFigure(e), { ghost: false }); f.key = LOOK.figKey(f); return f; }
+function drawHumanCorpse(g, e) {
+  if (!humOn() || typeof SFRIG === 'undefined') return false;
+  if (e.mon && !LOOK.isHumanMon(e.mon)) return false; if (!e.mon && !e.mine && !e.allyBody) return false;
+  const f = humCorpseFigure(e); if (!f) return false;
+  const x = SX(e.x, e.y), y = SY(e.x, e.y), dt = e.t0 != null ? GT - e.t0 : 99, action = dt < .7 ? 'death' : 'corpse';
+  let s = humStrip(f, action, e.sect || 0, 'none'); if (!s && action === 'death') s = humStrip(f, 'corpse', e.sect || 0, 'none'); if (!s) return false;
+  const r = s.rects[action === 'death' && s.rects.length > 1 ? SFRIG.frameAt('death', dt / .7) : 0] || s.rects[0];
+  g.fillStyle = 'rgba(110,10,10,.35)'; g.beginPath(); g.ellipse(x + 2, y + 1, 15, 6, 0, 0, 7); g.fill();
+  g.imageSmoothingEnabled = false; g.drawImage(s.canvas, r.sx, 0, r.w, r.h, Math.round(x + r.ox), Math.round(y + r.oy), r.w, r.h);
+  if (e.cont && e.cont.items.length) { const tw = (Math.sin(GT * 5 + e.x) + 1) / 2; g.fillStyle = `rgba(255,224,120,${.4 + .6 * tw})`; g.fillRect(Math.round(x + 9), Math.round(y - 12), 2, 2); }
+  return true;
+}
+/* ---- character creation preview and paper doll: the same rig and the same figure as the world ---- */
+const HUM_DOLL = new Map();
+/* previews show the middle of the cell (the body and most weapon swings), not the margin kept for fallen bodies */
+function humFrameURL(f, o) { const C = SFRIG.CELL, s = SFRIG.frameSVG(f, o).replace('viewBox="0 0 ' + C.width + ' ' + C.height + '"', 'viewBox="' + (C.anchorX - 56) + ' ' + (C.anchorY - 104) + ' 112 112"'); return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(s); }
+function humDollSrc(ch) { const f = humFigure(ch); const k = f.key; let u = HUM_DOLL.get(k); if (!u) { if (HUM_DOLL.size > 24) HUM_DOLL.clear(); u = humFrameURL(f, { action: 'idle', frame: 0, direction: 0 }); HUM_DOLL.set(k, u); } return u; }
+const CCP = { dir: 0, act: 'idle', f: 0, timer: null };
+const CC_ACTS = [['idle', 'Idle'], ['walk', 'Walk'], ['run', 'Run'], ['ready', 'Ready'], ['slash1h', 'Attack'], ['cast1h', 'Cast'], ['cast2h', 'Cast (two hands)']];
+function ccPreviewFig(look) { const f = LOOK.figure(look, null, { seed: 'preview' }); if (look.cloak) f.cloak = look.cloak; if (CCP.act === 'slash1h' || CCP.act === 'ready') f.weapon = 'sword'; return f; }
+function ccPreviewTick() {
+  const img = document.getElementById('ccprev'); if (!img || document.getElementById('cc').hidden) { clearInterval(CCP.timer); CCP.timer = null; return; }
+  const n = SFRIG.ANIMATIONS[CCP.act] || 1; CCP.f = (CCP.f + 1) % n; img.src = humFrameURL(ccPreviewFig(CC.look), { action: CCP.act, frame: CCP.f, direction: CCP.dir });
+}
+function ccPreviewStart() { if (!CCP.timer) CCP.timer = setInterval(ccPreviewTick, 125); ccPreviewTick(); }
+function ccAppearanceHtml() {
+  const L = CC.look, sw = (k, obj, names) => Object.keys(obj).map(id => `<button style="background:${obj[id]}" class="${L[k] === id ? 'on' : ''}" data-c="lk" data-k="${k}" data-v="${id}" aria-label="${esc(names[id])}" title="${esc(names[id])}"></button>`).join('');
+  const chips = (k, list, names, dis) => list.map(id => `<button class="btn sm ${L[k] === id ? 'ac' : ''}" data-c="lk" data-k="${k}" data-v="${id}"${dis ? ' disabled' : ''}>${esc(names[id])}</button>`).join('');
+  return `<label>Appearance <span class="note">(cosmetic only)</span></label>
+  <div class="ccprev"><button class="btn sm" data-c="rot" data-d="1" aria-label="Turn left">◀</button><img id="ccprev" alt="Character preview" width="112" height="112"><button class="btn sm" data-c="rot" data-d="-1" aria-label="Turn right">▶</button></div>
+  <div class="chips">${CC_ACTS.map(([a, n]) => `<button class="btn sm ${CCP.act === a ? 'ac' : ''}" data-c="pact" data-v="${a}">${n}</button>`).join('')}</div>
+  <div class="chips">${['male', 'female'].map(b => `<button class="btn sm ${L.body === b ? 'ac' : ''}" data-c="lk" data-k="body" data-v="${b}">${b === 'male' ? 'Male' : 'Female'}</button>`).join('')}<button class="btn sm" data-c="rnd">Randomize</button></div>
+  <label>Skin</label><div class="sw">${sw('skin', LOOK.SKIN, LOOK.NAMES.skin)}</div>
+  <label>Hair</label><div class="chips">${chips('hair', LOOK.HAIRSTYLES, LOOK.NAMES.hairStyle)}</div>
+  <label>Hair colour</label><div class="sw">${sw('hairColor', LOOK.HAIR, LOOK.NAMES.hair)}</div>
+  <label>Facial hair</label><div class="chips">${chips('beard', LOOK.BEARDS, LOOK.NAMES.beard, L.body === 'female')}</div>
+  <label>Clothing colour</label><div class="sw">${sw('cloth', LOOK.CLOTH, LOOK.NAMES.cloth)}</div>`;
+}
+function ccLookAction(b) {
+  const c = b.dataset.c; if (!CC.look) CC.look = LOOK.random('cc:' + Date.now());
+  if (c === 'lk') { const k = b.dataset.k, v = b.dataset.v; CC.look[k] = v; if (k === 'body' && v === 'female') CC.look.beard = 'none'; return true; }
+  if (c === 'rnd') { CC.lookN = (CC.lookN || 0) + 1; CC.look = LOOK.random('cc:' + Date.now() + ':' + CC.lookN); return true; }
+  if (c === 'rot') { CCP.dir = (CCP.dir + (+b.dataset.d) + 8) % 8; ccPreviewTick(); return 'keep'; }
+  if (c === 'pact') { CCP.act = b.dataset.v; CCP.f = 0; return true; }
+  if (c === 'hflag') { humSetFlag(!humOn()); return true; }
+  return false;
+}
+/* developer / test access */
+const HUMANS_API = { on: humOn, set: humSetFlag, stats: () => ({ on: humOn(), strips: HUM.cache.size, ready: [...HUM.cache.values()].filter(s => s.ready).length, px: HUM.px, maxPx: HUM.maxPx, queue: HUM.queue.length, inflight: HUM.inflight, built: HUM.built, evicted: HUM.evicted, fallbacks: HUM.fallbacks, buildMs: Math.round(HUM.buildMs), maxBuildMs: Math.round(HUM.maxBuildMs * 10) / 10 }),
+  figure: e => humFigure(e), anim: e => humAnim(e, humFigure(e)), isHuman: humIsHuman, baseLook: humBaseLook, LOOK, RIG: () => SFRIG, cache: HUM };
 /* ================= GAME: actors, intents, combat, magic, gathering, crafting, death ================= */
 const MON = {
   rat:   { n: 'dock rat',    col: '#7a6a62', size: .7,  h: 34, hp: 20, atk: 22, def: 20, dmg: [3, 6],  reach: 1.15, tele: .45, rec: 1.3,  speed: 3.6, aggro: 6,   leash: 16, armor: 4,  diff: 15, loot: { gold: [2, 9] }, skin: { hide: [1, 1] } },
@@ -4666,7 +5378,7 @@ function sndTick() {
 
 /* ---------- player ---------- */
 function newChar(o) {
-  const c = { kind: 'player', pid: 'p1', name: o.name, x: 92.5, y: 304.5, sect: 0, str: o.str, dex: o.dex, int: o.int, skills: SF.newSkills(), pack: SF.newContainer('pack', 'p1'), bank: SF.newContainer('bank', 'p1'), equip: emptyEquip(), eqMig: SF.EQ.MIGRATION, look: o.look || {}, bound: 'quay', freeLessons: 2, hotbar: [null, null, null, null], sw: SF.newSwing(), combatMig: SF.COMBAT_MIGRATION };
+  const c = { kind: 'player', pid: 'p1', name: o.name, x: 92.5, y: 304.5, sect: 0, str: o.str, dex: o.dex, int: o.int, skills: SF.newSkills(), pack: SF.newContainer('pack', 'p1'), bank: SF.newContainer('bank', 'p1'), equip: emptyEquip(), eqMig: SF.EQ.MIGRATION, look: SF.LOOK.normalize(o.look || {}, o.name), bound: 'quay', freeLessons: 2, hotbar: [null, null, null, null], sw: SF.newSwing(), combatMig: SF.COMBAT_MIGRATION };
   c.id = 'p1'; for (const [k, v] of Object.entries(o.skills)) c.skills[k].v = v * 10;
   c.hp = SF.maxHp(c); c.stam = SF.maxStam(c); c.mana = SF.maxMana(c); return c;
 }
@@ -4745,7 +5457,7 @@ function damagePlayer(amt, src, kind, hx) {
   if (P.rooted > GT) P.rooted = 0;
   if (P.bandage && kind !== 'poison') slipBandage(src);                               // a blow makes the healer's fingers slip; the timer runs on
   if (P.task && P.task.kind === 'vet' && kind !== 'poison') { P.task.t1 += .25; }
-  else if (P.task && P.task.kind !== 'vet') { log(P.task.label + ' interrupted.'); P.task = null; }
+  else if (P.task && P.task.kind !== 'vet') { log(P.task.label + ' interrupted.'); P.task = null; P._htaskbreak = GT; }
   if (P.meditating) { P.meditating = null; log('Your meditation is broken.'); }
   if (P.batch || PANEL === 'craft') stopBatch(P.batch ? 'Combat stops your work.' : '');
   if (P.hidden && src && dist(src, P) <= 1) reveal('You are discovered!');
@@ -4753,11 +5465,11 @@ function damagePlayer(amt, src, kind, hx) {
 }
 function playerDies(src) {
   if (P.ghost) return;                                                                            // death resolves exactly once
-  simEmit('ActorKilled', { actor: aidOf(P), killer: aidOf(src), x: P.x, y: P.y });
+  simEmit('ActorKilled', { actor: aidOf(P), killer: aidOf(src), x: P.x, y: P.y }); const hfig = humSnapshot(P);   // the body keeps the look it died in (visual only)
   P.hp = 0; P.ghost = true; P.ghostAt = GT; P.armed = false; P.sel = null; P.prep = null; P.held = null; P.task = null; if (P.bandage) { P.bandDone = P.bandage.id; P.bandage = null; } P.hidden = false; P.poison = null; P.meditating = null; AIM = null; P.batch = null; if (PANEL === 'craft') closePanel();
   const protectedRoad = protAt(P.x, P.y);
   if (!protectedRoad) { const corpse = SF.deathTransaction(P, GT, { x: P.x, y: P.y });
-  addEnt({ kind: 'corpse', mine: true, name: 'your body', x: P.x, y: P.y, cont: corpse, expires: corpse.expires }); }
+  addEnt({ kind: 'corpse', mine: true, name: 'your body', x: P.x, y: P.y, cont: corpse, expires: corpse.expires, t0: GT, sect: P.sect || 0, hfig }); }
   for (const e of ents) if (e.target === P) { e.target = null; e.state = 'return'; }
   log(`You have died${src ? ' to a ' + (src.name || 'foe') : ''}. ${protectedRoad ? 'Your belongings stay with you on this protected road.' : 'Your tradeable belongings stay on your body for 12 minutes.'}`, '#ff6a5a'); SFXA.cancelPending(); snd('player.death');
   save(); refreshHud(); renderPanel();
@@ -4820,7 +5532,7 @@ function swingSound(a, w) {
   if (!SFXA.has(ev)) return; if (a === P) snd(ev, { key: 'P' }); else sndAt(ev, a, { key: 'sw' + a.id });
 }
 /* a blow that does no harm still makes a sound: a shield parry or armor that takes it all */
-function noHarmSound(t, parried) { const ev = parried ? 'block.shield' : 'hit.armor'; if (t === P) snd(ev, { gain: .5, key: 'impP' }); else sndAt(ev, t, { gain: .5, key: 'imp' + t.id }); }
+function noHarmSound(t, parried) { if (parried) t._hblock = GT; const ev = parried ? 'block.shield' : 'hit.armor'; if (t === P) snd(ev, { gain: .5, key: 'impP' }); else sndAt(ev, t, { gain: .5, key: 'imp' + t.id }); }
 const wardSound = t => { if (sndOnce('veil' + (t.id || 'P'), .6)) { if (t === P) snd('magic.ward', { gain: .6 }); else sndAt('magic.ward', t, { gain: .6 }); } };
 /* the shared damage entry: a swing, a shot, a spell or a creature's blow reaches any actor (player, hireling, creature, pet) through here */
 function damageActor(t, amt, kind, src, hx) { if (t === P) return damagePlayer(amt, src === P ? null : src, kind, hx); if (isAlly(t)) return damageAlly(t, amt, src, kind, hx); return damageMon(t, amt, kind, src, hx); }
@@ -4858,7 +5570,7 @@ function swingAt(a, t) {
   }
   if (a === P && P.hidden) reveal('You attack and are revealed.');
   if (a === P && !P.drawn && !w.ammo && w.fam !== 'Unarmed') snd('weapon.draw', { key: 'Pdraw', gain: .7 });
-  SF.swingSpend(a.sw, GT); a.lastCombat = GT; if (a === P) { P.lastCombat = GT; P.drawn = true; P.drawing = 0; }
+  SF.swingSpend(a.sw, GT); a.lastCombat = GT; a._hswing = GT; if (a === P) { P.lastCombat = GT; P.drawn = true; P.drawing = 0; }
   faceToward(a, t.x, t.y); const A = fighter(a), D = fighter(t);
   const chance = SF.hitChance(A.atk, D.def), hit = R() < chance;
   if (a === P) gain(w.skill, D.diff);                                                   // a legitimate attempt
@@ -4930,7 +5642,7 @@ function killMon(m, src) {
   const cont = SF.newContainer('corpse'); for (const k in d.loot) { const q = rnd(d.loot[k][0], d.loot[k][1]); if (q > 0) cont.items.push(lootItem(k, q, 100)); }
   for (const [id, ch] of d.rare || []) if (R() < ch) cont.items.push(lootItem(id, 1, rnd(60, 100)));
   if (m.purse) cont.items.push(SF.newItem('gold', m.purse));
-  const corpse = addEnt({ kind: 'corpse', mon: m.type, sect: m.sect || 0, t0: GT, name: d.n + ' remains', x: m.x, y: m.y, cont, expires: GT + (d.boss ? 600 : 240), skinned: !d.skin });
+  const corpse = addEnt({ kind: 'corpse', mon: m.type, sect: m.sect || 0, t0: GT, hfig: m._hfig || null, name: d.n + ' remains', x: m.x, y: m.y, cont, expires: GT + (d.boss ? 600 : 240), skinned: !d.skin });
   if (corpse && (P.sel === m || src === P) && mine) { P.sel = corpse; if (!P.lootHinted) { P.lootHinted = true; log('Tap the bones (or press Interact) beside them to loot.', '#ffe08a'); } }
   for (const e of ents) if (e.target === m) { e.target = null; if (e.kind === 'mon') e.state = 'return'; }
   if (P.sel === m) { P.sel = mine ? null : corpse; P.armed = false; }
@@ -5018,9 +5730,9 @@ function damageAlly(a, amt, src, kind, hx) {
 function allyDies(a, src) {
   if (a.ghost) return;                                                                            // death resolves exactly once
   simEmit('ActorKilled', { actor: aidOf(a), killer: aidOf(src), x: a.x, y: a.y });
-  a.hp = 0; a.ghost = true; a.ghostAt = GT; a.poison = null; a.foe = null; a.reviveOffer = null;
+  const hfig = humSnapshot(a); a.hp = 0; a.ghost = true; a.ghostAt = GT; a.poison = null; a.foe = null; a.reviveOffer = null;
   const body = SF.deathTransaction(a, GT, { x: a.x, y: a.y }); body.owner = a.aid;
-  addEnt({ kind: 'corpse', allyBody: a.aid, name: a.name + "'s body", x: a.x, y: a.y, cont: body, expires: body.expires });
+  addEnt({ kind: 'corpse', allyBody: a.aid, name: a.name + "'s body", x: a.x, y: a.y, cont: body, expires: body.expires, t0: GT, sect: a.sect || 0, hfig });
   for (const e of ents) if (e.target === a) { e.target = null; if (e.kind === 'mon') e.state = 'return'; }
   log(`${a.name} has fallen${src && src.name ? ' to a ' + src.name : ''}. Her ghost waits by her body; bandages (Healing and Anatomy 80) or a resurrection spell can bring her back.`, '#ff8a6a'); sndAt('player.death', a, { gain: .8 });
 }
@@ -5282,7 +5994,7 @@ function populate() {
   for (const [x, y] of [[129.5, 297.5], [129.5, 303.5], [116.5, 260.5], [116.5, 340.5], [55.5, 285.5]]) npc('guard', 'Quay warden', x, y);
   const c = ZONES.camp; npc('healer', 'Old Fenna, camp healer', c.cx + 2.5, c.cy + 1.5); npc('campbank', 'Crow, camp strongbox', c.cx - 3.5, c.cy - 3.5); npc('outlaw', 'Mags, fence', c.cx + 3.5, c.cy - 3.5);
   annPopulate(npc);
-  lifePopulate(npc);   // Living World phase 4: homes, workplaces, routines, residents, guard patrols, the travelling merchant (src/townlife.js)
+  lifePopulate(npc); humAssignSeeds();   // humAssignSeeds: each NPC's persistent appearance seed (src/humans.js). Living World phase 4: homes, workplaces, routines, residents, guard patrols, the travelling merchant (src/townlife.js)
   for (let i = 0; i < 12; i++) { for (const s of SPAWNS) s.next = 0; spawnTick(true); }
 }
 const SHOPS = { provisioner: ['hatchet', 'pickaxe', 'knife', 'rod', 'tongs', 'sewkit', 'cloth', 'vial', 'bandage', 'lanternoil', 'cookedmeat', 'shirt', 'trousers', 'shoes', 'cloak', 'lute', 'lockpick', 'repairkit'], smith: ['dagger', 'kryss', 'spear', 'sword', 'battleaxe', 'glaive', 'mace', 'waraxe', 'hammer', 'ironbar', 'ringmail_tunic', 'ringmail_sleeves', 'ringmail_gloves', 'ringmail_leggings', 'chain_coif', 'chain_tunic', 'chain_leggings', 'plate_gorget', 'plate_chest', 'plate_arms', 'plate_gauntlets', 'plate_leggings', 'bascinet', 'open_helm', 'closed_helm', 'plate_helm', 'buckler', 'metal_shield', 'kite_shield'], workshop: ['shortbow', 'crossbow', 'heavycrossbow', 'arrow', 'bolt', 'pine', 'buckler', 'wooden_shield', 'strap', 'trapkit', 'repairkit'], apothecary: ['reedash', 'shelldust', 'marshroot', 'lanternoil', 'blacksalt', 'vial', 'draught', 'antidote', 'manatonic', 'stamtonic', 'cinder'], outlaw: ['bandage', 'draught', 'arrow', 'cookedmeat', 'cloth', 'vial', 'reedash', 'marshroot', 'knife', 'dagger', 'lockpick', 'venom', 'trapkit'] };
@@ -6141,6 +6853,7 @@ function drawEnt(e) {
   if (e.kind === 'pet') { g.strokeStyle = '#5aa8ff'; g.lineWidth = 1.5; g.beginPath(); g.ellipse(x, y, 14 * big, 7 * big, 0, 0, 7); g.stroke(); }
   if (P.sel === e && !P.ghost) { g.strokeStyle = relColor(e); g.lineWidth = 2; g.beginPath(); g.ellipse(x, y, 20 * big, 10 * big, 0, 0, 7); g.stroke(); }
   if (e.kind === 'player' && drawForm(g, e, x, y)) { }
+  else if (humIsHuman(e) && drawHuman(g, e, x, y)) { }   // classic humans v2 (feature flag; src/humans.js) — every human, one renderer
   else if (e.kind === 'player') drawScout(g, e, x, y, P.ghost ? 'ghost' : (P.look.cloak || null));
   else if (e.kind === 'ally') { if (e.ghost) g.globalAlpha = .75; drawScout(g, e, x, y, e.ghost ? 'ghost' : '#2f7a46'); }
   else if (e.kind === 'npc') drawScout(g, e, x, y, NPC_COL[e.role] || (e.life && LIFE_COL[e.life.prof]) || '#5a5a5a');
@@ -6156,6 +6869,7 @@ function drawEnt(e) {
 }
 function drawCorpse(e) {
   const g = ctx, x = SX(e.x, e.y), y = SY(e.x, e.y);
+  if (drawHumanCorpse(g, e)) return;   // human bodies (player, hireling, bandits) in the appearance they died in (feature flag)
   if (e.mon && MSI[e.mon]) { drawSheet(g, e.mon, e.sect, GT - (e.t0 || 0) < .3 ? 6 : 7, x, y); if (e.cont && e.cont.items.length) { const tw = (Math.sin(GT * 5 + e.x) + 1) / 2; g.fillStyle = `rgba(255,224,120,${.4 + .6 * tw})`; g.fillRect(Math.round(x + 9), Math.round(y - 12), 2, 2); } return; }
   if (e.mon) { const s = Math.max(.8, Math.min(2, MON[e.mon].size || 1)), px = (a, b, w, h, c) => { g.fillStyle = c; g.fillRect(Math.round(x + a * s), Math.round(y + b * s), Math.ceil(w * s), Math.ceil(h * s)); };
     g.fillStyle = 'rgba(110,10,10,.4)'; g.beginPath(); g.ellipse(x, y, 13 * s, 5 * s, 0, 0, 7); g.fill();
@@ -6206,7 +6920,7 @@ function render() {
   for (const e of ents) if (e.kind === 'corpse' && !e.gone) drawCorpse(e);
   for (const e of ents) { if (e.kind === 'corpse' || e.gone) continue; if (e.hidden && e !== P) continue; const X = SX(e.x, e.y), Y = SY(e.x, e.y); if (X < camX - 100 || X > camX + vw + 100 || Y < camY - 20 || Y > camY + vh + 120) continue; vis.push({ d: e.x + e.y, e }); }
   vis.sort((a, b) => a.d - b.d); for (const v of vis) { if (v.e) drawEnt(v.e); else if (v.p) drawPiece(ctx, v.p); else { const kit = ENVOK && !inDun; if (kit && v.t === T.TR && inFront(v.x, v.y)) ctx.globalAlpha = .45; if (!(kit && envTall(ctx, v.t, v.x, v.y))) drawTall(v.t, v.x, v.y); ctx.globalAlpha = 1; } }
-  drawEffects();
+  drawEffects(); if (humOn()) humPump();
   drawLight(LW, LH, camX, camY); devDraw(camX, camY);
   mctx.setTransform(1, 0, 0, 1, 0, 0); mctx.imageSmoothingEnabled = false; mctx.drawImage(LB, 0, 0, LW * DP, LH * DP);
   drawOverlay(camX, camY);
@@ -6390,7 +7104,7 @@ const PANELS = {
     return ['Master Vey, trainer', h]; },
   log: () => ['Combat and system log', LOG.slice(-150).reverse().map(l => `<div style="color:${l.c};padding:2px 0">${esc(l.t)}</div>`).join('')],
   picker: () => ['Which one?', PICK.map((e, i) => `<div class="row"><span class="nm">${esc(e.name)}</span><span class="v">${dist(e, P).toFixed(1)} m</span>${btn('pick', 'Select', { i })}</div>`).join('')],
-  menu: () => ['Menu', `<div class="grid2">${btn('open', 'Abilities', { p: 'abilities' })}${btn('open', 'Log', { p: 'log' })}${btn('zoom', 'Zoom ×' + ZOOM)}${btn('mirror', SETTINGS.mirror ? 'Right-handed layout' : 'Left-handed layout')}${btn('sprintt', SETTINGS.stickSprint ? 'Stick sprint: on (push far)' : 'Stick sprint: off (button only)')}${btn('mute', muted ? 'Sound off' : 'Sound on')}${btn('music', SFXA.musicOn ? 'Music on' : 'Music off')}${btn('savenow', 'Save now')}${btn('open', 'How to play', { p: 'help' })}</div><p class="note" style="margin-top:12px">Shardfall web slice · offline M1. ${btn('wipe', 'Delete character', {}, 'on')}</p>`],
+  menu: () => ['Menu', `<div class="grid2">${btn('open', 'Abilities', { p: 'abilities' })}${btn('open', 'Log', { p: 'log' })}${btn('zoom', 'Zoom ×' + ZOOM)}${btn('mirror', SETTINGS.mirror ? 'Right-handed layout' : 'Left-handed layout')}${btn('sprintt', SETTINGS.stickSprint ? 'Stick sprint: on (push far)' : 'Stick sprint: off (button only)')}${btn('mute', muted ? 'Sound off' : 'Sound on')}${btn('music', SFXA.musicOn ? 'Music on' : 'Music off')}${btn('humans', humOn() ? 'Classic humans v2: on' : 'Classic humans v2: off')}${btn('savenow', 'Save now')}${btn('open', 'How to play', { p: 'help' })}</div><p class="note" style="margin-top:12px">Shardfall web slice · offline M1. ${btn('wipe', 'Delete character', {}, 'on')}</p>`],
   quest: () => questPanel(), journal: () => journalPanel(),
   help: () => ['How to play', `<p><b>Move</b> with the floating stick on the left. Press <b>Sprint</b> to run faster; it drains 7 stamina a second and switches off when you run out. Tapping the world never moves you.</p><p><b>Target</b> by tapping a creature, person, corpse or resource, or press <b>Target</b> to cycle nearby creatures. Tap your portrait to target yourself.</p><p><b>Attack</b> arms your basic attack on the selected creature; with nothing selected it picks the nearest creature you can see. Enemy spells do the same. You swing whenever it is in reach and your weapon is ready. It never chases, picks targets, casts or loots for you. <b>Cancel</b> disarms and stops actions.</p><p><b>Combat</b> follows the Second Age rules: your weapon skill against the defender's sets the hit chance; Tactics, Anatomy and Strength set the damage; armor absorbs part of each blow; a shield parries with half your Parrying as a percent. Swing speed comes from the weapon and your current stamina. Bows and crossbows reload while you move, but you must stand still to aim, and the shot lands a second later.</p><p><b>First Aid</b>: the bandage slot treats you (15 s; poison 18 s). Tap an ally or a ghost and press <b>Bandage</b> to treat them (5 s; poison 6 s; resurrection 10 s at 80 Healing and Anatomy). Being hit makes your fingers slip and the bandage heal less. Wren, a sellsword by the plaza, will follow you if asked.</p><p><b>Spells</b>: tap a spell slot to prepare (stand still), it is then held for 3 s; tap a target or tap the slot again to release. Ground spells need a tap on the ground. Casting stows your weapon.</p><p><b>Interact</b> gathers, opens bodies and chests, disarms revealed snares, talks and uses stations in reach. Stairs in the Sunken Bell ruin and the north Ashfen hatch lead down three levels to the Bellkeeper.</p><p><b>Menu → Abilities</b> holds Search, Tame, pet care, bard songs, pickpocketing, venom and snares. <b>Bar</b> cycles through three pages of three slots.</p><p><b>Death</b> in the wilderness leaves tradeable gear on your body for 12 minutes. On protected roads you keep your gear. Walk to a shrine or healer, or wait 12 s to return to your bound shrine. Bank what you cannot afford to lose.</p><p><b>Crafting</b>: Interact at the forge, anvil, bench, still or fire. Pick a category, then a recipe: the detail shows every input, the metal, your odds and what a failure costs before you commit. Mining and smithing mentors stand by the public forge.</p><p><b>Skills</b> rise 0.1 at a time from real use against suitable difficulty, to 100 each and 700 total.</p><p class="note">Keyboard: WASD/arrows move, Shift sprints, Space attack, E interact, B bandage self, 1–3 current bar slots, Tab target, Esc cancel.</p>`] };
 let PICK = [];
@@ -6435,6 +7149,7 @@ const ACT = {
   craft: d => { startCraft(d.r, +(d.n || 1)); },
   pick: d => { P.sel = PICK[+d.i]; closePanel(); },
   petatk: () => petCommand('attack'),
+  humans: () => { humSetFlag(!humOn()); renderPanel(); renderEqWin(true); },
   zoom: () => { ZOOM = ZOOMS[(ZOOMS.indexOf(ZOOM) + 1) % ZOOMS.length]; resize(); renderPanel(); }, mirror: () => { SETTINGS.mirror = !SETTINGS.mirror; document.body.classList.toggle('mirror', SETTINGS.mirror); saveSettings(); renderPanel(); },
   sprintt: () => { SETTINGS.stickSprint = !SETTINGS.stickSprint; saveSettings(); renderPanel(); }, sprint: () => { if (P.ghost) return; if (!P.sprintOn && P.stam < 5) return log('Too tired to sprint.', '#ffb070'); P.sprintOn = !P.sprintOn; }, mute: () => { muted = !muted; SETTINGS.muted = muted; saveSettings(); SFXA.setMuted(muted); renderPanel(); }, music: () => { SFXA.musicOn = !SFXA.musicOn; SETTINGS.music = SFXA.musicOn; saveSettings(); renderPanel(); }, savenow: () => { log(save() ? 'Saved.' : 'Save failed. Check browser storage.'); },
   wipe: () => { const el = $('#panel .pb'); if (!el.querySelector('[data-a=wipe2]')) el.insertAdjacentHTML('beforeend', '<p>Delete this character for good? ' + btn('wipe2', 'Yes, delete', {}, 'on') + '</p>'); }, wipe2: () => { try { localStorage.removeItem(SAVEKEY); deletingSave = true; } catch (e) { return log('Could not delete the saved character.'); } location.reload(); },
@@ -6958,24 +7673,28 @@ const PROFILES = {
   'Archer scout': { s: [45, 65, 40], k: { archery: 50, tactics: 30, concealment: 20 }, ideal: 'Archery, Tactics, Anatomy, Healing, Tracking, Concealment, Shadowstep' },
   'Mace dexer': { s: [60, 60, 30], k: { macefighting: 50, tactics: 30, healing: 20 }, ideal: 'Mace Fighting, Tactics, Anatomy, Healing, Parrying, Wardcraft, Wrestling' },
   'Merchant smith': { s: [60, 50, 40], k: { mining: 40, smithing: 40, woodcutting: 20 }, ideal: 'Mining, Smithing, Engineering, Carpentry, Woodcutting, Appraisal, Tailoring' } };
-let CC = { name: '', prof: 'Glaive hybrid', s: [55, 45, 50], k: Object.entries(PROFILES['Glaive hybrid'].k), cloak: '' };
+let CC = { name: '', prof: 'Glaive hybrid', s: [55, 45, 50], k: Object.entries(PROFILES['Glaive hybrid'].k), cloak: '', look: null };
 const CLOAKS = ['', '#8a2a2a', '#2a3a8a', '#5a2a6a', '#3a3a3a', '#8a6a2a'];
 function renderCC() {
+  if (humOn() && !CC.look) CC.look = SF.LOOK.random('cc:' + Date.now());
   const rs = readSave(), sv0 = rs.save, live = SF.SKILLS.filter(s => s[3]); const good = rs.problem ? readSave(SAVEKEY + '.lastgood') : null; const opts = sel => live.map(s => `<option value="${s[0]}"${s[0] === sel ? ' selected' : ''}>${esc(s[1])}</option>`).join('');
   const tot = CC.s.reduce((a, b) => a + b, 0), kt = CC.k.reduce((a, b) => a + b[1], 0);
-  $('#ccin').innerHTML = `<div class="cchead"><img src="${SCOUT_SRC}" alt="" class="ccimg"><div><h1>Shardfall</h1><div class="sub">Saltmarsh Quay · offline island slice</div></div></div>
+  $('#ccin').innerHTML = `<div class="cchead">${humOn() ? '' : `<img src="${SCOUT_SRC}" alt="" class="ccimg">`}<div><h1>Shardfall</h1><div class="sub">Saltmarsh Quay · offline island slice</div></div></div>
   ${sv0 ? `<button class="btn ac big" data-c="cont">Continue as ${esc(sv0.char.name)}${sv0.char.ghost ? ' (ghost)' : ''}</button><div class="sub" style="margin:8px 0 0">or create a new character below (replaces the saved one; the old save is kept as a backup)</div>` : ''}
   ${rs.problem ? `<div class="warn" id="ccrecover"><b>Your saved game could not be loaded:</b> ${esc(rs.problem)}${CC.bootErr ? ' (' + esc(CC.bootErr) + ')' : ''}. Nothing has been deleted.<div class="chips" style="margin-top:6px">${good && good.save ? `<button class="btn sm ac" data-c="restore">Restore the last good save (${esc(good.save.char.name)})</button>` : ''}${rs.raw ? '<button class="btn sm" data-c="export">Export the save</button><button class="btn sm" data-c="reset">Delete the saved game…</button>' : ''}</div><div class="sub">Creating a new character keeps a copy of the damaged save.</div></div>` : ''}
   <div class="ccgrid"><div><label for="ccn">Name</label><input id="ccn" maxlength="16" value="${esc(CC.name)}" placeholder="e.g. Tess" autocomplete="off">
   <label>Starting idea <span class="note">(editable, no class is locked in)</span></label><div class="chips">${Object.keys(PROFILES).map(p => `<button class="btn sm ${CC.prof === p ? 'ac' : ''}" data-c="prof" data-p="${p}">${p}</button>`).join('')}</div>
   ${PROFILES[CC.prof] ? `<p class="note">At the cap: ${PROFILES[CC.prof].ideal}.</p>` : ''}
-  <label>Cloak</label><div class="sw">${CLOAKS.map(c => `<button style="background:${c || '#2f5a5a'}" class="${CC.cloak === c ? 'on' : ''}" data-c="cloak" data-v="${c}" aria-label="cloak colour"></button>`).join('')}</div></div>
+  <label>Cloak</label><div class="sw">${CLOAKS.map(c => `<button style="background:${c || '#2f5a5a'}" class="${CC.cloak === c ? 'on' : ''}" data-c="cloak" data-v="${c}" aria-label="cloak colour"></button>`).join('')}</div>
+  ${humOn() ? ccAppearanceHtml() : ''}<label class="cchflag"><input type="checkbox" data-c="hflag"${humOn() ? ' checked' : ''}> Classic human art v2 <span class="note">(preview; same setting as in the Menu)</span></label></div>
   <div><label>Attributes <span class="note">(${tot} / 150, each 25–100)</span></label>${['Strength', 'Dexterity', 'Intellect'].map((n, i) => `<div class="stat"><span>${n}</span><button class="btn sm" data-c="st" data-i="${i}" data-d="-5">−</button><b>${CC.s[i]}</b><button class="btn sm" data-c="st" data-i="${i}" data-d="5">+</button></div>`).join('')}
   <p class="note">HP ${50 + Math.floor(CC.s[0] / 2)} · stamina ${CC.s[1]} · mana ${CC.s[2]}</p>
   <label>Starting skills <span class="note">(${kt} / 100, at most 50 each)</span></label>${CC.k.map((k, i) => `<div class="skl"><select data-c="sk" data-i="${i}" aria-label="Skill ${i + 1}">${opts(k[0])}</select><select data-c="kv" data-i="${i}" aria-label="Skill ${i + 1} points">${[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50].map(v => `<option${v === k[1] ? ' selected' : ''}>${v}</option>`).join('')}</select></div>`).join('')}</div></div>
   <div id="ccerr" class="warn"></div><button class="btn ac big" data-c="go">Enter Saltmarsh Quay</button><p class="note" style="text-align:center">Saves in this browser. Your first two trainer lessons are free.</p>`;
+  if (humOn()) ccPreviewStart();
 }
 $('#cc').addEventListener('click', ev => { const b = ev.target.closest('[data-c]'); if (!b || b.tagName === 'SELECT') return; const c = b.dataset.c; CC.name = $('#ccn')?.value ?? CC.name;
+  { const la = ccLookAction(b); if (la === 'keep') return; if (la) { renderCC(); return; } }   // appearance: cosmetic only (src/humans.js)
   if (c === 'cont') { const rs = readSave(); if (rs.save) bootSaved(rs); else renderCC(); return; }
   if (c === 'export') { const rs = readSave(); if (rs.raw) exportSave(rs.raw); return; }
   if (c === 'restore') { const g = readSave(SAVEKEY + '.lastgood'); if (g.save) { const cur = readSave(); backupRaw('.damaged', cur.raw); try { localStorage.setItem(SAVEKEY, g.raw); } catch (e) { } CC.bootErr = ''; } renderCC(); return; }
@@ -6983,7 +7702,7 @@ $('#cc').addEventListener('click', ev => { const b = ev.target.closest('[data-c]
   if (c === 'prof') { CC.prof = b.dataset.p; const p = PROFILES[CC.prof]; CC.s = p.s.slice(); CC.k = Object.entries(p.k); }
   if (c === 'st') { const i = +b.dataset.i, d = +b.dataset.d, nv = CC.s[i] + d, tot = CC.s.reduce((a, x) => a + x, 0) + d; if (nv >= 25 && nv <= 100 && tot <= 150) CC.s[i] = nv; }
   if (c === 'cloak') CC.cloak = b.dataset.v;
-  if (c === 'go') { const err = $('#ccerr'); const name = CC.name.trim().replace(/[^\p{L}\p{N} '\-]/gu, '').slice(0, 16); if (name.length < 2) return err.textContent = 'Choose a name of at least 2 letters.'; const sk = {}; for (const [k, v] of CC.k) sk[k] = (sk[k] || 0) + v; const e = SF.validateCreation({ str: CC.s[0], dex: CC.s[1], int: CC.s[2], skills: sk }); if (e.length) return err.textContent = e.join(' '); if (CC.k.some(([k], i) => CC.k.findIndex(x => x[0] === k) !== i && CC.k[i][1] > 0)) return err.textContent = 'Pick different skills.'; { const old = readSave(); if (old.raw) backupRaw(old.problem ? '.damaged' : '.replaced', old.raw); } boot(null, { name, str: CC.s[0], dex: CC.s[1], int: CC.s[2], skills: sk, look: { cloak: CC.cloak || null } }); return; }
+  if (c === 'go') { const err = $('#ccerr'); const name = CC.name.trim().replace(/[^\p{L}\p{N} '\-]/gu, '').slice(0, 16); if (name.length < 2) return err.textContent = 'Choose a name of at least 2 letters.'; const sk = {}; for (const [k, v] of CC.k) sk[k] = (sk[k] || 0) + v; const e = SF.validateCreation({ str: CC.s[0], dex: CC.s[1], int: CC.s[2], skills: sk }); if (e.length) return err.textContent = e.join(' '); if (CC.k.some(([k], i) => CC.k.findIndex(x => x[0] === k) !== i && CC.k[i][1] > 0)) return err.textContent = 'Pick different skills.'; { const old = readSave(); if (old.raw) backupRaw(old.problem ? '.damaged' : '.replaced', old.raw); } boot(null, { name, str: CC.s[0], dex: CC.s[1], int: CC.s[2], skills: sk, look: Object.assign({}, CC.look || {}, { cloak: CC.cloak || null }) }); return; }
   renderCC(); });
 $('#cc').addEventListener('change', ev => { const s = ev.target; if (!s.dataset || !s.dataset.c) return; CC.name = $('#ccn')?.value ?? CC.name; const i = +s.dataset.i; if (s.dataset.c === 'sk') CC.k[i][0] = s.value; if (s.dataset.c === 'kv') CC.k[i][1] = +s.value; CC.prof = 'Custom'; renderCC(); });
 /* bootSaved: migrate a copy, validate the result, keep the raw save as the last good one, then boot. Any failure leaves the stored
@@ -6998,7 +7717,7 @@ function showRecovery() { renderCC(); const r = $('#ccrecover'); if (!r) { $('#c
 function boot(saved, fresh) {
   genWorld(); buildTiles(); buildMini(); resize();
   if (saved) { for (const row of saved.nodes || []) { if (!Array.isArray(row)) continue; const [k, gen, spec, n, max, t] = row; RES.set(k, { gen, spec: spec || undefined, n, max, t }); }
-    const c = saved.char; P = newChar({ name: c.name, str: c.str, dex: c.dex, int: c.int, skills: {}, look: c.look }); Object.assign(P, c); P.equip = Object.assign(emptyEquip(), P.equip); delete P.equip.armor; SF.setUidBase(saved.uid || 1); GT = saved.gt || 0;
+    const c = saved.char; P = newChar({ name: c.name, str: c.str, dex: c.dex, int: c.int, skills: {}, look: c.look }); Object.assign(P, c); P.look = SF.LOOK.normalize(P.look, P.name); P.equip = Object.assign(emptyEquip(), P.equip); delete P.equip.armor; SF.setUidBase(saved.uid || 1); GT = saved.gt || 0;
     for (const k of Object.keys(SF.newSkills())) if (!P.skills[k]) P.skills[k] = { v: 0, lock: 'raise' };
     for (const co of saved.corpses || []) { if (!co || !Array.isArray(co.items)) continue; const cont = SF.newContainer('corpse', 'p1'); cont.items = co.items; cont.diedAt = GT - (co.diedAgo ?? 999); cont.expires = GT + co.left; addEnt({ kind: 'corpse', mine: true, name: 'your body', x: co.x, y: co.y, cont, expires: GT + co.left }); }
     if (P.ghost && !Number.isFinite(c.ghostAt)) P.ghostAt = GT - 12;
@@ -7049,7 +7768,7 @@ function spawnMon(type, dx = 3, dy = 0) { const d = MON[type]; if (!d) return nu
   return addEnt({ kind: 'mon', type, name: d.n, x, y, hp: d.hp, max: d.hp, state: 'idle', home: { x, y }, sect: 0, ward: 0 }); }
 /* __SF is a development and test hook (the browser suites drive the game through it). It is not a security boundary: anything
    here is reachable from the console in an offline single-player game, and a multiplayer server must not trust the client. */
-window.__SF = { FRAME_ERR, readSave, validateSave, get WS() { return WS; }, dist, closePanel, lifeSave, LIFE, LIFE_SCHED, lifeTick, lifeResume, lifeInspect, lifeTownGeo, lifeTalk, talk, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
+window.__SF = { HUMANS: HUMANS_API, FRAME_ERR, readSave, validateSave, get WS() { return WS; }, dist, closePanel, lifeSave, LIFE, LIFE_SCHED, lifeTick, lifeResume, lifeInspect, lifeTownGeo, lifeTalk, talk, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
 
 /* ================= EQUIPMENT UI (v0.25): paper doll window, backpack, item tooltips, drag and drop, armor crafting =================
    Every change to items goes through the validated commands in SF.EQ (equipItem, unequipItem, dropItem, pickupItem, splitStack,
@@ -7188,7 +7907,7 @@ function renderEqWin(force) {
   if (!open) { if (!el.hidden) { el.hidden = true; EQW.html = ''; } return; }
   const e = EQ.effective(P);
   let h = `<div class="eqh" data-eqmove><b>${esc(P.name)}</b><span class="note">AR ${f1w(e.ar)} · ${f1w(encumb().wt)}/${f1w(SF.carryCap(P))}</span><button class="x" data-a="eqclose" aria-label="Close equipment">×</button></div><div class="eqb">`;
-  h += `<div class="eqdoll"><div class="eqcol">${EQ_LEFT.map(eqSlotHtml).join('')}</div><div class="eqfig" data-drop="eq:auto"><i class="doll" style="background-image:url(${SCOUT_SRC})"></i>${P.ghost ? '<span class="note">ghost</span>' : ''}</div><div class="eqcol">${EQ_RIGHT.map(eqSlotHtml).join('')}</div></div>`;
+  h += `<div class="eqdoll"><div class="eqcol">${EQ_LEFT.map(eqSlotHtml).join('')}</div><div class="eqfig" data-drop="eq:auto">${humOn() ? `<img class="doll2" alt="" src="${humDollSrc(P)}">` : `<i class="doll" style="background-image:url(${SCOUT_SRC})"></i>`}${P.ghost ? '<span class="note">ghost</span>' : ''}</div><div class="eqcol">${EQ_RIGHT.map(eqSlotHtml).join('')}</div></div>`;
   h += `<div class="eqrow">${EQ_BOTTOM.map(eqSlotHtml).join('')}</div>`;
   const sel = EQW.sel && P.equip[EQW.sel];
   if (EQW.sel) h += `<div class="eqcard">${sel ? itemTip(sel, { compare: false, icon: 40 }) + `<div class="acts">${SF.ITEMS[sel.id].trade || sel.id === 'garment' ? btn('uneq', 'Remove', { s: EQW.sel }) : ''}${SF.WEARABLE(sel.id) && sel.cond !== undefined && sel.cond < (sel.maxc || 100) ? btn('repair', 'Repair', { u: sel.uid }) : ''}${SF.ITEMS[sel.id].trade ? btn('drop', 'Drop', { u: sel.uid }) : ''}</div>` : `<p class="note">${EQ.SLOT[EQW.sel].n}: empty. Drag an item here, or double-click it in the backpack.</p>`}</div>`;
