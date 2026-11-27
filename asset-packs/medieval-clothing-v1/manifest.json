@@ -1,0 +1,70 @@
+{
+  "version": "1.0.0",
+  "status": "procedural prototype; painted overlays and runtime integration not complete",
+  "cell": {
+    "width": 112,
+    "height": 100,
+    "anchorX": 56,
+    "anchorY": 86
+  },
+  "paperdoll": {
+    "width": 384,
+    "height": 512,
+    "kind": "scaled shared resting pose SVG, not dedicated painted portrait"
+  },
+  "directions": [
+    "S",
+    "SW",
+    "W",
+    "NW",
+    "N",
+    "NE",
+    "E",
+    "SE"
+  ],
+  "animations": "inherits 29 action states from layered-armor-v1",
+  "atlas": "16 rows: male then female, direction order above; time frames in columns",
+  "source": [
+    "wardrobe.mjs",
+    "world-rig.mjs",
+    "views.mjs"
+  ],
+  "preview": "preview.html",
+  "test": "node test.mjs",
+  "dependencies": [
+    "../layered-armor-v1/armor-layers.mjs"
+  ],
+  "productionPNGAtlasesIncluded": false,
+  "gameIntegrated": false,
+  "visualQA": false,
+  "knownLimits": [
+    "existing weapon art not material-aware",
+    "hood overlay occludes facial details",
+    "paperdoll is shared pose, not painted",
+    "no isolated painted PNG masks; garment-only SVG export and apron sample available",
+    "source is derived from existing prototype rig; future merge must reconcile",
+    "cosmetic shirt/trousers are baseline rig geometry, not separate removable painted layers",
+    "depth and corpse clipping need visual QA"
+  ],
+  "cosmeticSVGExports": {
+    "frame": "garmentFrameSVG",
+    "atlas": "garmentAtlasSVG",
+    "phases": [
+      "back",
+      "under",
+      "outer",
+      "head"
+    ],
+    "note": "No base shirt/trousers layers; heraldry requires tabard; SVG only, no painted masks."
+  },
+  "samples": [
+    "samples/role-lineup.svg",
+    "samples/guard-lineup.svg",
+    "samples/apron-long-walk-outer.svg"
+  ],
+  "validation": {
+    "sampledFinalFrames": 20416,
+    "errors": 0,
+    "scope": "role × body × direction × action final frame; evaluated committed JS after stripping module declarations; not browser, pixel or full frame tests"
+  }
+}
