@@ -1,0 +1,69 @@
+{
+ "note": "Everything the wardrobe can draw today is procedural prototype art. This list is what has NO art at all, then what needs a painted production layer.",
+ "no_art": {
+  "overlays": {
+   "hood_down": "hood (down)",
+   "measuring_tape": "measuring tape",
+   "bedroll": "bedroll",
+   "quiver": "quiver",
+   "sleepwear": "sleeping clothes",
+   "embroidery": "fine embroidery"
+  },
+  "props": {
+   "saw": "saw",
+   "hoe": "hoe",
+   "crook": "shepherd's crook",
+   "bread": "bread",
+   "sewing_kit": "sewing kit",
+   "vial": "vial / herbs",
+   "bandage": "bandage",
+   "rope": "rope / cargo",
+   "pouch_goods": "goods / pouch in hand",
+   "holy_symbol": "holy symbol",
+   "reagent_pouch": "reagent pouch in hand"
+  },
+  "used_by_live_npcs": [
+   "prop hoe",
+   "prop holy_symbol",
+   "prop pouch_goods",
+   "prop reagent_pouch",
+   "prop rope",
+   "prop sewing_kit",
+   "prop vial"
+  ]
+ },
+ "needs_painted_layer": {
+  "overlays": {
+   "apron_long": "long work apron",
+   "apron_short": "short apron",
+   "vest": "vest / waistcoat",
+   "skirt": "skirt",
+   "dress": "long dress",
+   "straw_hat": "straw hat",
+   "hood": "hood (up)",
+   "headscarf": "headscarf / bandana",
+   "sash": "sash",
+   "pouch": "belt pouch",
+   "mantle": "short mantle",
+   "trim": "rank trim on tabard/cloak",
+   "crest": "officer crest on helm",
+   "heraldry": "regional heraldic device",
+   "bracer": "forearm bracer",
+   "wear": "dirt, patches and fading"
+  },
+  "props": {
+   "smith_hammer": "smith's hammer",
+   "tongs": "smith tongs",
+   "pickaxe": "pickaxe",
+   "hatchet": "hatchet",
+   "fishing_rod": "fishing rod",
+   "tankard": "tankard",
+   "book": "book / ledger",
+   "staff": "staff",
+   "basket": "fish basket",
+   "lantern": "lantern (night watch, free hand only)",
+   "bow": "bow",
+   "knife": "knife"
+  }
+ }
+}
