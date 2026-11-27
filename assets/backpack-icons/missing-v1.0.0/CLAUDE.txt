@@ -1,0 +1,5 @@
+SHARDFALL — missing backpack icons v1.0.0
+
+The adjacent atlas.json contains the actual transparent 448x64 PNG as png_base64 and seven 64x64 item rectangles. Decode to PNG using base64, validate SHA-256 against the manifest, and crop each rect using Pillow. This is a palette-optimized production atlas; high-resolution masters are not included.
+
+Inspect main and existing assets/backpack-icons/v1.0.0, src/backpack-icons.js and tools/embed_backpack_icons.py. Integrate the seven item IDs through the existing generation pipeline, preserve existing art and item stats, and do not manually edit generated base64 JS unless the established pipeline requires it. Wick is the dry cotton quest item. Test backpack, equipment, vendors, loot, tooltips, mobile and standalone build. Commit only the relevant changes, open a PR against main, and report test results. No new gameplay mechanics.
