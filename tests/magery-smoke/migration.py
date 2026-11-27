@@ -6,10 +6,10 @@ with sync_playwright() as p:
     pg = b.new_page(viewport={'width': 1280, 'height': 720})
     pg.on('pageerror', lambda e: errs.append('PAGEERROR ' + str(e))); pg.on('console', lambda m: errs.append(m.text) if m.type == 'error' else None)
     pg.goto('file://' + f); pg.wait_for_timeout(600); pg.evaluate("localStorage.clear()"); pg.reload(); pg.wait_for_timeout(600)
-    pg.click('[data-c=prof][data-p="Group healer"]'); pg.fill('#ccn', 'Old'); pg.click('[data-c=go]'); pg.wait_for_timeout(800)
+    pg.evaluate("o => __CC.quick(o)", {'name': 'Old', 'template': 'mage'}); pg.wait_for_timeout(800)
     pg.evaluate("""() => { const s = JSON.parse(localStorage.getItem('shardfall.save.v1')); const c = s.char;
       c.pack.items = c.pack.items.filter(i => !['spellbook','rune','black_pearl','blood_moss','garlic','ginseng','mandrake_root','nightshade','spider_silk','sulfurous_ash'].includes(i.id));
-      c.pack.items.push({ uid: 9001, id: 'reedash', qty: 12 }); delete c.magery; c.skills.spellcraft.v = 450;
+      c.pack.items.push({ uid: 9001, id: 'reedash', qty: 12 }); delete c.magery; s.v = 7; delete c.t2aMig; delete c.skills.magery; c.skills.spellcraft = { v: 450, lock: 'raise' };
       c.hotbar = [{ k: 'item', id: 'bandage' }, { k: 'spell', id: 'mend' }, { k: 'spell', id: 'curtain' }, { k: 'spell', id: 'cinderseal' }, null, null, null, null, null];
       localStorage.setItem('shardfall.save.v1', JSON.stringify(s)); localStorage.removeItem('shardfall.save.v1.premagery'); Storage.prototype.setItem = function () {}; }""")
     pg.reload(); pg.wait_for_timeout(800); pg.click('[data-c=cont]'); pg.wait_for_timeout(800)
@@ -17,7 +17,7 @@ with sync_playwright() as p:
     pg.evaluate("__SF.save()"); pg.reload(); pg.wait_for_timeout(800); pg.click('[data-c=cont]'); pg.wait_for_timeout(800)
     r2 = pg.evaluate("""() => { const P = __SF.P; return { hot: P.hotbar.slice(0,4).map(h => h && h.id), books: P.pack.items.filter(i => i.id === 'spellbook').length }; }""")
     # curtain still castable from old bar
-    r3 = pg.evaluate("""() => { const S = __SF, P = S.P; S.SF.addItem(P.pack, S.SF.newItem('shelldust', 5)); S.SF.addItem(P.pack, S.SF.newItem('marshroot', 5)); S.SF.addItem(P.pack, S.SF.newItem('blacksalt', 5)); P.skills.spellcraft.v = 800; P.mana = 60; S.castSlot('curtain'); for (let i = 0; i < 30; i++) S.update(.05); const held = P.held && P.held.sp.id; const ok = S.releaseHeld({ x: P.x + 2, y: P.y }); return { held, ok, log: S.LOG.slice(-3).map(l => l.t) }; }""")
+    r3 = pg.evaluate("""() => { const S = __SF, P = S.P; S.SF.addItem(P.pack, S.SF.newItem('shelldust', 5)); S.SF.addItem(P.pack, S.SF.newItem('marshroot', 5)); S.SF.addItem(P.pack, S.SF.newItem('blacksalt', 5)); P.skills.magery.v = 800; P.base.int = P.int = 70; P.mana = 60; S.setRng(() => .1); S.castSlot('curtain'); for (let i = 0; i < 30; i++) S.update(.05); const held = P.held && P.held.sp.id; const ok = S.releaseHeld({ x: P.x + 2, y: P.y }); return { held, ok, log: S.LOG.slice(-3).map(l => l.t) }; }""")
     # death clears buffs
     r4 = pg.evaluate("""() => { const S = __SF, P = S.P, MG = S.SF.MAGERY; P.mg.mods = { str: { pos: { v: 5, until: S.GT + 99 } } }; P.mg.night = S.GT + 99; S.update(.05); const s1 = P.str; S.damagePlayer(9999, null, 'phys'); S.update(.05); return { buffed: s1, after: P.str, base: P.base.str, night: !!P.mg.night }; }""")
     b.close()

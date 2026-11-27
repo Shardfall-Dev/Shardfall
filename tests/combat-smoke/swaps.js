@@ -11,7 +11,7 @@
   out.cycle = { fistsReadyAfter: Math.round((tReady - g0) * 100) / 100, glaiveSwungAt: Math.round((P.sw.t - g0) * 100) / 100, plainGlaive: SF.swingDelay(100, 25) };
   // one readiness state through a new target and a held spell
   P.armed = false; step(4); const readyBefore = P.sw.ready; const m2 = add('boar', -1, 0, 100000); P.sel = m2; S.update(.05); const keptOnRetarget = P.sw.ready;
-  SF.addItem(P.pack, SF.newItem('black_pearl', 3)); SF.addItem(P.pack, SF.newItem('nightshade', 3)); P.skills.spellcraft.v = 1000; P.mana = 50; const book = P.pack.items.find(i => i.id === 'spellbook'); if (book) book.spells = SF.MAGERY.SPELLS.map(s => s.id);
+  SF.addItem(P.pack, SF.newItem('black_pearl', 3)); SF.addItem(P.pack, SF.newItem('nightshade', 3)); P.skills.magery.v = 1000; P.mana = 50; const book = P.pack.items.find(i => i.id === 'spellbook'); if (book) book.spells = SF.MAGERY.SPELLS.map(s => s.id);
   S.castSlot('magery.05'); step(.8); const held = !!P.held, keptWhileHeld = P.sw.ready; S.ACT.atk(); S.update(.05); const swungWhileHeld = !P.sw.ready && !!P.held;
   out.readiness = { readyBefore, keptOnRetarget, held, keptWhileHeld, swungWhileHeld };
   // a prepared (not yet held) spell holds the swing

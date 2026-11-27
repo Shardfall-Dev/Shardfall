@@ -17,10 +17,10 @@ EXPECT = {
   'mace.js': {'miss': {'stam': 55, 'cond': 100}, 'hit': {'stamLost': 3, 'cond': 97}, 'creatureStamLost': 3, 'sword': {'stamLost': 0, 'cond': 99.8}, 'toPlayer': {'lost': 23, 'expect': 23}},
   'firstaid.js': {'fullHp': {'spent': 0, 'log': 'You are not hurt.'}, 'self': {'spent': 1, 'dur': 15.0, 'kind': 'heal', 'doneEarly': False, 'healed': 43, 'log': 'You heal yourself for 43 HP.'},
                   'slips': {'healed': 35, 'log': 'You heal yourself for 35 HP (2 slips).'}, 'whileActive': {'stillBandaging': True, 'swung': True, 'done': True}, 'movedWhileBandaging': True,
-                  'other': {'button': 'Bandage Wren', 'dur': 5.0, 'healed': 43, 'log': 'You heal Wren for 43 HP.'}, 'outOfReach': {'healed': False, 'log': 'Wren moved out of reach; the bandage is wasted.'},
+                  'other': {'button': 'Bandage', 'dur': 5.0, 'healed': 43, 'log': 'You heal Wren for 43 HP.'}, 'outOfReach': {'healed': False, 'log': 'Wren moved out of reach; the bandage is wasted.'},
                   'changed': {'healed': True, 'log': 'Wren was poisoned before you finished; this bandage was for wounds.'},
                   'cure': {'dur': 6.0, 'low': {'cured': False, 'log': 'Curing poison needs 60 Healing and 60 Anatomy. The bandage does nothing.'}, 'at60': {'cured': True, 'hpSame': True, 'log': 'You cure Wren of poison.'}, 'fail60': 'You fail to cure the poison.', 'selfDur': 18.0, 'selfCured': True},
-                  'ghost': {'ghost': True, 'body': True, 'armorOnBody': True, 'button': 'Bandage: resurrect Wren', 'dur': 10.0, 'low': {'still': True, 'log': 'Resurrection needs 80 Healing and 80 Anatomy. The ghost stays a ghost.'}, 'fail80': True,
+                  'ghost': {'ghost': True, 'body': True, 'armorOnBody': True, 'button': 'Resurrect', 'dur': 10.0, 'low': {'still': True, 'log': 'Resurrection needs 80 Healing and 80 Anatomy. The ghost stays a ghost.'}, 'fail80': True,
                             'res': {'alive': True, 'hp': 20, 'max': 80, 'armor': 'leather_tunic', 'weapon': 'sword', 'bodyGone': True}}},
 }
 def sub(exp, got, path=''):
@@ -33,7 +33,8 @@ def sub(exp, got, path=''):
   return bad
 def new_char(pg, prof='Glaive hybrid', name='Tess'):
   pg.goto('file://' + f); pg.wait_for_timeout(500); pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_timeout(500)
-  pg.click(f'[data-c=prof][data-p="{prof}"]'); pg.fill('#ccn', name); pg.click('[data-c=go]'); pg.wait_for_timeout(900)
+  pg.evaluate("o => __CC.quick(o)", {'name': name, 'template': {'Glaive hybrid': 'swordsman', 'Mace dexer': 'maceman', 'Merchant smith': 'blacksmith'}.get(prof, 'swordsman')}); pg.wait_for_timeout(900)
+  if prof == 'Glaive hybrid': pg.evaluate(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'legacy-profile.js')).read())
 fails = 0; report = {}
 with sync_playwright() as p:
   b = p.chromium.launch(executable_path=chrome, args=['--no-sandbox'])
@@ -48,5 +49,5 @@ with sync_playwright() as p:
 open(os.path.join(os.environ.get('COMBAT_REPORT_DIR', '/tmp'), 'combat-smoke-report.json'), 'w').write(json.dumps(report, indent=1))
 for extra in ['reload.py', 'playtest.py']:
   args = [sys.executable, os.path.join(here, extra), f, chrome] + sys.argv[3:4]
-  r = subprocess.run(args, capture_output=True, text=True); print((r.stdout.strip() or r.stderr[-600:])[:1500]); fails += r.returncode != 0
+  r = subprocess.run(args, capture_output=True, text=True); print(r.stdout.strip() or r.stderr[-600:]); fails += r.returncode != 0
 print('ALL PASS' if not fails else f'{fails} FAILED'); sys.exit(1 if fails else 0)

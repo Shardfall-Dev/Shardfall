@@ -1,0 +1,1738 @@
+{
+ "build": "Shardfall_v0.31.html",
+ "rows": [
+  {
+   "id": "npc:odile-banker",
+   "kind": "npc",
+   "gameRole": "banker",
+   "region": "saltmarsh",
+   "role": "banker",
+   "rank": null,
+   "body": "female",
+   "source": "cosmetic",
+   "via": "role:banker",
+   "fallback": false,
+   "overlays": [
+    "trim"
+   ],
+   "prop": "book",
+   "missing": []
+  },
+  {
+   "id": "npc:harl-smith",
+   "kind": "npc",
+   "gameRole": "smith",
+   "region": "saltmarsh",
+   "role": "blacksmith",
+   "rank": null,
+   "body": "male",
+   "source": "cosmetic",
+   "via": "role:smith",
+   "fallback": false,
+   "overlays": [
+    "apron_long"
+   ],
+   "prop": "smith_hammer",
+   "missing": []
+  },
+  {
+   "id": "npc:master-vey-trainer",
+   "kind": "npc",
+   "gameRole": "trainer",
+   "region": "saltmarsh",
+   "role": "trainer",
+   "rank": null,
+   "body": "male",
+   "source": "cosmetic",
+   "via": "role:trainer",
+   "fallback": false,
+   "overlays": [
+    "sash"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "npc:pell-bowyer",
+   "kind": "npc",
+   "gameRole": "workshop",
+   "region": "saltmarsh",
+   "role": "fletcher",
+   "rank": null,
+   "body": "male",
+   "source": "cosmetic",
+   "via": "role:workshop",
+   "fallback": false,
+   "overlays": [
+    "vest",
+    "bracer"
+   ],
+   "prop": "knife",
+   "missing": []
+  },
+  {
+   "id": "npc:sorrel-apothecary",
+   "kind": "npc",
+   "gameRole": "apothecary",
+   "region": "saltmarsh",
+   "role": "healer",
+   "rank": null,
+   "body": "female",
+   "source": "cosmetic",
+   "via": "role:apothecary",
+   "fallback": false,
+   "overlays": [
+    "pouch"
+   ],
+   "prop": null,
+   "missing": [
+    "prop vial"
+   ]
+  },
+  {
+   "id": "npc:gus-provisioner",
+   "kind": "npc",
+   "gameRole": "provisioner",
+   "region": "saltmarsh",
+   "role": "merchant",
+   "rank": null,
+   "body": "male",
+   "source": "cosmetic",
+   "via": "role:provisioner",
+   "fallback": false,
+   "overlays": [
+    "vest",
+    "pouch"
+   ],
+   "prop": null,
+   "missing": [
+    "prop pouch_goods"
+   ]
+  },
+  {
+   "id": "npc:mara-quay-smith",
+   "kind": "npc",
+   "gameRole": "qsmith",
+   "region": "saltmarsh",
+   "role": "blacksmith",
+   "rank": null,
+   "body": "female",
+   "source": "cosmetic",
+   "via": "role:qsmith",
+   "fallback": false,
+   "overlays": [
+    "apron_long"
+   ],
+   "prop": "smith_hammer",
+   "missing": []
+  },
+  {
+   "id": "npc:dena-assaymaster",
+   "kind": "npc",
+   "gameRole": "assay",
+   "region": "saltmarsh",
+   "role": "assayer",
+   "rank": null,
+   "body": "female",
+   "source": "cosmetic",
+   "via": "role:assay",
+   "fallback": false,
+   "overlays": [
+    "vest",
+    "apron_short",
+    "pouch"
+   ],
+   "prop": "book",
+   "missing": []
+  },
+  {
+   "id": "npc:sister-maud-healer",
+   "kind": "npc",
+   "gameRole": "healer",
+   "region": "saltmarsh",
+   "role": "priest",
+   "rank": null,
+   "body": "female",
+   "source": "cosmetic",
+   "via": "actor:npc:sister-maud-healer",
+   "fallback": false,
+   "overlays": [
+    "sash"
+   ],
+   "prop": null,
+   "missing": [
+    "prop holy_symbol"
+   ]
+  },
+  {
+   "id": "npc:quaywarden-brann",
+   "kind": "npc",
+   "gameRole": "quaywarden",
+   "region": "saltmarsh",
+   "role": "guard",
+   "rank": "captain",
+   "body": "male",
+   "source": "cosmetic",
+   "via": "role:quaywarden",
+   "fallback": false,
+   "overlays": [
+    "heraldry",
+    "trim",
+    "crest"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "npc:quay-warden",
+   "kind": "npc",
+   "gameRole": "guard",
+   "region": "saltmarsh",
+   "role": "guard",
+   "rank": "sergeant",
+   "body": "female",
+   "source": "cosmetic",
+   "via": "role:guard",
+   "fallback": false,
+   "overlays": [
+    "heraldry",
+    "trim"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "npc:quay-warden-2",
+   "kind": "npc",
+   "gameRole": "guard",
+   "region": "saltmarsh",
+   "role": "guard",
+   "rank": "patrol",
+   "body": "male",
+   "source": "cosmetic",
+   "via": "role:guard",
+   "fallback": false,
+   "overlays": [
+    "heraldry"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "npc:quay-warden-3",
+   "kind": "npc",
+   "gameRole": "guard",
+   "region": "saltmarsh",
+   "role": "guard",
+   "rank": "patrol",
+   "body": "male",
+   "source": "cosmetic",
+   "via": "role:guard",
+   "fallback": false,
+   "overlays": [
+    "heraldry"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "npc:quay-warden-4",
+   "kind": "npc",
+   "gameRole": "guard",
+   "region": "saltmarsh",
+   "role": "guard",
+   "rank": "recruit",
+   "body": "male",
+   "source": "cosmetic",
+   "via": "role:guard",
+   "fallback": false,
+   "overlays": [
+    "heraldry"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "npc:quay-warden-5",
+   "kind": "npc",
+   "gameRole": "guard",
+   "region": "saltmarsh",
+   "role": "guard",
+   "rank": "patrol",
+   "body": "male",
+   "source": "cosmetic",
+   "via": "role:guard",
+   "fallback": false,
+   "overlays": [
+    "heraldry"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "npc:old-fenna-camp-healer",
+   "kind": "npc",
+   "gameRole": "healer",
+   "region": null,
+   "role": "healer",
+   "rank": null,
+   "body": "female",
+   "source": "cosmetic",
+   "via": "role:healer",
+   "fallback": false,
+   "overlays": [
+    "pouch"
+   ],
+   "prop": null,
+   "missing": [
+    "prop vial"
+   ]
+  },
+  {
+   "id": "npc:crow-camp-strongbox",
+   "kind": "npc",
+   "gameRole": "campbank",
+   "region": null,
+   "role": "fence",
+   "rank": null,
+   "body": "male",
+   "source": "cosmetic",
+   "via": "role:campbank",
+   "fallback": false,
+   "overlays": [
+    "pouch",
+    "wear"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "npc:mags-fence",
+   "kind": "npc",
+   "gameRole": "outlaw",
+   "region": null,
+   "role": "fence",
+   "rank": null,
+   "body": "female",
+   "source": "cosmetic",
+   "via": "role:outlaw",
+   "fallback": false,
+   "overlays": [
+    "pouch",
+    "wear"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "npc:hobb-mynoc-banker",
+   "kind": "npc",
+   "gameRole": "banker",
+   "region": "mynoc",
+   "role": "banker",
+   "rank": null,
+   "body": "male",
+   "source": "cosmetic",
+   "via": "role:banker",
+   "fallback": false,
+   "overlays": [
+    "trim"
+   ],
+   "prop": "book",
+   "missing": []
+  },
+  {
+   "id": "npc:brega-forgemistress",
+   "kind": "npc",
+   "gameRole": "smith/smith",
+   "region": "mynoc",
+   "role": "blacksmith",
+   "rank": null,
+   "body": "female",
+   "source": "cosmetic",
+   "via": "role:smith",
+   "fallback": false,
+   "overlays": [
+    "apron_long"
+   ],
+   "prop": "smith_hammer",
+   "missing": []
+  },
+  {
+   "id": "npc:tollin-mine-stores",
+   "kind": "npc",
+   "gameRole": "miner/shop",
+   "region": "mynoc",
+   "role": "miner",
+   "rank": null,
+   "body": "male",
+   "source": "cosmetic",
+   "via": "actor:npc:tollin-mine-stores",
+   "fallback": false,
+   "overlays": [
+    "vest",
+    "wear"
+   ],
+   "prop": "pickaxe",
+   "missing": []
+  },
+  {
+   "id": "npc:sister-ewe-healer",
+   "kind": "npc",
+   "gameRole": "healer",
+   "region": "mynoc",
+   "role": "priest",
+   "rank": null,
+   "body": "female",
+   "source": "cosmetic",
+   "via": "actor:npc:sister-ewe-healer",
+   "fallback": false,
+   "overlays": [
+    "sash"
+   ],
+   "prop": null,
+   "missing": [
+    "prop holy_symbol"
+   ]
+  },
+  {
+   "id": "npc:mynoc-warden",
+   "kind": "npc",
+   "gameRole": "guard/guard",
+   "region": "mynoc",
+   "role": "guard",
+   "rank": "sergeant",
+   "body": "female",
+   "source": "cosmetic",
+   "via": "role:guard",
+   "fallback": false,
+   "overlays": [
+    "heraldry",
+    "trim"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "npc:mynoc-warden-2",
+   "kind": "npc",
+   "gameRole": "guard/guard",
+   "region": "mynoc",
+   "role": "guard",
+   "rank": "patrol",
+   "body": "male",
+   "source": "cosmetic",
+   "via": "role:guard",
+   "fallback": false,
+   "overlays": [
+    "heraldry"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "npc:quill-vespar-banker",
+   "kind": "npc",
+   "gameRole": "banker",
+   "region": "vespar",
+   "role": "banker",
+   "rank": null,
+   "body": "female",
+   "source": "cosmetic",
+   "via": "role:banker",
+   "fallback": false,
+   "overlays": [
+    "trim"
+   ],
+   "prop": "book",
+   "missing": []
+  },
+  {
+   "id": "npc:merrin-tailor",
+   "kind": "npc",
+   "gameRole": "tailor/shop",
+   "region": "vespar",
+   "role": "tailor",
+   "rank": null,
+   "body": "female",
+   "source": "cosmetic",
+   "via": "role:tailor",
+   "fallback": false,
+   "overlays": [
+    "apron_long",
+    "dress"
+   ],
+   "prop": null,
+   "missing": [
+    "prop sewing_kit"
+   ]
+  },
+  {
+   "id": "npc:pip-tinker",
+   "kind": "npc",
+   "gameRole": "tinker/shop",
+   "region": "vespar",
+   "role": "tinker",
+   "rank": null,
+   "body": "male",
+   "source": "cosmetic",
+   "via": "role:tinker",
+   "fallback": false,
+   "overlays": [
+    "apron_short",
+    "pouch"
+   ],
+   "prop": "tongs",
+   "missing": []
+  },
+  {
+   "id": "npc:adda-supplies",
+   "kind": "npc",
+   "gameRole": "provisioner/shop",
+   "region": "vespar",
+   "role": "merchant",
+   "rank": null,
+   "body": "female",
+   "source": "cosmetic",
+   "via": "role:provisioner",
+   "fallback": false,
+   "overlays": [
+    "vest",
+    "pouch"
+   ],
+   "prop": null,
+   "missing": [
+    "prop pouch_goods"
+   ]
+  },
+  {
+   "id": "npc:old-cray-fishmonger",
+   "kind": "npc",
+   "gameRole": "fishmonger/shop",
+   "region": "vespar",
+   "role": "fishmonger",
+   "rank": null,
+   "body": "male",
+   "source": "cosmetic",
+   "via": "role:fishmonger",
+   "fallback": false,
+   "overlays": [
+    "apron_short"
+   ],
+   "prop": "basket",
+   "missing": []
+  },
+  {
+   "id": "npc:brother-lune-healer",
+   "kind": "npc",
+   "gameRole": "healer",
+   "region": "vespar",
+   "role": "priest",
+   "rank": null,
+   "body": "male",
+   "source": "cosmetic",
+   "via": "actor:npc:brother-lune-healer",
+   "fallback": false,
+   "overlays": [
+    "sash"
+   ],
+   "prop": null,
+   "missing": [
+    "prop holy_symbol"
+   ]
+  },
+  {
+   "id": "npc:captain-rhea-moonglen-boat",
+   "kind": "npc",
+   "gameRole": "boat",
+   "region": "vespar",
+   "role": "captain_sea",
+   "rank": null,
+   "body": "female",
+   "source": "cosmetic",
+   "via": "role:boat",
+   "fallback": false,
+   "overlays": [
+    "vest"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "npc:captain-ysolde-quay-packet",
+   "kind": "npc",
+   "gameRole": "packet",
+   "region": "vespar",
+   "role": "captain_sea",
+   "rank": null,
+   "body": "female",
+   "source": "cosmetic",
+   "via": "role:packet",
+   "fallback": false,
+   "overlays": [
+    "vest"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "npc:vespar-watch",
+   "kind": "npc",
+   "gameRole": "guard/guard",
+   "region": "vespar",
+   "role": "guard",
+   "rank": "sergeant",
+   "body": "male",
+   "source": "cosmetic",
+   "via": "role:guard",
+   "fallback": false,
+   "overlays": [
+    "heraldry",
+    "trim"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "npc:vespar-watch-2",
+   "kind": "npc",
+   "gameRole": "guard/guard",
+   "region": "vespar",
+   "role": "guard",
+   "rank": "patrol",
+   "body": "female",
+   "source": "cosmetic",
+   "via": "role:guard",
+   "fallback": false,
+   "overlays": [
+    "heraldry"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "npc:vespar-watch-3",
+   "kind": "npc",
+   "gameRole": "guard/guard",
+   "region": "vespar",
+   "role": "guard",
+   "rank": "patrol",
+   "body": "female",
+   "source": "cosmetic",
+   "via": "role:guard",
+   "fallback": false,
+   "overlays": [
+    "heraldry"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "npc:vespar-watch-4",
+   "kind": "npc",
+   "gameRole": "guard/guard",
+   "region": "vespar",
+   "role": "guard",
+   "rank": "recruit",
+   "body": "female",
+   "source": "cosmetic",
+   "via": "role:guard",
+   "fallback": false,
+   "overlays": [
+    "heraldry"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "npc:tam-ferryman",
+   "kind": "npc",
+   "gameRole": "ferry",
+   "region": "skara",
+   "role": "sailor",
+   "rank": null,
+   "body": "male",
+   "source": "cosmetic",
+   "via": "role:ferry",
+   "fallback": false,
+   "overlays": [
+    "vest",
+    "headscarf"
+   ],
+   "prop": null,
+   "missing": [
+    "prop rope"
+   ]
+  },
+  {
+   "id": "npc:wenna-ferrywoman",
+   "kind": "npc",
+   "gameRole": "ferry",
+   "region": "skara",
+   "role": "sailor",
+   "rank": null,
+   "body": "female",
+   "source": "cosmetic",
+   "via": "role:ferry",
+   "fallback": false,
+   "overlays": [
+    "vest",
+    "headscarf"
+   ],
+   "prop": null,
+   "missing": [
+    "prop rope"
+   ]
+  },
+  {
+   "id": "npc:ivo-skara-banker",
+   "kind": "npc",
+   "gameRole": "banker",
+   "region": "skara",
+   "role": "banker",
+   "rank": null,
+   "body": "male",
+   "source": "cosmetic",
+   "via": "role:banker",
+   "fallback": false,
+   "overlays": [
+    "trim"
+   ],
+   "prop": "book",
+   "missing": []
+  },
+  {
+   "id": "npc:maeve-innkeeper",
+   "kind": "npc",
+   "gameRole": "innkeeper/innkeeper",
+   "region": "skara",
+   "role": "innkeeper",
+   "rank": null,
+   "body": "female",
+   "source": "cosmetic",
+   "via": "role:innkeeper",
+   "fallback": false,
+   "overlays": [
+    "dress",
+    "apron_short"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "npc:fen-bowyer",
+   "kind": "npc",
+   "gameRole": "workshop/shop",
+   "region": "skara",
+   "role": "fletcher",
+   "rank": null,
+   "body": "female",
+   "source": "cosmetic",
+   "via": "role:workshop",
+   "fallback": false,
+   "overlays": [
+    "vest",
+    "bracer"
+   ],
+   "prop": "knife",
+   "missing": []
+  },
+  {
+   "id": "npc:ash-fletcher",
+   "kind": "npc",
+   "gameRole": "fletcher/shop",
+   "region": "skara",
+   "role": "fletcher",
+   "rank": null,
+   "body": "male",
+   "source": "cosmetic",
+   "via": "role:fletcher",
+   "fallback": false,
+   "overlays": [
+    "vest",
+    "bracer"
+   ],
+   "prop": "knife",
+   "missing": []
+  },
+  {
+   "id": "npc:old-rowan-healer",
+   "kind": "npc",
+   "gameRole": "healer",
+   "region": "skara",
+   "role": "healer",
+   "rank": null,
+   "body": "male",
+   "source": "cosmetic",
+   "via": "role:healer",
+   "fallback": false,
+   "overlays": [
+    "pouch"
+   ],
+   "prop": null,
+   "missing": [
+    "prop vial"
+   ]
+  },
+  {
+   "id": "npc:ranger-captain-hale",
+   "kind": "npc",
+   "gameRole": "ranger",
+   "region": "skara",
+   "role": "ranger",
+   "rank": null,
+   "body": "male",
+   "source": "cosmetic",
+   "via": "role:ranger",
+   "fallback": false,
+   "overlays": [
+    "bracer"
+   ],
+   "prop": "bow",
+   "missing": []
+  },
+  {
+   "id": "npc:dorn-stablehand",
+   "kind": "npc",
+   "gameRole": "stable",
+   "region": "skara",
+   "role": "farmer",
+   "rank": null,
+   "body": "male",
+   "source": "cosmetic",
+   "via": "role:stable",
+   "fallback": false,
+   "overlays": [
+    "straw_hat",
+    "wear"
+   ],
+   "prop": null,
+   "missing": [
+    "prop hoe"
+   ]
+  },
+  {
+   "id": "npc:skara-ranger",
+   "kind": "npc",
+   "gameRole": "guard/guard",
+   "region": "skara",
+   "role": "guard",
+   "rank": "sergeant",
+   "body": "male",
+   "source": "cosmetic",
+   "via": "role:guard",
+   "fallback": false,
+   "overlays": [
+    "heraldry",
+    "trim"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "npc:skara-ranger-2",
+   "kind": "npc",
+   "gameRole": "guard",
+   "region": "skara",
+   "role": "guard",
+   "rank": "patrol",
+   "body": "female",
+   "source": "cosmetic",
+   "via": "role:guard",
+   "fallback": false,
+   "overlays": [
+    "heraldry"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "npc:sela-college-bank",
+   "kind": "npc",
+   "gameRole": "banker",
+   "region": "moonglen",
+   "role": "banker",
+   "rank": null,
+   "body": "female",
+   "source": "cosmetic",
+   "via": "role:banker",
+   "fallback": false,
+   "overlays": [
+    "trim"
+   ],
+   "prop": "book",
+   "missing": []
+  },
+  {
+   "id": "npc:magister-orrin",
+   "kind": "npc",
+   "gameRole": "mage/shop",
+   "region": "moonglen",
+   "role": "mage",
+   "rank": null,
+   "body": "male",
+   "source": "cosmetic",
+   "via": "role:mage",
+   "fallback": false,
+   "overlays": [
+    "mantle"
+   ],
+   "prop": "staff",
+   "missing": []
+  },
+  {
+   "id": "npc:nettle-reagent-seller",
+   "kind": "npc",
+   "gameRole": "reagents/shop",
+   "region": "moonglen",
+   "role": "reagents",
+   "rank": null,
+   "body": "female",
+   "source": "cosmetic",
+   "via": "role:reagents",
+   "fallback": false,
+   "overlays": [
+    "pouch"
+   ],
+   "prop": null,
+   "missing": [
+    "prop reagent_pouch"
+   ]
+  },
+  {
+   "id": "npc:pell-innkeeper",
+   "kind": "npc",
+   "gameRole": "innkeeper/innkeeper",
+   "region": "moonglen",
+   "role": "innkeeper",
+   "rank": null,
+   "body": "male",
+   "source": "cosmetic",
+   "via": "role:innkeeper",
+   "fallback": false,
+   "overlays": [
+    "vest",
+    "apron_short"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "npc:archivist-venn",
+   "kind": "npc",
+   "gameRole": "scholar/scholar",
+   "region": "moonglen",
+   "role": "scholar",
+   "rank": null,
+   "body": "female",
+   "source": "cosmetic",
+   "via": "role:scholar",
+   "fallback": false,
+   "overlays": [
+    "mantle"
+   ],
+   "prop": "book",
+   "missing": []
+  },
+  {
+   "id": "npc:astronomer-iska",
+   "kind": "npc",
+   "gameRole": "scholar/astronomer",
+   "region": "moonglen",
+   "role": "scholar",
+   "rank": null,
+   "body": "female",
+   "source": "cosmetic",
+   "via": "role:scholar",
+   "fallback": false,
+   "overlays": [
+    "mantle"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "npc:sister-moira-healer",
+   "kind": "npc",
+   "gameRole": "healer",
+   "region": "moonglen",
+   "role": "priest",
+   "rank": null,
+   "body": "female",
+   "source": "cosmetic",
+   "via": "actor:npc:sister-moira-healer",
+   "fallback": false,
+   "overlays": [
+    "sash"
+   ],
+   "prop": null,
+   "missing": [
+    "prop holy_symbol"
+   ]
+  },
+  {
+   "id": "npc:captain-hollis-vespar-boat",
+   "kind": "npc",
+   "gameRole": "boat",
+   "region": "moonglen",
+   "role": "captain_sea",
+   "rank": null,
+   "body": "male",
+   "source": "cosmetic",
+   "via": "role:boat",
+   "fallback": false,
+   "overlays": [
+    "vest"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "npc:college-warden",
+   "kind": "npc",
+   "gameRole": "guard/guard",
+   "region": "moonglen",
+   "role": "guard",
+   "rank": "sergeant",
+   "body": "female",
+   "source": "cosmetic",
+   "via": "role:guard",
+   "fallback": false,
+   "overlays": [
+    "heraldry",
+    "trim"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "npc:college-warden-2",
+   "kind": "npc",
+   "gameRole": "guard/guard",
+   "region": "moonglen",
+   "role": "guard",
+   "rank": "patrol",
+   "body": "male",
+   "source": "cosmetic",
+   "via": "role:guard",
+   "fallback": false,
+   "overlays": [
+    "heraldry"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "npc:captain-bram-vespar-packet",
+   "kind": "npc",
+   "gameRole": "packet",
+   "region": "saltmarsh",
+   "role": "captain_sea",
+   "rank": null,
+   "body": "male",
+   "source": "cosmetic",
+   "via": "role:packet",
+   "fallback": false,
+   "overlays": [
+    "vest"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "npc:nell-fisherwoman",
+   "kind": "npc",
+   "gameRole": "resident/fisher",
+   "region": "vespar",
+   "role": "fisher",
+   "rank": null,
+   "body": "female",
+   "source": "cosmetic",
+   "via": "prof:fisher",
+   "fallback": false,
+   "overlays": [],
+   "prop": "fishing_rod",
+   "missing": []
+  },
+  {
+   "id": "npc:garrick-dockhand",
+   "kind": "npc",
+   "gameRole": "resident/dockhand",
+   "region": "vespar",
+   "role": "sailor",
+   "rank": null,
+   "body": "male",
+   "source": "cosmetic",
+   "via": "prof:dockhand",
+   "fallback": false,
+   "overlays": [
+    "vest",
+    "headscarf"
+   ],
+   "prop": null,
+   "missing": [
+    "prop rope"
+   ]
+  },
+  {
+   "id": "npc:lise-weaver",
+   "kind": "npc",
+   "gameRole": "resident/townsfolk",
+   "region": "vespar",
+   "role": "tailor",
+   "rank": null,
+   "body": "female",
+   "source": "cosmetic",
+   "via": "actor:npc:lise-weaver",
+   "fallback": false,
+   "overlays": [
+    "dress"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "npc:old-tomas",
+   "kind": "npc",
+   "gameRole": "resident/townsfolk",
+   "region": "vespar",
+   "role": "elder",
+   "rank": null,
+   "body": "male",
+   "source": "cosmetic",
+   "via": "actor:npc:old-tomas",
+   "fallback": false,
+   "overlays": [],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "npc:corin-carter",
+   "kind": "npc",
+   "gameRole": "resident/townsfolk",
+   "region": "vespar",
+   "role": "villager",
+   "rank": null,
+   "body": "male",
+   "source": "cosmetic",
+   "via": "actor:npc:corin-carter",
+   "fallback": false,
+   "overlays": [],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "npc:durn-miner",
+   "kind": "npc",
+   "gameRole": "resident/miner",
+   "region": "mynoc",
+   "role": "miner",
+   "rank": null,
+   "body": "male",
+   "source": "cosmetic",
+   "via": "prof:miner",
+   "fallback": false,
+   "overlays": [
+    "vest",
+    "wear"
+   ],
+   "prop": "pickaxe",
+   "missing": []
+  },
+  {
+   "id": "npc:kessa-miner",
+   "kind": "npc",
+   "gameRole": "resident/miner",
+   "region": "mynoc",
+   "role": "miner",
+   "rank": null,
+   "body": "female",
+   "source": "cosmetic",
+   "via": "prof:miner",
+   "fallback": false,
+   "overlays": [
+    "vest",
+    "wear"
+   ],
+   "prop": "pickaxe",
+   "missing": []
+  },
+  {
+   "id": "npc:fennick-woodcutter",
+   "kind": "npc",
+   "gameRole": "resident/woodcutter",
+   "region": "mynoc",
+   "role": "woodcutter",
+   "rank": null,
+   "body": "male",
+   "source": "cosmetic",
+   "via": "prof:woodcutter",
+   "fallback": false,
+   "overlays": [
+    "apron_short"
+   ],
+   "prop": "hatchet",
+   "missing": []
+  },
+  {
+   "id": "npc:mabry-cook",
+   "kind": "npc",
+   "gameRole": "resident/townsfolk",
+   "region": "mynoc",
+   "role": "cook",
+   "rank": null,
+   "body": "female",
+   "source": "cosmetic",
+   "via": "actor:npc:mabry-cook",
+   "fallback": false,
+   "overlays": [
+    "headscarf"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "npc:bryn-forester",
+   "kind": "npc",
+   "gameRole": "resident/woodcutter",
+   "region": "skara",
+   "role": "woodcutter",
+   "rank": null,
+   "body": "female",
+   "source": "cosmetic",
+   "via": "prof:woodcutter",
+   "fallback": false,
+   "overlays": [
+    "apron_short"
+   ],
+   "prop": "hatchet",
+   "missing": []
+  },
+  {
+   "id": "npc:ysolde-herb-gatherer",
+   "kind": "npc",
+   "gameRole": "resident/townsfolk",
+   "region": "skara",
+   "role": "herbalist",
+   "rank": null,
+   "body": "female",
+   "source": "cosmetic",
+   "via": "actor:npc:ysolde-herb-gatherer",
+   "fallback": false,
+   "overlays": [
+    "dress",
+    "pouch",
+    "headscarf"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "npc:tibbet-student",
+   "kind": "npc",
+   "gameRole": "resident/student",
+   "region": "moonglen",
+   "role": "student",
+   "rank": null,
+   "body": "male",
+   "source": "cosmetic",
+   "via": "prof:student",
+   "fallback": false,
+   "overlays": [],
+   "prop": "book",
+   "missing": []
+  },
+  {
+   "id": "npc:mira-student",
+   "kind": "npc",
+   "gameRole": "resident/student",
+   "region": "moonglen",
+   "role": "student",
+   "rank": null,
+   "body": "female",
+   "source": "cosmetic",
+   "via": "prof:student",
+   "fallback": false,
+   "overlays": [],
+   "prop": "book",
+   "missing": []
+  },
+  {
+   "id": "npc:tobin-travelling-merchant",
+   "kind": "npc",
+   "gameRole": "trader/trader",
+   "region": "mynoc",
+   "role": "trader",
+   "rank": null,
+   "body": "male",
+   "source": "cosmetic",
+   "via": "role:trader",
+   "fallback": false,
+   "overlays": [
+    "vest",
+    "pouch"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "mon:rat:1",
+   "kind": "mon",
+   "gameRole": "rat",
+   "region": null,
+   "role": null,
+   "rank": null,
+   "body": null,
+   "source": null,
+   "via": null,
+   "fallback": null,
+   "overlays": [],
+   "prop": null,
+   "missing": [
+    "no human wardrobe (creature art unchanged)"
+   ]
+  },
+  {
+   "id": "mon:boar:4",
+   "kind": "mon",
+   "gameRole": "boar",
+   "region": null,
+   "role": null,
+   "rank": null,
+   "body": null,
+   "source": null,
+   "via": null,
+   "fallback": null,
+   "overlays": [],
+   "prop": null,
+   "missing": [
+    "no human wardrobe (creature art unchanged)"
+   ]
+  },
+  {
+   "id": "mon:snapper:7",
+   "kind": "mon",
+   "gameRole": "snapper",
+   "region": null,
+   "role": null,
+   "rank": null,
+   "body": null,
+   "source": null,
+   "via": null,
+   "fallback": null,
+   "overlays": [],
+   "prop": null,
+   "missing": [
+    "no human wardrobe (creature art unchanged)"
+   ]
+  },
+  {
+   "id": "mon:spider:8",
+   "kind": "mon",
+   "gameRole": "spider",
+   "region": null,
+   "role": null,
+   "rank": null,
+   "body": null,
+   "source": null,
+   "via": null,
+   "fallback": null,
+   "overlays": [],
+   "prop": null,
+   "missing": [
+    "no human wardrobe (creature art unchanged)"
+   ]
+  },
+  {
+   "id": "mon:wisp:9",
+   "kind": "mon",
+   "gameRole": "wisp",
+   "region": null,
+   "role": null,
+   "rank": null,
+   "body": null,
+   "source": null,
+   "via": null,
+   "fallback": null,
+   "overlays": [],
+   "prop": null,
+   "missing": [
+    "no human wardrobe (creature art unchanged)"
+   ]
+  },
+  {
+   "id": "mon:smuggler:10",
+   "kind": "mon",
+   "gameRole": "smuggler",
+   "region": null,
+   "role": "smuggler",
+   "rank": null,
+   "body": "male",
+   "source": "cosmetic",
+   "via": "mob:smuggler",
+   "fallback": false,
+   "overlays": [
+    "sash",
+    "headscarf",
+    "wear"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "mon:hound:13",
+   "kind": "mon",
+   "gameRole": "hound",
+   "region": null,
+   "role": null,
+   "rank": null,
+   "body": null,
+   "source": null,
+   "via": null,
+   "fallback": null,
+   "overlays": [],
+   "prop": null,
+   "missing": [
+    "no human wardrobe (creature art unchanged)"
+   ]
+  },
+  {
+   "id": "mon:skeleton:20",
+   "kind": "mon",
+   "gameRole": "skeleton",
+   "region": null,
+   "role": null,
+   "rank": null,
+   "body": null,
+   "source": null,
+   "via": null,
+   "fallback": null,
+   "overlays": [],
+   "prop": null,
+   "missing": [
+    "no human wardrobe (creature art unchanged)"
+   ]
+  },
+  {
+   "id": "mon:sentinel:30",
+   "kind": "mon",
+   "gameRole": "sentinel",
+   "region": null,
+   "role": null,
+   "rank": null,
+   "body": null,
+   "source": null,
+   "via": null,
+   "fallback": null,
+   "overlays": [],
+   "prop": null,
+   "missing": [
+    "no human wardrobe (creature art unchanged)"
+   ]
+  },
+  {
+   "id": "mon:captain:38",
+   "kind": "mon",
+   "gameRole": "captain",
+   "region": null,
+   "role": "drowned_captain",
+   "rank": null,
+   "body": "female",
+   "source": "cosmetic",
+   "via": "mob:captain",
+   "fallback": false,
+   "overlays": [
+    "vest",
+    "wear"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "mon:bellkeeper:42",
+   "kind": "mon",
+   "gameRole": "bellkeeper",
+   "region": null,
+   "role": null,
+   "rank": null,
+   "body": null,
+   "source": null,
+   "via": null,
+   "fallback": null,
+   "overlays": [],
+   "prop": null,
+   "missing": [
+    "no human wardrobe (creature art unchanged)"
+   ]
+  },
+  {
+   "id": "mon:bandit:54",
+   "kind": "mon",
+   "gameRole": "bandit",
+   "region": null,
+   "role": "bandit_road",
+   "rank": null,
+   "body": "female",
+   "source": "cosmetic",
+   "via": "mob:bandit",
+   "fallback": false,
+   "overlays": [
+    "hood",
+    "wear"
+   ],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "mon:dire_wolf:56",
+   "kind": "mon",
+   "gameRole": "dire_wolf",
+   "region": null,
+   "role": null,
+   "rank": null,
+   "body": null,
+   "source": null,
+   "via": null,
+   "fallback": null,
+   "overlays": [],
+   "prop": null,
+   "missing": [
+    "no human wardrobe (creature art unchanged)"
+   ]
+  },
+  {
+   "id": "mon:giant_spider:58",
+   "kind": "mon",
+   "gameRole": "giant_spider",
+   "region": null,
+   "role": null,
+   "rank": null,
+   "body": null,
+   "source": null,
+   "via": null,
+   "fallback": null,
+   "overlays": [],
+   "prop": null,
+   "missing": [
+    "no human wardrobe (creature art unchanged)"
+   ]
+  },
+  {
+   "id": "mon:troll:59",
+   "kind": "mon",
+   "gameRole": "troll",
+   "region": null,
+   "role": null,
+   "rank": null,
+   "body": null,
+   "source": null,
+   "via": null,
+   "fallback": null,
+   "overlays": [],
+   "prop": null,
+   "missing": [
+    "no human wardrobe (creature art unchanged)"
+   ]
+  },
+  {
+   "id": "mon:ettin:60",
+   "kind": "mon",
+   "gameRole": "ettin",
+   "region": null,
+   "role": null,
+   "rank": null,
+   "body": null,
+   "source": null,
+   "via": null,
+   "fallback": null,
+   "overlays": [],
+   "prop": null,
+   "missing": [
+    "no human wardrobe (creature art unchanged)"
+   ]
+  },
+  {
+   "id": "mon:harpy:61",
+   "kind": "mon",
+   "gameRole": "harpy",
+   "region": null,
+   "role": null,
+   "rank": null,
+   "body": null,
+   "source": null,
+   "via": null,
+   "fallback": null,
+   "overlays": [],
+   "prop": null,
+   "missing": [
+    "no human wardrobe (creature art unchanged)"
+   ]
+  },
+  {
+   "id": "mon:orc:63",
+   "kind": "mon",
+   "gameRole": "orc",
+   "region": null,
+   "role": null,
+   "rank": null,
+   "body": null,
+   "source": null,
+   "via": null,
+   "fallback": null,
+   "overlays": [],
+   "prop": null,
+   "missing": [
+    "no human wardrobe (creature art unchanged)"
+   ]
+  },
+  {
+   "id": "mon:lizardman:65",
+   "kind": "mon",
+   "gameRole": "lizardman",
+   "region": null,
+   "role": null,
+   "rank": null,
+   "body": null,
+   "source": null,
+   "via": null,
+   "fallback": null,
+   "overlays": [],
+   "prop": null,
+   "missing": [
+    "no human wardrobe (creature art unchanged)"
+   ]
+  },
+  {
+   "id": "mon:slime:67",
+   "kind": "mon",
+   "gameRole": "slime",
+   "region": null,
+   "role": null,
+   "rank": null,
+   "body": null,
+   "source": null,
+   "via": null,
+   "fallback": null,
+   "overlays": [],
+   "prop": null,
+   "missing": [
+    "no human wardrobe (creature art unchanged)"
+   ]
+  },
+  {
+   "id": "mon:earth_elemental:70",
+   "kind": "mon",
+   "gameRole": "earth_elemental",
+   "region": null,
+   "role": null,
+   "rank": null,
+   "body": null,
+   "source": null,
+   "via": null,
+   "fallback": null,
+   "overlays": [],
+   "prop": null,
+   "missing": [
+    "no human wardrobe (creature art unchanged)"
+   ]
+  },
+  {
+   "id": "mon:gargoyle:71",
+   "kind": "mon",
+   "gameRole": "gargoyle",
+   "region": null,
+   "role": null,
+   "rank": null,
+   "body": null,
+   "source": null,
+   "via": null,
+   "fallback": null,
+   "overlays": [],
+   "prop": null,
+   "missing": [
+    "no human wardrobe (creature art unchanged)"
+   ]
+  },
+  {
+   "id": "mon:deer:72",
+   "kind": "mon",
+   "gameRole": "deer",
+   "region": null,
+   "role": null,
+   "rank": null,
+   "body": null,
+   "source": null,
+   "via": null,
+   "fallback": null,
+   "overlays": [],
+   "prop": null,
+   "missing": [
+    "no human wardrobe (creature art unchanged)"
+   ]
+  },
+  {
+   "id": "mon:hare:75",
+   "kind": "mon",
+   "gameRole": "hare",
+   "region": null,
+   "role": null,
+   "rank": null,
+   "body": null,
+   "source": null,
+   "via": null,
+   "fallback": null,
+   "overlays": [],
+   "prop": null,
+   "missing": [
+    "no human wardrobe (creature art unchanged)"
+   ]
+  },
+  {
+   "id": "mon:bear:92",
+   "kind": "mon",
+   "gameRole": "bear",
+   "region": null,
+   "role": null,
+   "rank": null,
+   "body": null,
+   "source": null,
+   "via": null,
+   "fallback": null,
+   "overlays": [],
+   "prop": null,
+   "missing": [
+    "no human wardrobe (creature art unchanged)"
+   ]
+  },
+  {
+   "id": "npc:wren",
+   "kind": "ally",
+   "gameRole": "",
+   "region": "saltmarsh",
+   "role": "hireling",
+   "rank": null,
+   "body": "female",
+   "source": "equip",
+   "via": "actor:npc:wren",
+   "fallback": false,
+   "overlays": [],
+   "prop": null,
+   "missing": []
+  },
+  {
+   "id": "player:p1",
+   "kind": "player",
+   "gameRole": "",
+   "region": "saltmarsh",
+   "role": "player",
+   "rank": null,
+   "body": "male",
+   "source": "equip",
+   "via": "player",
+   "fallback": false,
+   "overlays": [],
+   "prop": null,
+   "missing": []
+  }
+ ]
+}

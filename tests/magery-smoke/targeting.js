@@ -14,7 +14,7 @@
   // scroll: learn none; read a scroll, interrupt, check ledger, retry
   step(.5); SF.addItem(P.pack, SF.newItem('scroll.12', 1)); const m0 = P.mana; S.castSlot('magery.12', { scroll: true }); const during = { scroll: SF.count(P.pack, 'scroll.12'), mana: P.mana };
   S.damagePlayer(1, null, 'phys'); out.scrollInterrupt = { during, after: { scroll: SF.count(P.pack, 'scroll.12'), manaLost: Math.round((m0 - P.mana) * 100) / 100 } };
-  step(.5); P.skills.spellcraft.v = 400; S.castSlot('magery.12', { scroll: true }); step(.8); out.scrollHeld = P.held && P.held.sp.id; out.scrollLeft = SF.count(P.pack, 'scroll.12');
+  step(.5); P.skills.magery.v = 400; S.castSlot('magery.12', { scroll: true }); step(.8); out.scrollHeld = P.held && P.held.sp.id; out.scrollLeft = SF.count(P.pack, 'scroll.12');
   out.unknownCast = (S.castSlot('magery.30'), S.LOG.slice(-1)[0].t);
   return out;
 })()

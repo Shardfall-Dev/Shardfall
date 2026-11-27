@@ -2,6 +2,7 @@
 # usage: python3 tests/backpack-smoke/run.py Shardfall_vX.html [/path/to/chrome]
 # Creates a character, fills the pack, saves, reloads and continues the saved character,
 # then checks the three sorts, desktop hover stats, phone tap-to-inspect and item actions after sorting.
+# v0.29: the inline card became the item popup (#ipop) and the per-tile tooltip the shared delayed tooltip (#itip).
 import sys, os, json
 from playwright.sync_api import sync_playwright
 
@@ -12,15 +13,15 @@ def check(ok, msg, got=None):
     print(('ok   ' if ok else 'FAIL ') + msg + ('' if ok or got is None else f'  (got {got!r})'))
     if not ok: fails.append(msg)
 
-FILL = """() => { const S = __SF, P = S.P, SF = S.SF; P.pack.items.length = 0;
+FILL = """() => { const S = __SF, P = S.P, SF = S.SF; P.pack.items.length = 0; P.base.str = P.str = 60;   // fixture: strong enough for the sword and the chain tunic (v0.30 templates start at 65 points)
   for (const [id, q] of [['sword',1],['chain_tunic',1],['bandage',5],['draught',3],['cookedmeat',2],['reedash',12],['pine',4],['gold',40]]) SF.addItem(P.pack, SF.newItem(id, q));
   S.save(); }"""
 NAMES = "() => [...document.querySelectorAll('#panel .bagcell small')].map(e => e.textContent)"
 GROUPS = "() => [...document.querySelectorAll('#panel .baggroup')].map(e => e.textContent)"
-CARD = "() => { const c = document.querySelector('#panel .bagcard'); return c && { title: c.querySelector('span').textContent, acts: [...c.querySelectorAll('button')].map(b => b.textContent) }; }"
+CARD = "() => { const c = document.querySelector('#ipop'); return c && !c.hidden ? { title: c.querySelector('.tiptitle').textContent, acts: [...c.querySelectorAll('.acts button')].map(b => b.textContent) } : null; }"
 cell = lambda name: f'#panel .bagcell:has(small:text-is("{name}"))'
 sortb = lambda s: f'#panel [data-a=bagsort][data-s="{s}"]'
-cardbtn = lambda label: f'#panel .bagcard button:text-is("{label}")'
+cardbtn = lambda label: f'#ipop .acts button:text-is("{label}")'
 pack = lambda pg: pg.evaluate("() => Object.fromEntries(__SF.P.pack.items.map(i => [i.id, i.qty]))")
 
 SAVE = {}
@@ -31,7 +32,8 @@ def start(pg, errs, fresh):
         pg.evaluate("s => { localStorage.clear(); localStorage.setItem('shardfall.save.v1', s); }", SAVE['raw']); pg.reload(); pg.wait_for_timeout(600)
     if fresh:
         pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_timeout(600)
-        pg.click('[data-c=prof][data-p="Group healer"]'); pg.fill('#ccn', 'Tess'); pg.click('[data-c=go]'); pg.wait_for_timeout(1000)
+        pg.evaluate("o => __CC.quick(o)", {'name': 'Tess', 'template': 'mage'}); pg.wait_for_timeout(1000)
+        pg.evaluate("__SF.P.str = 60; if (__SF.P.base) __SF.P.base.str = 60; __SF.save()")   # v0.30 healers start at STR 20; the sword and chain tunic below want more
         pg.evaluate(FILL); pg.reload(); pg.wait_for_timeout(600)
     pg.click('[data-c=cont]'); pg.wait_for_timeout(900)
 
@@ -58,13 +60,13 @@ with sync_playwright() as p:
     check(qt == sorted(qt, reverse=True) and qt[0] == 40, 'Quantity sort: largest stacks first', qt)
     check(pg.get_attribute(sortb('Quantity'), 'class').split()[-1] == 'on', 'active sort button is highlighted')
     # hover stats
-    tipvis = lambda name: pg.eval_on_selector(cell(name) + ' .bagtip', 'e => getComputedStyle(e).display')
-    check(tipvis('Iron Quay sword') == 'none', 'tooltip hidden before hover')
-    pg.hover(cell('Iron Quay sword')); pg.wait_for_timeout(100)
-    tip = pg.inner_text(cell('Iron Quay sword') + ' .bagtip')
-    check(tipvis('Iron Quay sword') == 'block' and 'Damage' in tip and 'Speed' in tip and 'Weight' in tip, 'desktop hover shows weapon stats (damage, speed, weight units)', tip)
-    pg.hover(cell('Iron chainmail tunic')); pg.wait_for_timeout(100)
-    check('Armor protection' in pg.inner_text(cell('Iron chainmail tunic') + ' .bagtip') and 'Chainmail' in pg.inner_text(cell('Iron chainmail tunic') + ' .bagtip') and tipvis('Iron Quay sword') == 'none', 'hover moves to armor stats')
+    tipvis = lambda: pg.evaluate("() => !document.querySelector('#itip').hidden")
+    check(not tipvis(), 'tooltip hidden before hover')
+    pg.hover(cell('Iron Quay sword')); pg.wait_for_timeout(420)
+    tip = pg.inner_text('#itip')
+    check(tipvis() and 'Damage' in tip and 'Speed' in tip and 'Weight' in tip, 'desktop hover shows weapon stats (damage, speed, weight units)', tip)
+    pg.hover(cell('Iron chainmail tunic')); pg.wait_for_timeout(420)
+    check('Armor protection' in pg.inner_text('#itip') and 'Chainmail' in pg.inner_text('#itip') and 'Iron Quay sword' not in pg.inner_text('#itip'), 'hover moves to armor stats')
     pg.mouse.move(5, 5)
     # actions after sorting (Quantity sort still active)
     pg.click(cell('Healing draught')); pg.wait_for_timeout(100)
@@ -82,8 +84,8 @@ with sync_playwright() as p:
     pg.click(cell('Bandage')); pg.click(cardbtn('Slot')); pg.wait_for_timeout(100)
     check(pg.evaluate("__SF.PANEL") == 'assign' and 'Bandage' in pg.inner_text('#panel'), 'Slot opens hotbar assignment for the bandage')
     pg.evaluate("__SF.ACT.bag()"); pg.wait_for_timeout(100)
-    pg.click(cell('Iron chainmail tunic')); pg.click(cardbtn('Appraise')); pg.wait_for_timeout(100)
-    check(not errs, 'Appraise runs without errors', errs)
+    pg.click(cell('Iron chainmail tunic')); pg.click(cardbtn('Identify')); pg.wait_for_timeout(100)
+    check(not errs, 'Identify (Item Identification) runs without errors', errs)
     pg.evaluate("__SF.ACT.bag()"); pg.click(cell('Roast meat')); pg.click(cell('Roast meat')); pg.wait_for_timeout(100)
     check(pg.evaluate(CARD) is None, 'clicking the selected tile again closes the card')
     pg.evaluate("__SF.save()"); SAVE['raw'] = pg.evaluate("localStorage.getItem('shardfall.save.v1')")
@@ -98,20 +100,23 @@ with sync_playwright() as p:
     pg.tap(cell('Iron chainmail tunic')); pg.wait_for_timeout(150)
     card = pg.evaluate(CARD)
     check(card and card['title'] == 'Iron chainmail tunic' and 'Equip' in card['acts'], 'tap pins armor card', card)
-    check(pg.eval_on_selector(cell('Iron chainmail tunic') + ' .bagtip', 'e => getComputedStyle(e).display') == 'none', 'no floating tooltip on phone tap')
-    box = pg.eval_on_selector('#panel .bagcard', 'e => { const r = e.getBoundingClientRect(); return [r.left, r.right, r.width]; }')
+    check(pg.evaluate("document.querySelector('#itip').hidden"), 'no floating tooltip on phone tap')
+    box = pg.eval_on_selector('#ipop', 'e => { const r = e.getBoundingClientRect(); return [r.left, r.right, r.width]; }')
     check(box[0] >= 0 and box[1] <= 844, 'card fits phone width', box)
     tiles = pg.eval_on_selector_all('#panel .bagcell', 'es => es.map(e => Math.round(e.getBoundingClientRect().height))')
     check(min(tiles) >= 44, 'tiles are at least 44 px tall', tiles)
     pg.screenshot(path='/tmp/backpack-phone.png')
+    pg.tap('#ipop .ipx'); pg.wait_for_timeout(100)   # v0.29: the popup may cover the sort bar on a small phone; its × closes it
+    check(pg.evaluate(CARD) is None, 'the popup × closes it')
     pg.tap(sortb('Quantity')); pg.wait_for_timeout(100)
-    check(pg.evaluate(CARD)['title'] == 'Iron chainmail tunic', 'selection survives re-sorting')
+    pg.tap(cell('Iron chainmail tunic')); pg.wait_for_timeout(100)
+    check(pg.evaluate(CARD)['title'] == 'Iron chainmail tunic', 'after re-sorting the tile opens its own popup')
     pg.tap(cardbtn('Equip')); pg.wait_for_timeout(100)
     check(pg.evaluate("__SF.P.equip.chest && __SF.P.equip.chest.id") == 'chain_tunic', 'tap Equip after sort equips the armor')
     pg.tap(cell('Bandage')); pg.wait_for_timeout(100); pg.evaluate("__SF.P.hp = 5"); pg.tap(cardbtn('Bandage self')); pg.wait_for_timeout(300)
     check(not errs, 'tap Bandage self on bandage runs without errors', errs)
-    pg.tap(cell('Gold')); pg.wait_for_timeout(100); pg.tap(cell('Gold')); pg.wait_for_timeout(100)
-    check(pg.evaluate(CARD) is None, 'tapping the selected tile again closes the card')
+    pg.tap(cell('Gold')); pg.wait_for_timeout(100); pg.tap('#ipop .ipx'); pg.wait_for_timeout(100)
+    check(pg.evaluate(CARD) is None, 'the × closes the popup')
     pg.evaluate("__SF.save()"); SAVE['raw'] = pg.evaluate("localStorage.getItem('shardfall.save.v1')")
     check(not errs, 'no page errors on phone', errs); ctx.close()
 

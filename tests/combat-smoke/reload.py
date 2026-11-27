@@ -6,7 +6,12 @@ new = os.path.abspath(sys.argv[1]); chrome = sys.argv[2] if len(sys.argv) > 2 el
 old = sys.argv[3] if len(sys.argv) > 3 else None
 if not old:
   old = os.path.join(tempfile.mkdtemp(), 'Shardfall_v0.16.html'); repo = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-  open(old, 'wb').write(subprocess.run(['git', '-C', repo, 'show', 'main:Shardfall_v0.16.html'], capture_output=True, check=True).stdout)
+  # the v0.16 build is no longer on main: take it from its own commit (70c5d60, "Add a Cancel-cast button ... (v0.16)")
+  for ref in ['70c5d60336a9a341b3350ef416d0e77dfec4c78c', 'main']:
+    got = subprocess.run(['git', '-C', repo, 'show', ref + ':Shardfall_v0.16.html'], capture_output=True)
+    if got.returncode == 0: break
+  else: raise SystemExit('Shardfall_v0.16.html not found in git: git fetch --depth=1 origin 70c5d60336a9a341b3350ef416d0e77dfec4c78c')
+  open(old, 'wb').write(got.stdout)
 errs = []; bad = []; out = {}
 def check(cond, msg):
   if not cond: bad.append(msg)
@@ -17,7 +22,7 @@ with sync_playwright() as p:
     page.goto('file://' + path); page.wait_for_timeout(700); page.click('[data-c=cont]'); page.wait_for_timeout(900)
   # ---- reload during treatment
   pg.goto('file://' + new); pg.wait_for_timeout(500); pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_timeout(500)
-  pg.click('[data-c=prof][data-p="Glaive hybrid"]'); pg.fill('#ccn', 'Rel'); pg.click('[data-c=go]'); pg.wait_for_timeout(900)
+  pg.evaluate("o => __CC.quick(o)", {'name': 'Rel', 'template': 'swordsman'}); pg.wait_for_timeout(900); pg.evaluate(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'legacy-profile.js')).read())
   r1 = pg.evaluate("""() => { const S = __SF, P = S.P; P.skills.healing.v = 1000; P.skills.anatomy.v = 1000; P.hp = 20; S.setRng(() => 0); S.useSlot(0); for (let i = 0; i < 100; i++) S.update(.05); S.save();
     return { left: P.bandage.t1 - S.GT, bandages: S.SF.count(P.pack, 'bandage'), id: P.bandage.id }; }""")
   cont(pg, new)
@@ -37,7 +42,7 @@ with sync_playwright() as p:
   check(r4['pid'] and r5['linked'] and r5['kind'] == 'heal' and r5['healed'], 'a treatment on Wren survives a reload and finishes on Wren')
   # ---- a real v0.16 save migrates once
   pg.goto('file://' + old); pg.wait_for_timeout(600); pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_timeout(600)
-  pg.click('[data-c=prof][data-p="Glaive hybrid"]'); pg.fill('#ccn', 'Oldie'); pg.click('[data-c=go]'); pg.wait_for_timeout(900)
+  pg.click('[data-c=prof][data-p="Glaive hybrid"]'); pg.fill('#ccn', 'Oldie'); pg.click('[data-c=go]'); pg.wait_for_timeout(900)   # the v0.16 build has its own one-page creator
   o1 = pg.evaluate("""() => { const S = __SF, P = S.P, SF = S.SF; P.skills.blades.v = 300; P.skills.shieldwork.v = 250; P.skills.shieldwork.lock = 'lower'; P.skills.medicine.v = 333; P.skills.brawling.v = 120; P.skills.knives.lock = 'hold'; P.skills.hammers.v = 44;
     P.equip.weapon.quality = 'exceptional'; P.equip.weapon.maker = 'Oldie'; P.equip.weapon.cond = 77; P.equip.armor = SF.newItem('chain', 1, { cond: 90, maxc: 100 });
     P.hotbar = [{ k: 'item', id: 'bandage' }, { k: 'spell', id: 'magery.05' }, { k: 'act', id: 'brace' }, { k: 'item', id: 'draught' }, null, { k: 'act', id: 'track' }, null, null, null]; S.save();

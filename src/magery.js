@@ -2,7 +2,7 @@
 /* Shardfall Magery module — the 64 spells of the Eight Circles. Pure, renderer-free, network-free.
    Extends the rules module (SF) with SF.MAGERY. Brief: docs/magery/Magery_Brief.txt. Book: docs/magery/Spellbook.md.
    SPELL_DATA below is docs/magery/spells.json verbatim (tests/magery.test.js checks they match).
-   Symbols: M = Spellcraft, E = Spell Focus, R = recipient's Wardcraft, all 0–100. C = circle 1..8. */
+   Symbols: M = Magery, E = Evaluating Intelligence, R = recipient's Resisting Spells, all 0–100. C = circle 1..8. */
 (function (root) {
 'use strict';
 const SF = root.SF; if (!SF) throw new Error('magery.js needs the rules module (SF) first');
@@ -142,7 +142,7 @@ MG.MIGRATION = 1;
 // c: saved character. Idempotent: a second run changes nothing. Returns { changed, book }.
 MG.migrateChar = (c, legacySpells) => {
   if (c.magery && c.magery.mig >= MG.MIGRATION) return { changed: false };
-  const sc = c.skills && c.skills.spellcraft ? c.skills.spellcraft.v / 10 : 0;
+  const sc = c.skills ? ((c.skills.magery || c.skills.spellcraft || {}).v || 0) / 10 : 0   /* spellcraft: a save not yet moved to the v0.30 registry */;
   const book = new Set();
   if (sc > 0) { for (const s of MG.STARTER) book.add(s); for (const [old, nu] of Object.entries(MG.LEGACY_MAP)) { const L = legacySpells && legacySpells[old]; if (!L || sc >= L.min) book.add(nu); } }
   for (const h of c.hotbar || []) if (h && h.k === 'spell' && MG.LEGACY_MAP[h.id]) book.add(MG.LEGACY_MAP[h.id]);

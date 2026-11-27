@@ -4,18 +4,23 @@ A T2A-era Ultima Online-style 2.5D isometric sandbox RPG for phones, built as a 
 
 ## Play
 
-**Online:** every merge to `main` publishes the newest build on GitHub Pages (`.github/workflows/pages.yml`; one-time setup: Settings → Pages → Source: GitHub Actions. Pages on a private repository needs a paid GitHub plan, and the site itself is public): `https://shardfall-dev.github.io/Shardfall/`. On iPhone, Share → Add to Home Screen gives it an app icon.
+**Online:** every merge to `main` runs all checks (`.github/workflows/ci.yml`) and, if they pass, publishes the newest build on GitHub Pages (`.github/workflows/pages.yml`): `https://shardfall-dev.github.io/Shardfall/`. The repository is public and Pages is enabled (source: GitHub Actions). On iPhone, Share → Add to Home Screen gives it an app icon.
 
-**On your computer:** run `python3 -m http.server` in this folder and open `http://localhost:8000/Shardfall_v0.28.1.html`. The game loads its sound and music from `assets/audio/web/`, so it needs to be served like this; opened straight from disk it plays silently. For a single file that plays from disk with sound effects, build `./build.sh 0.28.1 --offline`.
+**On your computer:** run `python3 -m http.server` in this folder and open `http://localhost:8000/Shardfall_v0.33.html`. The game loads its sound and music from `assets/audio/web/`, so it needs to be served like this; opened straight from disk it plays silently. For a single file that plays from disk with sound effects, build `./build.sh 0.33 --offline`.
 
-**Developer panel:** add `?dev` to the address (for example `http://localhost:8000/Shardfall_v0.28.1.html?dev`) and press the small DEV button. It shows the world's live numbers (creatures by faction, regions, camps and what the ecosystem has been doing), lets you set the time, pause or fast-forward the simulation, send test travellers anywhere and inspect any actor you tap (a creature shows its faction, activity, what it decided and why, its senses, pack, camp and sound). Without `?dev` it does not exist.
+**Developer panel:** add `?dev` to the address (for example `http://localhost:8000/Shardfall_v0.33.html?dev`) and press the small DEV button. It shows the world's live numbers (creatures by faction, regions, camps and what the ecosystem has been doing), lets you set the time, pause or fast-forward the simulation, send test travellers anywhere and inspect any actor you tap (a creature shows its faction, activity, what it decided and why, its senses, pack, camp and sound). Without `?dev` it does not exist.
 
-Progress saves to the browser's local storage.
+
+Progress saves to the browser's local storage. If a save cannot be read, the start screen says why and offers to restore the last good save, export the save or delete it; nothing is overwritten silently (copies: `shardfall.save.v1.lastgood`, `.replaced`, `.damaged`). Open the game in one tab at a time: a second tab takes over saving.
 
 ## Layout
 
 - `src/head.html` — page markup and CSS (HUD, panels).
-- `src/rules.js` — the pure rules module (`SF`): items, skills, recipes, materials, crafting and repair math, and the Second Age combat and First Aid rules. No DOM.
+- `src/rules.js` — the pure rules module (`SF`): items, the 49-skill registry (`SF.SKILL_DEFS`), recipes, materials, crafting and repair math, and the Second Age combat and First Aid rules. No DOM.
+- `src/skills.js` — the skill engine (`SF.SK`): the v8 skill migration, skill checks and gains, real and displayed values, stat gains, creation rules, trainers, every skill's rules (Meditation, Stealth, taming, bard songs, stealing, poisoning, locks and traps, the ten added skills), the content that gives each skill a road to 100.0, and `SK.routes` that proves it. No DOM.
+- `src/wardrobe.js` — NPC wardrobe and faction appearance (`SF.WARDROBE`, pure, deterministic): regional guard uniforms by rank, civilian roles and palettes, activity states, hostile human variants. `src/gear-render.js` draws what it chooses.
+- `src/stats.js` — attribute locks (`SF.STATS`): raise / hold / lower per stat, the lock command, save repair and tooltips. The gains themselves are in `src/skills.js` (`SK.statGain`), which honours the locks. No DOM.
+- `src/creation.js` — the character creation rules (`SF.CREATION`): the shared validator (`validate`, used by the creator, boot and a future server), appearance allowlists, the twelve starting templates, the five starting towns, the skill-driven starter kit and the save conversion of appearances. No DOM.
 - `src/equipment.js` — the equipment rules module (`SF.EQ`): 18 equipment slots, armor families and pieces, material variants (metals, hides, cloth, bone, dragon scale), body-region armor, weight units and carrying capacity, encumbrance, effective attributes, durability and repair risk, the validated item commands (`equipItem`, `unequipItem`, `moveItem`, `dropItem`, `pickupItem`, `splitStack`, `mergeStacks`, `craftItem`, `repairItem`), appearance data and the v0.24 → v0.25 save conversion. No DOM.
 - `src/magery.js` — the Magery rules module (`SF.MAGERY`): the 64 spells (data from `docs/magery/spells.json`), success, resistance, damage, statuses, save migration. No DOM.
 - `src/audio.js` — the Web Audio player for the sound pack (`SFXA`).
@@ -24,7 +29,8 @@ Progress saves to the browser's local storage.
 - `assets/music/v1.0.0/` — the Saltmarsh soundtrack: five MIDI sources, MP3 renders and `soundtrack.json`.
 - `src/assets.js` — embedded sprite sheets and art (data URIs; large, not meant for hand-editing).
 - `src/magery-art.js` — the 64 spell signs as one embedded atlas.
-- `src/bestiary-art.js` — the 11 bestiary v1 sheets and their manifest, embedded (generated: `python3 tools/embed_bestiary.py` reads `assets/bestiary/Shardfall_Bestiary_v1.0.0.zip`).
+- `src/bestiary-art.js` — the 17 bestiary sheets and one merged manifest, embedded (generated: `python3 tools/embed_bestiary.py` merges `assets/bestiary/Shardfall_Bestiary_v1.0.0.zip` (11 sheets) and `assets/bestiary/v1.1.0/` (6 sheets, draft01); it rejects duplicate creature ids, wrong sizes, missing alpha and empty cells).
+- `assets/bestiary/v1.1.0/` — bestiary v1.1.0 draft01: boar, marsh hound, mud snapper, mire spider, red deer and brown hare, with `manifest.json`, `validation.json` and `README.txt`; extracted from `assets/bestiary/Shardfall_Bestiary_v1.1.0_draft01.zip`.
 - `src/magic.js` — casting in the world: prepare → hold → release, targets, effects, fields, runes, summons, spellbook panel, hotbar signs.
 - `src/backpack-icons.js` — backpack icon atlas v1.0.1 and its id → rect map, embedded (generated: `python3 tools/embed_backpack_icons.py` reads `assets/backpack-icons/v1.0.0/Shardfall_Backpack_Icons_v1.0.0.zip` and adds the seven PNGs in `assets/backpack-icons/v1.0.1/icons_64/`; the extension step needs Pillow).
 - `src/anniabreen.js` — Anniabreen v1.0: the mainland, Vespar's river islands, Skara Bryn and Moonglen; towns, roads, the Mynoc mine, landmark art, ferries, boats, the public moongates and their map symbols. Since v0.23 it is drawn in its original frame and then stretched (`annStretch`: towns move whole, the wilds between them grow ×1.35; `annWarp` / `annUnwarp` convert).
@@ -33,34 +39,215 @@ Progress saves to the browser's local storage.
 - `src/living.js` — the Living World runtime in the game: the 50 ms step loop and interpolation, light and local lights, walkability, the travel graph from roads, piers, gates and stairs, the navigator (doors, stuck recovery) and the developer panel (`?dev`).
 - `src/ecology.js` — the monster ecosystem (Living World phase 3): species profiles as data, factions, perception, decisions, roaming, packs, predator and prey, creature-against-creature fights, camp sorties, regional populations and persistent camps, graveyards that rise at night, creature sound, and the new procedural wildlife (deer, hares, bears).
 - `src/townlife.js` — town life (Living World phase 4): homes, workplaces and daily schedules for Vespar and Mynoc, residents, resource workers gathering real ore, wood and fish, guard patrols and the night watch, the travelling merchant on the cart road, shop hours, fear of creatures and resuming the day after a load.
+- `src/npcfight.js` — NPC combat (Living World phase 5, step 1): fighting profiles for townsfolk and guards, creatures targeting townsfolk outside protected ground, guards leaving their patrol to fight creatures in their jurisdiction, knock-downs and getting up, the NPC combat counters.
 - `src/game.js` — the game: world generation, rendering, input, NPCs, quests, crafting UI, save/load, and the one physical-combat resolver every swing goes through.
+- `src/creation-ui.js` — the title screen and the four-step character creator (identity and appearance, profession, stats and skills, town and review) with the live portrait and world-sprite preview; it starts the game loop.
 - `src/equipment-ui.js` — the equipment UI: paper doll window, backpack (search, sorts, filters, split and merge, virtualized grid), item tooltips with comparison, drag and drop, context menu, the Armor crafting category.
+- `src/hud-ui.js` — the HUD UI (v0.29): the delayed item tooltip, the item information popup with actions and drop confirmation, one popup manager (Escape order, outside taps never reach the world) and the compact target frame with its retention rules (`TARGET_RETAIN`).
 - `src/tail.html` — closes the game script block and the page.
-- `build.sh` — joins the parts into the game: `./build.sh 0.28.1` → `Shardfall_v0.28.1.html` (web build, 7.1 MB); `./build.sh 0.28.1 --offline` → `Shardfall_v0.28.1_offline.html` (22 MB, every sound inside, not committed). Needs `python3`.
-- `Shardfall_v0.28.1.html` — the current built game.
+- `build.sh` — joins the parts into the game: `./build.sh 0.33` → `Shardfall_v0.33.html` (web build, about 11 MB); `./build.sh 0.33 --offline` → `Shardfall_v0.33_offline.html` (22 MB, every sound inside, not committed). Needs `python3`.
+- `Shardfall_v0.33.html` — the current built game.
+- `src/gear.js` — equipment appearance (`SF.GEAR`, pure, no DOM): one description of what a character looks like in its equipment, shared by the paper doll, the world sprite, NPCs and corpses: each piece's material channels (metal, wood, hide, cloth) from `SF.matOf` and `EQ.matColor`, stud metal, blade and handle, the occlusion rules (helmets and hair, two-handed weapons and the off hand), a stable appearance key, corpse snapshots, NPC presets and the clip → rig animation map.
+- `src/human-rig.js` — the layered human rig (`HUMAN_RIG`, pure): the classic-humans-v2 body with the layered-armor-v1 armor painter, 112×100 cells, 8 directions, 29 animations, both bodies; builds draw lists that `src/gear-render.js` paints.
+- `src/equipment-art.js` — Medieval Equipment Art v1 pieces and material masks, embedded (generated: `python3 tools/embed_equipment_art.py > src/equipment-art.js` reads `asset-packs/medieval-equipment-art-v1/Shardfall_Medieval_Equipment_Art_v1.zip`; needs Pillow).
+- `src/gear-render.js` — the layered equipment renderer: the fitted paper doll with the painted pieces, per-channel recolouring through the masks, world strips from the rig, NPCs, corpses, caches, and the "New art" switch (off by default; `?gear=new` / `?gear=old`).
+- `src/painted-art.js` — Painted Human Candidates v0.1, accepted cells only (generated: `python3 tools/painted_candidates.py --embed`; `--check` verifies it, `qa.json` and `missing.json` are current).
+- `src/painted.js` — `SF.PAINTED` (pure): which human, state and direction has a validated painted frame. `src/painted-render.js` draws it before the layered renderer, developer flag only.
+- `assets/humans/painted-candidates-v0.1/` — `review.json` (manual QA verdicts), `qa.json` (every frame, metrics, accepted/rejected and why), `missing.json` (art still needed). `docs/humans/PAINTED_CANDIDATES.md` explains them.
+- `docs/art/SPRITES_PAPERDOLL_EQUIPMENT_GAPS.md` — what art is still missing for world sprites, the paper doll, icons and NPC outfits, in priority order.
+- `docs/archive/superseded-renderers/` — docs, manifests and screenshots from the renderers v0.33 did not keep (#35, #36, #37, #39's rig, #40).
+- `docs/equipment/RENDERING.md` — how equipment is drawn, the material channels, occlusion, caches, the review flag and the art still missing.
 - `.github/workflows/pages.yml` — publishes the newest build to GitHub Pages as `index.html`, with the audio beside it.
 - `docs/WORLD_SIMULATION_MASTER.md` — the Living World master roadmap (the full specification). `docs/WORLD_SIMULATION_PROGRESS.md` — what is built, phase by phase, the audit matrix, asset gaps and the next task.
+- `docs/design/character-creation-v2.md` — the creation spec; `docs/design/character-creation-v2-status.md` — what v0.30 built, the decisions where the stat and skill designs disagreed, tuning, tests and the missing character art (`assets/character/missing-character-art.json`).
 - `docs/Shardfall_Audio.md` — what plays when, the audio pipeline and sound-release versioning.
 - `docs/Shardfall_Crafting_Guide.md` — the crafting design guide the build follows.
 - `docs/equipment/STATUS.md` — equipment, paper doll, inventory and armor: the model, slots, families, materials, weight, UI, save conversion, approximations.
 - `assets/equipment-icons/missing-icons.json` — the 67 icons the equipment pieces and new materials still need (ids, file names, 64×64, descriptions).
+- `docs/skills/T2A_SKILL_PARITY_v1.md` — the skill audit and brief. `docs/skills/STATUS.md` — all 49 skills: state, mechanics, road to 100.0, deviations, migration, tests, gaps.
 - `docs/combat/STATUS.md` — combat and First Aid: the rules, the weapon table, the save migration, sources and every approximation.
 - `docs/magery/` — the Magery kit: brief (`Magery_Brief.txt`), illustrated book (`Shardfall_Spellbook.html`, `Spellbook.md`), `spells.json`, reference math, and `STATUS.md` (what is in, what differs, what is left).
-- `tests/rules.test.js` — deterministic rules tests: `node tests/rules.test.js Shardfall_v0.28.1.html`
-- `tests/equipment.test.js` — equipment rules tests (slots, layering, carrying capacity, Mithril, exceptional, two-handed, requirements, encumbrance, crafting variants, durability, repair risk, atomic rollback, split/merge, death, migration): `node tests/equipment.test.js Shardfall_v0.28.1.html`
-- `tests/equipment-smoke/run.py` — paper doll in Chrome (C key, double-click, mouse and touch drag, drop validation, two-handed, context menu, tooltips and comparison, search/sort/filter, split/merge, 600 stacks, encumbrance and recovery, region mitigation, broken armor, meditation, window drag, Armor crafting, vendors, save/reload, v6 → v7 migration, phone): `python3 tests/equipment-smoke/run.py Shardfall_v0.28.1.html`
-- `tests/magery.test.js` — Magery rules tests: `node tests/magery.test.js Shardfall_v0.28.1.html`
-- `tests/combat.test.js` — combat and First Aid rules tests: `node tests/combat.test.js Shardfall_v0.28.1.html`
-- `tests/magery-smoke/run.py` — in-browser Magery scenarios (Playwright + Chrome): `python3 tests/magery-smoke/run.py Shardfall_v0.28.1.html`
-- `tests/combat-smoke/run.py` — in-browser combat, archery, First Aid, reload, old-save and phone play-test scenarios: `python3 tests/combat-smoke/run.py Shardfall_v0.28.1.html` (screenshots in `$COMBAT_SHOTS`, default `/tmp/combat-shots`)
-- `tests/backpack-smoke/run.py` — in-browser backpack checks (saved character, three sorts, desktop hover, phone tap, actions after sorting): `python3 tests/backpack-smoke/run.py Shardfall_v0.28.1.html`
-- `tests/backpack-smoke/panels.py` — the seven v1.0.1 icons everywhere items are listed (backpack tile, tooltip and tap card, Character, vendor buy and sell, loot, bank, crafting rows and inputs), weapon profiles unchanged, the wick still lights the Shore Beacon; desktop and two landscape phones: `python3 tests/backpack-smoke/panels.py Shardfall_v0.28.1.html`
-- `tests/backpack-smoke/icons.py` — backpack icon checks (all 161 ids resolve, slot / tooltip / tap card use the same tile, stack counts readable after every sort, desktop and two landscape phones): `python3 tests/backpack-smoke/icons.py Shardfall_v0.28.1.html`
-- `tests/sfx-smoke/run.py` — browser checks for sound, music, doors and footsteps (Playwright + Chrome; serves the web build on a local port): `python3 tests/sfx-smoke/run.py "$PWD/Shardfall_v0.28.1.html"`
-- `tests/anniabreen-smoke/run.py` — Anniabreen walk-through (Playwright + Chrome): a scripted walker drives the joystick through the real update loop and times the routes; mine/smelt/bank, ferries, boats, moongates, doors, touch and mouse over a bridge, reload, save migration, phone map: `python3 tests/anniabreen-smoke/run.py Shardfall_v0.28.1.html [--shots DIR]`
-- `tests/bestiary-smoke/run.py` — bestiary checks in the built game (sheets load, pixel-exact cells, 8 facings, walk / wind-up / impact against the player; preview screenshots when the pack is extracted): `python3 tests/bestiary-smoke/run.py Shardfall_v0.28.1.html [chrome] [screenshot-dir]`
-- `tests/world.test.js` — world simulation core tests: `node tests/world.test.js Shardfall_v0.28.1.html`
-- `tests/world-smoke/run.py` — Living World checks in the built game: phase 1 (actor ids, controllers, shared damage, death once, bounded events, save/load identity, v4 → v5 migration, seeded determinism), then `phase2.py` (clock, light, travel graph, journeys by road, boat, moongate and stairs, doors, stuck recovery, search budget, live step rate, developer panel) and `expansion.py` (towns unchanged tile for tile, sites and camps, causeway and islands, long journeys, v0.22 → v0.23 save migration) and `phase3.py` (species profiles and factions, regional populations, predator and prey, creature-against-creature fights, timid wildlife, perception at night and in hiding, graveyards rising at night, persistent camps through a reload, packs, pursuit limits, camp patrols, the spatial index, and a seeded three-day run) and `phase4.py` (homes, workplaces and schedules, a full accelerated day, shop hours, miners on real rock faces, guard patrols and the night watch, the travelling merchant, fear of creatures, crowds spreading out, resuming the day after a reload): `python3 tests/world-smoke/run.py Shardfall_v0.28.1.html`
+- `tests/rules.test.js` — deterministic rules tests: `node tests/rules.test.js Shardfall_v0.33.html`
+- `tests/equipment.test.js` — equipment rules tests (slots, layering, carrying capacity, Mithril, exceptional, two-handed, requirements, encumbrance, crafting variants, durability, repair risk, atomic rollback, split/merge, death, migration): `node tests/equipment.test.js Shardfall_v0.33.html`
+- `tests/equipment-smoke/run.py` — paper doll in Chrome (C key, double-click, mouse and touch drag, drop validation, two-handed, context menu, tooltips and comparison, search/sort/filter, split/merge, 600 stacks, encumbrance and recovery, region mitigation, broken armor, meditation, window drag, Armor crafting, vendors, save/reload, v6 → v7 migration, phone): `python3 tests/equipment-smoke/run.py Shardfall_v0.33.html`
+- `tests/creation.test.js` — character creation rules (every template, budgets, duplicates and aliases, names, appearance, kits, towns): `node tests/creation.test.js Shardfall_v0.33.html`
+- `tests/stats.test.js` — attribute locks and the stat gains (raise / hold / lower, the 225 cap transfer from a Lower stat, the natural store): `node tests/stats.test.js Shardfall_v0.33.html`
+- `tests/creation-smoke/run.py` — the creator in Chrome on desktop and three phone sizes, every template and town, first fights, casting, mining and smithing, natural gains, Continue, Replace, old v7 saves: `python3 tests/creation-smoke/run.py Shardfall_v0.33.html`
+- `tests/magery.test.js` — Magery rules tests: `node tests/magery.test.js Shardfall_v0.33.html`
+- `tests/combat.test.js` — combat and First Aid rules tests: `node tests/combat.test.js Shardfall_v0.33.html`
+- `tests/magery-smoke/run.py` — in-browser Magery scenarios (Playwright + Chrome): `python3 tests/magery-smoke/run.py Shardfall_v0.33.html`
+- `tests/combat-smoke/run.py` — in-browser combat, archery, First Aid, reload, old-save and phone play-test scenarios: `python3 tests/combat-smoke/run.py Shardfall_v0.33.html` (screenshots in `$COMBAT_SHOTS`, default `/tmp/combat-shots`)
+- `tests/backpack-smoke/run.py` — in-browser backpack checks (saved character, three sorts, desktop hover, phone tap, actions after sorting): `python3 tests/backpack-smoke/run.py Shardfall_v0.33.html`
+- `tests/backpack-smoke/panels.py` — the seven v1.0.1 icons everywhere items are listed (backpack tile, tooltip and tap card, Character, vendor buy and sell, loot, bank, crafting rows and inputs), weapon profiles unchanged, the wick still lights the Shore Beacon; desktop and two landscape phones: `python3 tests/backpack-smoke/panels.py Shardfall_v0.33.html`
+- `tests/backpack-smoke/icons.py` — backpack icon checks (all 161 ids resolve, slot / tooltip / tap card use the same tile, stack counts readable after every sort, desktop and two landscape phones): `python3 tests/backpack-smoke/icons.py Shardfall_v0.33.html`
+- `tests/ui-smoke/run.py` — the v0.29 inventory and target-frame checks in Chrome (no grid movement or scroll jump at the bottom of a 300-stack pack, 300 ms tooltip on screen, popup lines and actions, compare, equip, split, drop confirmation, Escape and outside taps, rapid inspection, listener count; frame hidden by default, size and position, 44 px close, pass-through body, monster / NPC / deposit / tree / corpse / ally, retention with hysteresis, despawn, kill, removed resource, travel, closing during combat, no idle rebuilds, save and reload; two landscape phones): `python3 tests/ui-smoke/run.py Shardfall_v0.33.html [chrome] [screenshot-dir]`
+- `tests/sfx-smoke/run.py` — browser checks for sound, music, doors and footsteps (Playwright + Chrome; serves the web build on a local port): `python3 tests/sfx-smoke/run.py "$PWD/Shardfall_v0.33.html"`
+- `tests/anniabreen-smoke/run.py` — Anniabreen walk-through (Playwright + Chrome): a scripted walker drives the joystick through the real update loop and times the routes; mine/smelt/bank, ferries, boats, moongates, doors, touch and mouse over a bridge, reload, save migration, phone map: `python3 tests/anniabreen-smoke/run.py Shardfall_v0.33.html [--shots DIR]`
+- `tests/bestiary-smoke/run.py` — bestiary checks for all 17 sheets (geometry of every cell: alpha, no spill, feet on the pivot, real movement; sheets load and draw pixel-exact; 8 facings; walk / wind-up / impact / recover against the player; deer and hares fleeing and striking as pets; fallback to procedural art while a sheet decodes; a phone draw-cost check at 4x CPU slowdown; preview screenshots when the pack is extracted): `python3 tests/bestiary-smoke/run.py Shardfall_v0.33.html [chrome] [screenshot-dir]`
+- `tests/inventory.test.js` — inventory conservation regressions (quantities, same-container moves, staged drops, audit and repair of duplicates): `node tests/inventory.test.js Shardfall_v0.33.html`
+- `tests/stability-smoke/run.py` — save and reload in Chrome, phone and desktop: dropped piles, opened chests, spell preparation, poison, death, units conserved; damaged, truncated, future and broken saves, restore and export, two tabs, full storage: `python3 tests/stability-smoke/run.py Shardfall_v0.33.html`
+- `tests/check-build.py` — every script compiles, the committed build equals `./build.sh` output, audio, music and art manifests are complete: `python3 tests/check-build.py Shardfall_v0.33.html`
+- `tests/soak/run.py` — long-duration world simulation (default 3 game days, save and reload half way): step and draw times, heap, actors, path queue, logs, audio caches, errors and failed asset requests: `python3 tests/soak/run.py Shardfall_v0.33.html [--days 3]`
+- `tests/world.test.js` — world simulation core tests: `node tests/world.test.js Shardfall_v0.33.html`
+- `tests/world-smoke/run.py` — Living World checks in the built game: phase 1 (actor ids, controllers, shared damage, death once, bounded events, save/load identity, v4 → v5 migration, seeded determinism), then `phase2.py` (clock, light, travel graph, journeys by road, boat, moongate and stairs, doors, stuck recovery, search budget, live step rate, developer panel) and `expansion.py` (towns unchanged tile for tile, sites and camps, causeway and islands, long journeys, v0.22 → v0.23 save migration) and `phase3.py` (species profiles and factions, regional populations, predator and prey, creature-against-creature fights, timid wildlife, perception at night and in hiding, graveyards rising at night, persistent camps through a reload, packs, pursuit limits, camp patrols, the spatial index, and a seeded three-day run) and `phase5.py` (fighting profiles, creatures targeting townsfolk only outside protected ground, guards stepping in and returning to patrol, knock-down once and getting up, you cannot hurt townsfolk, health and knock-downs through a reload, a seeded day of fights) and `phase4.py` (homes, workplaces and schedules, a full accelerated day, shop hours, miners on real rock faces, guard patrols and the night watch, the travelling merchant, fear of creatures, crowds spreading out, resuming the day after a reload): `python3 tests/world-smoke/run.py Shardfall_v0.33.html`
+- `tests/skills.test.js` — the skill system (registry, migration, gains, stats, creation, trainers, per-skill rules, every skill's road to 100.0; also runs `skills-gain.test.js` and `skills-mech.test.js`): `node tests/skills.test.js Shardfall_v0.33.html`
+- `tests/skills-smoke/run.py` — skills in Chrome: creation, the Skills page, trainers, stat gain, a real v0.28.1 save migrating, 30 skill scenarios (`scenarios.js`): `python3 tests/skills-smoke/run.py Shardfall_v0.33.html [chrome] [Shardfall_v0.33.html]`
+- `tests/gear.test.js` — equipment appearance and rig tests (every item and weapon resolves, independent material channels, studs, blade/handle, two-handed off hand in all 29 animations × 8 directions, helmet hair, corpse snapshots, NPC presets, clip mapping): `node tests/gear.test.js Shardfall_v0.33.html`
+- `tests/gear-smoke/run.py` — the layered renderer in Chrome (flag off leaves the previous renderer untouched; seven armor sets on both bodies through the real equip command; immediate doll and world updates; 8 directions × idle, walk, run, attack, casting; death, corpse and reload; persistence; NPCs, Wren and 70 actors with timings; backpack icons; phone): `python3 tests/gear-smoke/run.py Shardfall_v0.33.html [chrome] [--shots DIR]` (contact sheets and screenshots in `$GEAR_SHOTS`, default `/tmp/gear-shots`)
+- `tests/painted.test.js` — painted candidates: embedded data equals the QA, no duplicated or borrowed frames, frame mapping, eligibility from real equipment, honest missing list: `node tests/painted.test.js Shardfall_v0.33.html`
+- `tests/wardrobe.test.js` — the NPC wardrobe (data validation, determinism, regional uniforms, real equipment untouched, every piece resolves in SF.GEAR): `node tests/wardrobe.test.js Shardfall_v0.33.html`
+- `tests/painted-smoke/run.py` — painted candidates in Chrome: flag off untouched, strict and bodies modes, fallbacks, equip/unequip, NPCs on the same path, save/reload, atlas preview, phone: `python3 tests/painted-smoke/run.py Shardfall_v0.33.html [chrome] [--shots DIR]`
+
+## v0.33 — Everything merged: skills, creator, stat locks, living world, layered equipment art and NPC wardrobes
+
+One build from the parallel work of #25–#41. Where two or more PRs built the same thing, one was kept and the others ported onto it.
+
+- **Skills and stats (#34 base).** The 49 Second Age skills (#34). The new four-step creator (#33): looks, templates, five starting towns, a skill-driven starter kit. Stat locks (#32/#33). There is one stat engine: natural Strength, Dexterity and Intelligence rise with skill gains. Only a stat set to ▲ Raise grows. At 225, one point moves from a stat set to ▼ Lower, and with none set to Lower nothing changes. Creation uses the late-1999 limits: 80 attribute points (10–60 each) and three skills totalling 100 (50 max). The 65-point option from #33 was dropped.
+- **Saves.** v8 is the skill reform and v9 adds looks, stat locks and a character id. Backups: `.pret2a`, `.prev8`. The v0.28.2 recovery screen (restore the last good save, export, delete) is now part of the new title screen.
+- **Living World phase 5, step 1 (#31)**, and the v0.29.2 stabilization, popups, target frame and wildlife sheets (#25–#28, #30), are included.
+- **Equipment art (#38).** The layered `SF.GEAR` renderer with the Medieval Equipment Art v1 pieces. It is still behind the "New art" toggle in the equipment window. #41's painted human candidates stay behind the developer flag.
+- **NPC wardrobes (#39) on SF.GEAR.** Guards wear their region's uniform by rank. Townsfolk dress by role and palette, and change between work and off-duty clothes. Bandits, smugglers and the drowned captain have their own variants. All cosmetic. #39's separate procedural rig was not ported.
+- **Superseded renderers (#35, #36, #37, #40).** Their code is not merged. Their art and docs are kept in `docs/archive/superseded-renderers/` and `assets/humans/painted-v2.1/`.
+- **Not merged: #29 (v0.28.3).** It fixed the same audit findings as the v0.28.2 stabilization in a different way, and conflicts with it. The v0.28.2 fixes are the ones kept.
+- **What is still missing** for sprites, the paper doll and equipment: `docs/art/SPRITES_PAPERDOLL_EQUIPMENT_GAPS.md`.
+
+
+## v0.32.1 — Painted human candidates (developer flag only)
+
+- **Nothing changes for players.** The new painted bodies are drawn only with `?dev&painted=strict` (or `?dev&painted=bodies`, a QA view) in the address, or from the **PAINTED** button next to DEV. The choice is not saved.
+- **192 candidates checked, 101 accepted, 91 rejected.** The exact list and the reason for every rejection are in `assets/humans/painted-candidates-v0.1/qa.json`; the PAINTED button's atlas view crosses out each rejected frame and shows why on hover.
+  - No frame facing south survived (each has dark background baked between the legs), and no frame facing north-east (each is really a side view with the face showing).
+  - Rejected frames are left out of the game entirely. Nothing is mirrored, copied from another direction, duplicated or redrawn.
+- **One path for everyone.** The player, Wren, townsfolk, guards and human enemies all go through the same check, using the same appearance and pose as the layered renderer. Body type follows character creation.
+- **Strict mode draws a painted body only when it tells the truth:** the actor wears nothing (no armour, clothing or weapon overlays exist yet), and an accepted frame exists for that state and direction. In every other case the existing renderer draws the actor exactly as before. Running, weapon attacks, death, corpses, ghosts and tools always use the existing renderer.
+- **Not shown by these bodies:** the hair, hair colour, skin tone and beard chosen in character creation (hair and skin are baked in). The paper doll is unchanged.
+- `assets/humans/painted-candidates-v0.1/missing.json` lists the art still needed. Nothing in it is marked complete.
+
+## v0.32 — Medieval equipment art (preview, off by default)
+
+- **Layered equipment.** What you wear is now drawn piece by piece instead of as one recoloured traveller. Turn it on with **New art** in the paper doll's title bar (or add `?gear=new` to the address). The previous art stays the default until the new art has been reviewed.
+  - **Paper doll:** a fitted male or female body wearing the new painted Medieval Equipment Art v1 pieces: armor of every family, helmets, robes, cloaks, boots, belts, shields and weapons.
+  - **Materials are separate.** Each piece shows its own material: a valorite chest with mithril arms and iron legs, spined leather with golden studs, a verite blade on a pine grip, a bloodwood bow. Only that material's part of the painting changes, so trim, heraldry, buckles and bow strings keep their paint.
+  - **In the world** you, Wren, townsfolk, guards and human enemies wear their gear in all eight directions and in every movement, combat, casting, gathering, bandaging and death animation.
+  - **Townsfolk and guards** carry no equipment, so they wear outfits made of existing items. Those outfits are never added to any inventory or loot.
+  - **Updates at once.** Equipping or removing an item changes the doll and the world sprite on the next frame.
+  - **Corpses** keep the look their owner died in, including after a save and reload. What is looted is unchanged.
+  - **Covering rules:** helmets trim or hide hair, closed helms hide the face, and a two-handed weapon hides the off hand in every pose.
+- **No gameplay changes.** Items, slots, materials, weights, armor, combat, crafting and saves are as before. Saved corpses gain an optional `gear` field (appearance only), which older builds ignore.
+- **Screenshots:** `docs/equipment/shots/`.
+- **Still procedural in the world.** World sprites use the original articulated rig from the classic-humans-v2 and layered-armor-v1 packs, coloured from the real materials. The painted pieces are static and are not yet fitted to each animation frame. The art still missing is listed in `docs/equipment/RENDERING.md`.
+
+## v0.30 — Townsfolk can be hurt, and guards fight back (Living World phase 5, step 1)
+
+- **Outside protected ground, creatures may go after townsfolk.** Wolves, hounds, rats, spiders and the undead treat the merchant on the cart road, woodcutters at the edge of the woods and anyone else outside the town walls the way they treat you; inside protected ground everyone is still safe. Deer, hares and other wildlife leave people alone.
+- **Townsfolk run and shout for the guards.** Someone who is hit drops what they are doing, runs for shelter and calls out; they remember what attacked them.
+- **Guards fight back.** A guard who sees a creature attacking someone (a townsperson, the merchant, you or Wren) within his town's reach, or hears a cry for help nearby, leaves his patrol and fights it with his halberd. Guards wear chainmail and are strong fighters, but they use the same combat rules as you and can lose. He gives up when the creature runs out of the town's reach, and goes back to his patrol.
+- **Knocked down, not killed.** A townsperson who loses all health falls and lies there for a minute, then gets up with a third of their health and goes home to recover. NPCs cannot die yet; that comes with corpses and looting later in phase 5.
+- **You cannot hurt townsfolk yet.** Your blows and spells pass them by until the law arrives in the next step: criminal and murderer flags, and guards who come after you.
+- Tap a townsperson to see their health bar once they are hurt, and *Knocked down* or *Fighting* in the target frame.
+- A hurt or knocked-down townsperson stays that way through a save and reload.
+
+## v0.30.0 — The Second Age skills
+
+All 49 classic skills under their own names, with their own mechanics, a working way to train each to 100.0, stats that grow by use,
+and old characters carried over point for point. Full status, sources and deviations: `docs/skills/STATUS.md`.
+
+- **Skill gain fixed.** One classic check for every use: a difficulty window that teaches while the use is still a challenge. The old
+  ±40 window, the three-uses-per-target limit and the recipe taper are gone. Every skill has a proven road from the trainer's 30.0 to 100.0.
+- **49 skills.** Renamed and reworked: Magery, Evaluating Intelligence, Resisting Spells, Poisoning, Hiding, Stealth, Detecting Hidden,
+  Stealing, Lockpicking, Remove Trap, Animal Taming, Animal Lore, Peacemaking, Enticement, Lumberjacking, Blacksmithy, Bowcraft &
+  Fletching, Tinkering, Item Identification. Added: Arms Lore, Begging, Camping, Cartography, Forensic Evaluation, Herding, Inscription,
+  Snooping, Spirit Speak, Taste Identification. Skinning and Foraging are activities now (no skill), their points kept in the skill pool.
+- **The mechanics, not just names:** Hiding no longer walks for free (Stealth needs 80 Hiding, a step per 10 skill, armor matters);
+  Meditation regenerates as in the Second Age (1/7 to 1 mana a second, the trance doubles it, metal and full hands block it); area
+  Peacemaking, Enticement, two-target Provocation; creature-specific taming, control by Taming and Lore, feeding and loyalty; Veterinary
+  with Animal Lore; stealing by weight with a chance of being noticed; four poison strengths; lockboxes and trapped boxes to practise
+  on, trapped dungeon chests; creature spells you can resist; treasure maps, campfires, scrolls written from your spellbook, magic loot.
+- **Stats grow by use** (225 total, atrophy at the cap); no one sells stats. **Creation:** 80 stat points (10–60), up to three skills.
+- **Trainers:** each profession teaches its own skills to 30.0 at a gold per tenth (Lessons tab or a word with them).
+- **Skills page:** the classic groups, search, real or displayed values, locks, one-tap Use, help and prerequisite badges.
+- **Saves:** v7 → v8 once, with a backup; values, locks, gold, gear and the world are kept.
+- New tests: `tests/skills.test.js` (+ `skills-gain`, `skills-mech`), `tests/skills-smoke/`.
+
+## v0.30 — Character Creation v2.0
+
+- **A new creator.** A title screen (Continue / New character) and four steps: Identity & Appearance, Starting Profession, Stats & Skills, Starting Town & Review. Dark wood, brass and parchment; works with mouse, keyboard and touch, from desktop down to a small phone held either way.
+  - **Male or female**, skin tone, hairstyle, hair colour, facial hair, shirt colour and cloak. A live portrait shows every choice and the world sprite (turnable) shows your skin and cloak. Appearance never changes stats, gear, weight or combat. Female sprite sheets and hair, beard and clothing layers are not drawn yet: see *Missing art* below.
+  - **Twelve editable templates** (Swordsman, Maceman, Fencer, Archer, Mage, Blacksmith, Carpenter, Rogue, Healer, Bard, Animal Tamer, Advanced). They only fill in numbers; change anything and you are Custom. There are no classes.
+  - **Early Second Age start:** 65 attribute points (each 10–45) and 100 skill points over two or three different skills (each up to 50). Counters, sliders, ± buttons and typed values can never overspend. Every other skill starts at 0.0 and every lock at Raise.
+  - **Five starting towns:** Saltmarsh Quay (the tutorial, recommended), Vespar, Mynoc, Skara Bryn and Moonglen. You start beside the town shrine with your soul bound there.
+  - **A starter kit that follows your skills:** plain clothes, journal, food, 100 gold, 10 bandages, and a weapon or tool for each skill that uses one (a sword, mace, dagger or bow you are strong enough for, a buckler beside a one-handed weapon with Parrying, pickaxe, hatchet, tongs, sewing kit, rod, lockpicks, a lute, a first-circle spellbook with its reagents). Starter tools and clothes cannot be sold back.
+  - The review lists everything before you begin; Begin stays disabled, with the reason, until the character is valid. Starting a new character over a saved one asks first, offers a download of the old save, and keeps a copy.
+- **Attributes grow naturally.** Using skills raises Strength, Dexterity and Intelligence (up to 100 each, 225 together). Each attribute has a lock on the Character page and the paper doll: ▲ raise, ■ hold, ▼ lower; at 225 a gain takes a point from an attribute set to Lower. Trainers no longer sell attribute points.
+- **Classic skill names everywhere:** Magery, Evaluating Intelligence, Resisting Spells, Hiding, Stealth, Detecting Hidden, Stealing, Lockpicking, Remove Trap, Animal Taming, Animal Lore, Peacemaking, Lumberjacking, Blacksmithy, Bowcraft & Fletching, Tinkering, Item Identification, Poisoning. Saved skill values are untouched.
+- **Saves:** v8. Old characters keep their stats (even above the new creation limits), skills, items, position and quests, get attribute locks and a character id, and are never given a second kit. A copy of the v7 save is kept once.
+
+### Missing art
+
+Female sheets, an unhooded base body, and hair, facial hair, cloak and clothing layers for every clip and facing, plus front-view paper-doll bodies. Details: `docs/design/character-creation-v2-status.md`, list: `assets/character/missing-character-art.json`.
+
+## v0.29.2 — Everything merged: stabilization (v0.28.2, #27) + backpack popups, target frame and wildlife sheets (v0.29.1, #28)
+
+- One build with every open branch together; it replaces PRs #25, #26, #27, #28 and #29. Nothing new beyond what those builds contain.
+- #29 (v0.28.3) fixed the same audit findings as #27 independently; this build keeps #27's fixes (recovery screen, CI, soak) and drops #29's duplicate code.
+
+## v0.29.1 — Everything merged: backpack popups and target frame (v0.29, #25) + wildlife sheets (v0.28.2, #26)
+
+- One build with both open branches together; it replaces PRs #25 and #26. Nothing new beyond what those two builds contain, described below.
+- Also brings in the v0.28.1 stabilization audit (`docs/audits/v0.28.1-stabilization.md`).
+
+## v0.29 — Backpack popups and a compact target frame
+
+- **The backpack stays still.** Selecting an item no longer puts its card above the grid, so the grid never jumps or scrolls, even at the bottom of a large pack. The tiles, sorts, filters, stack counts, weight bar and the weight-only limit are unchanged.
+- **Item tooltips and popups.**
+  - Desktop: rest the pointer on an item for about 300 ms for a compact tooltip beside the cursor; it never runs off the screen and goes when you move away.
+  - Click (or tap on a phone) for the item's popup beside the tile. It shows only what applies to that item: material, quality, weight, durability, damage or armor, weapon speed, required skill and Strength, magical properties, quantity and a short description where the item has one. Its buttons do what the old card did (Equip, Use, Split half, Split 1, Slot, Repair, Appraise, Drop), plus **Inspect** to compare with what you wear.
+  - On phones the popup has 44 px buttons and never resizes or moves the backpack.
+  - Close it with ×, Escape or a tap outside. A tap on the game world only closes it: you don't walk, target or attack.
+  - **Dropping valuable things asks first:** anything worth 25 gold or more, or exceptional, rare, magical, marked or maker-signed items, from the popup, the right-click menu or the paper doll.
+- **A compact target frame.**
+  - Hidden until you pick something: tap or click a creature, person, deposit, tree, corpse or fishing water, or use Attack, Tab or Interact. Walking past things never opens it, and picking something else replaces it at once.
+  - It sits at the top centre, about 248 px wide on desktop and 208 px on phones, as tall as its contents. The × is a 44 px button, and taps on the rest of the frame pass through to the world.
+  - It shows what matters for each kind of target:
+    - creatures: hostility, what they are doing and a health bar;
+    - townsfolk: role, a quest mark and Talk, Trade or Bank;
+    - deposits and trees: the wood or ore once surveyed, the skill needed, what is left, and Mine or Chop;
+    - remains: Loot, and loot rights on bodies that have them.
+    Rarer actions (Tame, bard songs, Pickpocket, Anatomy, Dismiss) sit behind **⋯**.
+  - **It clears itself** when:
+    - you go beyond the retention distance: 12 tiles for characters and creatures, 5 for resources and objects (`TARGET_RETAIN` in `src/hud-ui.js`);
+    - the target despawns, dies with nothing left to loot, hides, or the resource is removed;
+    - you travel (moongate, stairs, boat) or change level;
+    - you press × or Escape.
+    A one-tile margin and a short grace stop it flickering at the edge, and something picked from further away is kept while you walk to it. These are retention distances only: attack, spell and interaction ranges are unchanged.
+  - **Closing it ends your armed swing** on that target, as the × always did. It never starts an attack, uses an item or stops anything else.
+- **Escape** now closes, in order: the item popup or menu, then the open panel, then cancels a cast, aim, task or armed attack, and then clears the target.
+- No change to items, statistics, combat, the world or the save. Open popups and the target are not saved.
+- New test: `tests/ui-smoke/run.py`. The backpack, equipment and combat browser tests now use the popup, the delayed tooltip and the shorter frame buttons.
+
+## v0.28.2 — Stabilization (no new gameplay)
+
+Fixes from the v0.28.1 technical audit (`docs/audits/v0.28.1-stabilization.md`; results in `docs/audits/v0.28.2-results.md`). Combat, balance, world, graphics and item IDs are unchanged, and existing saves load as before.
+
+- **Items can no longer be duplicated or destroyed by bad moves.** Moving, dropping and taking only accept whole quantities from 1 to the stack size; moving into the same container, splitting a single item or moving a damaged item is refused with nothing changed. A dropped item reaches the ground only after every check has passed, so it can never end up both on the ground and in your pack or bank.
+- **What a save keeps.**
+  - Items you drop stay on the ground through a reload, for the time they had left.
+  - A chest you opened keeps what you left in it and stays open until it relocks; a reload no longer refills it.
+  - A spell you were preparing when the game was saved counts as interrupted on load: the reagents or scroll come back and half the mana is spent, exactly as Cancel, once.
+  - Poison carries on after a reload.
+- **Damaged saves.** A save that cannot be read no longer stops the game or gets overwritten: the start screen explains, and offers the last good save, an export, or deleting it after a confirmation. Making a new character keeps a copy of the old save. A save with a repeated item or a fractional stack is repaired on load without losing anything. If the game is open in two tabs, only the newest one saves. A full browser storage is reported.
+- **Steadier.** Bank, shop and trainer buttons check that you are still at the counter. An error in drawing no longer stops the world, and the reverse. Switching away from the game releases held keys and the stick. The sound player's memory stays capped.
+- **Display.** The loot window and backpack show the same weight line (everything you carry against your limit), not the old 45-stack limit; dropped piles and chests no longer say "criminal to loot for NaN s".
+- **Checks.** Every push runs all rules suites, build freshness, asset manifests and every browser suite; Pages deploys only after they pass. New tests: `tests/inventory.test.js`, `tests/stability-smoke/run.py`, `tests/check-build.py`, `tests/soak/run.py`.
+
+## v0.28.2 — Wildlife sheets (bestiary v1.1.0 draft01)
+
+- **Six creatures get painted, animated sprites** in place of their code-drawn stand-ins: the reed boar, marsh hound, mud snapper, mire spider, red deer and brown hare. Each has 8 facings with idle, walk, wind-up and impact poses, at the same size as before.
+  - Their stats, behaviour, spawns, loot, sounds and attack timing are unchanged. Deer and hares still bolt from you.
+  - The other procedural creatures (bear, wreck crab, ash wisp, bell sentinel, the Bellkeeper) and the scout-tinted ones (drowned captain, smuggler, bandit) keep their current look until their sheets are finished. The 11 v1.0 bestiary sheets and the rat and skeleton sheets are untouched.
+- **Tamed creatures with sheets now show their strike** (impact, then recover) when they attack for you. Before, a tamed dire wolf kept walking while it bit.
+- **No invisible creatures while sheets load.** A creature whose sheet has not decoded yet is drawn with its code-drawn art for that moment.
+- **Polymorph forms** use a bestiary sheet when the form has one.
 
 ## v0.28.1 — Life around Vespar (fix)
 
@@ -247,6 +434,22 @@ The first step of the Living World roadmap (`docs/WORLD_SIMULATION_MASTER.md`, p
 - Second Age combat and First Aid (#9) is in. The sound pack is rewired to the new resolver: a swing or release sound on every attempt (yours, Wren's), one impact per landed blow (flesh, bone, armor, blunt for maces and fists, shield on a parry), a shield or armor sound when a blow is fully absorbed, the ward sound when a spell soaks it, and the bandage sound when an application starts. Wren's hits, fall and return have sound too.
 - The backpack card now names the weapon's skill, speed, Strength and hands, and bandages offer Bandage self, Bandage other and Slot other.
 
+## v0.18c — Second Age combat and First Aid (built in parallel, #9)
+- Combat skills are now Swordsmanship, Mace Fighting, Fencing, Archery, Wrestling, Parrying and Healing. Each weapon uses its UO profile: real dice, speed, STR, hands; the pack names its skill.
+- Hit chance is your weapon skill against the defender's; Tactics, Anatomy and Strength set damage; armor absorbs part of each blow; a shield parries at half your Parrying; player recipients take half. Maces and war hammers drain stamina and wear armor.
+- Swing speed comes from the weapon and your current stamina (quarter-second ticks, 1.25–10 s). One swing timer: a ready swing survives a target change, an unequip or a held spell; equipping during recovery restarts it.
+- Bows and crossbows reload while you move but need you to stand still to aim; one arrow or bolt per release; the shot lands a second later.
+- First Aid: bandage yourself (15 s; poison 18 s) or another (5 s; poison 6 s; resurrection 10 s). Cure at 60/60, resurrect at 80/80. Blows make your fingers slip. The application is saved with the game.
+- Wren, a sellsword at the plaza, follows you on request, fights by the same rules, and can be bandaged or brought back from a ghost.
+- Old saves migrate once (snapshot in `shardfall.save.v1.precombat`); merged points wait on the Skills page. Details: `docs/combat/STATUS.md`.
+
+## v0.18b — Bestiary v1 (built in parallel with the music v0.18)
+
+- Eleven creatures from the bestiary pack are in the game data and renderer: orc, ettin, troll, lizardman, gargoyle, earth elemental, giant spider, dire wolf, harpy, slime and the Lich Lord (boss).
+- Sprites follow the existing combat states: neutral when standing, the walk cycle while moving, the wind-up pose for the whole telegraph and the impact pose on the strike resolution, then recover. Facing is locked from the telegraph to the end of the swing.
+- Sheets are drawn untouched (no outline, tint or alpha cut), so the Lich Lord's turquoise rim and gold glints show as painted.
+- Not yet: spawn placement, balance (stats are provisional placeholders), dedicated death art. Corpses use the standard bones. To see one, run `__SF.spawnMon('lich_lord')` in the browser console.
+
 ## v0.18 — online play and music
 
 - The game is now a small web page (3.7 MB instead of 22 MB) published on GitHub Pages. Sounds are separate small files (2.1 MB in all instead of 14 MB) that download quietly after the first tap.
@@ -258,22 +461,6 @@ The first step of the Living World roadmap (`docs/WORLD_SIMULATION_MASTER.md`, p
 - World sounds pan with the view, fade with distance and stay silent for hidden foes and rooms out of sight. Up to 14 voices; mute is remembered; audio starts from your first tap or key press and pauses in the background.
 - Kit building doors now open and close (Interact, E or tap the door), block movement when closed, and are remembered in your save. Older saves load with every door open.
 - Footsteps follow the surface: timber piers and floors, stone, grass, dirt, sand, mud and shallows. A cobbled quayside now joins the piers to the plaza road.
-
-## v0.18b — Bestiary v1 (built in parallel with the music v0.18)
-
-- Eleven creatures from the bestiary pack are in the game data and renderer: orc, ettin, troll, lizardman, gargoyle, earth elemental, giant spider, dire wolf, harpy, slime and the Lich Lord (boss).
-- Sprites follow the existing combat states: neutral when standing, the walk cycle while moving, the wind-up pose for the whole telegraph and the impact pose on the strike resolution, then recover. Facing is locked from the telegraph to the end of the swing.
-- Sheets are drawn untouched (no outline, tint or alpha cut), so the Lich Lord's turquoise rim and gold glints show as painted.
-- Not yet: spawn placement, balance (stats are provisional placeholders), dedicated death art. Corpses use the standard bones. To see one, run `__SF.spawnMon('lich_lord')` in the browser console.
-
-## v0.18c — Second Age combat and First Aid (built in parallel, #9)
-- Combat skills are now Swordsmanship, Mace Fighting, Fencing, Archery, Wrestling, Parrying and Healing. Each weapon uses its UO profile: real dice, speed, STR, hands; the pack names its skill.
-- Hit chance is your weapon skill against the defender's; Tactics, Anatomy and Strength set damage; armor absorbs part of each blow; a shield parries at half your Parrying; player recipients take half. Maces and war hammers drain stamina and wear armor.
-- Swing speed comes from the weapon and your current stamina (quarter-second ticks, 1.25–10 s). One swing timer: a ready swing survives a target change, an unequip or a held spell; equipping during recovery restarts it.
-- Bows and crossbows reload while you move but need you to stand still to aim; one arrow or bolt per release; the shot lands a second later.
-- First Aid: bandage yourself (15 s; poison 18 s) or another (5 s; poison 6 s; resurrection 10 s). Cure at 60/60, resurrect at 80/80. Blows make your fingers slip. The application is saved with the game.
-- Wren, a sellsword at the plaza, follows you on request, fights by the same rules, and can be bandaged or brought back from a ghost.
-- Old saves migrate once (snapshot in `shardfall.save.v1.precombat`); merged points wait on the Skills page. Details: `docs/combat/STATUS.md`.
 
 ## v0.16 — Cancel cast
 

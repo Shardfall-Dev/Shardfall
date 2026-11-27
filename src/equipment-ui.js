@@ -25,6 +25,8 @@ bagIcon = function (it, size) {
   if (!d.fam) return baseBagIcon(it, size);
   const m = SF.matOf(it), col = EQ.matColor(d.fixedMat || m), chip = isDefaultMat(d, m) ? '' : `<b class="matchip" style="background:${col}"></b>`;
   const r = BAG_ICONS.rect[it.id] || (d.icon && BAG_ICONS.rect[d.icon]);
+  const gu = !r && gearIconUrl(it);   // no painted icon of its own: its piece of the new equipment art, in its materials (when on)
+  if (gu) return `<i class="bagico gearico" aria-hidden="true" data-icon="${esc(it.id)}" style="width:${size}px;height:${size}px;background-image:url(${gu});background-size:contain;background-position:center">${chip}</i>`;
   if (r) { const k = size / r[2]; return `<i class="bagico" aria-hidden="true" data-icon="${esc(it.id)}" style="width:${size}px;height:${size}px;background-size:${BAG_ICONS.w * k}px ${BAG_ICONS.h * k}px;background-position:${-r[0] * k}px ${-r[1] * k}px">${chip}</i>`; }
   return `<i class="bagglyph eqglyph" aria-hidden="true" data-icon="${esc(it.id)}" style="width:${size}px;height:${size}px">${eqSvg(d.slot, col, Math.round(size * .86))}${chip}</i>`;
 };
@@ -101,8 +103,7 @@ function showTip(key, x, y, pin) {
   el.style.left = L + 'px'; el.style.top = T + 'px';
 }
 function hideTip() { ITIP.key = null; ITIP.pin = false; const el = $('#itip'); if (el) el.hidden = true; }
-document.addEventListener('pointerover', e => { if (e.pointerType !== 'mouse' || DRAG.on) return; const t = e.target.closest('[data-tip]'); if (!t || t.closest('.bagcell')) return; showTip(t.dataset.tip, e.clientX, e.clientY); });
-document.addEventListener('pointerout', e => { if (e.pointerType !== 'mouse' || ITIP.pin) return; const t = e.target.closest('[data-tip]'); if (t && !t.contains(e.relatedTarget)) hideTip(); });
+// hover: see src/hud-ui.js (v0.29) — one delayed tooltip for every [data-tip], backpack tiles included
 document.addEventListener('pointermove', e => { if (e.pointerType === 'mouse' && ITIP.key && !ITIP.pin) { const el = $('#itip'); const w = el.offsetWidth, h = el.offsetHeight; let L = e.clientX + 16, T = e.clientY + 12; if (L + w > VW - 6) L = Math.max(6, e.clientX - w - 12); if (T + h > VH - 6) T = Math.max(6, VH - h - 6); el.style.left = L + 'px'; el.style.top = T + 'px'; } });
 // touch: tapping an item name (data-tip without an action) pins its tooltip; the next tap anywhere closes it
 document.addEventListener('click', e => { const t = e.target.closest('[data-tip]'); if (t && !t.closest('[data-a]') && !t.closest('.bagcell')) { const r = t.getBoundingClientRect(); if (ITIP.key === t.dataset.tip && ITIP.pin) hideTip(); else showTip(t.dataset.tip, r.left, r.bottom, true); return; } if (ITIP.pin && !e.target.closest('#itip')) hideTip(); }, true);
@@ -127,17 +128,20 @@ function eqStatsHtml() {
   const kv = (k, v, c) => `<span>${k}</span><span class="${c || ''}">${v}</span>`;
   return `<div class="eqstat">${kv('Armor rating', `<b>${f1w(e.ar)}</b>${magicArmor(P) ? ' +' + magicArmor(P) + ' magic' : ''}`)}${kv('Weapon', esc(weaponLabel(P)) + ` · ${lo}–${hi} dmg`)}${kv('Attack speed', SF.swingDelay(P.stam, w.speed).toFixed(2) + ' s per swing')}`
     + kv('Equipment weight', f1w(e.eqWt)) + kv('Carried', `${f1w(en.wt)} / ${f1w(en.cap)}`, en.stage >= 2 ? 'bad' : en.stage === 1 ? 'warn' : '') + kv('Encumbrance', `${en.n} (${Math.round(en.ratio * 100)}%)`, en.stage >= 2 ? 'bad' : en.stage === 1 ? 'warn' : '')
-    + kv('Strength', `${e.str}`) + kv('Dexterity', `${e.dex}${e.dexMod ? ` <span class="note">(${P.dex} ${e.dexMod})</span>` : ''}`, e.dexMod ? 'warn' : '') + kv('Intelligence', `${e.int}`)
+    + statRowsHtml() + kv('Attribute total', `${SF.STATS.total(P)} / ${SF.STAT_CAP}`) + (e.dexMod ? kv('Dexterity now', `${e.dex} <span class="note">(${P.dex} ${e.dexMod})</span>`, 'warn') : '')
     + kv('Dexterity penalty', e.dexMod ? String(e.dexMod) : 'none') + kv('Meditation', e.med ? `−${Math.round(e.med * 100)}% mana regeneration` : 'unhindered', e.med ? 'warn' : '')
     + (e.broken.length ? kv('Broken', e.broken.map(s => EQ.SLOT[s].n).join(', ') + ' · repair them', 'bad') : '') + '</div>';
 }
+/* the paper doll figure: the traveller's front cell, in this character's skin tone and cloak colour (cached per look) */
+const DOLL = { key: '', src: '' };
+function dollSrc() { const k = SF.CREATION.lookKey(P.look); if (k === DOLL.key && DOLL.src) return DOLL.src; const sh = scoutSheet(P.look); if (!sh || !sh.toDataURL) return SCOUT_SRC; DOLL.key = k; DOLL.src = sh.toDataURL(); return DOLL.src; }
 function renderEqWin(force) {
   const el = $('#eqwin'); if (!el) return;
   const open = !!(P && SETTINGS.eqOpen && !SCREEN); document.body.classList.toggle('eqopen', open);
   if (!open) { if (!el.hidden) { el.hidden = true; EQW.html = ''; } return; }
   const e = EQ.effective(P);
-  let h = `<div class="eqh" data-eqmove><b>${esc(P.name)}</b><span class="note">AR ${f1w(e.ar)} · ${f1w(encumb().wt)}/${f1w(SF.carryCap(P))}</span><button class="x" data-a="eqclose" aria-label="Close equipment">×</button></div><div class="eqb">`;
-  h += `<div class="eqdoll"><div class="eqcol">${EQ_LEFT.map(eqSlotHtml).join('')}</div><div class="eqfig" data-drop="eq:auto"><i class="doll" style="background-image:url(${SCOUT_SRC})"></i>${P.ghost ? '<span class="note">ghost</span>' : ''}</div><div class="eqcol">${EQ_RIGHT.map(eqSlotHtml).join('')}</div></div>`;
+  let h = `<div class="eqh" data-eqmove><b>${esc(P.name)}</b><span class="note">AR ${f1w(e.ar)} · ${f1w(encumb().wt)}/${f1w(SF.carryCap(P))}</span><button class="gtog${gearOn() ? ' on' : ''}" data-a="gearart" aria-pressed="${gearOn()}" title="Medieval equipment art (preview): layered paper doll and world sprites">New art</button><button class="x" data-a="eqclose" aria-label="Close equipment">×</button></div><div class="eqb">`;
+  h += `<div class="eqdoll"><div class="eqcol">${EQ_LEFT.map(eqSlotHtml).join('')}</div><div class="eqfig" data-drop="eq:auto">${(gearOn() && gearDollSrc(P)) ? `<img class="gdoll" src="${gearDollSrc(P)}" alt="${esc(P.name)} in the equipment worn" draggable="false">` : `<i class="doll" style="background-image:url(${dollSrc()})"></i>`}${P.ghost ? '<span class="note">ghost</span>' : ''}</div><div class="eqcol">${EQ_RIGHT.map(eqSlotHtml).join('')}</div></div>`;
   h += `<div class="eqrow">${EQ_BOTTOM.map(eqSlotHtml).join('')}</div>`;
   const sel = EQW.sel && P.equip[EQW.sel];
   if (EQW.sel) h += `<div class="eqcard">${sel ? itemTip(sel, { compare: false, icon: 40 }) + `<div class="acts">${SF.ITEMS[sel.id].trade || sel.id === 'garment' ? btn('uneq', 'Remove', { s: EQW.sel }) : ''}${SF.WEARABLE(sel.id) && sel.cond !== undefined && sel.cond < (sel.maxc || 100) ? btn('repair', 'Repair', { u: sel.uid }) : ''}${SF.ITEMS[sel.id].trade ? btn('drop', 'Drop', { u: sel.uid }) : ''}</div>` : `<p class="note">${EQ.SLOT[EQW.sel].n}: empty. Drag an item here, or double-click it in the backpack.</p>`}</div>`;
@@ -257,18 +261,17 @@ function bagRows(items) {
     cur.items.push(it); }
   return { rows, h: y };
 }
-function bagCell(it, selected) {
-  return `<button class="bagcell" data-a="baginspect" data-u="${it.uid}" data-drag="pack:${it.uid}" data-drop="pack:${it.uid}" aria-pressed="${selected === it}">${bagIcon(it, 40)}<small>${esc(SF.itemName(it))}</small>${it.qty > 1 ? '<strong>' + it.qty + '</strong>' : ''}${it.cond !== undefined && SF.WEARABLE(it.id) && it.cond < .2 * (it.maxc || 100) ? `<em class="wornmark">${it.cond <= 0 ? 'broken' : 'worn'}</em>` : ''}<span class="bagtip" role="tooltip">${bagStats(it)}</span></button>`;
+function bagCell(it, selected) {   // v0.29: the tile carries its tooltip key; the information popup (src/hud-ui.js) replaces the inline card and per-tile copies
+  return `<button class="bagcell" data-a="baginspect" data-u="${it.uid}" data-tip="pack:${it.uid}" data-drag="pack:${it.uid}" data-drop="pack:${it.uid}" aria-pressed="${selected === it}" aria-haspopup="dialog">${bagIcon(it, 40)}<small>${esc(SF.itemName(it))}</small>${it.qty > 1 ? '<strong>' + it.qty + '</strong>' : ''}${it.cond !== undefined && SF.WEARABLE(it.id) && it.cond < .2 * (it.maxc || 100) ? `<em class="wornmark">${it.cond <= 0 ? 'broken' : 'worn'}</em>` : ''}</button>`;
 }
 function bagPanel2() {
   const all = P.pack.items, items = bagItems(), en = encumb(), gold = SF.count(P.pack, 'gold');
-  let h = `<div class="note">${all.length} stack${all.length === 1 ? '' : 's'} · ${f1w(en.wt)} / ${f1w(en.cap)} weight · ${gold} gold${en.stage ? ' · <span class="' + (en.stage >= 2 ? 'warn' : '') + '">' + en.n.toLowerCase() + (en.stage >= 3 ? ': drop something to move' : en.stage === 2 ? ': no running' : '') + '</span>' : ''}</div>`;
+  let h = `<div class="note">${all.length} stack${all.length === 1 ? '' : 's'} · ${carriedText()} · ${gold} gold${en.stage ? ' · <span class="' + (en.stage >= 2 ? 'warn' : '') + '">' + en.n.toLowerCase() + (en.stage >= 3 ? ': drop something to move' : en.stage === 2 ? ': no running' : '') + '</span>' : ''}</div>`;
   h += `<div class="encbar s${en.stage}" title="${en.n}"><i style="width:${Math.min(100, en.ratio / 1.25 * 100)}%"></i><b style="left:${.75 / 1.25 * 100}%"></b><b style="left:${100 / 1.25}%"></b></div>`;
   h += `<div class="bagtools"><input id="bagq" type="search" placeholder="Search the backpack" value="${esc(BAG.q)}" autocomplete="off" aria-label="Search the backpack">${btn('bagmerge', 'Merge stacks')}${btn('eqwin', 'Paper doll')}</div>`;
   h += '<div class="bagsorts">Sort ' + Object.keys(BAG_SORTS).map(s => btn('bagsort', s, { s }, s === bagSort ? 'on' : '')).join('') + '</div>';
   h += '<div class="bagsorts bagfilters">' + Object.keys(BAG_FILTERS).map(f => btn('bagfilter', f, { f }, f === BAG.filter ? 'ac' : '')).join('') + '</div>';
-  const selected = findU(P.pack, bagUid);
-  if (selected) h += '<div class="bagcard">' + bagStats(selected) + '<div>' + bagActions2(selected) + '</div></div>';
+  const selected = findU(P.pack, bagUid);   // v0.29: selection only highlights its tile; nothing is inserted above the grid, so it never moves
   const { rows, h: total } = bagRows(items), [a, b] = items.length > BAG_VIRT_MIN ? BAG.rows : [0, 1e9];   // small packs draw every row
   let out = '', top = null, bottom = 0;
   for (const r of rows) { if (r.y + r.h < a * CELL_H || r.y > b * CELL_H) continue; if (top === null) top = r.y; bottom = r.y + r.h;
@@ -379,7 +382,7 @@ craftDetail = craftDetail2; PANELS.craft = craftPanel2;
 
 /* ---------- actions ---------- */
 Object.assign(ACT, {
-  eqwin: () => toggleEqWin(), eqclose: () => toggleEqWin(false),
+  eqwin: () => toggleEqWin(), eqclose: () => toggleEqWin(false), gearart: () => setGearArt(!gearOn()),
   eqsel: d => { EQW.sel = EQW.sel === d.s ? null : d.s; renderEqWin(true); },
   bagfilter: d => { BAG.filter = d.f; BAG.rows = [0, 18]; renderPanel(); },
   bagsort: d => { bagSort = d.s; BAG.rows = [0, 18]; renderPanel(); },

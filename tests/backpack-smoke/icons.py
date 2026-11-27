@@ -21,7 +21,8 @@ check(ICONS['version'] == '1.0.1' and N == 161 and all(i in RECT for i in NEW), 
 
 FILL = """ids => { const S = __SF, P = S.P, SF = S.SF; P.pack.items.length = 0;
   ids.forEach((id, i) => SF.addItem(P.pack, SF.newItem(id, SF.ITEMS[id].stack ? 1 + (i * 37) % 250 : 1), { slots: 999, kg: 1e9 })); }"""
-TILES = """() => [...document.querySelectorAll('#panel .bagcell')].map(c => { const i = c.querySelector('.bagico'), t = c.querySelector('.bagtip .bagico'), it = __SF.findU ? null : null;
+TILES = """() => [...document.querySelectorAll('#panel .bagcell')].map(c => { const i = c.querySelector('.bagico'), d = document.createElement('div'); d.innerHTML = __SF.itemTip(__SF.tipItem(c.dataset.tip));   // v0.29: the tooltip is built on demand from the tile's key
+  const t = d.querySelector('.bagico');
   return { u: +c.dataset.u, icon: i && i.dataset.icon, pos: i && i.style.backgroundPosition, size: i && i.style.width, tip: t && t.dataset.icon, glyph: !!c.querySelector('.bagglyph') }; })"""
 UID2ID = "() => Object.fromEntries(__SF.P.pack.items.map(i => [i.uid, i.id]))"
 BADGES = """() => [...document.querySelectorAll('#panel .bagcell strong')].map(s => { s.parentElement.scrollIntoView({ block: 'center' }); const r = s.getBoundingClientRect(), c = s.parentElement.getBoundingClientRect(), cs = getComputedStyle(s);
@@ -32,7 +33,7 @@ def start(pg, errs):
     pg.on('pageerror', lambda e: errs.append(str(e)))
     pg.goto('file://' + f); pg.wait_for_timeout(600)
     pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_timeout(600)
-    pg.click('[data-c=prof][data-p="Group healer"]'); pg.fill('#ccn', 'Tess'); pg.click('[data-c=go]'); pg.wait_for_timeout(1200)
+    pg.evaluate("o => __CC.quick(o)", {'name': 'Tess', 'template': 'mage'}); pg.wait_for_timeout(1200)
 
 def batches(n):
     for i in range(0, len(IDS), n): yield IDS[i:i + n]
@@ -71,13 +72,14 @@ with sync_playwright() as p:
     MIX = ['sword', 'heavycrossbow', 'kryss', 'wick', 'chain', 'bandage', 'draught', 'gold', 'reedash', 'pine', 'scroll.18', 'black_pearl', 'spellbook', 'arrow']
     pg.evaluate(FILL, MIX); pg.evaluate("__SF.ACT.bag()"); pg.wait_for_timeout(150)
     cell = lambda id: f'#panel .bagcell:has(.bagico[data-icon="{id}"])'
-    pg.hover(cell('scroll.18')); pg.wait_for_timeout(120)
-    tip = pg.eval_on_selector(cell('scroll.18') + ' .bagtip', "e => ({ d: getComputedStyle(e).display, i: e.querySelector('.bagico')?.dataset.icon, w: e.querySelector('.bagico')?.getBoundingClientRect().width, t: e.innerText })")
-    check(tip['d'] == 'block' and tip['i'] == 'scroll.18' and round(tip['w']) == 56 and 'Cinderball' in tip['t'], 'desktop hover tooltip shows the same icon at 56 px', tip)
+    pg.hover(cell('scroll.18')); pg.wait_for_timeout(420)
+    tip = pg.eval_on_selector('#itip', "e => ({ d: e.hidden ? 'none' : 'block', i: e.querySelector('.bagico')?.dataset.icon, w: e.querySelector('.bagico')?.getBoundingClientRect().width, t: e.innerText })")
+    check(tip['d'] == 'block' and tip['i'] == 'scroll.18' and round(tip['w']) == 48 and 'Cinderball' in tip['t'], 'desktop hover tooltip (after ~300 ms) shows the same icon at 48 px', tip)
     pg.screenshot(path='/tmp/bag-icons-desktop-hover.png')
     pg.mouse.move(5, 5); pg.click(cell('sword')); pg.wait_for_timeout(120)
-    card = pg.evaluate("() => { const c = document.querySelector('#panel .bagcard'); const i = c && c.querySelector('.baghead .bagico'); return c && { i: i && i.dataset.icon, title: c.querySelector('span').textContent, acts: c.querySelectorAll('button').length }; }")
-    check(card and card['i'] == 'sword' and 'sword' in card['title'].lower() and card['acts'] > 0, 'click card shows the same icon with title and actions', card)
+    card = pg.evaluate("() => { const c = document.querySelector('#ipop'); const i = c && c.querySelector('.baghead .bagico'); return c && !c.hidden && { i: i && i.dataset.icon, title: c.querySelector('.tiptitle').textContent, acts: c.querySelectorAll('.acts button').length }; }")
+    check(card and card['i'] == 'sword' and 'sword' in card['title'].lower() and card['acts'] > 0, 'click popup shows the same icon with title and actions', card)
+    pg.keyboard.press('Escape')
     pg.evaluate("() => { const SF = __SF.SF; SF.ITEMS.__noicon = { n: 'Test trinket', kg: .1, cat: 'tool' }; SF.addItem(__SF.P.pack, SF.newItem('__noicon', 1), { slots: 999, kg: 1e9 }); __SF.ACT.bag(); }"); pg.wait_for_timeout(100)
     gl = pg.evaluate("() => !!document.querySelector('#panel .bagcell .bagglyph')")
     pg.evaluate("() => { const P = __SF.P; P.pack.items = P.pack.items.filter(i => i.id !== '__noicon'); delete __SF.SF.ITEMS.__noicon; __SF.ACT.bag(); }")
@@ -102,14 +104,15 @@ with sync_playwright() as p:
         start(pg, errs)
         pg.evaluate(FILL, MIX); pg.evaluate("__SF.ACT.bag()"); pg.wait_for_timeout(200)
         pg.tap(cell('black_pearl')); pg.wait_for_timeout(150)
-        card = pg.evaluate("() => { const c = document.querySelector('#panel .bagcard'); const i = c && c.querySelector('.baghead .bagico'); const r = c && c.getBoundingClientRect(); return c && { i: i && i.dataset.icon, l: r.left, r: r.right }; }")
-        check(card and card['i'] == 'black_pearl' and card['l'] >= 0 and card['r'] <= vw, f'phone {vw}x{vh}: tap card shows the same icon and fits', card)
-        check(pg.eval_on_selector(cell('black_pearl') + ' .bagtip', 'e => getComputedStyle(e).display') == 'none', f'phone {vw}x{vh}: no floating tooltip on tap')
+        card = pg.evaluate("() => { const c = document.querySelector('#ipop'); const i = c && c.querySelector('.baghead .bagico'); const r = c && c.getBoundingClientRect(); return c && !c.hidden && { i: i && i.dataset.icon, l: r.left, r: r.right }; }")
+        check(card and card['i'] == 'black_pearl' and card['l'] >= 0 and card['r'] <= vw, f'phone {vw}x{vh}: tap popup shows the same icon and fits', card)
+        check(pg.evaluate("document.querySelector('#itip').hidden"), f'phone {vw}x{vh}: no floating tooltip on tap')
         for s in ['Name', 'Quantity', 'Category']:
             pg.tap(f'#panel [data-a=bagsort][data-s="{s}"]'); pg.wait_for_timeout(120)
             bs = pg.evaluate(BADGES); bad = [x for x in bs if not (x['inside'] and x['onTop'] and x['px'] >= 12 and x['scroll'])]
             check(bs and not bad, f'phone {vw}x{vh} {s} sort: stack counts readable', bad[:3])
-        check(pg.evaluate("() => document.querySelector('#panel .bagcard .baghead .bagico')?.dataset.icon") == 'black_pearl', f'phone {vw}x{vh}: selection and icon survive re-sorting')
+        pg.tap(cell('black_pearl')); pg.wait_for_timeout(120)   # v0.29: tapping a sort button closes the popup (outside tap); the tile reopens its own
+        check(pg.evaluate("() => document.querySelector('#ipop:not([hidden]) .baghead .bagico')?.dataset.icon") == 'black_pearl', f'phone {vw}x{vh}: after re-sorting the tile opens its own popup and icon')
         tiles = pg.eval_on_selector_all('#panel .bagcell', 'es => es.map(e => Math.round(e.getBoundingClientRect().height))')
         check(min(tiles) >= 44, f'phone {vw}x{vh}: tiles at least 44 px tall', tiles)
         pg.screenshot(path=f'/tmp/bag-icons-phone-{vw}x{vh}.png')

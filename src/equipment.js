@@ -51,12 +51,12 @@ EQ.FAMILIES = {
   leather:  { n: 'Leather', ar: 12, med: 0, spd: 0, dur: 35, repair: 'tailoring' },
   studded:  { n: 'Studded leather', ar: 16, med: .10, spd: 0, dur: 40, repair: 'tailoring' },
   bone:     { n: 'Bone', ar: 22, med: .15, spd: .01, dur: 45, repair: 'tailoring' },
-  ringmail: { n: 'Ringmail', ar: 20, med: .15, spd: .02, dur: 45, repair: 'smithing' },
-  chain:    { n: 'Chainmail', ar: 23, med: .20, spd: .03, dur: 50, repair: 'smithing' },
-  plate:    { n: 'Platemail', ar: 30, med: .35, spd: .06, dur: 50, repair: 'smithing' },
-  helm:     { n: 'Helmet', ar: 24, med: .30, spd: 0, dur: 45, repair: 'smithing' },
-  dragon:   { n: 'Dragon scale', ar: 35, med: .25, spd: .03, dur: 60, repair: 'smithing' },
-  shield:   { n: 'Shield', ar: 0, med: 0, spd: 0, dur: 50, repair: 'smithing' },
+  ringmail: { n: 'Ringmail', ar: 20, med: .15, spd: .02, dur: 45, repair: 'blacksmithy' },
+  chain:    { n: 'Chainmail', ar: 23, med: .20, spd: .03, dur: 50, repair: 'blacksmithy' },
+  plate:    { n: 'Platemail', ar: 30, med: .35, spd: .06, dur: 50, repair: 'blacksmithy' },
+  helm:     { n: 'Helmet', ar: 24, med: .30, spd: 0, dur: 45, repair: 'blacksmithy' },
+  dragon:   { n: 'Dragon scale', ar: 35, med: .25, spd: .03, dur: 60, repair: 'blacksmithy' },
+  shield:   { n: 'Shield', ar: 0, med: 0, spd: 0, dur: 50, repair: 'blacksmithy' },
   jewelry:  { n: 'Jewelry', ar: 0, med: 0, spd: 0, dur: 0, repair: null } };
 
 /* ---------------- materials ---------------- */
@@ -244,7 +244,7 @@ EQ.broken = broken;
 /* AR of a region this piece covers, before wear */
 EQ.baseRegionAR = it => { const d = SF.ITEMS[it.id]; if (!d || !d.fam || d.cat === 'shield' || d.cat === 'jewelry') return 0; const a = d.ar !== undefined ? d.ar : EQ.FAMILIES[d.fam].ar; return a * EQ.mat(d.fixedMat || SF.matOf(it)).prot * EQ.qual(it).prot; };
 /* after wear: broken gives nothing; under 20 % condition the badly-worn −15 % (SF.condFactor) */
-EQ.regionAR = it => broken(it) ? 0 : EQ.baseRegionAR(it) * SF.condFactor(it.cond, it.maxc);
+EQ.regionAR = it => broken(it) ? 0 : EQ.baseRegionAR(it) * SF.condFactor(it.cond, it.maxc) + (it.magic && it.magic.k === 'def' ? it.magic.l : 0);   // + a magic piece's defense level
 /* the piece's share of the suit: what the tooltip calls its protection (region AR × body coverage) */
 EQ.protection = it => { const d = SF.ITEMS[it.id]; return d && d.slot ? EQ.regionAR(it) * EQ.coverage(d.slot) : 0; };
 EQ.baseProtection = it => { const d = SF.ITEMS[it.id]; return d && d.slot ? EQ.baseRegionAR(it) * EQ.coverage(d.slot) : 0; };
@@ -254,7 +254,7 @@ EQ.value = it => { const d = SF.ITEMS[it.id]; if (!d) return 0; const base = d.v
   const c = it.cond === undefined ? 1 : .5 + .5 * clamp(0, 1, it.cond / (it.maxc || 1)); return Math.round(base * EQ.mat(d.fixedMat || SF.matOf(it)).val * EQ.qual(it).val * c); };
 SF.itemWt = it => SF.itemKg(it) * SF.WU;
 SF.repairSkill = id => { const d = SF.ITEMS[id]; if (d.repair) return d.repair; if (d.fam && EQ.FAMILIES[d.fam].repair) return EQ.FAMILIES[d.fam].repair;
-  if (d.wpn === 'shortbow' || d.wpn === 'crossbow' || d.wpn === 'heavycrossbow') return 'carpentry'; if (d.armor === 'cloth' || d.armor === 'leather') return 'tailoring'; return 'smithing'; };
+  if (d.wpn === 'shortbow' || d.wpn === 'crossbow' || d.wpn === 'heavycrossbow') return 'bowcraft'; if (d.armor === 'cloth' || d.armor === 'leather') return 'tailoring'; return 'blacksmithy'; };
 
 /* ---------------- character totals ---------------- */
 EQ.equipKg = ch => { let k = 0; for (const s in ch.equip || {}) if (ch.equip[s]) k += SF.itemKg(ch.equip[s]) + (ch.equip[s].items ? SF.containerKg(ch.equip[s]) : 0); return k; };
@@ -298,18 +298,52 @@ EQ.signature = ch => EQ.SLOT_IDS.map(s => { const it = ch.equip && ch.equip[s]; 
 // equipment are restored exactly (same item objects, same quantities), so nothing is lost or duplicated.
 EQ.snapshot = ch => ({ items: ch.pack.items.slice(), qty: ch.pack.items.map(i => i.qty), equip: Object.assign({}, ch.equip), ver: ch.pack.ver });
 EQ.restore = (ch, s) => { ch.pack.items.splice(0, ch.pack.items.length, ...s.items); s.items.forEach((it, i) => { it.qty = s.qty[i]; }); for (const k of Object.keys(ch.equip)) delete ch.equip[k]; Object.assign(ch.equip, s.equip); ch.pack.ver = s.ver + 1; };
-EQ.tx = (ch, fn) => {
-  const s = EQ.snapshot(ch); let r;
+/* tx: run a command on the actor's pack and equipment; commit only if it adds no new inventory problem, else restore exactly.
+   A problem that was already there before the command (say an old save with a duplicate) does not block unrelated commands;
+   commit(r) runs only after the audit passed, so a side effect outside the actor (the world) can never be rolled back after. */
+const problemKeys = a => new Set(a.dups.map(u => 'd' + u).concat(a.bad.map(b => 'b' + b.uid + ':' + b.why)));
+EQ.tx = (ch, fn, commit) => {
+  const s = EQ.snapshot(ch), pre = problemKeys(EQ.audit(ch)); let r;
   try { r = fn(); } catch (e) { r = { ok: false, reason: 'internal error: ' + e.message }; }
-  if (r && r.ok) { const a = EQ.audit(ch); if (!a.ok) r = { ok: false, reason: 'duplicate item ' + a.dups.join(',') }; }
+  if (r && r.ok) { const a = EQ.audit(ch), fresh = [...problemKeys(a)].filter(k => !pre.has(k)); if (fresh.length) { const d = fresh.filter(k => k[0] === 'd').map(k => k.slice(1)), b = fresh.filter(k => k[0] === 'b').map(k => k.slice(1)); r = { ok: false, reason: d.length ? 'duplicate item ' + d.join(',') : 'invalid item ' + b.join(',') }; } }
+  if (r && r.ok && commit) { try { if (commit(r) === false) r = { ok: false, reason: r.commitReason || 'failed' }; } catch (e) { r = { ok: false, reason: 'internal error: ' + e.message }; } }
+  if (r) delete r.commitReason;
   if (!r || !r.ok) { EQ.restore(ch, s); return r || { ok: false, reason: 'failed' }; }
   ch.pack.ver++; return r;
 };
-/* every item instance exists exactly once across pack (nested), bank and equipment */
+/* every item instance exists exactly once across pack (nested), bank, equipment and any extra containers, and has a valid shape:
+   a positive safe-integer uid, a known item id and a positive whole quantity. Runs on commands only, never per tick. */
 EQ.audit = (ch, extra) => {
-  const seen = new Set(), dups = []; const see = it => { if (!it) return; if (seen.has(it.uid)) dups.push(it.uid); seen.add(it.uid); if (it.items) it.items.forEach(see); };
-  (ch.pack ? ch.pack.items : []).forEach(see); (ch.bank ? ch.bank.items : []).forEach(see); for (const s in ch.equip || {}) see(ch.equip[s]); for (const c of extra || []) c.items.forEach(see);
-  return { ok: !dups.length, dups };
+  const seen = new Set(), dups = [], bad = [];
+  const see = it => { if (!it) return; if (seen.has(it.uid)) dups.push(it.uid); seen.add(it.uid);
+    if (!Number.isSafeInteger(it.uid) || it.uid <= 0) bad.push({ uid: it.uid, why: 'uid' }); else if (!SF.ITEMS[it.id]) bad.push({ uid: it.uid, why: 'id' }); else if (!SF.validQty(it.qty)) bad.push({ uid: it.uid, why: 'qty' });
+    if (Array.isArray(it.items)) it.items.forEach(see); };
+  (ch.pack ? ch.pack.items : []).forEach(see); (ch.bank ? ch.bank.items : []).forEach(see); for (const s in ch.equip || {}) see(ch.equip[s]); for (const c of extra || []) (c.items || []).forEach(see);
+  return { ok: !dups.length && !bad.length, dups, bad };
+};
+/* normalize: repair a loaded character without losing anything. A repeated uid gets a fresh one (both copies are kept, since we
+   cannot know which is the original), a fractional quantity is floored, an empty or negative stack and an unknown id are removed.
+   extra: further containers owned by the save (corpses, piles, chests) that share the uid space. */
+EQ.normalize = (ch, extra) => {
+  const seen = new Set(), out = { reassigned: 0, fixedQty: 0, removed: 0, unknown: [] };
+  const fixList = list => { for (let i = list.length - 1; i >= 0; i--) if (!fixOne(list[i])) { list.splice(i, 1); out.removed++; } };
+  const fixOne = it => {
+    if (!it || typeof it !== 'object') return false;
+    if (!SF.ITEMS[it.id]) { out.unknown.push(it.id); return false; }
+    if (typeof it.qty !== 'number' || !isFinite(it.qty) || it.qty < 1) return false;
+    if (!Number.isSafeInteger(it.qty)) { it.qty = Math.min(Number.MAX_SAFE_INTEGER, Math.floor(it.qty)); out.fixedQty++; }
+    if (!Number.isSafeInteger(it.uid) || it.uid <= 0 || seen.has(it.uid)) { it.uid = SF.newItem(it.id, 1).uid; out.reassigned++; }
+    seen.add(it.uid); if (Array.isArray(it.items)) fixList(it.items); return true;
+  };
+  // the first pass registers every valid uid so the next-uid counter moves past them before anything is reassigned
+  let max = 0; const scan = it => { if (it && Number.isSafeInteger(it.uid)) max = Math.max(max, it.uid); if (it && Array.isArray(it.items)) it.items.forEach(scan); };
+  const lists = [ch.pack && ch.pack.items, ch.bank && ch.bank.items].concat((extra || []).map(c => c && c.items)).filter(Array.isArray);
+  lists.forEach(l => l.forEach(scan)); for (const s in ch.equip || {}) scan(ch.equip[s]); SF.setUidBase(max + 1);
+  for (const l of lists.slice(0, 2)) fixList(l);
+  for (const s in ch.equip || {}) if (ch.equip[s] && !fixOne(ch.equip[s])) { ch.equip[s] = null; out.removed++; }
+  for (const l of lists.slice(2)) fixList(l);
+  if (out.reassigned + out.fixedQty + out.removed && ch.pack) ch.pack.ver = (ch.pack.ver || 0) + 1;
+  return out;
 };
 EQ.find = (ch, uid) => { uid = +uid; const i = ch.pack.items.findIndex(it => it.uid === uid); if (i >= 0) return { where: 'pack', item: ch.pack.items[i], index: i }; for (const s in ch.equip || {}) if (ch.equip[s] && ch.equip[s].uid === uid) return { where: 'equip', slot: s, item: ch.equip[s] }; return null; };
 EQ.canEquip = (ch, it, slot) => {
@@ -340,16 +374,20 @@ EQ.unequipItem = (ch, a) => EQ.tx(ch, () => { const it = ch.equip[a.slot]; if (!
 /* moveItem / pickupItem: container to container through the conserving transfer, with the carrying-capacity check when cap is given */
 EQ.moveItem = (from, to, a) => SF.transfer(from, to, +a.uid, a.qty, { cap: a.cap, fromVer: a.fromVer });
 EQ.pickupItem = (ch, from, a) => { if (a.qty !== undefined && !(a.qty > 0)) return { ok: false, reason: 'nothing to take' }; return SF.transfer(from, ch.pack, +a.uid, a.qty, { cap: EQ.capFor(ch) }); };
-/* dropItem: out of the pack or a slot; place(item) puts it in the world and must return true, or the drop is undone */
+/* dropItem: out of the pack or a slot; place(item) puts it in the world and must return true, or the drop is undone.
+   Validate → stage (pack/equip change) → audit pack, bank, equipment → commit (place) last, so a refused drop never reaches
+   the world and a placed item is never also left behind. An item whose uid is repeated anywhere is not dropped at all. */
 EQ.dropItem = (ch, a, place) => EQ.tx(ch, () => {
   const f = EQ.find(ch, a.uid); if (!f) return { ok: false, reason: 'item is gone' }; const it = f.item, d = SF.ITEMS[it.id];
+  if (!SF.itemShapeOk(it)) return { ok: false, reason: 'that item is damaged' };
   if (!d.trade) return { ok: false, reason: 'that cannot be dropped' };
-  const q = Math.min(it.qty, Math.max(1, Math.floor(a.qty || it.qty))); let out = it;
-  if (q < it.qty) { out = SF.newItem(it.id, q, EQ.copyFields(it)); it.qty -= q; }
+  const pre = EQ.audit(ch); if (pre.dups.includes(it.uid)) return { ok: false, reason: 'that item is listed twice; it cannot be dropped' };
+  let q = it.qty; if (a.qty !== undefined) { q = a.qty; if (!SF.validQty(q) || q > it.qty) return { ok: false, reason: 'invalid quantity' }; }
+  let out = it;
+  if (q < it.qty) { if (!d.stack) return { ok: false, reason: 'that does not split' }; out = SF.newItem(it.id, q, EQ.copyFields(it)); it.qty -= q; }
   else if (f.where === 'pack') ch.pack.items.splice(ch.pack.items.indexOf(it), 1); else ch.equip[f.slot] = null;
-  if (place && place(out) === false) return { ok: false, reason: 'there is no room to drop it here' };
-  return { ok: true, item: out, qty: q, from: f.where === 'equip' ? f.slot : 'pack' };
-});
+  return { ok: true, item: out, qty: q, from: f.where === 'equip' ? f.slot : 'pack', commitReason: 'there is no room to drop it here' };
+}, r => (place ? place(r.item) : true));
 EQ.copyFields = it => { const o = {}; for (const k in it) if (k !== 'uid' && k !== 'qty') o[k] = it[k] && typeof it[k] === 'object' ? JSON.parse(JSON.stringify(it[k])) : it[k]; return o; };
 /* splitStack / mergeStacks inside one container */
 EQ.splitStack = (c, a) => { const it = c.items.find(i => i.uid === +a.uid); const q = Math.floor(a.qty); if (!it) return { ok: false, reason: 'item is gone' }; if (!SF.ITEMS[it.id].stack || !(q >= 1 && q < it.qty)) return { ok: false, reason: 'cannot split that' };
@@ -383,7 +421,7 @@ const R = [];
 const rec = (sub, out, skill, min, station, tool, lines, x) => R.push(Object.assign({ id: out, name: SF.ITEMS[out].n, out, qty: 1, skill, min, station, tool, cat: 'Armor', sub, lines }, x || {}));
 const tailorCloth = (out, min, n) => rec('Cloth', out, 'tailoring', min, 'bench', 'sewkit', [{ item: 'cloth', qty: n }], { fixedMat: 'cloth' });
 const tailorHide = (sub, out, min, n, extra) => rec(sub, out, 'tailoring', min, 'bench', 'sewkit', [{ form: 'hide', qty: n }].concat(extra || []), { prim: 'hide', defMat: 'regular' });
-const smith = (sub, out, min, n, extra) => rec(sub, out, 'smithing', min, 'anvil', 'tongs', [{ form: 'ingot', qty: n }].concat(extra || []), { prim: 'metal', defMat: 'iron' });
+const smith = (sub, out, min, n, extra) => rec(sub, out, 'blacksmithy', min, 'anvil', 'tongs', [{ form: 'ingot', qty: n }].concat(extra || []), { prim: 'metal', defMat: 'iron' });
 tailorCloth('cloth_cap', 0, 2); tailorCloth('shirt', 0, 4); tailorCloth('trousers', 0, 4); tailorCloth('cloth_gloves', 5, 2); tailorCloth('tabard', 10, 5); tailorCloth('cloak', 15, 7); tailorCloth('robe', 20, 8);
 tailorHide('Leather', 'leather_cap', 10, 2); tailorHide('Leather', 'leather_gloves', 15, 3); tailorHide('Leather', 'leather_gorget', 20, 4); tailorHide('Leather', 'leather_sleeves', 25, 8);
 tailorHide('Leather', 'leather_leggings', 30, 10); tailorHide('Leather', 'leather_tunic', 35, 12); tailorHide('Leather', 'shoes', 5, 2); tailorHide('Leather', 'boots', 15, 4); tailorHide('Leather', 'belt', 5, 2);
@@ -398,7 +436,7 @@ smith('Helmets', 'bascinet', 10, 15); smith('Helmets', 'open_helm', 30, 15); smi
 smith('Shields', 'metal_shield', 25, 14, [{ item: 'strap', qty: 1 }]); smith('Shields', 'kite_shield', 45, 16, [{ item: 'strap', qty: 1 }]); smith('Shields', 'heater_shield', 65, 18, [{ item: 'strap', qty: 2 }]);
 rec('Shields', 'wooden_shield', 'carpentry', 10, 'bench', 'knife', [{ form: 'log', qty: 6 }, { item: 'strap', qty: 1 }], { prim: 'wood', defMat: 'pine' });
 for (const [out, min, n] of [['dragon_gloves', 85, 8], ['dragon_helm', 87, 10], ['dragon_arms', 90, 14], ['dragon_legs', 92, 18], ['dragon_chest', 95, 22]])
-  rec('Dragon scale', out, 'smithing', min, 'anvil', 'tongs', [{ item: 'dragonscale', qty: n }, { item: 'strap', qty: Math.ceil(n / 4) }], { fixedMat: 'dragonscale' });
+  rec('Dragon scale', out, 'blacksmithy', min, 'anvil', 'tongs', [{ item: 'dragonscale', qty: n }, { item: 'strap', qty: Math.ceil(n / 4) }], { fixedMat: 'dragonscale' });
 smith('Accessories', 'ring', 20, 1); smith('Accessories', 'bracelet', 25, 2); smith('Accessories', 'necklace', 30, 2);
 // woods: the generic lineItem knows ingots and ores; logs follow the same pattern
 const baseLine2 = SF.lineItem; SF.lineItem = (ln, m, s) => ln.form === 'log' ? { id: SF.logId(m), mat: null } : baseLine2(ln, m, s);

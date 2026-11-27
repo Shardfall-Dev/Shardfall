@@ -11,12 +11,12 @@ let CASTID = 0;
 const isLiving = a => a && (a === P ? !P.ghost : alive(a) && (a.kind === 'mon' || a.kind === 'pet' || (a.kind === 'ally' && !a.ghost)));
 const isPlayerGhost = e => (e.kind === 'player' || e.kind === 'ally') && e.ghost;
 const mgOf = a => a.mg || (a.mg = {});
-const MON_R = m => { const d = MON[m.type]; return d && d.wardcraft !== undefined ? d.wardcraft : cl(Math.round((d ? d.diff : 30) - 15), 0, 100); };   // tuning: creature Wardcraft
-const rOf = a => a === P ? sv('wardcraft') : a.summon ? 30 : MON_R(a);
+const MON_R = m => { const d = MON[m.type]; return d && d.resist !== undefined ? d.resist : cl(Math.round((d ? d.diff : 30) - 15), 0, 100); };   // tuning: creature Wardcraft
+const rOf = a => a === P ? sv('resistingspells') : a.summon ? 30 : MON_R(a);
 const intOf = a => a === P ? P.int : a.summon ? (a.summon.int || 40) : (MON[a.type] && MON[a.type].int) || 20 + Math.round(((MON[a.type] || {}).diff || 30) * .6);   // tuning
 const tacticsOf = a => a === P ? sv('tactics') : (MON[a.type] || {}).atk || 40;
 const nameOf = a => a === P ? 'you' : a.name || (MON[a.type] || {}).n || 'it';
-const mval = () => sv('spellcraft'), eval_ = () => sv('focus');
+const mval = () => sv('magery'), eval_ = () => sv('evaluatingintelligence');
 function knownSpells() { return MG.bookSpells(P.pack); }
 function hurt(a, amt, src, kind) { if (amt <= 0) { floater(a.x, a.y, '0', '#c8c8c8'); return; } damageActor(a, amt, kind, src); }   // the shared damage entry (src/game.js)
 function aggro(a, src) { if (a !== P && a.kind === 'mon' && alive(a) && !a.target) { a.target = src || P; a.state = 'chase'; } }
@@ -36,9 +36,9 @@ function castSlot(id, opt) {
   if (!sp.legacy) {
     if (!scroll && !knownSpells().has(id)) { if (!SF.count(P.pack, 'spellbook')) return log('You need your spellbook to cast ' + sp.n + '.', '#ffb070'); return log(sp.n + ' is not in your spellbook' + (SF.count(P.pack, sp.scroll) ? ' — read the scroll from your pack, or learn it.' : '.'), '#ffb070'); }
     if (scroll && !SF.count(P.pack, sp.scroll)) return log('You have no scroll of ' + sp.n + '.', '#ffb070');
-    if (!scroll && M < sp.min) return log(`${sp.n} needs Spellcraft ${sp.min}.`, '#ffb070');
-    if (scroll && MG.scrollChance(sp, M) <= 0) return log(`The scroll's words slip away from you (Spellcraft above ${MG.scrollGate(sp)} needed).`, '#ffb070');
-  } else if (M < sp.min) return log(`${sp.n} needs Spellcraft ${sp.min}.`, '#ffb070');
+    if (!scroll && M < sp.min) return log(`${sp.n} needs Magery ${sp.min}.`, '#ffb070');
+    if (scroll && MG.scrollChance(sp, M) <= 0) return log(`The scroll's words slip away from you (Magery above ${MG.scrollGate(sp)} needed).`, '#ffb070');
+  } else if (M < sp.min) return log(`${sp.n} needs Magery ${sp.min}.`, '#ffb070');
   const items = scroll ? [sp.scroll] : sp.regs;
   const miss = items.filter(r => !SF.count(P.pack, r)); if (miss.length) return log('Missing reagents: ' + miss.map(r => SF.ITEMS[r].n).join(', ') + '.', '#ffb070');
   if (P.mana < sp.mp) return log('Not enough mana.', '#ffb070');
@@ -60,7 +60,7 @@ function prepTick() {
   if (P.prep && GT >= P.prep.t1) {
     const pr = P.prep, sp = pr.sp; P.prep = null; const M = mval();
     const ch = sp.legacy ? SF.spellSuccess(M, sp.min) : MG.chance(sp, M, pr.scroll);
-    const ok = R() < ch; gain('spellcraft', sp.legacy ? sp.min + 15 : (pr.scroll ? MG.scrollGate(sp) : sp.min) + 10);
+    const ok = R() < ch; skillUse('magery', ch, ok, null, sp.legacy ? [sp.min - 20, sp.min + 30] : SF.SK.magCircleWindow(pr.scroll ? Math.max(1, sp.circle - 2) : sp.circle));   // circle window: a circle stops teaching 20 points above its centre
     if (!ok) { log((pr.scroll ? 'The scroll crumbles and the spell fizzles.' : 'The spell fizzles.'), '#a8a8a8'); P.spellReadyAt = GT + MG.RECOVERY; snd('magic.fizzle', { key: 'P' }); FX.push({ k: 'puff', x: P.x, y: P.y, t0: GT, dur: .6 }); return; }
     P.held = { sp, t0: GT, until: GT + MG.HOLD, scroll: pr.scroll, rid: pr.rid }; snd('magic.prepare', { key: 'P' });
     if (sp.tgt === 'self' && (sp.legacy || !['magery.56'].includes(sp.id))) { if (releaseHeld(P)) return; }
@@ -145,7 +145,7 @@ function spellHit(sp, a, base, ctx) {
   const eid = ctx.cid + ':' + (a === P ? 'P' : a.id) + (ctx.tag || ''); if (RESOLVED.has(eid)) return null; RESOLVED.add(eid);
   if (!isLiving(a)) return null;
   const r = MG.resolveHit({ mode: ctx.mode || sp.resist, base, circle: ctx.circle || sp.circle, M: ctx.M, E: ctx.E, R: rOf(a) }, R);
-  if (a === P && ctx.src === P) gain('wardcraft', sp.min + 10);
+  if (a === P && r.roll !== null && r.chance > 0 && svReal('resistingspells') < SF.SK.resistMaxFor(ctx.circle || sp.circle || 1)) skillCheck('resistingspells', 0, 120);   // any resistible spell that reaches you teaches, up to a ceiling set by its circle (RunUO CheckResisted)
   if (r.applied > 0) hurt(a, r.applied, ctx.src, 'spell'); else floater(a.x, a.y, '0', '#c8c8c8');
   if (a !== P) aggro(a, ctx.src);
   log(`${sp.n}${ctx.reflected ? ' (reflected)' : ''} → ${nameOf(a)}: ${r.applied}${r.resisted ? ' (resisted)' : ''}${ctx.note || ''}`, a === P ? '#ff9a8a' : '#c8a0ff', 'combat');
@@ -176,10 +176,10 @@ function effectOn(sp, t, x) {
   if (sp.tgt === 'living' && a !== P) { const rf = reflectFor(sp, a); if (rf) { a = rf.recipient; ctx.src = rf.src; ctx.reflected = true; } }
   if (sp.tgt === 'living' && a !== P && sp.effect !== 'heal') aggro(a, P);
   switch (sp.effect) {
-    case 'direct': case 'delayed_hit': deliver(sp, a, ctx, () => { const base = MG.rollBase(sp.id, M, R); spellHit(sp, a, base, ctx); if (sp.id === 'magery.51') FX.push({ k: 'boom', x: a.x, y: a.y, r: .9, t0: GT, dur: .6 }); if (sp.id === 'magery.30') FX.push({ k: 'bolt', x: a.x, y: a.y, t0: GT, dur: .3 }); if (sp.id === 'magery.43') FX.push({ k: 'boom', x: a.x, y: a.y, r: 1, t0: GT, dur: .5 }); }); gain('focus', sp.min + 10); return true;
+    case 'direct': case 'delayed_hit': deliver(sp, a, ctx, () => { const base = MG.rollBase(sp.id, M, R); spellHit(sp, a, base, ctx); if (sp.id === 'magery.51') FX.push({ k: 'boom', x: a.x, y: a.y, r: .9, t0: GT, dur: .6 }); if (sp.id === 'magery.30') FX.push({ k: 'bolt', x: a.x, y: a.y, t0: GT, dur: .3 }); if (sp.id === 'magery.43') FX.push({ k: 'boom', x: a.x, y: a.y, r: 1, t0: GT, dur: .5 }); }); skillCheck('evaluatingintelligence', 0, 100); return true;
     case 'conditional_hit': { const ci = P.int, ti = intOf(a); const mb = MG.mindburst(ci, ti); const victim = mb.victim === 'caster' ? P : mb.victim === 'target' ? a : null;
       deliver(sp, a, ctx, () => { if (!victim || !mb.amount) { floater(a.x, a.y, 'no effect', '#c8c8c8'); log('Mindburst: equal minds, no effect.', '#c8a0ff'); return; } spellHit(sp, victim, mb.amount, Object.assign({}, ctx, { mode: 'half_only', tag: victim === P ? ':back' : '', note: victim === P ? ' — backfire' : '' })); });
-      gain('focus', sp.min + 10); return true; }
+      skillCheck('evaluatingintelligence', 0, 100); return true; }
     case 'heal': { const amt = MG.rollBase(sp.id, M, R); healActor(a, amt); return true; }
     case 'stat_bonus': { applyStats(a, sp.stats, A, GT + MG.boonDuration(M)); floater(a.x, a.y, sp.stats.map(s => '+' + A + ' ' + s.toUpperCase()).join(' '), '#9fe8ff'); return true; }
     case 'stat_penalty': { const until = GT + MG.ceilTick(MG.hexDuration(M, rOf(a))); applyStats(a, sp.stats, -A, until); floater(a.x, a.y, sp.stats.map(s => '−' + A + ' ' + s.toUpperCase()).join(' '), '#c97bff'); log(`${sp.n} → ${nameOf(a)}${ctx.reflected ? ' (reflected)' : ''}: −${A} ${sp.stats.join('/').toUpperCase()} for ${Math.round(until - GT)} s.`, '#c8a0ff'); return true; }
@@ -199,7 +199,7 @@ function effectOn(sp, t, x) {
     case 'disguise': { const g = mgOf(P); g.disguise = { name: pick(['Hooded traveller', 'Grey wanderer', 'Marsh pilgrim', 'Salt-stained sailor']), until: GT + MG.incognito(M) }; log('You now appear as a ' + g.disguise.name.toLowerCase() + '.', '#c8e0ff'); return true; }
     case 'transformation': { const form = x.form || (mgOf(P).lastForm) || 'hound'; const g = mgOf(P); g.form = { type: form, until: GT + MG.polymorph(M) }; g.lastForm = form; FX.push({ k: 'puff', x: P.x, y: P.y, t0: GT, dur: .6 }); log('You take the form of a ' + MON[form].n + '.', '#c8e0ff'); return true; }
     case 'movement': { if (!standable(t.x, t.y) || occupied(t.x, t.y, P)) { log('Blink Step needs open, legal ground.', '#ffb070'); return false; } FX.push({ k: 'puff', x: P.x, y: P.y, t0: GT, dur: .4 }); P.x = t.x; P.y = t.y; FX.push({ k: 'puff', x: P.x, y: P.y, t0: GT, dur: .4 }); return true; }
-    case 'shared_damage': { const c = { x: t.x, y: t.y }; EFX.push({ k: 'groundwarn', x: c.x, y: c.y, r: sp.radius, t0: GT, at: GT + sp.delay, fn: () => areaPool(sp, c, ctx) }); gain('focus', sp.min + 10); return true; }
+    case 'shared_damage': { const c = { x: t.x, y: t.y }; EFX.push({ k: 'groundwarn', x: c.x, y: c.y, r: sp.radius, t0: GT, at: GT + sp.delay, fn: () => areaPool(sp, c, ctx) }); skillCheck('evaluatingintelligence', 0, 100); return true; }
     case 'area_percent_hit': { const c = { x: P.x, y: P.y }; EFX.push({ k: 'groundwarn', x: c.x, y: c.y, r: sp.radius, t0: GT, at: GT + sp.delay, fn: () => { for (const v of livingNear(c.x, c.y, sp.radius, e => e !== P && los(c, e))) { const n = MG.earthshaker(v.hp); hurt(v, n, P, 'spell'); aggro(v, P); log(`Earthshaker → ${nameOf(v)}: ${n}`, '#c8a0ff', 'combat'); } FX.push({ k: 'boom', x: c.x, y: c.y, r: 3, t0: GT, dur: .7 }); sndAt('combat.blast', c); } }); return true; }
     case 'barrier': case 'damage_field': case 'poison_field': case 'control_field': return placeField(sp, t, M, E, ctx);
     case 'field_removal': return dispelField(t);
@@ -268,8 +268,8 @@ function unveil(sp, t, M) {
   FX.push({ k: 'ring', x: t.x, y: t.y, c: '#fff0a0', t0: GT, dur: 1 }); let n = 0;
   for (const m of ents) if (m.kind === 'mon' && alive(m) && Math.hypot(m.x - t.x, m.y - t.y) <= sp.radius) {
     if (m.invisUntil > GT) { m.invisUntil = 0; n++; floater(m.x, m.y, 'revealed', '#fff0a0'); }
-    if (m.hidden && R() < MG.revealChance(M, sv('search'), (MON[m.type] || {}).diff || 40, 0)) { m.hidden = false; n++; floater(m.x, m.y, 'revealed', '#fff0a0'); } }
-  for (const tr of TRAPS) if (tr.hidden && Math.hypot(tr.x - t.x, tr.y - t.y) <= sp.radius && R() < MG.revealChance(M, sv('search'), tr.diff, 0)) { tr.hidden = false; n++; }
+    if (m.hidden && R() < MG.revealChance(M, sv('detectinghidden'), (MON[m.type] || {}).diff || 40, 0)) { m.hidden = false; n++; floater(m.x, m.y, 'revealed', '#fff0a0'); } }
+  for (const tr of TRAPS) if (tr.hidden && Math.hypot(tr.x - t.x, tr.y - t.y) <= sp.radius && R() < MG.revealChance(M, sv('detectinghidden'), tr.diff, 0)) { tr.hidden = false; n++; }
   log(n ? `Unveil exposes ${n} hidden thing${n > 1 ? 's' : ''}.` : 'Unveil finds nothing hidden.', n ? '#ffe08a' : undefined); return true;
 }
 
@@ -282,7 +282,7 @@ function chestSpell(sp, pt, M, E) {
   if (sp.effect === 'lock') { log('Arcane Lock seals only a container you own. This chest is not yours.', '#ffb070'); return false; }
   if (sp.effect === 'trap') { if (c.rtrap) { log('That latch already carries a rune trap.'); return true; } c.rtrap = { M, E, by: P.name }; FX.push({ k: 'ring', x: cpos.x, y: cpos.y, c: '#ff8a40', t0: GT, dur: .6 }); log('A spark settles into the latch.', '#ffb070'); return true; }
   if (sp.effect === 'disarm') { if (!c.rtrap) { log('There is no rune trap on that latch.'); return true; } c.rtrap = null; FX.push({ k: 'ring', x: cpos.x, y: cpos.y, c: '#c8c8c8', t0: GT, dur: .6 }); log('You pull the spark from the latch.', '#7ee08a'); return true; }
-  if (sp.effect === 'unlock') { if (c.open && GT <= c.refill) { log('That chest is already open.'); return true; } const need = c.mlock || MLOCK_REQ[c.tier] || 70; if (M < need) { log(`The seal is too strong (Spellcraft ${need}).`, '#ffb070'); return true; } c.open = true; c.refill = GT + 600; c.cont = chestLoot(c.tier); c.mlock = 0; log('The lock gives way. Any trap on it is still armed.', '#ffe08a'); return true; }
+  if (sp.effect === 'unlock') { if (c.open && GT <= c.refill) { log('That chest is already open.'); return true; } const need = c.mlock || MLOCK_REQ[c.tier] || 70; if (M < need) { log(`The seal is too strong (Magery ${need}).`, '#ffb070'); return true; } c.open = true; c.refill = GT + 600; c.cont = chestLoot(c.tier); c.mlock = 0; log('The lock gives way. Any trap on it is still armed.', '#ffe08a'); return true; }
   if (sp.effect === 'object_use') { FX.push({ k: 'ring', x: cpos.x, y: cpos.y, c: '#c8e0ff', t0: GT, dur: .6 }); if (c.rtrap) springRuneTrap(c, true); else log('The far hand touches the latch. Nothing happens.'); return true; }
   return true;
 }
@@ -420,8 +420,8 @@ function magicArmor(a) { const g = a.mg; return g && g.armor && g.armor.until > 
 function recomputeStats() {
   if (!P.base) P.base = { str: P.str, dex: P.dex, int: P.int };
   const g = P.mg || {}; const eff = P._eff || {};
-  for (const s of ['str', 'dex', 'int']) { if (eff[s] !== undefined && P[s] !== eff[s]) P.base[s] += P[s] - eff[s];   // trained outside magic: keep the change on the base
-    P[s] = MG.effectiveStat(P.base[s], g.mods, s, GT); eff[s] = P[s]; }
+  // P.base holds the natural attributes and only SF.STATS changes them (v0.30); P.str/dex/int are always derived from it
+  for (const s of ['str', 'dex', 'int']) { P[s] = MG.effectiveStat(P.base[s], g.mods, s, GT); eff[s] = P[s]; }
   P._eff = eff;
   // pools never fill on a cap increase; they clamp down on a decrease. A living character keeps at least 1 HP.
   P.hp = Math.min(P.hp, SF.maxHp(P)); if (!P.ghost) P.hp = Math.max(1, P.hp); P.stam = Math.min(P.stam, SF.maxStam(P)); P.mana = Math.min(P.mana, SF.maxMana(P));
@@ -475,7 +475,7 @@ function drawSummon(g, e, x, y) {
   else { g.fillStyle = c; g.beginPath(); g.ellipse(x, y - 22, 11, 20, 0, 0, 7); g.fill(); g.fillStyle = 'rgba(255,255,255,.7)'; g.fillRect(x - 5, y - 32, 3, 3); g.fillRect(x + 2, y - 32, 3, 3); }
   g.globalAlpha = 1;
 }
-function drawForm(g, e, x, y) { const f = e === P && P.mg && P.mg.form; if (!f) return false; if (MSI[f.type]) return drawSheet(g, f.type, P.sect, P.speed > .3 ? Math.floor(GT * 9) % 4 : 0, x, y); const s = beastSprite({ type: f.type, speed: P.speed, sect: P.sect, state: '' }); g.imageSmoothingEnabled = false; g.drawImage(s, Math.round(x - s.ox), Math.round(y - s.oy)); return true; }
+function drawForm(g, e, x, y) { const f = e === P && P.mg && P.mg.form; if (!f) return false; if (BSI[f.type] && drawBestiary(g, { type: f.type, sect: P.sect, speed: P.speed, state: '', id: 0 }, x, y)) return true; if (MSI[f.type]) return drawSheet(g, f.type, P.sect, P.speed > .3 ? Math.floor(GT * 9) % 4 : 0, x, y); const s = beastSprite({ type: f.type, speed: P.speed, sect: P.sect, state: '' }); g.imageSmoothingEnabled = false; g.drawImage(s, Math.round(x - s.ox), Math.round(y - s.oy)); return true; }
 
 /* ---------- hotbar signs: drag on desktop, "Assign to slot" or long-press on touch ---------- */
 function magicSlots() {
@@ -500,7 +500,7 @@ const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
 let MDET = null;
 function spellbookPanel() {
   const M = mval(), known = knownSpells(), hasBook = SF.count(P.pack, 'spellbook') > 0; const c = +(PTAB || 1) || 1;
-  let h = `<div class="note">Spellcraft ${f1(P.skills.spellcraft.v)} · Focus ${f1(P.skills.focus.v)} · ${hasBook ? known.size + ' / 64 spells in your book' : '<b class="warn">no spellbook in your pack</b>'}. Tap a slot to prepare, then tap a target to release (3 s hold). Drag a sign to the bar, or long-press it.</div>`;
+  let h = `<div class="note">Magery ${f1(P.skills.magery.v)} · Evaluating Intelligence ${f1(P.skills.evaluatingintelligence.v)} · ${hasBook ? known.size + ' / 64 spells in your book' : '<b class="warn">no spellbook in your pack</b>'}. Tap a slot to prepare, then tap a target to release (3 s hold). Drag a sign to the bar, or long-press it.</div>`;
   h += `<div class="chips">${[1, 2, 3, 4, 5, 6, 7, 8].map(i => btn('mtab', ROMAN[i], { c: i }, i === c ? 'ac' : '')).join('')}</div>`;
   for (const sp of MG.SPELLS.filter(s => s.circle === c)) {
     const k = known.has(sp.id), sc = SF.count(P.pack, sp.scroll), ch = MG.bookChance(sp, M), rg = sp.regs.map(r => `${SF.ITEMS[r].n}${SF.count(P.pack, r) ? '' : ' ✗'}`).join(', ');
@@ -529,11 +529,6 @@ function magicItemActions(it) {
   if (it.id === 'spellbook') a += btn('open', 'Open', { p: 'spells' });
   return a;
 }
-function mageryStarter(add) {
-  if (P.skills.spellcraft.v < 100) P.skills.spellcraft.v = 100;            // magic starters begin with at least 10.0 Spellcraft
-  P.pack.items.push(SF.newItem('spellbook', 1, { spells: MG.STARTER.slice() }));
-  for (const r of Object.keys(MG.REAGENTS)) add(r, 12); add('rune', 1);
-}
 
 /* ---------- boot: shops, loot, migration, panels, actions ---------- */
 function mageryBoot(saved) {
@@ -559,16 +554,16 @@ function mageryBoot(saved) {
 }
 
 /* ---------- launch-book spells: kept castable for old hotbars that still name them ---------- */
-function spellDmg(base) { return SF.spellDamage(base, sv('focus'), 0); }
+function spellDmg(base) { return SF.spellDamage(base, sv('evaluatingintelligence'), 0); }
 function applyLegacy(sp, t) {
-  const sc = sv('spellcraft');
+  const sc = sv('magery');
   if (sp.heal) { const amt = Math.round(sp.heal[0] + sp.heal[1] * sc); const tgt = t.kind ? t : P; const b = tgt.hp; tgt.hp = Math.min(tgt === P ? SF.maxHp(P) : tgt.max, tgt.hp + amt); FX.push({ k: 'heal', x: tgt.x, y: tgt.y, t0: GT, dur: .8 }); floater(tgt.x, tgt.y, '+' + Math.round(tgt.hp - b), '#7ee08a'); spellSnd(sp, tgt); return; }
   if (sp.absorb) { P.veil = { left: sp.absorb, until: GT + sp.dur }; floater(P.x, P.y, 'stoneveil', '#c8b890'); spellSnd(sp, P); return; }
   if (sp.recall) { const s = SHRINES.find(z => z.id === P.bound); P.x = s.x + .5; P.y = s.y + 1.7; FX.push({ k: 'ring', x: P.x, y: P.y, c: '#ffe08a', t0: GT, dur: .8 }); log('You return to the ' + s.n + '.'); SFXA.cancelPending(); spellSnd(sp, P); return; }
   if (sp.summon) { if (petSlotsUsed() > 0) return log('The Reedling needs both control slots. Dismiss your pets first.'); addEnt({ kind: 'pet', type: null, name: 'Reedling', x: P.x + 1, y: P.y, hp: 40, max: 40, until: GT + sp.summon, order: 'follow', slots: 2 }); log('A Reedling rises from the reeds.', '#ffe08a'); spellSnd(sp, { x: P.x + 1, y: P.y }); return; }
   if (sp.cloud) { EFX.push({ k: 'cloud', x: t.x, y: t.y, r: sp.radius, until: GT + sp.cloud }); spellSnd(sp, t); for (const m of ents) if (m.kind === 'mon' && m.target === P && !los(m, P)) { m.state = 'return'; m.target = null; } return; }
   if (sp.root) { EFX.push({ k: 'root', x: t.x, y: t.y, r: sp.radius, until: GT + sp.root }); spellSnd(sp, t); for (const m of ents) if (m.kind === 'mon' && alive(m) && Math.hypot(m.x - t.x, m.y - t.y) <= sp.radius) { m.rooted = GT + sp.root; floater(m.x, m.y, 'rooted', '#c8a070'); if (!m.target) { m.target = P; m.state = 'chase'; } } return; }
-  if (sp.id === 'saltstorm') { EFX.push({ k: 'groundwarn', x: t.x, y: t.y, r: sp.radius, t0: GT, at: GT + sp.warn, fn: () => { FX.push({ k: 'bolt', x: t.x, y: t.y, t0: GT, dur: .3 }); spellSnd(sp, t); for (const m of ents.slice()) if (m.kind === 'mon' && alive(m) && Math.hypot(m.x - t.x, m.y - t.y) <= sp.radius) damageMon(m, spellDmg(sp.dmg), 'spell'); gain('focus', sp.min + 10); } }); return; }
+  if (sp.id === 'saltstorm') { EFX.push({ k: 'groundwarn', x: t.x, y: t.y, r: sp.radius, t0: GT, at: GT + sp.warn, fn: () => { FX.push({ k: 'bolt', x: t.x, y: t.y, t0: GT, dur: .3 }); spellSnd(sp, t); for (const m of ents.slice()) if (m.kind === 'mon' && alive(m) && Math.hypot(m.x - t.x, m.y - t.y) <= sp.radius) damageMon(m, spellDmg(sp.dmg), 'spell'); skillCheck('evaluatingintelligence', 0, 100); } }); return; }
   const m = t; if (m === P || m.kind !== 'mon') return; if (!m.target) { m.target = P; m.state = 'chase'; }
   if (sp.unweave) { if (m.ward > 0) { m.ward = 0; floater(m.x, m.y, 'unwoven', '#c8a0ff'); spellSnd(sp, m); } else log('There is no ward on that creature to unweave.'); return; }
   if (sp.hex) { m.hexUntil = GT + sp.hex; floater(m.x, m.y, 'hexed', '#c97bff'); spellSnd(sp, m); return; }

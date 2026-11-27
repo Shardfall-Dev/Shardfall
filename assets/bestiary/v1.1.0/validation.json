@@ -1,0 +1,98 @@
+{
+  "boar": {
+    "frames": 40,
+    "size": [
+      800,
+      1280
+    ],
+    "source": "a_clean_transparent_background_sprite_sheet_a_5_c.png",
+    "target_height": 46,
+    "actual_idle_median_height": 46.5,
+    "min_max_height": [
+      39,
+      54
+    ],
+    "source_edge_flags": [],
+    "sha256": "9b79c3d5fb88ffcbcc9adb30d49b0027987ecff6cc922cf639bfcb3944c02979"
+  },
+  "hound": {
+    "frames": 40,
+    "size": [
+      800,
+      1280
+    ],
+    "source": "a_detailed_sprite_sheet_style_image_a_clean_800_1.png",
+    "target_height": 46,
+    "actual_idle_median_height": 46.5,
+    "min_max_height": [
+      34,
+      57
+    ],
+    "source_edge_flags": [],
+    "sha256": "8fdf8e3bd4a963a1c39d1adbda89a3b5c0087279f394c79ce5d86ff17d54a464"
+  },
+  "snapper": {
+    "frames": 40,
+    "size": [
+      800,
+      1280
+    ],
+    "source": "a_clean_transparent_background_sprite_sheet_game.png",
+    "target_height": 34,
+    "actual_idle_median_height": 34.0,
+    "min_max_height": [
+      31,
+      44
+    ],
+    "source_edge_flags": [],
+    "sha256": "14c94bde279a551e4f32a758244f758a714ae0e838fafe67158fa16441faaa75"
+  },
+  "spider": {
+    "frames": 40,
+    "size": [
+      800,
+      1280
+    ],
+    "source": "a_detailed_sprite_sheet_image_a_clean_transparent.png",
+    "target_height": 30,
+    "actual_idle_median_height": 30.5,
+    "min_max_height": [
+      27,
+      36
+    ],
+    "source_edge_flags": [],
+    "sha256": "48f1ad3be6fbe06ba44437000ef04473590391dbacc0ee0aaaf82f00fb414f0d"
+  },
+  "deer": {
+    "frames": 40,
+    "size": [
+      800,
+      1280
+    ],
+    "source": "a_high_resolution_sprite_sheet_image_with_a_transp.png",
+    "target_height": 54,
+    "actual_idle_median_height": 54.5,
+    "min_max_height": [
+      43,
+      61
+    ],
+    "source_edge_flags": [],
+    "sha256": "8a0a33eb7541a976343d8213be809f793f327031ad08d59996939d5049f10146"
+  },
+  "hare": {
+    "frames": 40,
+    "size": [
+      800,
+      1280
+    ],
+    "source": "a_clean_transparent_background_sprite_sheet_a_sin.png",
+    "target_height": 22,
+    "actual_idle_median_height": 22.0,
+    "min_max_height": [
+      21,
+      25
+    ],
+    "source_edge_flags": [],
+    "sha256": "d00b9ff05f58caa65eaccab5a7eb0ddb465e6007d9d7e959b4abf6a66954a5f7"
+  }
+}

@@ -31,13 +31,23 @@ def stick(page, jx, jy, ms):
 PLUS_Y, MINUS_Y, PLUS_X = (-80, 40), (80, -40), (80, 40)
 def tp(page, x, y): J(page, "([x, y]) => { const P = __SF.P; P.x = x; P.y = y; P.sel = null; P.armed = false; P.task = null; }", [x, y])
 
+# fixture: the timings below were tuned on the old 150-point profile (55 / 45 / 50); v0.30 characters start at 65 points,
+# so swing and cast timing would differ. The sound checks are about which cue plays, not about attributes.
+OLDSTATS = "(() => { const P = __SF.P; Object.assign(P.base, { str: 55, dex: 45, int: 50 }); P.str = 55; P.dex = 45; P.int = 50; P.stam = 45; P.mana = 50; P.hp = __SF.SF.maxHp(P); })()"
 def create(page, name, keyboard=False):
-    page.goto(HTML); page.wait_for_selector('#ccn')
+    # the real creator (v0.30): title → New character → name → Next ×3 → Begin; by keyboard or by mouse
+    page.goto(HTML); page.wait_for_selector('[data-c=new]')
     if keyboard:
-        page.focus('#ccn'); page.keyboard.type(name); page.focus('[data-c=go]'); page.keyboard.press('Enter')
+        page.focus('[data-c=new]'); page.keyboard.press('Enter'); page.wait_for_selector('#ccn'); page.focus('#ccn'); page.keyboard.type(name); page.keyboard.press('Enter')
+        for _ in range(2): page.wait_for_selector('[data-c=next]'); page.focus('[data-c=next]'); page.keyboard.press('Enter')
+        if page.locator('[data-c=replace]').count(): page.focus('[data-c=replace]'); page.keyboard.press('Space')
+        page.wait_for_selector('[data-c=go]:not([disabled])'); page.focus('[data-c=go]'); page.keyboard.press('Enter')
     else:
-        page.fill('#ccn', name); page.click('[data-c=go]')
-    page.wait_for_function('window.__SF && __SF.P'); J(page, HOOK)
+        page.click('[data-c=new]'); page.fill('#ccn', name)
+        for _ in range(3): page.click('[data-c=next]')
+        if page.locator('[data-c=replace]').count(): page.check('[data-c=replace]')
+        page.click('[data-c=go]')
+    page.wait_for_function('window.__SF && __SF.P'); J(page, HOOK); J(page, OLDSTATS)
 
 with sync_playwright() as pw:
     br = pw.chromium.launch(executable_path='/usr/bin/google-chrome', args=['--mute-audio'])
@@ -45,10 +55,10 @@ with sync_playwright() as pw:
     # ---------- mobile: first gesture is a HUD tap ----------
     ctx = br.new_context(viewport={'width': 844, 'height': 390}, has_touch=True, is_mobile=True, device_scale_factor=2); ctx.set_offline(OFFLINE)
     page = ctx.new_page(); errs = []; page.on('pageerror', lambda e: errs.append(str(e)))
-    page.goto(HTML); page.wait_for_selector('#ccn')
+    page.goto(HTML); page.wait_for_selector('[data-c=new]')
     st0 = J(page, "SFXA.ctx ? SFXA.ctx.state : 'none'")
-    page.fill('#ccn', 'Mobi'); J(page, "document.querySelector('#rot') && 0")
-    page.tap('[data-c=go]'); page.wait_for_function('window.__SF && __SF.P'); J(page, HOOK)
+    J(page, "__CC.quick({ name: 'Mobi' })")             # no gesture yet: the first touch is the HUD tap below
+    page.wait_for_function('window.__SF && __SF.P'); J(page, HOOK); J(page, OLDSTATS)
     if J(page, "!document.querySelector('#rot').hidden"): J(page, "document.querySelector('#rot').hidden = true")
     page.tap('#b-run'); page.wait_for_timeout(1200)
     st = J(page, "SFXA.ctx && SFXA.ctx.state")
@@ -116,21 +126,22 @@ with sync_playwright() as pw:
     check('standing idle: no footsteps', not [e for e in played(page) if e.startswith('step')], played(page))
 
     # ---------- combat ----------
-    J(page, """(() => { const S = __SF, P = S.P, SF = S.SF; P.equip.weapon = SF.newItem('sword', 1); P.skills.swordsmanship.v = 1000; P.skills.tactics.v = 1000; P.drawn = false; P.hp = 999; })()""")
+    J(page, """(() => { const S = __SF, P = S.P, SF = S.SF; P.equip.weapon = SF.newItem('sword', 1); P.skills.swordsmanship.v = 1000; P.skills.tactics.v = 1000; P.drawn = false; P.hp = 999; P.dex = 100; P.stam = 100; })()""")
     def purge(*keep): J(page, "ks => { for (const e of __SF.ents) if (e.kind === 'mon' && !ks.includes(e.id)) e.gone = true; for (let i = __SF.ents.length - 1; i >= 0; i--) if (__SF.ents[i].gone) __SF.ents.splice(i, 1); }", list(keep))
     def spawn(t, x, y, extra=''):
         return J(page, f"""(() => {{ const S = __SF, d = S.MON['{t}']; const m = S.addEnt({{ kind: 'mon', type: '{t}', name: d.n, x: {x}, y: {y}, hp: d.hp, max: d.hp, state: 'idle', home: {{ x: {x}, y: {y} }}, sect: 0, ward: 0, purse: 0 }}); {extra}; return m.id; }})()""")
     # wilderness west of the gate so creatures aggro
     J(page, "(() => { for (const e of __SF.ents) if (e.kind === 'mon') e.gone = true; for (let i = __SF.ents.length - 1; i >= 0; i--) if (__SF.ents[i].gone) __SF.ents.splice(i, 1); })()")
     tp(page, 300.5, 296.5); page.wait_for_timeout(300)
-    purge(); clear(page); rid = spawn('rat', 301.5, 296.5, "m.rooted = __SF.GT + 999")
+    purge(); clear(page); J(page, "__SF.setRng(() => .999)"); rid = spawn('rat', 301.5, 296.5, "m.rooted = __SF.GT + 999")   # misses from the start: the whiff below must hear no impact
     page.wait_for_timeout(1200)
     J(page, "__SF.setRng(() => .999); __SF.P.skills.swordsmanship.v = 500")   # T2A hit chance caps at 100 %: at 100.0 vs a rat every swing lands, so whiff at 50.0
     R = f"__SF.ents.find(e => e.id === {rid})"
     J(page, f"(() => {{ __SF.P.sel = {R}; __SF.toggleArm(); }})()"); page.wait_for_timeout(900); J(page, "__SF.P.armed = false")
     pl = played(page)
     check('rat alerts on aggro', 'rat.alert' in pl, pl)
-    check('a whiff: draw, then the swing alone (no impact)', 'weapon.draw' in pl and 'swing.sword' in pl and not [e for e in pl if e.startswith('hit.')], pl)
+    # the rooted rat may still strike the player in this window: its blow plays hit.* with player.hurt, which is not an impact of our swing
+    check('a whiff: draw, then the swing alone (no impact)', 'weapon.draw' in pl and 'swing.sword' in pl and len([e for e in pl if e.startswith('hit.')]) <= pl.count('player.hurt'), pl)
     tele = J(page, "window.__tries.filter(e => /attack|warn/.test(e))")
     check('rat telegraph plays its attack cue (distinct from the strike)', 'rat.attack' in pl, tele)
     J(page, "__SF.setRng(() => 0); __SF.P.skills.swordsmanship.v = 1000"); page.wait_for_timeout(1500); clear(page)
@@ -156,7 +167,7 @@ with sync_playwright() as pw:
     pl = played(page)
     check('shooting from range: bow.release at the shot, flesh impact on arrival', 'bow.release' in pl and 'hit.flesh' in pl and pl.index('bow.release') < pl.index('hit.flesh') and not [e for e in pl if e.startswith('swing')], pl)
     # spell kill
-    J(page, f"""(() => {{ const S = __SF, P = S.P, SF = S.SF, MG = SF.MAGERY; P.skills.spellcraft.v = 1000; P.skills.focus.v = 1000; P.mana = 999; if (!SF.count(P.pack, 'spellbook')) SF.addItem(P.pack, SF.newItem('spellbook', 1)); SF.addItem(P.pack, SF.newItem('scroll.18', 1)); MG.learn(P.pack, 'scroll.18'); for (const r of SF.SPELL['magery.18'].regs) SF.addItem(P.pack, SF.newItem(r, 30)); const m = S.ents.find(e => e.id === {bid}); m.hp = 2; m.pacified = S.GT + 999; m.state = 'idle'; m.target = null; P.sel = m; P.spellReadyAt = 0; }})()"""); purge(bid)
+    J(page, f"""(() => {{ const S = __SF, P = S.P, SF = S.SF, MG = SF.MAGERY; P.skills.magery.v = 1000; P.skills.evaluatingintelligence.v = 1000; P.mana = 999; if (!SF.count(P.pack, 'spellbook')) SF.addItem(P.pack, SF.newItem('spellbook', 1)); SF.addItem(P.pack, SF.newItem('scroll.18', 1)); MG.learn(P.pack, 'scroll.18'); for (const r of SF.SPELL['magery.18'].regs) SF.addItem(P.pack, SF.newItem(r, 30)); const m = S.ents.find(e => e.id === {bid}); m.hp = 2; m.pacified = S.GT + 999; m.state = 'idle'; m.target = null; P.sel = m; P.spellReadyAt = 0; }})()"""); purge(bid)
     clear(page); J(page, "__SF.castSlot('magery.18')"); page.wait_for_timeout(2600)
     held = J(page, "!!__SF.P.held"); pl1 = [e for e in played(page) if e.startswith('magic.')]
     J(page, "__SF.castSlot('magery.18')"); page.wait_for_timeout(1500); pl = [e for e in played(page) if e.startswith('magic.') or e.startswith('hit.')]
@@ -177,7 +188,7 @@ with sync_playwright() as pw:
     check('resurrection plays player.revive', 'player.revive' in played(page), played(page))
 
     # ---------- gathering and crafting ----------
-    J(page, "(() => { const S = __SF, P = S.P, SF = S.SF; P.hp = 999; SF.addItem(P.pack, SF.newItem('pickaxe', 1)); P.skills.mining.v = 1000; P.skills.smithing.v = 1000; })()")
+    J(page, "(() => { const S = __SF, P = S.P, SF = S.SF; P.hp = 999; SF.addItem(P.pack, SF.newItem('pickaxe', 1)); P.skills.mining.v = 1000; P.skills.blacksmithy.v = 1000; })()")
     rock = J(page, "__SF.QUAY_ROCKS[0]"); tp(page, rock[0] + .5, rock[1] + 1.4); page.wait_for_timeout(200); clear(page)
     J(page, f"(() => {{ const S = __SF; S.startGather(S.nodeAt({rock[0]}, {rock[1]})); }})()"); page.wait_for_timeout(300)
     stick(page, *PLUS_X, 300); page.wait_for_timeout(2500)
@@ -249,3 +260,4 @@ with sync_playwright() as pw:
     check('older save without door state loads; every door open', J(page2, "__SF.DOORS.every(d => d.open)") and not errs2, errs2[:3])
     ctx.close(); br.close()
 print(json.dumps({'pass': sum(r[1] for r in RESULTS), 'fail': sum(not r[1] for r in RESULTS)}))
+sys.exit(1 if any(not r[1] for r in RESULTS) else 0)

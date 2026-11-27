@@ -25,9 +25,13 @@ with sync_playwright() as p:
     errs = []; pg = b.new_page(viewport={'width': 1280, 'height': 720})
     pg.on('pageerror', lambda e: errs.append(str(e)))
     pg.goto('file://' + f); pg.wait_for_timeout(600); pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_timeout(600)
-    pg.click('[data-c=prof][data-p="Group healer"]'); pg.fill('#ccn', 'Tess'); pg.click('[data-c=go]'); pg.wait_for_timeout(1200)
+    pg.evaluate("o => __CC.quick(o)", {'name': 'Tess', 'template': 'mage'}); pg.wait_for_timeout(1200)
+    # fixture: these scenarios were written for the pre-v0.30 "Group healer" (40 / 40 / 70, every reagent and a rune); the v0.30
+    # Mage starts at 15 / 10 / 40 with only the starter spells' reagents (see tests/creation-smoke for the real kit)
+    pg.evaluate("() => { const P = __SF.P; Object.assign(P.base, { str: 40, dex: 40, int: 70 }); P.str = 40; P.dex = 40; P.int = 70; P.mana = 70; P.stam = 40; P.hp = __SF.SF.maxHp(P); }")
+    pg.evaluate("() => { const SF = __SF.SF; for (const r of Object.keys(SF.MAGERY.REAGENTS)) SF.addItem(__SF.P.pack, SF.newItem(r, 12)); SF.addItem(__SF.P.pack, SF.newItem('rune', 1)); }")
     out = pg.evaluate(open(os.path.join(here, name)).read()); bad = sub(exp, out) + [f'page error: {e}' for e in errs]
     print(('ok   ' if not bad else 'FAIL ') + name); [print('     ' + x) for x in bad]; fails += len(bad); pg.close()
   b.close()
-r = subprocess.run([sys.executable, os.path.join(here, 'migration.py'), f, chrome], capture_output=True, text=True); print((r.stdout.strip() or r.stderr[-400:])[:300]); fails += r.returncode != 0
+r = subprocess.run([sys.executable, os.path.join(here, 'migration.py'), f, chrome], capture_output=True, text=True); print(r.stdout.strip() or r.stderr[-400:]); fails += r.returncode != 0
 print('ALL PASS' if not fails else f'{fails} FAILED'); sys.exit(1 if fails else 0)

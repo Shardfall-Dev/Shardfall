@@ -1,0 +1,4356 @@
+{
+ "pack": "Shardfall_Painted_Candidates_v0.1",
+ "archiveSha256": "17b1b497dd80dbb87f6c1ea0b5a679d13aa1f6dcd0984f9fccc54a1a0d95c7b1",
+ "status": "experimental; accepted frames are usable behind the developer flag only",
+ "contract": {
+  "cell": [
+   128,
+   128
+  ],
+  "feetAnchor": [
+   64,
+   106
+  ],
+  "rowOrder": [
+   "S",
+   "SW",
+   "W",
+   "NW",
+   "N",
+   "NE",
+   "E",
+   "SE"
+  ],
+  "framesPerDirection": 3,
+  "sameAs": "Saltmarsh Scout animation sheets (src/game.js drawPlayerAnim)"
+ },
+ "thresholds": {
+  "darkLegBandReject": 10,
+  "footSpeckReject": 3,
+  "islandRejectPx": 4,
+  "feetRow": [
+   104,
+   105
+  ]
+ },
+ "summary": {
+  "frames": 192,
+  "accepted": 101,
+  "rejected": 91,
+  "rejectReasons": {
+   "baked dark background remnant in the leg band": 59,
+   "facing": 31,
+   "alpha": 3,
+   "pose": 3,
+   "stray dark specks at the feet": 1,
+   "cropping": 1,
+   "detached alpha island": 1
+  },
+  "directionsWithNoAcceptedFrame": [
+   "female/Cast/NE",
+   "female/Cast/S",
+   "female/Idle/N",
+   "female/Idle/NE",
+   "female/Idle/S",
+   "female/Unarmed_Attack/NE",
+   "female/Unarmed_Attack/NW",
+   "female/Unarmed_Attack/S",
+   "female/Walk/NE",
+   "female/Walk/S",
+   "male/Cast/NE",
+   "male/Cast/S",
+   "male/Idle/E",
+   "male/Idle/N",
+   "male/Idle/NE",
+   "male/Idle/NW",
+   "male/Idle/S",
+   "male/Unarmed_Attack/N",
+   "male/Unarmed_Attack/NE",
+   "male/Unarmed_Attack/NW",
+   "male/Unarmed_Attack/S",
+   "male/Walk/N",
+   "male/Walk/NE",
+   "male/Walk/NW",
+   "male/Walk/S"
+  ]
+ },
+ "accepted": {
+  "male": {
+   "Idle": {
+    "S": [],
+    "SW": [
+     0,
+     1,
+     2
+    ],
+    "W": [
+     2
+    ],
+    "NW": [],
+    "N": [],
+    "NE": [],
+    "E": [],
+    "SE": [
+     0,
+     1
+    ]
+   },
+   "Walk": {
+    "S": [],
+    "SW": [
+     0,
+     1,
+     2
+    ],
+    "W": [
+     0,
+     1
+    ],
+    "NW": [],
+    "N": [],
+    "NE": [],
+    "E": [
+     0,
+     1,
+     2
+    ],
+    "SE": [
+     0,
+     1,
+     2
+    ]
+   },
+   "Cast": {
+    "S": [],
+    "SW": [
+     0,
+     1,
+     2
+    ],
+    "W": [
+     0,
+     1,
+     2
+    ],
+    "NW": [
+     0,
+     1,
+     2
+    ],
+    "N": [
+     1,
+     2
+    ],
+    "NE": [],
+    "E": [
+     0
+    ],
+    "SE": [
+     0,
+     2
+    ]
+   },
+   "Unarmed_Attack": {
+    "S": [],
+    "SW": [
+     0,
+     1,
+     2
+    ],
+    "W": [
+     0,
+     1,
+     2
+    ],
+    "NW": [],
+    "N": [],
+    "NE": [],
+    "E": [
+     0,
+     1,
+     2
+    ],
+    "SE": [
+     0,
+     1,
+     2
+    ]
+   }
+  },
+  "female": {
+   "Idle": {
+    "S": [],
+    "SW": [
+     2
+    ],
+    "W": [
+     0,
+     1,
+     2
+    ],
+    "NW": [
+     0,
+     2
+    ],
+    "N": [],
+    "NE": [],
+    "E": [
+     0,
+     1
+    ],
+    "SE": [
+     0,
+     1
+    ]
+   },
+   "Walk": {
+    "S": [],
+    "SW": [
+     0,
+     1,
+     2
+    ],
+    "W": [
+     0,
+     1,
+     2
+    ],
+    "NW": [
+     0,
+     1,
+     2
+    ],
+    "N": [
+     0
+    ],
+    "NE": [],
+    "E": [
+     0,
+     1,
+     2
+    ],
+    "SE": [
+     0,
+     1,
+     2
+    ]
+   },
+   "Cast": {
+    "S": [],
+    "SW": [
+     0,
+     1,
+     2
+    ],
+    "W": [
+     0,
+     1,
+     2
+    ],
+    "NW": [
+     0,
+     1,
+     2
+    ],
+    "N": [
+     0,
+     1,
+     2
+    ],
+    "NE": [],
+    "E": [
+     0,
+     1,
+     2
+    ],
+    "SE": [
+     0,
+     1,
+     2
+    ]
+   },
+   "Unarmed_Attack": {
+    "S": [],
+    "SW": [
+     0,
+     1,
+     2
+    ],
+    "W": [
+     0,
+     1,
+     2
+    ],
+    "NW": [],
+    "N": [
+     1,
+     2
+    ],
+    "NE": [],
+    "E": [
+     0,
+     1,
+     2
+    ],
+    "SE": [
+     0,
+     1,
+     2
+    ]
+   }
+  }
+ },
+ "frames": {
+  "male/Idle/S/00": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (122 px)"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     51,
+     41,
+     78,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 122,
+    "footSpecks": 0,
+    "feetX": 63.8,
+    "islands": []
+   }
+  },
+  "male/Idle/S/01": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (122 px)"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     51,
+     41,
+     78,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 122,
+    "footSpecks": 0,
+    "feetX": 64.4,
+    "islands": []
+   }
+  },
+  "male/Idle/S/02": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (127 px)"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     51,
+     41,
+     77,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 127,
+    "footSpecks": 0,
+    "feetX": 64.0,
+    "islands": []
+   }
+  },
+  "male/Idle/SW/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     50,
+     41,
+     79,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 1,
+    "footSpecks": 0,
+    "feetX": 60.4,
+    "islands": []
+   }
+  },
+  "male/Idle/SW/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     50,
+     41,
+     79,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 2,
+    "footSpecks": 0,
+    "feetX": 59.7,
+    "islands": []
+   }
+  },
+  "male/Idle/SW/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     49,
+     41,
+     79,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 5,
+    "footSpecks": 0,
+    "feetX": 60.7,
+    "islands": []
+   }
+  },
+  "male/Idle/W/00": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (43 px)"
+   ],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     54,
+     41,
+     75,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 43,
+    "footSpecks": 0,
+    "feetX": 60.2,
+    "islands": []
+   }
+  },
+  "male/Idle/W/01": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (23 px)"
+   ],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     54,
+     41,
+     75,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 23,
+    "footSpecks": 0,
+    "feetX": 61.1,
+    "islands": []
+   }
+  },
+  "male/Idle/W/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     55,
+     41,
+     74,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 3,
+    "footSpecks": 0,
+    "feetX": 62.5,
+    "islands": []
+   }
+  },
+  "male/Idle/NW/00": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (84 px)"
+   ],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     52,
+     41,
+     76,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 84,
+    "footSpecks": 0,
+    "feetX": 61.8,
+    "islands": []
+   }
+  },
+  "male/Idle/NW/01": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (22 px)"
+   ],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     52,
+     40,
+     76,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 22,
+    "footSpecks": 0,
+    "feetX": 62.1,
+    "islands": []
+   }
+  },
+  "male/Idle/NW/02": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (28 px)"
+   ],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     53,
+     40,
+     76,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 28,
+    "footSpecks": 0,
+    "feetX": 61.7,
+    "islands": []
+   }
+  },
+  "male/Idle/N/00": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (64 px)"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     51,
+     42,
+     78,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 64,
+    "footSpecks": 0,
+    "feetX": 65.7,
+    "islands": []
+   }
+  },
+  "male/Idle/N/01": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (80 px)"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     51,
+     42,
+     78,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 80,
+    "footSpecks": 0,
+    "feetX": 64.7,
+    "islands": []
+   }
+  },
+  "male/Idle/N/02": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (29 px)"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     51,
+     41,
+     78,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 29,
+    "footSpecks": 0,
+    "feetX": 65.6,
+    "islands": []
+   }
+  },
+  "male/Idle/NE/00": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (60 px)",
+    "facing: right-facing profile with the face visible (reads as E/SE), not a back three-quarter NE view"
+   ],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     52,
+     40,
+     76,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 60,
+    "footSpecks": 0,
+    "feetX": 66.5,
+    "islands": []
+   }
+  },
+  "male/Idle/NE/01": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (10 px)",
+    "facing: right-facing profile with the face visible (reads as E/SE), not a back three-quarter NE view"
+   ],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     51,
+     41,
+     78,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 10,
+    "footSpecks": 0,
+    "feetX": 65.5,
+    "islands": []
+   }
+  },
+  "male/Idle/NE/02": {
+   "status": "rejected",
+   "reasons": [
+    "facing: right-facing profile with the face visible (reads as E/SE), not a back three-quarter NE view"
+   ],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     50,
+     41,
+     79,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 2,
+    "footSpecks": 0,
+    "feetX": 66.7,
+    "islands": []
+   }
+  },
+  "male/Idle/E/00": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (19 px)"
+   ],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     51,
+     42,
+     78,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 19,
+    "footSpecks": 0,
+    "feetX": 67.9,
+    "islands": []
+   }
+  },
+  "male/Idle/E/01": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (18 px)"
+   ],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     51,
+     40,
+     78,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 18,
+    "footSpecks": 0,
+    "feetX": 66.8,
+    "islands": []
+   }
+  },
+  "male/Idle/E/02": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (17 px)"
+   ],
+   "warnings": [
+    "1 dark speck pixel(s) at the feet",
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     55,
+     40,
+     74,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 17,
+    "footSpecks": 1,
+    "feetX": 66.1,
+    "islands": []
+   }
+  },
+  "male/Idle/SE/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     49,
+     40,
+     80,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 8,
+    "footSpecks": 0,
+    "feetX": 67.8,
+    "islands": []
+   }
+  },
+  "male/Idle/SE/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     49,
+     40,
+     79,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 8,
+    "footSpecks": 0,
+    "feetX": 67.2,
+    "islands": []
+   }
+  },
+  "male/Idle/SE/02": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (19 px)"
+   ],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     51,
+     40,
+     77,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 19,
+    "footSpecks": 0,
+    "feetX": 67.4,
+    "islands": []
+   }
+  },
+  "male/Walk/S/00": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (45 px)"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     51,
+     46,
+     77,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 45,
+    "footSpecks": 0,
+    "feetX": 63.8,
+    "islands": []
+   }
+  },
+  "male/Walk/S/01": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (28 px)"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     51,
+     46,
+     77,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 28,
+    "footSpecks": 0,
+    "feetX": 64.1,
+    "islands": []
+   }
+  },
+  "male/Walk/S/02": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (44 px)"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     51,
+     46,
+     77,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 44,
+    "footSpecks": 0,
+    "feetX": 64.6,
+    "islands": []
+   }
+  },
+  "male/Walk/SW/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     49,
+     46,
+     80,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 60.8,
+    "islands": []
+   }
+  },
+  "male/Walk/SW/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     49,
+     46,
+     80,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 60.8,
+    "islands": []
+   }
+  },
+  "male/Walk/SW/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     49,
+     46,
+     80,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 59.7,
+    "islands": []
+   }
+  },
+  "male/Walk/W/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     55,
+     46,
+     73,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 62.1,
+    "islands": []
+   }
+  },
+  "male/Walk/W/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     52,
+     45,
+     77,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 58.4,
+    "islands": []
+   }
+  },
+  "male/Walk/W/02": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (12 px)"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     55,
+     46,
+     74,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 12,
+    "footSpecks": 0,
+    "feetX": 60.4,
+    "islands": []
+   }
+  },
+  "male/Walk/NW/00": {
+   "status": "rejected",
+   "reasons": [
+    "facing: chest and face toward the viewer (reads as SW/W), not a back three-quarter NW view"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     49,
+     46,
+     80,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 3,
+    "footSpecks": 0,
+    "feetX": 60.5,
+    "islands": []
+   }
+  },
+  "male/Walk/NW/01": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (13 px)",
+    "facing: chest and face toward the viewer (reads as SW/W), not a back three-quarter NW view"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     51,
+     45,
+     77,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 13,
+    "footSpecks": 0,
+    "feetX": 58.9,
+    "islands": []
+   }
+  },
+  "male/Walk/NW/02": {
+   "status": "rejected",
+   "reasons": [
+    "facing: chest and face toward the viewer (reads as SW/W), not a back three-quarter NW view"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     50,
+     45,
+     79,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 9,
+    "footSpecks": 0,
+    "feetX": 58.6,
+    "islands": []
+   }
+  },
+  "male/Walk/N/00": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (19 px)"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     51,
+     45,
+     77,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 19,
+    "footSpecks": 0,
+    "feetX": 65.2,
+    "islands": []
+   }
+  },
+  "male/Walk/N/01": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (21 px)"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     51,
+     45,
+     78,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 21,
+    "footSpecks": 0,
+    "feetX": 66.2,
+    "islands": []
+   }
+  },
+  "male/Walk/N/02": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (29 px)"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     51,
+     47,
+     78,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 29,
+    "footSpecks": 0,
+    "feetX": 63.8,
+    "islands": []
+   }
+  },
+  "male/Walk/NE/00": {
+   "status": "rejected",
+   "reasons": [
+    "facing: right-facing profile with the face visible (reads as E/SE), not NE"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     48,
+     47,
+     80,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 66.6,
+    "islands": []
+   }
+  },
+  "male/Walk/NE/01": {
+   "status": "rejected",
+   "reasons": [
+    "facing: right-facing profile with the face visible (reads as E/SE), not NE"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     49,
+     47,
+     80,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 66.4,
+    "islands": []
+   }
+  },
+  "male/Walk/NE/02": {
+   "status": "rejected",
+   "reasons": [
+    "facing: right-facing profile with the face visible (reads as E/SE), not NE"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     48,
+     47,
+     81,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 1,
+    "footSpecks": 0,
+    "feetX": 69.9,
+    "islands": []
+   }
+  },
+  "male/Walk/E/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     48,
+     46,
+     80,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 3,
+    "footSpecks": 0,
+    "feetX": 68.2,
+    "islands": []
+   }
+  },
+  "male/Walk/E/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     48,
+     46,
+     80,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 66.1,
+    "islands": []
+   }
+  },
+  "male/Walk/E/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     48,
+     46,
+     80,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 1,
+    "footSpecks": 0,
+    "feetX": 67.0,
+    "islands": []
+   }
+  },
+  "male/Walk/SE/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     48,
+     47,
+     81,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 2,
+    "footSpecks": 0,
+    "feetX": 66.5,
+    "islands": []
+   }
+  },
+  "male/Walk/SE/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     48,
+     46,
+     80,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 4,
+    "footSpecks": 0,
+    "feetX": 66.5,
+    "islands": []
+   }
+  },
+  "male/Walk/SE/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     48,
+     46,
+     80,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 3,
+    "footSpecks": 0,
+    "feetX": 67.1,
+    "islands": []
+   }
+  },
+  "male/Cast/S/00": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (80 px)"
+   ],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease",
+    "male Cast and Unarmed_Attack poses are very close; the cast gesture reads as a punch"
+   ],
+   "metrics": {
+    "bbox": [
+     50,
+     42,
+     78,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 80,
+    "footSpecks": 0,
+    "feetX": 64.4,
+    "islands": []
+   }
+  },
+  "male/Cast/S/01": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (85 px)"
+   ],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease",
+    "male Cast and Unarmed_Attack poses are very close; the cast gesture reads as a punch"
+   ],
+   "metrics": {
+    "bbox": [
+     51,
+     42,
+     78,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 85,
+    "footSpecks": 0,
+    "feetX": 62.5,
+    "islands": []
+   }
+  },
+  "male/Cast/S/02": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (110 px)"
+   ],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease",
+    "male Cast and Unarmed_Attack poses are very close; the cast gesture reads as a punch"
+   ],
+   "metrics": {
+    "bbox": [
+     51,
+     42,
+     77,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 110,
+    "footSpecks": 0,
+    "feetX": 63.0,
+    "islands": []
+   }
+  },
+  "male/Cast/SW/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease",
+    "male Cast and Unarmed_Attack poses are very close; the cast gesture reads as a punch"
+   ],
+   "metrics": {
+    "bbox": [
+     48,
+     42,
+     80,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 59.6,
+    "islands": []
+   }
+  },
+  "male/Cast/SW/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease",
+    "male Cast and Unarmed_Attack poses are very close; the cast gesture reads as a punch"
+   ],
+   "metrics": {
+    "bbox": [
+     47,
+     43,
+     82,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 62.8,
+    "islands": []
+   }
+  },
+  "male/Cast/SW/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease",
+    "male Cast and Unarmed_Attack poses are very close; the cast gesture reads as a punch"
+   ],
+   "metrics": {
+    "bbox": [
+     46,
+     45,
+     82,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 61.7,
+    "islands": []
+   }
+  },
+  "male/Cast/W/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease",
+    "male Cast and Unarmed_Attack poses are very close; the cast gesture reads as a punch"
+   ],
+   "metrics": {
+    "bbox": [
+     47,
+     45,
+     81,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 2,
+    "footSpecks": 0,
+    "feetX": 61.9,
+    "islands": []
+   }
+  },
+  "male/Cast/W/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease",
+    "male Cast and Unarmed_Attack poses are very close; the cast gesture reads as a punch"
+   ],
+   "metrics": {
+    "bbox": [
+     49,
+     42,
+     80,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 62.0,
+    "islands": []
+   }
+  },
+  "male/Cast/W/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease",
+    "male Cast and Unarmed_Attack poses are very close; the cast gesture reads as a punch"
+   ],
+   "metrics": {
+    "bbox": [
+     49,
+     42,
+     80,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 2,
+    "footSpecks": 0,
+    "feetX": 60.2,
+    "islands": []
+   }
+  },
+  "male/Cast/NW/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease",
+    "male Cast and Unarmed_Attack poses are very close; the cast gesture reads as a punch"
+   ],
+   "metrics": {
+    "bbox": [
+     50,
+     44,
+     79,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 6,
+    "footSpecks": 0,
+    "feetX": 60.6,
+    "islands": []
+   }
+  },
+  "male/Cast/NW/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease",
+    "male Cast and Unarmed_Attack poses are very close; the cast gesture reads as a punch"
+   ],
+   "metrics": {
+    "bbox": [
+     50,
+     45,
+     78,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 63.1,
+    "islands": []
+   }
+  },
+  "male/Cast/NW/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease",
+    "male Cast and Unarmed_Attack poses are very close; the cast gesture reads as a punch"
+   ],
+   "metrics": {
+    "bbox": [
+     51,
+     44,
+     77,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 61.9,
+    "islands": []
+   }
+  },
+  "male/Cast/N/00": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (15 px)"
+   ],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease",
+    "male Cast and Unarmed_Attack poses are very close; the cast gesture reads as a punch"
+   ],
+   "metrics": {
+    "bbox": [
+     51,
+     44,
+     77,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 15,
+    "footSpecks": 0,
+    "feetX": 63.8,
+    "islands": []
+   }
+  },
+  "male/Cast/N/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease",
+    "male Cast and Unarmed_Attack poses are very close; the cast gesture reads as a punch"
+   ],
+   "metrics": {
+    "bbox": [
+     50,
+     45,
+     79,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 63.9,
+    "islands": []
+   }
+  },
+  "male/Cast/N/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease",
+    "male Cast and Unarmed_Attack poses are very close; the cast gesture reads as a punch"
+   ],
+   "metrics": {
+    "bbox": [
+     50,
+     44,
+     79,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 7,
+    "footSpecks": 0,
+    "feetX": 64.5,
+    "islands": []
+   }
+  },
+  "male/Cast/NE/00": {
+   "status": "rejected",
+   "reasons": [
+    "facing: right-facing profile with the face visible (reads as E/SE), not NE"
+   ],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease",
+    "male Cast and Unarmed_Attack poses are very close; the cast gesture reads as a punch"
+   ],
+   "metrics": {
+    "bbox": [
+     48,
+     47,
+     81,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 1,
+    "footSpecks": 0,
+    "feetX": 62.1,
+    "islands": []
+   }
+  },
+  "male/Cast/NE/01": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (37 px)",
+    "stray dark specks at the feet (4 px)",
+    "facing: right-facing profile with the face visible (reads as E/SE), not NE"
+   ],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease",
+    "male Cast and Unarmed_Attack poses are very close; the cast gesture reads as a punch"
+   ],
+   "metrics": {
+    "bbox": [
+     49,
+     44,
+     79,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 37,
+    "footSpecks": 4,
+    "feetX": 62.3,
+    "islands": []
+   }
+  },
+  "male/Cast/NE/02": {
+   "status": "rejected",
+   "reasons": [
+    "facing: right-facing profile with the face visible (reads as E/SE), not NE"
+   ],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease",
+    "male Cast and Unarmed_Attack poses are very close; the cast gesture reads as a punch"
+   ],
+   "metrics": {
+    "bbox": [
+     46,
+     44,
+     82,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 1,
+    "footSpecks": 0,
+    "feetX": 65.4,
+    "islands": []
+   }
+  },
+  "male/Cast/E/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease",
+    "male Cast and Unarmed_Attack poses are very close; the cast gesture reads as a punch"
+   ],
+   "metrics": {
+    "bbox": [
+     47,
+     45,
+     82,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 67.4,
+    "islands": []
+   }
+  },
+  "male/Cast/E/01": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (13 px)"
+   ],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease",
+    "male Cast and Unarmed_Attack poses are very close; the cast gesture reads as a punch"
+   ],
+   "metrics": {
+    "bbox": [
+     48,
+     46,
+     80,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 13,
+    "footSpecks": 0,
+    "feetX": 60.0,
+    "islands": []
+   }
+  },
+  "male/Cast/E/02": {
+   "status": "rejected",
+   "reasons": [
+    "cropping: the top of the head is cut off and the raised arm is broken"
+   ],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease",
+    "male Cast and Unarmed_Attack poses are very close; the cast gesture reads as a punch"
+   ],
+   "metrics": {
+    "bbox": [
+     48,
+     52,
+     81,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 67.2,
+    "islands": []
+   }
+  },
+  "male/Cast/SE/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease",
+    "male Cast and Unarmed_Attack poses are very close; the cast gesture reads as a punch"
+   ],
+   "metrics": {
+    "bbox": [
+     46,
+     46,
+     82,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 64.0,
+    "islands": []
+   }
+  },
+  "male/Cast/SE/01": {
+   "status": "rejected",
+   "reasons": [
+    "detached alpha island (15 px)"
+   ],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease",
+    "male Cast and Unarmed_Attack poses are very close; the cast gesture reads as a punch"
+   ],
+   "metrics": {
+    "bbox": [
+     47,
+     46,
+     82,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 65.4,
+    "islands": [
+     15
+    ]
+   }
+  },
+  "male/Cast/SE/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease",
+    "male Cast and Unarmed_Attack poses are very close; the cast gesture reads as a punch"
+   ],
+   "metrics": {
+    "bbox": [
+     49,
+     44,
+     79,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 67.2,
+    "islands": []
+   }
+  },
+  "male/Unarmed_Attack/S/00": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (44 px)"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     53,
+     43,
+     75,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 44,
+    "footSpecks": 0,
+    "feetX": 69.4,
+    "islands": []
+   }
+  },
+  "male/Unarmed_Attack/S/01": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (32 px)"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     52,
+     44,
+     77,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 32,
+    "footSpecks": 0,
+    "feetX": 65.0,
+    "islands": []
+   }
+  },
+  "male/Unarmed_Attack/S/02": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (56 px)"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     52,
+     45,
+     76,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 56,
+    "footSpecks": 0,
+    "feetX": 62.6,
+    "islands": []
+   }
+  },
+  "male/Unarmed_Attack/SW/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     44,
+     48,
+     85,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 2,
+    "footSpecks": 0,
+    "feetX": 64.3,
+    "islands": []
+   }
+  },
+  "male/Unarmed_Attack/SW/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     45,
+     47,
+     84,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 2,
+    "footSpecks": 0,
+    "feetX": 61.9,
+    "islands": []
+   }
+  },
+  "male/Unarmed_Attack/SW/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     45,
+     45,
+     83,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 3,
+    "footSpecks": 0,
+    "feetX": 62.8,
+    "islands": []
+   }
+  },
+  "male/Unarmed_Attack/W/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "foot registration differs by 8.3 px across this direction"
+   ],
+   "metrics": {
+    "bbox": [
+     47,
+     46,
+     82,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 2,
+    "footSpecks": 0,
+    "feetX": 65.9,
+    "islands": []
+   }
+  },
+  "male/Unarmed_Attack/W/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "foot registration differs by 8.3 px across this direction"
+   ],
+   "metrics": {
+    "bbox": [
+     48,
+     46,
+     80,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 57.6,
+    "islands": []
+   }
+  },
+  "male/Unarmed_Attack/W/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "foot registration differs by 8.3 px across this direction"
+   ],
+   "metrics": {
+    "bbox": [
+     50,
+     46,
+     78,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 63.0,
+    "islands": []
+   }
+  },
+  "male/Unarmed_Attack/NW/00": {
+   "status": "rejected",
+   "reasons": [
+    "facing: chest toward the viewer (reads as SW), not NW"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     47,
+     48,
+     81,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 2,
+    "footSpecks": 0,
+    "feetX": 64.2,
+    "islands": []
+   }
+  },
+  "male/Unarmed_Attack/NW/01": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (25 px)"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     52,
+     46,
+     77,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 25,
+    "footSpecks": 0,
+    "feetX": 61.6,
+    "islands": []
+   }
+  },
+  "male/Unarmed_Attack/NW/02": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (15 px)"
+   ],
+   "warnings": [
+    "1 dark speck pixel(s) at the feet"
+   ],
+   "metrics": {
+    "bbox": [
+     48,
+     47,
+     80,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 15,
+    "footSpecks": 1,
+    "feetX": 63.7,
+    "islands": []
+   }
+  },
+  "male/Unarmed_Attack/N/00": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (25 px)"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     51,
+     45,
+     77,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 25,
+    "footSpecks": 0,
+    "feetX": 65.4,
+    "islands": []
+   }
+  },
+  "male/Unarmed_Attack/N/01": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (27 px)"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     50,
+     47,
+     79,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 27,
+    "footSpecks": 0,
+    "feetX": 63.2,
+    "islands": []
+   }
+  },
+  "male/Unarmed_Attack/N/02": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (10 px)"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     49,
+     49,
+     80,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 10,
+    "footSpecks": 0,
+    "feetX": 62.0,
+    "islands": []
+   }
+  },
+  "male/Unarmed_Attack/NE/00": {
+   "status": "rejected",
+   "reasons": [
+    "facing: right-facing profile with the face visible (reads as E/SE), not NE"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     49,
+     47,
+     79,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 65.9,
+    "islands": []
+   }
+  },
+  "male/Unarmed_Attack/NE/01": {
+   "status": "rejected",
+   "reasons": [
+    "facing: right-facing profile with the face visible (reads as E/SE), not NE"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     49,
+     47,
+     80,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 69.0,
+    "islands": []
+   }
+  },
+  "male/Unarmed_Attack/NE/02": {
+   "status": "rejected",
+   "reasons": [
+    "facing: right-facing profile with the face visible (reads as E/SE), not NE"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     47,
+     44,
+     81,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 1,
+    "footSpecks": 0,
+    "feetX": 67.1,
+    "islands": []
+   }
+  },
+  "male/Unarmed_Attack/E/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     47,
+     47,
+     81,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 64.8,
+    "islands": []
+   }
+  },
+  "male/Unarmed_Attack/E/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     47,
+     49,
+     82,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 61.7,
+    "islands": []
+   }
+  },
+  "male/Unarmed_Attack/E/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     48,
+     48,
+     80,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 63.8,
+    "islands": []
+   }
+  },
+  "male/Unarmed_Attack/SE/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     48,
+     49,
+     81,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 61.7,
+    "islands": []
+   }
+  },
+  "male/Unarmed_Attack/SE/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     47,
+     45,
+     82,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 1,
+    "footSpecks": 0,
+    "feetX": 65.3,
+    "islands": []
+   }
+  },
+  "male/Unarmed_Attack/SE/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     48,
+     48,
+     80,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 2,
+    "footSpecks": 0,
+    "feetX": 65.1,
+    "islands": []
+   }
+  },
+  "female/Idle/S/00": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (21 px)"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     54,
+     43,
+     75,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 21,
+    "footSpecks": 0,
+    "feetX": 63.9,
+    "islands": []
+   }
+  },
+  "female/Idle/S/01": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (29 px)"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     54,
+     43,
+     75,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 29,
+    "footSpecks": 0,
+    "feetX": 63.7,
+    "islands": []
+   }
+  },
+  "female/Idle/S/02": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (17 px)"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     54,
+     43,
+     75,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 17,
+    "footSpecks": 0,
+    "feetX": 63.9,
+    "islands": []
+   }
+  },
+  "female/Idle/SW/00": {
+   "status": "rejected",
+   "reasons": [
+    "alpha: dark background remnant behind the rear leg (visible at 1x)"
+   ],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     56,
+     43,
+     73,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 7,
+    "footSpecks": 0,
+    "feetX": 62.8,
+    "islands": []
+   }
+  },
+  "female/Idle/SW/01": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (24 px)"
+   ],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     54,
+     43,
+     74,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 24,
+    "footSpecks": 0,
+    "feetX": 61.2,
+    "islands": []
+   }
+  },
+  "female/Idle/SW/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     51,
+     43,
+     77,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 1,
+    "footSpecks": 0,
+    "feetX": 60.1,
+    "islands": []
+   }
+  },
+  "female/Idle/W/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     57,
+     43,
+     71,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 62.5,
+    "islands": []
+   }
+  },
+  "female/Idle/W/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     56,
+     43,
+     72,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 62.8,
+    "islands": []
+   }
+  },
+  "female/Idle/W/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     56,
+     43,
+     72,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 62.6,
+    "islands": []
+   }
+  },
+  "female/Idle/NW/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     55,
+     48,
+     74,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 1,
+    "footSpecks": 0,
+    "feetX": 62.5,
+    "islands": []
+   }
+  },
+  "female/Idle/NW/01": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (11 px)"
+   ],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     55,
+     47,
+     74,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 11,
+    "footSpecks": 0,
+    "feetX": 64.5,
+    "islands": []
+   }
+  },
+  "female/Idle/NW/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     55,
+     43,
+     73,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 61.9,
+    "islands": []
+   }
+  },
+  "female/Idle/N/00": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (15 px)"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     54,
+     42,
+     74,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 15,
+    "footSpecks": 0,
+    "feetX": 65.0,
+    "islands": []
+   }
+  },
+  "female/Idle/N/01": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (10 px)"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     55,
+     42,
+     74,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 10,
+    "footSpecks": 0,
+    "feetX": 65.6,
+    "islands": []
+   }
+  },
+  "female/Idle/N/02": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (11 px)"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     54,
+     43,
+     74,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 11,
+    "footSpecks": 0,
+    "feetX": 64.0,
+    "islands": []
+   }
+  },
+  "female/Idle/NE/00": {
+   "status": "rejected",
+   "reasons": [
+    "facing: right-facing profile with the face visible (reads as E/SE), not NE"
+   ],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     52,
+     44,
+     76,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 1,
+    "footSpecks": 0,
+    "feetX": 65.6,
+    "islands": []
+   }
+  },
+  "female/Idle/NE/01": {
+   "status": "rejected",
+   "reasons": [
+    "facing: right-facing profile with the face visible (reads as E/SE), not NE"
+   ],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     52,
+     44,
+     76,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 64.2,
+    "islands": []
+   }
+  },
+  "female/Idle/NE/02": {
+   "status": "rejected",
+   "reasons": [
+    "facing: right-facing profile with the face visible (reads as E/SE), not NE"
+   ],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     51,
+     43,
+     77,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 67.1,
+    "islands": []
+   }
+  },
+  "female/Idle/E/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     52,
+     43,
+     77,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 1,
+    "footSpecks": 0,
+    "feetX": 66.9,
+    "islands": []
+   }
+  },
+  "female/Idle/E/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     54,
+     43,
+     74,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 65.6,
+    "islands": []
+   }
+  },
+  "female/Idle/E/02": {
+   "status": "rejected",
+   "reasons": [
+    "alpha: dark background remnant behind the rear leg (visible at 1x)"
+   ],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     55,
+     43,
+     73,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 6,
+    "footSpecks": 0,
+    "feetX": 63.9,
+    "islands": []
+   }
+  },
+  "female/Idle/SE/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     52,
+     43,
+     76,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 1,
+    "footSpecks": 0,
+    "feetX": 67.8,
+    "islands": []
+   }
+  },
+  "female/Idle/SE/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     54,
+     43,
+     74,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 1,
+    "footSpecks": 0,
+    "feetX": 68.3,
+    "islands": []
+   }
+  },
+  "female/Idle/SE/02": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (13 px)"
+   ],
+   "warnings": [
+    "1 dark speck pixel(s) at the feet",
+    "Idle side views are painted mid-stride, so idle and walk read alike from the side"
+   ],
+   "metrics": {
+    "bbox": [
+     56,
+     43,
+     73,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 13,
+    "footSpecks": 1,
+    "feetX": 65.4,
+    "islands": []
+   }
+  },
+  "female/Walk/S/00": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (23 px)"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     54,
+     42,
+     75,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 23,
+    "footSpecks": 0,
+    "feetX": 64.8,
+    "islands": []
+   }
+  },
+  "female/Walk/S/01": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (18 px)"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     54,
+     42,
+     75,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 18,
+    "footSpecks": 0,
+    "feetX": 63.8,
+    "islands": []
+   }
+  },
+  "female/Walk/S/02": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (10 px)"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     54,
+     44,
+     75,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 10,
+    "footSpecks": 0,
+    "feetX": 63.9,
+    "islands": []
+   }
+  },
+  "female/Walk/SW/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     50,
+     44,
+     78,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 59.8,
+    "islands": []
+   }
+  },
+  "female/Walk/SW/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     50,
+     44,
+     79,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 59.2,
+    "islands": []
+   }
+  },
+  "female/Walk/SW/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     49,
+     44,
+     80,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 59.3,
+    "islands": []
+   }
+  },
+  "female/Walk/W/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     57,
+     42,
+     72,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 3,
+    "footSpecks": 0,
+    "feetX": 63.2,
+    "islands": []
+   }
+  },
+  "female/Walk/W/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     57,
+     44,
+     72,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 64.5,
+    "islands": []
+   }
+  },
+  "female/Walk/W/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     55,
+     42,
+     73,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 3,
+    "footSpecks": 0,
+    "feetX": 62.5,
+    "islands": []
+   }
+  },
+  "female/Walk/NW/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     53,
+     44,
+     76,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 2,
+    "footSpecks": 0,
+    "feetX": 62.1,
+    "islands": []
+   }
+  },
+  "female/Walk/NW/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     52,
+     44,
+     77,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 3,
+    "footSpecks": 0,
+    "feetX": 62.8,
+    "islands": []
+   }
+  },
+  "female/Walk/NW/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     54,
+     42,
+     75,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 59.5,
+    "islands": []
+   }
+  },
+  "female/Walk/N/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     55,
+     42,
+     74,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 8,
+    "footSpecks": 0,
+    "feetX": 66.5,
+    "islands": []
+   }
+  },
+  "female/Walk/N/01": {
+   "status": "rejected",
+   "reasons": [
+    "alpha: dark background remnant between the legs (visible at 1x)"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     55,
+     46,
+     74,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 8,
+    "footSpecks": 0,
+    "feetX": 65.1,
+    "islands": []
+   }
+  },
+  "female/Walk/N/02": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (21 px)"
+   ],
+   "warnings": [
+    "2 dark speck pixel(s) at the feet"
+   ],
+   "metrics": {
+    "bbox": [
+     54,
+     42,
+     74,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 21,
+    "footSpecks": 2,
+    "feetX": 64.0,
+    "islands": []
+   }
+  },
+  "female/Walk/NE/00": {
+   "status": "rejected",
+   "reasons": [
+    "facing: right-facing profile with the face visible (reads as E/SE), not NE"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     49,
+     46,
+     79,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 68.4,
+    "islands": []
+   }
+  },
+  "female/Walk/NE/01": {
+   "status": "rejected",
+   "reasons": [
+    "facing: right-facing profile with the face visible (reads as E/SE), not NE"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     51,
+     45,
+     77,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 66.3,
+    "islands": []
+   }
+  },
+  "female/Walk/NE/02": {
+   "status": "rejected",
+   "reasons": [
+    "facing: right-facing profile with the face visible (reads as E/SE), not NE"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     51,
+     49,
+     77,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 1,
+    "footSpecks": 0,
+    "feetX": 65.0,
+    "islands": []
+   }
+  },
+  "female/Walk/E/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     49,
+     44,
+     80,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 71.0,
+    "islands": []
+   }
+  },
+  "female/Walk/E/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     50,
+     44,
+     79,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 67.2,
+    "islands": []
+   }
+  },
+  "female/Walk/E/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "1 dark speck pixel(s) at the feet"
+   ],
+   "metrics": {
+    "bbox": [
+     50,
+     44,
+     79,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 1,
+    "footSpecks": 1,
+    "feetX": 67.5,
+    "islands": []
+   }
+  },
+  "female/Walk/SE/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     50,
+     45,
+     79,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 67.4,
+    "islands": []
+   }
+  },
+  "female/Walk/SE/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     51,
+     44,
+     77,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 67.8,
+    "islands": []
+   }
+  },
+  "female/Walk/SE/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     52,
+     44,
+     77,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 67.2,
+    "islands": []
+   }
+  },
+  "female/Cast/S/00": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (15 px)"
+   ],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease"
+   ],
+   "metrics": {
+    "bbox": [
+     50,
+     40,
+     78,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 15,
+    "footSpecks": 0,
+    "feetX": 65.9,
+    "islands": []
+   }
+  },
+  "female/Cast/S/01": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (28 px)"
+   ],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease"
+   ],
+   "metrics": {
+    "bbox": [
+     51,
+     40,
+     77,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 28,
+    "footSpecks": 0,
+    "feetX": 63.9,
+    "islands": []
+   }
+  },
+  "female/Cast/S/02": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (16 px)"
+   ],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease"
+   ],
+   "metrics": {
+    "bbox": [
+     50,
+     40,
+     78,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 16,
+    "footSpecks": 0,
+    "feetX": 60.5,
+    "islands": []
+   }
+  },
+  "female/Cast/SW/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease"
+   ],
+   "metrics": {
+    "bbox": [
+     48,
+     44,
+     80,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 62.6,
+    "islands": []
+   }
+  },
+  "female/Cast/SW/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease"
+   ],
+   "metrics": {
+    "bbox": [
+     48,
+     42,
+     81,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 64.3,
+    "islands": []
+   }
+  },
+  "female/Cast/SW/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "1 dark speck pixel(s) at the feet",
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease"
+   ],
+   "metrics": {
+    "bbox": [
+     47,
+     43,
+     81,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 2,
+    "footSpecks": 1,
+    "feetX": 63.9,
+    "islands": []
+   }
+  },
+  "female/Cast/W/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease"
+   ],
+   "metrics": {
+    "bbox": [
+     48,
+     41,
+     81,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 66.1,
+    "islands": []
+   }
+  },
+  "female/Cast/W/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease"
+   ],
+   "metrics": {
+    "bbox": [
+     49,
+     42,
+     79,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 1,
+    "footSpecks": 0,
+    "feetX": 64.1,
+    "islands": []
+   }
+  },
+  "female/Cast/W/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease"
+   ],
+   "metrics": {
+    "bbox": [
+     50,
+     42,
+     78,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 63.3,
+    "islands": []
+   }
+  },
+  "female/Cast/NW/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease"
+   ],
+   "metrics": {
+    "bbox": [
+     51,
+     46,
+     77,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 2,
+    "footSpecks": 0,
+    "feetX": 67.0,
+    "islands": []
+   }
+  },
+  "female/Cast/NW/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease"
+   ],
+   "metrics": {
+    "bbox": [
+     51,
+     46,
+     77,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 63.1,
+    "islands": []
+   }
+  },
+  "female/Cast/NW/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease"
+   ],
+   "metrics": {
+    "bbox": [
+     51,
+     46,
+     77,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 62.9,
+    "islands": []
+   }
+  },
+  "female/Cast/N/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease"
+   ],
+   "metrics": {
+    "bbox": [
+     53,
+     45,
+     76,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 3,
+    "footSpecks": 0,
+    "feetX": 64.8,
+    "islands": []
+   }
+  },
+  "female/Cast/N/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease"
+   ],
+   "metrics": {
+    "bbox": [
+     53,
+     42,
+     76,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 5,
+    "footSpecks": 0,
+    "feetX": 64.6,
+    "islands": []
+   }
+  },
+  "female/Cast/N/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease"
+   ],
+   "metrics": {
+    "bbox": [
+     53,
+     42,
+     76,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 3,
+    "footSpecks": 0,
+    "feetX": 64.9,
+    "islands": []
+   }
+  },
+  "female/Cast/NE/00": {
+   "status": "rejected",
+   "reasons": [
+    "facing: right-facing profile with the face visible (reads as E/SE), not NE"
+   ],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease"
+   ],
+   "metrics": {
+    "bbox": [
+     49,
+     42,
+     79,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 66.1,
+    "islands": []
+   }
+  },
+  "female/Cast/NE/01": {
+   "status": "rejected",
+   "reasons": [
+    "facing: right-facing profile with the face visible (reads as E/SE), not NE"
+   ],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease"
+   ],
+   "metrics": {
+    "bbox": [
+     52,
+     45,
+     77,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 63.0,
+    "islands": []
+   }
+  },
+  "female/Cast/NE/02": {
+   "status": "rejected",
+   "reasons": [
+    "facing: right-facing profile with the face visible (reads as E/SE), not NE"
+   ],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease"
+   ],
+   "metrics": {
+    "bbox": [
+     47,
+     43,
+     81,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 63.8,
+    "islands": []
+   }
+  },
+  "female/Cast/E/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease"
+   ],
+   "metrics": {
+    "bbox": [
+     49,
+     41,
+     79,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 63.4,
+    "islands": []
+   }
+  },
+  "female/Cast/E/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease"
+   ],
+   "metrics": {
+    "bbox": [
+     48,
+     43,
+     80,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 60.2,
+    "islands": []
+   }
+  },
+  "female/Cast/E/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease"
+   ],
+   "metrics": {
+    "bbox": [
+     48,
+     45,
+     80,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 63.1,
+    "islands": []
+   }
+  },
+  "female/Cast/SE/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease"
+   ],
+   "metrics": {
+    "bbox": [
+     49,
+     41,
+     80,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 63.6,
+    "islands": []
+   }
+  },
+  "female/Cast/SE/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease"
+   ],
+   "metrics": {
+    "bbox": [
+     48,
+     41,
+     80,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 62.6,
+    "islands": []
+   }
+  },
+  "female/Cast/SE/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [
+    "Cast is one unsplit candidate set, not CastPrepare / CastHold / CastRelease"
+   ],
+   "metrics": {
+    "bbox": [
+     49,
+     45,
+     79,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 63.2,
+    "islands": []
+   }
+  },
+  "female/Unarmed_Attack/S/00": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (10 px)",
+    "pose: arms at rest in all three candidates; no strike is visible"
+   ],
+   "warnings": [
+    "1 dark speck pixel(s) at the feet"
+   ],
+   "metrics": {
+    "bbox": [
+     55,
+     47,
+     73,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 10,
+    "footSpecks": 1,
+    "feetX": 62.5,
+    "islands": []
+   }
+  },
+  "female/Unarmed_Attack/S/01": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (20 px)",
+    "pose: arms at rest in all three candidates; no strike is visible"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     54,
+     46,
+     74,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 20,
+    "footSpecks": 0,
+    "feetX": 63.0,
+    "islands": []
+   }
+  },
+  "female/Unarmed_Attack/S/02": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (15 px)",
+    "pose: arms at rest in all three candidates; no strike is visible"
+   ],
+   "warnings": [
+    "1 dark speck pixel(s) at the feet"
+   ],
+   "metrics": {
+    "bbox": [
+     56,
+     48,
+     73,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 15,
+    "footSpecks": 1,
+    "feetX": 65.4,
+    "islands": []
+   }
+  },
+  "female/Unarmed_Attack/SW/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     47,
+     49,
+     81,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 62.2,
+    "islands": []
+   }
+  },
+  "female/Unarmed_Attack/SW/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     48,
+     50,
+     80,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 61.9,
+    "islands": []
+   }
+  },
+  "female/Unarmed_Attack/SW/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     46,
+     50,
+     83,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 1,
+    "footSpecks": 0,
+    "feetX": 61.3,
+    "islands": []
+   }
+  },
+  "female/Unarmed_Attack/W/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     47,
+     49,
+     82,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 65.0,
+    "islands": []
+   }
+  },
+  "female/Unarmed_Attack/W/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     50,
+     51,
+     78,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 66.4,
+    "islands": []
+   }
+  },
+  "female/Unarmed_Attack/W/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     55,
+     48,
+     74,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 62.3,
+    "islands": []
+   }
+  },
+  "female/Unarmed_Attack/NW/00": {
+   "status": "rejected",
+   "reasons": [
+    "facing: chest toward the viewer (reads as SW), not NW"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     49,
+     50,
+     79,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 64.0,
+    "islands": []
+   }
+  },
+  "female/Unarmed_Attack/NW/01": {
+   "status": "rejected",
+   "reasons": [
+    "facing: chest toward the viewer (reads as SW), not NW"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     50,
+     51,
+     79,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 2,
+    "footSpecks": 0,
+    "feetX": 63.6,
+    "islands": []
+   }
+  },
+  "female/Unarmed_Attack/NW/02": {
+   "status": "rejected",
+   "reasons": [
+    "facing: chest toward the viewer (reads as SW), not NW"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     52,
+     51,
+     76,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 63.0,
+    "islands": []
+   }
+  },
+  "female/Unarmed_Attack/N/00": {
+   "status": "rejected",
+   "reasons": [
+    "baked dark background remnant in the leg band (16 px)"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     54,
+     47,
+     74,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 16,
+    "footSpecks": 0,
+    "feetX": 64.0,
+    "islands": []
+   }
+  },
+  "female/Unarmed_Attack/N/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     53,
+     50,
+     76,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 3,
+    "footSpecks": 0,
+    "feetX": 62.2,
+    "islands": []
+   }
+  },
+  "female/Unarmed_Attack/N/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     51,
+     48,
+     78,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 62.0,
+    "islands": []
+   }
+  },
+  "female/Unarmed_Attack/NE/00": {
+   "status": "rejected",
+   "reasons": [
+    "facing: right-facing profile with the face visible (reads as E/SE), not NE"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     51,
+     53,
+     77,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 63.2,
+    "islands": []
+   }
+  },
+  "female/Unarmed_Attack/NE/01": {
+   "status": "rejected",
+   "reasons": [
+    "facing: right-facing profile with the face visible (reads as E/SE), not NE"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     51,
+     51,
+     77,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 64.5,
+    "islands": []
+   }
+  },
+  "female/Unarmed_Attack/NE/02": {
+   "status": "rejected",
+   "reasons": [
+    "facing: right-facing profile with the face visible (reads as E/SE), not NE"
+   ],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     48,
+     51,
+     81,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 62.3,
+    "islands": []
+   }
+  },
+  "female/Unarmed_Attack/E/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     50,
+     47,
+     78,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 60.5,
+    "islands": []
+   }
+  },
+  "female/Unarmed_Attack/E/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     48,
+     50,
+     81,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 60.3,
+    "islands": []
+   }
+  },
+  "female/Unarmed_Attack/E/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     50,
+     50,
+     79,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 64.3,
+    "islands": []
+   }
+  },
+  "female/Unarmed_Attack/SE/00": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     51,
+     49,
+     78,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 0,
+    "footSpecks": 0,
+    "feetX": 60.7,
+    "islands": []
+   }
+  },
+  "female/Unarmed_Attack/SE/01": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     48,
+     50,
+     80,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 1,
+    "footSpecks": 0,
+    "feetX": 60.2,
+    "islands": []
+   }
+  },
+  "female/Unarmed_Attack/SE/02": {
+   "status": "accepted",
+   "reasons": [],
+   "warnings": [],
+   "metrics": {
+    "bbox": [
+     50,
+     50,
+     79,
+     106
+    ],
+    "feetRow": 105,
+    "semiAlpha": 0,
+    "darkLegBand": 1,
+    "footSpecks": 0,
+    "feetX": 60.4,
+    "islands": []
+   }
+  }
+ }
+}

@@ -1,0 +1,853 @@
+[
+{
+"kind": "npc",
+"actorId": "npc:odile-banker",
+"role": "banker",
+"name": "Odile, banker",
+"town": null,
+"zone": "quay",
+"rosterIndex": 0
+},
+{
+"kind": "npc",
+"actorId": "npc:harl-smith",
+"role": "smith",
+"name": "Harl, smith",
+"town": null,
+"zone": "quay",
+"rosterIndex": 0
+},
+{
+"kind": "npc",
+"actorId": "npc:master-vey-trainer",
+"role": "trainer",
+"name": "Master Vey, trainer",
+"town": null,
+"zone": "quay",
+"rosterIndex": 0
+},
+{
+"kind": "npc",
+"actorId": "npc:pell-bowyer",
+"role": "workshop",
+"name": "Pell, bowyer",
+"town": null,
+"zone": "quay",
+"rosterIndex": 0
+},
+{
+"kind": "npc",
+"actorId": "npc:sorrel-apothecary",
+"role": "apothecary",
+"name": "Sorrel, apothecary",
+"town": null,
+"zone": "quay",
+"rosterIndex": 0
+},
+{
+"kind": "npc",
+"actorId": "npc:gus-provisioner",
+"role": "provisioner",
+"name": "Gus, provisioner",
+"town": null,
+"zone": "quay",
+"rosterIndex": 0
+},
+{
+"kind": "npc",
+"actorId": "npc:mara-quay-smith",
+"role": "qsmith",
+"name": "Mara, quay smith",
+"town": null,
+"zone": "quay",
+"rosterIndex": 0
+},
+{
+"kind": "npc",
+"actorId": "npc:dena-assaymaster",
+"role": "assay",
+"name": "Dena, assaymaster",
+"town": null,
+"zone": "quay",
+"rosterIndex": 0
+},
+{
+"kind": "npc",
+"actorId": "npc:sister-maud-healer",
+"role": "healer",
+"name": "Sister Maud, healer",
+"town": null,
+"zone": "quay",
+"rosterIndex": 0
+},
+{
+"kind": "npc",
+"actorId": "npc:quaywarden-brann",
+"role": "quaywarden",
+"name": "Quaywarden Brann",
+"town": null,
+"zone": "quay",
+"rosterIndex": 0
+},
+{
+"kind": "npc",
+"actorId": "npc:quay-warden",
+"role": "guard",
+"name": "Quay warden",
+"town": null,
+"zone": "safe",
+"rosterIndex": 0
+},
+{
+"kind": "npc",
+"actorId": "npc:quay-warden-2",
+"role": "guard",
+"name": "Quay warden",
+"town": null,
+"zone": "safe",
+"rosterIndex": 1
+},
+{
+"kind": "npc",
+"actorId": "npc:quay-warden-3",
+"role": "guard",
+"name": "Quay warden",
+"town": null,
+"zone": "safe",
+"rosterIndex": 2
+},
+{
+"kind": "npc",
+"actorId": "npc:quay-warden-4",
+"role": "guard",
+"name": "Quay warden",
+"town": null,
+"zone": "roads",
+"rosterIndex": 3
+},
+{
+"kind": "npc",
+"actorId": "npc:quay-warden-5",
+"role": "guard",
+"name": "Quay warden",
+"town": null,
+"zone": "roads",
+"rosterIndex": 4
+},
+{
+"kind": "npc",
+"actorId": "npc:old-fenna-camp-healer",
+"role": "healer",
+"name": "Old Fenna, camp healer",
+"town": null,
+"zone": "camp",
+"rosterIndex": 0
+},
+{
+"kind": "npc",
+"actorId": "npc:crow-camp-strongbox",
+"role": "campbank",
+"name": "Crow, camp strongbox",
+"town": null,
+"zone": "camp",
+"rosterIndex": 0
+},
+{
+"kind": "npc",
+"actorId": "npc:mags-fence",
+"role": "outlaw",
+"name": "Mags, fence",
+"town": null,
+"zone": "camp",
+"rosterIndex": 0
+},
+{
+"kind": "npc",
+"actorId": "npc:hobb-mynoc-banker",
+"role": "banker",
+"name": "Hobb, Mynoc banker",
+"town": "mynoc",
+"zone": "mynoc",
+"rosterIndex": 0
+},
+{
+"kind": "npc",
+"actorId": "npc:brega-forgemistress",
+"role": "smith",
+"name": "Brega, forgemistress",
+"town": "mynoc",
+"zone": "mynoc",
+"rosterIndex": 0,
+"life": {
+"prof": "smith",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:tollin-mine-stores",
+"role": "miner",
+"name": "Tollin, mine stores",
+"town": "mynoc",
+"zone": "mynoc",
+"rosterIndex": 0,
+"life": {
+"prof": "shop",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:sister-ewe-healer",
+"role": "healer",
+"name": "Sister Ewe, healer",
+"town": "mynoc",
+"zone": "mynoc",
+"rosterIndex": 0
+},
+{
+"kind": "npc",
+"actorId": "npc:mynoc-warden",
+"role": "guard",
+"name": "Mynoc warden",
+"town": "mynoc",
+"zone": "mynoc",
+"rosterIndex": 0,
+"life": {
+"prof": "guard",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:mynoc-warden-2",
+"role": "guard",
+"name": "Mynoc warden",
+"town": "mynoc",
+"zone": "mynoc",
+"rosterIndex": 1,
+"life": {
+"prof": "guard",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:quill-vespar-banker",
+"role": "banker",
+"name": "Quill, Vespar banker",
+"town": "vespar",
+"zone": "vespar",
+"rosterIndex": 0
+},
+{
+"kind": "npc",
+"actorId": "npc:merrin-tailor",
+"role": "tailor",
+"name": "Merrin, tailor",
+"town": "vespar",
+"zone": "vespar",
+"rosterIndex": 0,
+"life": {
+"prof": "shop",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:pip-tinker",
+"role": "tinker",
+"name": "Pip, tinker",
+"town": "vespar",
+"zone": "vespar",
+"rosterIndex": 0,
+"life": {
+"prof": "shop",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:adda-supplies",
+"role": "provisioner",
+"name": "Adda, supplies",
+"town": "vespar",
+"zone": "vespar",
+"rosterIndex": 0,
+"life": {
+"prof": "shop",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:old-cray-fishmonger",
+"role": "fishmonger",
+"name": "Old Cray, fishmonger",
+"town": "vespar",
+"zone": "vespar",
+"rosterIndex": 0,
+"life": {
+"prof": "shop",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:brother-lune-healer",
+"role": "healer",
+"name": "Brother Lune, healer",
+"town": "vespar",
+"zone": "vespar",
+"rosterIndex": 0
+},
+{
+"kind": "npc",
+"actorId": "npc:captain-rhea-moonglen-boat",
+"role": "boat",
+"name": "Captain Rhea, Moonglen boat",
+"town": "vespar",
+"zone": "vespar",
+"rosterIndex": 0
+},
+{
+"kind": "npc",
+"actorId": "npc:captain-ysolde-quay-packet",
+"role": "packet",
+"name": "Captain Ysolde, Quay packet",
+"town": "vespar",
+"zone": "vespar",
+"rosterIndex": 0
+},
+{
+"kind": "npc",
+"actorId": "npc:vespar-watch",
+"role": "guard",
+"name": "Vespar watch",
+"town": "vespar",
+"zone": "vespar",
+"rosterIndex": 0,
+"life": {
+"prof": "guard",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:vespar-watch-2",
+"role": "guard",
+"name": "Vespar watch",
+"town": "vespar",
+"zone": "vespar",
+"rosterIndex": 1,
+"life": {
+"prof": "guard",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:vespar-watch-3",
+"role": "guard",
+"name": "Vespar watch",
+"town": "vespar",
+"zone": "vespar",
+"rosterIndex": 2,
+"life": {
+"prof": "guard",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:vespar-watch-4",
+"role": "guard",
+"name": "Vespar watch",
+"town": "vespar",
+"zone": "vespar",
+"rosterIndex": 3,
+"life": {
+"prof": "guard",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:tam-ferryman",
+"role": "ferry",
+"name": "Tam, ferryman",
+"town": "skara",
+"zone": "skara",
+"rosterIndex": 0
+},
+{
+"kind": "npc",
+"actorId": "npc:wenna-ferrywoman",
+"role": "ferry",
+"name": "Wenna, ferrywoman",
+"town": "skaraland",
+"zone": "skaraland",
+"rosterIndex": 0
+},
+{
+"kind": "npc",
+"actorId": "npc:ivo-skara-banker",
+"role": "banker",
+"name": "Ivo, Skara banker",
+"town": "skara",
+"zone": "skara",
+"rosterIndex": 0
+},
+{
+"kind": "npc",
+"actorId": "npc:maeve-innkeeper",
+"role": "innkeeper",
+"name": "Maeve, innkeeper",
+"town": "skara",
+"zone": "skara",
+"rosterIndex": 0,
+"life": {
+"prof": "innkeeper",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:fen-bowyer",
+"role": "workshop",
+"name": "Fen, bowyer",
+"town": "skara",
+"zone": "skara",
+"rosterIndex": 0,
+"life": {
+"prof": "shop",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:ash-fletcher",
+"role": "fletcher",
+"name": "Ash, fletcher",
+"town": "skara",
+"zone": "skara",
+"rosterIndex": 0,
+"life": {
+"prof": "shop",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:old-rowan-healer",
+"role": "healer",
+"name": "Old Rowan, healer",
+"town": "skara",
+"zone": "skara",
+"rosterIndex": 0
+},
+{
+"kind": "npc",
+"actorId": "npc:ranger-captain-hale",
+"role": "ranger",
+"name": "Ranger-captain Hale",
+"town": "skaraland",
+"zone": "skaraland",
+"rosterIndex": 0
+},
+{
+"kind": "npc",
+"actorId": "npc:dorn-stablehand",
+"role": "stable",
+"name": "Dorn, stablehand",
+"town": "skaraland",
+"zone": "skaraland",
+"rosterIndex": 0
+},
+{
+"kind": "npc",
+"actorId": "npc:skara-ranger",
+"role": "guard",
+"name": "Skara ranger",
+"town": "skara",
+"zone": "skara",
+"rosterIndex": 0,
+"life": {
+"prof": "guard",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:skara-ranger-2",
+"role": "guard",
+"name": "Skara ranger",
+"town": "skaraland",
+"zone": "skaraland",
+"rosterIndex": 1
+},
+{
+"kind": "npc",
+"actorId": "npc:sela-college-bank",
+"role": "banker",
+"name": "Sela, college bank",
+"town": "moonglen",
+"zone": "moonglen",
+"rosterIndex": 0
+},
+{
+"kind": "npc",
+"actorId": "npc:magister-orrin",
+"role": "mage",
+"name": "Magister Orrin",
+"town": "moonglen",
+"zone": "moonglen",
+"rosterIndex": 0,
+"life": {
+"prof": "shop",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:nettle-reagent-seller",
+"role": "reagents",
+"name": "Nettle, reagent seller",
+"town": "moonglen",
+"zone": "moonglen",
+"rosterIndex": 0,
+"life": {
+"prof": "shop",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:pell-innkeeper",
+"role": "innkeeper",
+"name": "Pell, innkeeper",
+"town": "moonglen",
+"zone": "moonglen",
+"rosterIndex": 0,
+"life": {
+"prof": "innkeeper",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:archivist-venn",
+"role": "scholar",
+"name": "Archivist Venn",
+"town": "moonglen",
+"zone": "moonglen",
+"rosterIndex": 0,
+"life": {
+"prof": "scholar",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:astronomer-iska",
+"role": "scholar",
+"name": "Astronomer Iska",
+"town": "moonglen",
+"zone": "moonglen",
+"rosterIndex": 0,
+"life": {
+"prof": "astronomer",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:sister-moira-healer",
+"role": "healer",
+"name": "Sister Moira, healer",
+"town": "moonglen",
+"zone": "moonglen",
+"rosterIndex": 0
+},
+{
+"kind": "npc",
+"actorId": "npc:captain-hollis-vespar-boat",
+"role": "boat",
+"name": "Captain Hollis, Vespar boat",
+"town": "moonglen",
+"zone": "moonglen",
+"rosterIndex": 0
+},
+{
+"kind": "npc",
+"actorId": "npc:college-warden",
+"role": "guard",
+"name": "College warden",
+"town": "moonglen",
+"zone": "moonglen",
+"rosterIndex": 0,
+"life": {
+"prof": "guard",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:college-warden-2",
+"role": "guard",
+"name": "College warden",
+"town": "moonglen",
+"zone": "moonglen",
+"rosterIndex": 1,
+"life": {
+"prof": "guard",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:captain-bram-vespar-packet",
+"role": "packet",
+"name": "Captain Bram, Vespar packet",
+"town": null,
+"zone": "roads",
+"rosterIndex": 0
+},
+{
+"kind": "npc",
+"actorId": "npc:nell-fisherwoman",
+"role": "resident",
+"name": "Nell, fisherwoman",
+"town": "vespar",
+"zone": "vespar",
+"rosterIndex": 0,
+"life": {
+"prof": "fisher",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:garrick-dockhand",
+"role": "resident",
+"name": "Garrick, dockhand",
+"town": "vespar",
+"zone": "vespar",
+"rosterIndex": 0,
+"life": {
+"prof": "dockhand",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:lise-weaver",
+"role": "resident",
+"name": "Lise, weaver",
+"town": "vespar",
+"zone": "vespar",
+"rosterIndex": 0,
+"life": {
+"prof": "townsfolk",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:old-tomas",
+"role": "resident",
+"name": "Old Tomas",
+"town": "vespar",
+"zone": "vespar",
+"rosterIndex": 0,
+"life": {
+"prof": "townsfolk",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:corin-carter",
+"role": "resident",
+"name": "Corin, carter",
+"town": "vespar",
+"zone": "vespar",
+"rosterIndex": 0,
+"life": {
+"prof": "townsfolk",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:durn-miner",
+"role": "resident",
+"name": "Durn, miner",
+"town": "mynoc",
+"zone": "mynoc",
+"rosterIndex": 0,
+"life": {
+"prof": "miner",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:kessa-miner",
+"role": "resident",
+"name": "Kessa, miner",
+"town": "mynoc",
+"zone": "mynoc",
+"rosterIndex": 0,
+"life": {
+"prof": "miner",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:fennick-woodcutter",
+"role": "resident",
+"name": "Fennick, woodcutter",
+"town": "mynoc",
+"zone": "mynoc",
+"rosterIndex": 0,
+"life": {
+"prof": "woodcutter",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:mabry-cook",
+"role": "resident",
+"name": "Mabry, cook",
+"town": "mynoc",
+"zone": "mynoc",
+"rosterIndex": 0,
+"life": {
+"prof": "townsfolk",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:bryn-forester",
+"role": "resident",
+"name": "Bryn, forester",
+"town": "skara",
+"zone": "skara",
+"rosterIndex": 0,
+"life": {
+"prof": "woodcutter",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:ysolde-herb-gatherer",
+"role": "resident",
+"name": "Ysolde, herb gatherer",
+"town": "skara",
+"zone": "skara",
+"rosterIndex": 0,
+"life": {
+"prof": "townsfolk",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:tibbet-student",
+"role": "resident",
+"name": "Tibbet, student",
+"town": "moonglen",
+"zone": "moonglen",
+"rosterIndex": 0,
+"life": {
+"prof": "student",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:mira-student",
+"role": "resident",
+"name": "Mira, student",
+"town": "moonglen",
+"zone": "moonglen",
+"rosterIndex": 0,
+"life": {
+"prof": "student",
+"doing": "work"
+}
+},
+{
+"kind": "npc",
+"actorId": "npc:tobin-travelling-merchant",
+"role": "trader",
+"name": "Tobin, travelling merchant",
+"town": "mynoc",
+"zone": "mynoc",
+"rosterIndex": 0,
+"life": {
+"prof": "trader",
+"doing": "work"
+}
+},
+{
+"kind": "ally",
+"actorId": "npc:wren",
+"role": null,
+"name": "Wren",
+"town": null,
+"zone": "quay",
+"rosterIndex": 0,
+"equip": {
+"weapon": {
+"id": "sword",
+"material": null
+},
+"shield": {
+"id": "buckler",
+"material": null
+},
+"head": {
+"id": "leather_cap",
+"material": "regular"
+},
+"neck": {
+"id": "leather_gorget",
+"material": "regular"
+},
+"chest": {
+"id": "leather_tunic",
+"material": "regular"
+},
+"arms": {
+"id": "leather_sleeves",
+"material": "regular"
+},
+"hands": {
+"id": "leather_gloves",
+"material": "regular"
+},
+"legs": {
+"id": "leather_leggings",
+"material": "regular"
+},
+"feet": {
+"id": "boots",
+"material": "regular"
+},
+"shirt": {
+"id": "shirt",
+"material": null
+},
+"trousers": {
+"id": "trousers",
+"material": null
+}
+}
+}
+]

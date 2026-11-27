@@ -26,8 +26,8 @@ def start(pg, errs):
     pg.on('pageerror', lambda e: errs.append(str(e)))
     pg.goto('file://' + f); pg.wait_for_timeout(600)
     pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_timeout(600)
-    pg.click('[data-c=prof][data-p="Group healer"]'); pg.fill('#ccn', 'Tess'); pg.click('[data-c=go]'); pg.wait_for_timeout(1200)
-    pg.evaluate("() => { const P = __SF.P; P.str = 100; P.pack.items.length = 0; }")   # strong enough for every weapon, empty pack
+    pg.evaluate("o => __CC.quick(o)", {'name': 'Tess', 'template': 'mage'}); pg.wait_for_timeout(1200)
+    pg.evaluate("() => { const P = __SF.P; P.base.str = P.str = 100; P.pack.items.length = 0; }")   # strong enough for every weapon, empty pack
 
 FILL = """ids => { const S = __SF, P = S.P, SF = S.SF; P.pack.items.length = 0;
   ids.forEach(id => SF.addItem(P.pack, SF.newItem(id, 1), { slots: 999, kg: 1e9 })); }"""
@@ -44,7 +44,7 @@ def icons_ok(got, ids, size, where):
     check(not miss and not bad, f'{where}: {len(ids)} icons, each its own tile at {size} px', (miss, bad[:2]))
 
 def run(pg, tag, phone):
-    # ---------- backpack: tile, tooltip (desktop) or tap card (phone) ----------
+    # ---------- backpack: tile, tooltip (desktop) or tap popup (phone; v0.29 #ipop replaces the inline card) ----------
     pg.evaluate(FILL, NEW); pg.evaluate("__SF.ACT.bag()"); pg.wait_for_timeout(150)
     icons_ok(pg.evaluate(ICONS_IN, '#panel .bagcell > .bagico'), NEW, 40, f'{tag} backpack tiles')
     check(not pg.evaluate("() => document.querySelector('#panel .bagcell > .bagglyph')"), f'{tag} backpack: no category glyph left for the seven')
@@ -52,18 +52,19 @@ def run(pg, tag, phone):
     for id in NEW:
         if phone:
             pg.tap(cell(id)); pg.wait_for_timeout(100)
-            c = pg.evaluate("() => { const c = document.querySelector('#panel .bagcard'); return c && { i: c.querySelector('.baghead .bagico')?.dataset.icon, t: c.innerText }; }")
-            check(c and c['i'] == id, f'{tag} tap card for {id} shows its icon', c)
-            pg.tap(cell(id)); pg.wait_for_timeout(80)   # deselect
+            c = pg.evaluate("() => { const c = document.querySelector('#ipop'); return c && !c.hidden ? { i: c.querySelector('.baghead .bagico')?.dataset.icon, t: c.innerText } : null; }")
+            check(c and c['i'] == id, f'{tag} tap popup for {id} shows its icon', c)
+            pg.tap('#ipop .ipx'); pg.wait_for_timeout(80)   # close (v0.29 popup; on small phones it can cover the tile)
         else:
-            pg.hover(cell(id)); pg.wait_for_timeout(100)
-            t = pg.eval_on_selector(cell(id) + ' .bagtip', "e => ({ d: getComputedStyle(e).display, i: e.querySelector('.bagico')?.dataset.icon, w: Math.round(e.querySelector('.bagico')?.getBoundingClientRect().width), t: e.innerText })")
+            pg.hover(cell(id)); pg.wait_for_timeout(420)   # v0.29: one shared tooltip after about 300 ms
+            t = pg.eval_on_selector('#itip', "e => ({ d: e.hidden ? 'none' : 'block', i: e.querySelector('.bagico')?.dataset.icon, w: Math.round(e.querySelector('.bagico')?.getBoundingClientRect().width), t: e.innerText })")
             want = 'Damage' if id in WEAPONS else 'Quest'   # v0.25 tooltip: Damage / Speed / Weight lines
-            check(t['d'] == 'block' and t['i'] == id and t['w'] == 56 and want in t['t'], f'{tag} hover tooltip for {id}: icon at 56 px, stats intact', t)
-    if not phone: pg.hover(cell('wick')); pg.wait_for_timeout(80)
+            check(t['d'] == 'block' and t['i'] == id and t['w'] == 48 and want in t['t'], f'{tag} hover tooltip for {id}: icon at 48 px, stats intact', t)
+            pg.mouse.move(2, 2); pg.wait_for_timeout(40)
+    if not phone: pg.hover(cell('wick')); pg.wait_for_timeout(420)
     else: pg.tap(cell('heavycrossbow')); pg.wait_for_timeout(100)
     pg.screenshot(path=f'{shots}/{tag}-backpack.png')
-    if phone: pg.tap(cell('heavycrossbow')); pg.wait_for_timeout(80)
+    if phone: pg.tap('#ipop .ipx'); pg.wait_for_timeout(80)
     pg.mouse.move(2, 2)
 
     # ---------- equipment: each weapon equips, keeps its stats, and shows its icon on the Character panel ----------
@@ -108,7 +109,7 @@ def run(pg, tag, phone):
 
     # ---------- crafting: recipe rows and inputs show their outputs' and inputs' tiles; none of the seven is craftable ----------
     makes = pg.evaluate("ids => __SF.SF.RECIPES.filter(r => ids.includes(r.out)).map(r => r.id)", NEW)
-    check(makes == [], f'{tag} crafting: no recipe makes the seven (they come from vendors and the Quaywarden), as before', makes)
+    check(makes in ([], ['heavycrossbow']), f'{tag} crafting: no recipe makes the seven except the heavy crossbow (Bowcraft & Fletching makes it since v0.30)', makes)
     for st in ['anvil', 'bench']:
         pg.evaluate("st => { const S = __SF; const b = S.STATIONS.find(s => s.k === st); S.P.x = b.x + .5; S.P.y = b.y + 1.5; S.interact(); }", st)
         pg.wait_for_timeout(120)

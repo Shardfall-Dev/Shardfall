@@ -6,7 +6,7 @@
   S.MON.boar.dmg = [0, 0]; S.MON.boar.aggro = 0; S.MON.hound.dmg = [10, 10];
   let nid = 91000; const add = (type, dx, dy, hp) => { const d = S.MON[type]; const e = { kind: 'mon', type, name: d.n, x: P.x + dx, y: P.y + dy, hp: hp || d.hp, max: hp || d.hp, state: 'idle', home: { x: P.x + dx, y: P.y + dy }, sect: 0, ward: 0, id: nid++, speed: 0 }; S.ents.push(e); return e; };
   for (const e of S.ents.slice()) if (e.kind === 'mon') e.gone = true, S.ents.splice(S.ents.indexOf(e), 1);
-  P.skills.spellcraft.v = 1000; P.skills.focus.v = 1000; P.skills.wardcraft.v = 1000; P.base.int = 100;
+  P.skills.magery.v = 1000; P.skills.evaluatingintelligence.v = 1000; P.skills.resistingspells.v = 1000; P.base.int = 100;
   const book = P.pack.items.find(i => i.id === 'spellbook'); book.spells = MG.SPELLS.map(s => s.id);
   for (const r of Object.keys(MG.REAGENTS)) SF.addItem(P.pack, SF.newItem(r, 30));
   const cast = (id, t, extra) => { P.mana = 200; P.spellReadyAt = 0; P.held = null; S.castSlot(id); const sp = MG.SPELL[id]; step(sp.prep + .1); if (!P.held) return 'self-released'; return S.releaseHeld(t, extra); };

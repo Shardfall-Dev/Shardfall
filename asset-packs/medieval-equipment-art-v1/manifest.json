@@ -1,0 +1,1995 @@
+{
+  "version": "1.0.0",
+  "status": "static generated art and automatic masks; not paperdoll or animation aligned",
+  "source": "original generated art",
+  "maskChannels": {
+    "red": "primary weight",
+    "green": "secondary weight",
+    "blue": "fixed remainder",
+    "alpha": "source alpha"
+  },
+  "paletteSnapshot": {
+    "metal": {
+      "iron": "#8e8f8a",
+      "dull_copper": "#8a6646",
+      "shadow_iron": "#45454c",
+      "copper": "#c0603e",
+      "bronze": "#c8963e",
+      "golden": "#f2cc3a",
+      "agapite": "#d09090",
+      "verite": "#4aac62",
+      "valorite": "#5a80d8",
+      "mithril": "#c4d6ee"
+    },
+    "wood": {
+      "pine": "#e2c486",
+      "oak": "#8c5c32",
+      "ash": "#bcb69c",
+      "yew": "#9c4c2c",
+      "heartwood": "#8c5cbc",
+      "bloodwood": "#7c2024",
+      "frostwood": "#9cd2f2"
+    },
+    "hide": {
+      "regular": "#9a6a40",
+      "thick": "#6e4a2c",
+      "wolf": "#8c8a80",
+      "spined": "#5a7a4a",
+      "horned": "#a0603a",
+      "troll": "#5e6e52",
+      "barbed": "#6a3a5a",
+      "dragon": "#8a2a22"
+    },
+    "cloth": {
+      "linen": "#ac9776",
+      "navy": "#3b5676",
+      "forest": "#4d6845",
+      "burgundy": "#823e38",
+      "cream": "#c6bda5",
+      "purple": "#6d5279",
+      "charcoal": "#50504b"
+    }
+  },
+  "items": [
+    {
+      "id": "leather_tunic",
+      "slot": "chest",
+      "primary": "hide",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/leather_tunic.png",
+      "mask": "masks/leather_tunic.png",
+      "sourceBox": [
+        95,
+        0,
+        279,
+        170
+      ],
+      "size": [
+        155,
+        161
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "leather_sleeves",
+      "slot": "arms",
+      "primary": "hide",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/leather_sleeves.png",
+      "mask": "masks/leather_sleeves.png",
+      "sourceBox": [
+        95,
+        170,
+        279,
+        294
+      ],
+      "size": [
+        164,
+        121
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "leather_sleeves__image_left",
+      "slot": "arms",
+      "primary": "hide",
+      "secondary": null,
+      "variant": "image_left",
+      "art": "pieces/leather_sleeves__image_left.png",
+      "mask": "masks/leather_sleeves__image_left.png",
+      "sourceBox": [
+        95,
+        170,
+        187,
+        294
+      ],
+      "size": [
+        66,
+        121
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "leather_sleeves__image_right",
+      "slot": "arms",
+      "primary": "hide",
+      "secondary": null,
+      "variant": "image_right",
+      "art": "pieces/leather_sleeves__image_right.png",
+      "mask": "masks/leather_sleeves__image_right.png",
+      "sourceBox": [
+        187,
+        170,
+        279,
+        294
+      ],
+      "size": [
+        66,
+        121
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "leather_gloves",
+      "slot": "hands",
+      "primary": "hide",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/leather_gloves.png",
+      "mask": "masks/leather_gloves.png",
+      "sourceBox": [
+        95,
+        294,
+        279,
+        369
+      ],
+      "size": [
+        111,
+        65
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "leather_gloves__image_left",
+      "slot": "hands",
+      "primary": "hide",
+      "secondary": null,
+      "variant": "image_left",
+      "art": "pieces/leather_gloves__image_left.png",
+      "mask": "masks/leather_gloves__image_left.png",
+      "sourceBox": [
+        95,
+        294,
+        187,
+        369
+      ],
+      "size": [
+        54,
+        65
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "leather_gloves__image_right",
+      "slot": "hands",
+      "primary": "hide",
+      "secondary": null,
+      "variant": "image_right",
+      "art": "pieces/leather_gloves__image_right.png",
+      "mask": "masks/leather_gloves__image_right.png",
+      "sourceBox": [
+        187,
+        294,
+        279,
+        369
+      ],
+      "size": [
+        53,
+        65
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "leather_leggings",
+      "slot": "legs",
+      "primary": "hide",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/leather_leggings.png",
+      "mask": "masks/leather_leggings.png",
+      "sourceBox": [
+        95,
+        369,
+        279,
+        529
+      ],
+      "size": [
+        139,
+        155
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "studded_tunic",
+      "slot": "chest",
+      "primary": "hide",
+      "secondary": "metal",
+      "variant": null,
+      "art": "pieces/studded_tunic.png",
+      "mask": "masks/studded_tunic.png",
+      "sourceBox": [
+        300,
+        0,
+        480,
+        170
+      ],
+      "size": [
+        160,
+        155
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "studded_sleeves",
+      "slot": "arms",
+      "primary": "hide",
+      "secondary": "metal",
+      "variant": null,
+      "art": "pieces/studded_sleeves.png",
+      "mask": "masks/studded_sleeves.png",
+      "sourceBox": [
+        300,
+        170,
+        480,
+        294
+      ],
+      "size": [
+        160,
+        120
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "studded_sleeves__image_left",
+      "slot": "arms",
+      "primary": "hide",
+      "secondary": "metal",
+      "variant": "image_left",
+      "art": "pieces/studded_sleeves__image_left.png",
+      "mask": "masks/studded_sleeves__image_left.png",
+      "sourceBox": [
+        300,
+        170,
+        390,
+        294
+      ],
+      "size": [
+        65,
+        119
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "studded_sleeves__image_right",
+      "slot": "arms",
+      "primary": "hide",
+      "secondary": "metal",
+      "variant": "image_right",
+      "art": "pieces/studded_sleeves__image_right.png",
+      "mask": "masks/studded_sleeves__image_right.png",
+      "sourceBox": [
+        390,
+        170,
+        480,
+        294
+      ],
+      "size": [
+        66,
+        119
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "studded_gloves",
+      "slot": "hands",
+      "primary": "hide",
+      "secondary": "metal",
+      "variant": null,
+      "art": "pieces/studded_gloves.png",
+      "mask": "masks/studded_gloves.png",
+      "sourceBox": [
+        300,
+        294,
+        480,
+        369
+      ],
+      "size": [
+        111,
+        66
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "studded_gloves__image_left",
+      "slot": "hands",
+      "primary": "hide",
+      "secondary": "metal",
+      "variant": "image_left",
+      "art": "pieces/studded_gloves__image_left.png",
+      "mask": "masks/studded_gloves__image_left.png",
+      "sourceBox": [
+        300,
+        294,
+        390,
+        369
+      ],
+      "size": [
+        55,
+        66
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "studded_gloves__image_right",
+      "slot": "hands",
+      "primary": "hide",
+      "secondary": "metal",
+      "variant": "image_right",
+      "art": "pieces/studded_gloves__image_right.png",
+      "mask": "masks/studded_gloves__image_right.png",
+      "sourceBox": [
+        390,
+        294,
+        480,
+        369
+      ],
+      "size": [
+        53,
+        65
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "studded_leggings",
+      "slot": "legs",
+      "primary": "hide",
+      "secondary": "metal",
+      "variant": null,
+      "art": "pieces/studded_leggings.png",
+      "mask": "masks/studded_leggings.png",
+      "sourceBox": [
+        300,
+        369,
+        480,
+        529
+      ],
+      "size": [
+        129,
+        151
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "ringmail_tunic",
+      "slot": "chest",
+      "primary": "metal",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/ringmail_tunic.png",
+      "mask": "masks/ringmail_tunic.png",
+      "sourceBox": [
+        505,
+        0,
+        680,
+        170
+      ],
+      "size": [
+        149,
+        154
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "ringmail_sleeves",
+      "slot": "arms",
+      "primary": "metal",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/ringmail_sleeves.png",
+      "mask": "masks/ringmail_sleeves.png",
+      "sourceBox": [
+        505,
+        170,
+        680,
+        294
+      ],
+      "size": [
+        160,
+        117
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "ringmail_sleeves__image_left",
+      "slot": "arms",
+      "primary": "metal",
+      "secondary": null,
+      "variant": "image_left",
+      "art": "pieces/ringmail_sleeves__image_left.png",
+      "mask": "masks/ringmail_sleeves__image_left.png",
+      "sourceBox": [
+        505,
+        170,
+        592,
+        294
+      ],
+      "size": [
+        65,
+        116
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "ringmail_sleeves__image_right",
+      "slot": "arms",
+      "primary": "metal",
+      "secondary": null,
+      "variant": "image_right",
+      "art": "pieces/ringmail_sleeves__image_right.png",
+      "mask": "masks/ringmail_sleeves__image_right.png",
+      "sourceBox": [
+        592,
+        170,
+        680,
+        294
+      ],
+      "size": [
+        65,
+        117
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "ringmail_gloves",
+      "slot": "hands",
+      "primary": "metal",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/ringmail_gloves.png",
+      "mask": "masks/ringmail_gloves.png",
+      "sourceBox": [
+        505,
+        294,
+        680,
+        369
+      ],
+      "size": [
+        109,
+        65
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "ringmail_gloves__image_left",
+      "slot": "hands",
+      "primary": "metal",
+      "secondary": null,
+      "variant": "image_left",
+      "art": "pieces/ringmail_gloves__image_left.png",
+      "mask": "masks/ringmail_gloves__image_left.png",
+      "sourceBox": [
+        505,
+        294,
+        592,
+        369
+      ],
+      "size": [
+        52,
+        65
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "ringmail_gloves__image_right",
+      "slot": "hands",
+      "primary": "metal",
+      "secondary": null,
+      "variant": "image_right",
+      "art": "pieces/ringmail_gloves__image_right.png",
+      "mask": "masks/ringmail_gloves__image_right.png",
+      "sourceBox": [
+        592,
+        294,
+        680,
+        369
+      ],
+      "size": [
+        52,
+        65
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "ringmail_leggings",
+      "slot": "legs",
+      "primary": "metal",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/ringmail_leggings.png",
+      "mask": "masks/ringmail_leggings.png",
+      "sourceBox": [
+        505,
+        369,
+        680,
+        529
+      ],
+      "size": [
+        131,
+        148
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "chain_tunic",
+      "slot": "chest",
+      "primary": "metal",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/chain_tunic.png",
+      "mask": "masks/chain_tunic.png",
+      "sourceBox": [
+        698,
+        0,
+        880,
+        170
+      ],
+      "size": [
+        157,
+        156
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "chain_sleeves_concept",
+      "slot": "arms",
+      "primary": "metal",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/chain_sleeves_concept.png",
+      "mask": "masks/chain_sleeves_concept.png",
+      "sourceBox": [
+        698,
+        170,
+        880,
+        294
+      ],
+      "size": [
+        164,
+        119
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "chain_sleeves_concept__image_left",
+      "slot": "arms",
+      "primary": "metal",
+      "secondary": null,
+      "variant": "image_left",
+      "art": "pieces/chain_sleeves_concept__image_left.png",
+      "mask": "masks/chain_sleeves_concept__image_left.png",
+      "sourceBox": [
+        698,
+        170,
+        789,
+        294
+      ],
+      "size": [
+        69,
+        119
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "chain_sleeves_concept__image_right",
+      "slot": "arms",
+      "primary": "metal",
+      "secondary": null,
+      "variant": "image_right",
+      "art": "pieces/chain_sleeves_concept__image_right.png",
+      "mask": "masks/chain_sleeves_concept__image_right.png",
+      "sourceBox": [
+        789,
+        170,
+        880,
+        294
+      ],
+      "size": [
+        65,
+        119
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "chain_gloves_concept",
+      "slot": "hands",
+      "primary": "metal",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/chain_gloves_concept.png",
+      "mask": "masks/chain_gloves_concept.png",
+      "sourceBox": [
+        698,
+        294,
+        880,
+        369
+      ],
+      "size": [
+        109,
+        62
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "chain_gloves_concept__image_left",
+      "slot": "hands",
+      "primary": "metal",
+      "secondary": null,
+      "variant": "image_left",
+      "art": "pieces/chain_gloves_concept__image_left.png",
+      "mask": "masks/chain_gloves_concept__image_left.png",
+      "sourceBox": [
+        698,
+        294,
+        789,
+        369
+      ],
+      "size": [
+        52,
+        61
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "chain_gloves_concept__image_right",
+      "slot": "hands",
+      "primary": "metal",
+      "secondary": null,
+      "variant": "image_right",
+      "art": "pieces/chain_gloves_concept__image_right.png",
+      "mask": "masks/chain_gloves_concept__image_right.png",
+      "sourceBox": [
+        789,
+        294,
+        880,
+        369
+      ],
+      "size": [
+        51,
+        62
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "chain_leggings",
+      "slot": "legs",
+      "primary": "metal",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/chain_leggings.png",
+      "mask": "masks/chain_leggings.png",
+      "sourceBox": [
+        698,
+        369,
+        880,
+        529
+      ],
+      "size": [
+        128,
+        150
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "plate_chest",
+      "slot": "chest",
+      "primary": "metal",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/plate_chest.png",
+      "mask": "masks/plate_chest.png",
+      "sourceBox": [
+        895,
+        0,
+        1084,
+        170
+      ],
+      "size": [
+        164,
+        158
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "plate_arms",
+      "slot": "arms",
+      "primary": "metal",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/plate_arms.png",
+      "mask": "masks/plate_arms.png",
+      "sourceBox": [
+        895,
+        170,
+        1084,
+        294
+      ],
+      "size": [
+        167,
+        120
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "plate_arms__image_left",
+      "slot": "arms",
+      "primary": "metal",
+      "secondary": null,
+      "variant": "image_left",
+      "art": "pieces/plate_arms__image_left.png",
+      "mask": "masks/plate_arms__image_left.png",
+      "sourceBox": [
+        895,
+        170,
+        989,
+        294
+      ],
+      "size": [
+        69,
+        120
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "plate_arms__image_right",
+      "slot": "arms",
+      "primary": "metal",
+      "secondary": null,
+      "variant": "image_right",
+      "art": "pieces/plate_arms__image_right.png",
+      "mask": "masks/plate_arms__image_right.png",
+      "sourceBox": [
+        989,
+        170,
+        1084,
+        294
+      ],
+      "size": [
+        68,
+        120
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "plate_gauntlets",
+      "slot": "hands",
+      "primary": "metal",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/plate_gauntlets.png",
+      "mask": "masks/plate_gauntlets.png",
+      "sourceBox": [
+        895,
+        294,
+        1084,
+        369
+      ],
+      "size": [
+        121,
+        68
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "plate_gauntlets__image_left",
+      "slot": "hands",
+      "primary": "metal",
+      "secondary": null,
+      "variant": "image_left",
+      "art": "pieces/plate_gauntlets__image_left.png",
+      "mask": "masks/plate_gauntlets__image_left.png",
+      "sourceBox": [
+        895,
+        294,
+        989,
+        369
+      ],
+      "size": [
+        58,
+        67
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "plate_gauntlets__image_right",
+      "slot": "hands",
+      "primary": "metal",
+      "secondary": null,
+      "variant": "image_right",
+      "art": "pieces/plate_gauntlets__image_right.png",
+      "mask": "masks/plate_gauntlets__image_right.png",
+      "sourceBox": [
+        989,
+        294,
+        1084,
+        369
+      ],
+      "size": [
+        58,
+        68
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "plate_leggings",
+      "slot": "legs",
+      "primary": "metal",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/plate_leggings.png",
+      "mask": "masks/plate_leggings.png",
+      "sourceBox": [
+        895,
+        369,
+        1084,
+        529
+      ],
+      "size": [
+        122,
+        149
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "bone_chest",
+      "slot": "chest",
+      "primary": "fixed",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/bone_chest.png",
+      "mask": "masks/bone_chest.png",
+      "sourceBox": [
+        1094,
+        0,
+        1275,
+        170
+      ],
+      "size": [
+        163,
+        155
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "bone_arms",
+      "slot": "arms",
+      "primary": "fixed",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/bone_arms.png",
+      "mask": "masks/bone_arms.png",
+      "sourceBox": [
+        1094,
+        170,
+        1275,
+        294
+      ],
+      "size": [
+        162,
+        120
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "bone_arms__image_left",
+      "slot": "arms",
+      "primary": "fixed",
+      "secondary": null,
+      "variant": "image_left",
+      "art": "pieces/bone_arms__image_left.png",
+      "mask": "masks/bone_arms__image_left.png",
+      "sourceBox": [
+        1094,
+        170,
+        1184,
+        294
+      ],
+      "size": [
+        67,
+        120
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "bone_arms__image_right",
+      "slot": "arms",
+      "primary": "fixed",
+      "secondary": null,
+      "variant": "image_right",
+      "art": "pieces/bone_arms__image_right.png",
+      "mask": "masks/bone_arms__image_right.png",
+      "sourceBox": [
+        1184,
+        170,
+        1275,
+        294
+      ],
+      "size": [
+        65,
+        119
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "bone_gloves",
+      "slot": "hands",
+      "primary": "fixed",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/bone_gloves.png",
+      "mask": "masks/bone_gloves.png",
+      "sourceBox": [
+        1094,
+        294,
+        1275,
+        369
+      ],
+      "size": [
+        113,
+        70
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "bone_gloves__image_left",
+      "slot": "hands",
+      "primary": "fixed",
+      "secondary": null,
+      "variant": "image_left",
+      "art": "pieces/bone_gloves__image_left.png",
+      "mask": "masks/bone_gloves__image_left.png",
+      "sourceBox": [
+        1094,
+        294,
+        1184,
+        369
+      ],
+      "size": [
+        54,
+        70
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "bone_gloves__image_right",
+      "slot": "hands",
+      "primary": "fixed",
+      "secondary": null,
+      "variant": "image_right",
+      "art": "pieces/bone_gloves__image_right.png",
+      "mask": "masks/bone_gloves__image_right.png",
+      "sourceBox": [
+        1184,
+        294,
+        1275,
+        369
+      ],
+      "size": [
+        59,
+        68
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "bone_legs",
+      "slot": "legs",
+      "primary": "fixed",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/bone_legs.png",
+      "mask": "masks/bone_legs.png",
+      "sourceBox": [
+        1094,
+        369,
+        1275,
+        529
+      ],
+      "size": [
+        129,
+        147
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "dragon_chest",
+      "slot": "chest",
+      "primary": "fixed",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/dragon_chest.png",
+      "mask": "masks/dragon_chest.png",
+      "sourceBox": [
+        1288,
+        0,
+        1485,
+        170
+      ],
+      "size": [
+        156,
+        158
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "dragon_arms",
+      "slot": "arms",
+      "primary": "fixed",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/dragon_arms.png",
+      "mask": "masks/dragon_arms.png",
+      "sourceBox": [
+        1288,
+        170,
+        1485,
+        294
+      ],
+      "size": [
+        173,
+        120
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "dragon_arms__image_left",
+      "slot": "arms",
+      "primary": "fixed",
+      "secondary": null,
+      "variant": "image_left",
+      "art": "pieces/dragon_arms__image_left.png",
+      "mask": "masks/dragon_arms__image_left.png",
+      "sourceBox": [
+        1288,
+        170,
+        1386,
+        294
+      ],
+      "size": [
+        72,
+        118
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "dragon_arms__image_right",
+      "slot": "arms",
+      "primary": "fixed",
+      "secondary": null,
+      "variant": "image_right",
+      "art": "pieces/dragon_arms__image_right.png",
+      "mask": "masks/dragon_arms__image_right.png",
+      "sourceBox": [
+        1386,
+        170,
+        1485,
+        294
+      ],
+      "size": [
+        68,
+        120
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "dragon_gloves",
+      "slot": "hands",
+      "primary": "fixed",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/dragon_gloves.png",
+      "mask": "masks/dragon_gloves.png",
+      "sourceBox": [
+        1288,
+        294,
+        1485,
+        369
+      ],
+      "size": [
+        112,
+        68
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "dragon_gloves__image_left",
+      "slot": "hands",
+      "primary": "fixed",
+      "secondary": null,
+      "variant": "image_left",
+      "art": "pieces/dragon_gloves__image_left.png",
+      "mask": "masks/dragon_gloves__image_left.png",
+      "sourceBox": [
+        1288,
+        294,
+        1386,
+        369
+      ],
+      "size": [
+        58,
+        68
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "dragon_gloves__image_right",
+      "slot": "hands",
+      "primary": "fixed",
+      "secondary": null,
+      "variant": "image_right",
+      "art": "pieces/dragon_gloves__image_right.png",
+      "mask": "masks/dragon_gloves__image_right.png",
+      "sourceBox": [
+        1386,
+        294,
+        1485,
+        369
+      ],
+      "size": [
+        54,
+        68
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "dragon_legs",
+      "slot": "legs",
+      "primary": "fixed",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/dragon_legs.png",
+      "mask": "masks/dragon_legs.png",
+      "sourceBox": [
+        1288,
+        369,
+        1485,
+        529
+      ],
+      "size": [
+        144,
+        142
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "leather_cap",
+      "slot": "head",
+      "primary": "hide",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/leather_cap.png",
+      "mask": "masks/leather_cap.png",
+      "sourceBox": [
+        40,
+        520,
+        140,
+        656
+      ],
+      "size": [
+        88,
+        107
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "bascinet",
+      "slot": "head",
+      "primary": "metal",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/bascinet.png",
+      "mask": "masks/bascinet.png",
+      "sourceBox": [
+        170,
+        520,
+        280,
+        656
+      ],
+      "size": [
+        86,
+        109
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "norse_helm",
+      "slot": "head",
+      "primary": "metal",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/norse_helm.png",
+      "mask": "masks/norse_helm.png",
+      "sourceBox": [
+        307,
+        520,
+        409,
+        656
+      ],
+      "size": [
+        83,
+        111
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "chain_coif",
+      "slot": "head",
+      "primary": "metal",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/chain_coif.png",
+      "mask": "masks/chain_coif.png",
+      "sourceBox": [
+        430,
+        520,
+        550,
+        656
+      ],
+      "size": [
+        110,
+        120
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "kettle_helm_concept",
+      "slot": "head",
+      "primary": "metal",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/kettle_helm_concept.png",
+      "mask": "masks/kettle_helm_concept.png",
+      "sourceBox": [
+        560,
+        520,
+        713,
+        656
+      ],
+      "size": [
+        132,
+        111
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "great_helm",
+      "slot": "head",
+      "primary": "metal",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/great_helm.png",
+      "mask": "masks/great_helm.png",
+      "sourceBox": [
+        719,
+        520,
+        825,
+        656
+      ],
+      "size": [
+        87,
+        113
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "closed_helm",
+      "slot": "head",
+      "primary": "metal",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/closed_helm.png",
+      "mask": "masks/closed_helm.png",
+      "sourceBox": [
+        846,
+        520,
+        956,
+        656
+      ],
+      "size": [
+        90,
+        119
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "plate_helm",
+      "slot": "head",
+      "primary": "metal",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/plate_helm.png",
+      "mask": "masks/plate_helm.png",
+      "sourceBox": [
+        980,
+        520,
+        1089,
+        656
+      ],
+      "size": [
+        91,
+        125
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "open_helm",
+      "slot": "head",
+      "primary": "metal",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/open_helm.png",
+      "mask": "masks/open_helm.png",
+      "sourceBox": [
+        1109,
+        520,
+        1221,
+        656
+      ],
+      "size": [
+        93,
+        118
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "bone_helm",
+      "slot": "head",
+      "primary": "fixed",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/bone_helm.png",
+      "mask": "masks/bone_helm.png",
+      "sourceBox": [
+        1239,
+        520,
+        1368,
+        656
+      ],
+      "size": [
+        111,
+        124
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "dragon_helm",
+      "slot": "head",
+      "primary": "fixed",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/dragon_helm.png",
+      "mask": "masks/dragon_helm.png",
+      "sourceBox": [
+        1380,
+        520,
+        1505,
+        656
+      ],
+      "size": [
+        105,
+        127
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "cloak",
+      "slot": "cloak",
+      "primary": "cloth",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/cloak.png",
+      "mask": "masks/cloak.png",
+      "sourceBox": [
+        0,
+        656,
+        108,
+        850
+      ],
+      "size": [
+        99,
+        182
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "cloak_red_concept",
+      "slot": "cloak",
+      "primary": "cloth",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/cloak_red_concept.png",
+      "mask": "masks/cloak_red_concept.png",
+      "sourceBox": [
+        109,
+        656,
+        232,
+        850
+      ],
+      "size": [
+        117,
+        187
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "cloak_blue_concept",
+      "slot": "cloak",
+      "primary": "cloth",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/cloak_blue_concept.png",
+      "mask": "masks/cloak_blue_concept.png",
+      "sourceBox": [
+        232,
+        656,
+        360,
+        850
+      ],
+      "size": [
+        119,
+        187
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "cloak_green_concept",
+      "slot": "cloak",
+      "primary": "cloth",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/cloak_green_concept.png",
+      "mask": "masks/cloak_green_concept.png",
+      "sourceBox": [
+        360,
+        656,
+        466,
+        850
+      ],
+      "size": [
+        98,
+        188
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "robe",
+      "slot": "robe",
+      "primary": "cloth",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/robe.png",
+      "mask": "masks/robe.png",
+      "sourceBox": [
+        466,
+        656,
+        586,
+        850
+      ],
+      "size": [
+        117,
+        184
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "robe_blue_concept",
+      "slot": "robe",
+      "primary": "cloth",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/robe_blue_concept.png",
+      "mask": "masks/robe_blue_concept.png",
+      "sourceBox": [
+        586,
+        656,
+        700,
+        850
+      ],
+      "size": [
+        113,
+        187
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "robe_red_concept",
+      "slot": "robe",
+      "primary": "cloth",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/robe_red_concept.png",
+      "mask": "masks/robe_red_concept.png",
+      "sourceBox": [
+        700,
+        656,
+        810,
+        850
+      ],
+      "size": [
+        103,
+        187
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "robe_purple_concept",
+      "slot": "robe",
+      "primary": "cloth",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/robe_purple_concept.png",
+      "mask": "masks/robe_purple_concept.png",
+      "sourceBox": [
+        810,
+        656,
+        901,
+        850
+      ],
+      "size": [
+        84,
+        181
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "robe_dark_concept",
+      "slot": "robe",
+      "primary": "cloth",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/robe_dark_concept.png",
+      "mask": "masks/robe_dark_concept.png",
+      "sourceBox": [
+        901,
+        656,
+        1028,
+        850
+      ],
+      "size": [
+        115,
+        184
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "boots",
+      "slot": "feet",
+      "primary": "hide",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/boots.png",
+      "mask": "masks/boots.png",
+      "sourceBox": [
+        1034,
+        656,
+        1149,
+        778
+      ],
+      "size": [
+        103,
+        105
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "studded_boots_concept",
+      "slot": "feet",
+      "primary": "hide",
+      "secondary": "metal",
+      "variant": null,
+      "art": "pieces/studded_boots_concept.png",
+      "mask": "masks/studded_boots_concept.png",
+      "sourceBox": [
+        1151,
+        656,
+        1268,
+        778
+      ],
+      "size": [
+        105,
+        106
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "fur_boots_concept",
+      "slot": "feet",
+      "primary": "hide",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/fur_boots_concept.png",
+      "mask": "masks/fur_boots_concept.png",
+      "sourceBox": [
+        1270,
+        656,
+        1390,
+        778
+      ],
+      "size": [
+        109,
+        109
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "plate_boots_concept",
+      "slot": "feet",
+      "primary": "metal",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/plate_boots_concept.png",
+      "mask": "masks/plate_boots_concept.png",
+      "sourceBox": [
+        1398,
+        656,
+        1532,
+        778
+      ],
+      "size": [
+        113,
+        108
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "belt",
+      "slot": "belt",
+      "primary": "hide",
+      "secondary": "metal",
+      "variant": null,
+      "art": "pieces/belt.png",
+      "mask": "masks/belt.png",
+      "sourceBox": [
+        1033,
+        777,
+        1154,
+        845
+      ],
+      "size": [
+        113,
+        54
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "studded_belt_concept",
+      "slot": "belt",
+      "primary": "hide",
+      "secondary": "metal",
+      "variant": null,
+      "art": "pieces/studded_belt_concept.png",
+      "mask": "masks/studded_belt_concept.png",
+      "sourceBox": [
+        1174,
+        777,
+        1297,
+        845
+      ],
+      "size": [
+        111,
+        51
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "pouch_concept",
+      "slot": "belt",
+      "primary": "hide",
+      "secondary": "metal",
+      "variant": null,
+      "art": "pieces/pouch_concept.png",
+      "mask": "masks/pouch_concept.png",
+      "sourceBox": [
+        1310,
+        777,
+        1389,
+        845
+      ],
+      "size": [
+        65,
+        64
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "belt_heavy_concept",
+      "slot": "belt",
+      "primary": "hide",
+      "secondary": "metal",
+      "variant": null,
+      "art": "pieces/belt_heavy_concept.png",
+      "mask": "masks/belt_heavy_concept.png",
+      "sourceBox": [
+        1403,
+        777,
+        1530,
+        845
+      ],
+      "size": [
+        109,
+        50
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "wooden_shield",
+      "slot": "shield",
+      "primary": "wood",
+      "secondary": "metal",
+      "variant": null,
+      "art": "pieces/wooden_shield.png",
+      "mask": "masks/wooden_shield.png",
+      "sourceBox": [
+        0,
+        846,
+        156,
+        1024
+      ],
+      "size": [
+        146,
+        151
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "metal_shield",
+      "slot": "shield",
+      "primary": "metal",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/metal_shield.png",
+      "mask": "masks/metal_shield.png",
+      "sourceBox": [
+        156,
+        846,
+        310,
+        1024
+      ],
+      "size": [
+        143,
+        150
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "heater_shield",
+      "slot": "shield",
+      "primary": "metal",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/heater_shield.png",
+      "mask": "masks/heater_shield.png",
+      "sourceBox": [
+        309,
+        846,
+        420,
+        1024
+      ],
+      "size": [
+        99,
+        174
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "kite_shield",
+      "slot": "shield",
+      "primary": "metal",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/kite_shield.png",
+      "mask": "masks/kite_shield.png",
+      "sourceBox": [
+        420,
+        846,
+        540,
+        1024
+      ],
+      "size": [
+        100,
+        160
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "heraldic_shield_concept",
+      "slot": "shield",
+      "primary": "metal",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/heraldic_shield_concept.png",
+      "mask": "masks/heraldic_shield_concept.png",
+      "sourceBox": [
+        540,
+        846,
+        653,
+        1024
+      ],
+      "size": [
+        107,
+        164
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "sword",
+      "slot": "weapon",
+      "primary": "metal",
+      "secondary": "hide",
+      "variant": null,
+      "art": "pieces/sword.png",
+      "mask": "masks/sword.png",
+      "sourceBox": [
+        653,
+        846,
+        790,
+        1024
+      ],
+      "size": [
+        129,
+        174
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "axe",
+      "slot": "weapon",
+      "primary": "metal",
+      "secondary": "wood",
+      "variant": null,
+      "art": "pieces/axe.png",
+      "mask": "masks/axe.png",
+      "sourceBox": [
+        758,
+        846,
+        906,
+        1024
+      ],
+      "size": [
+        136,
+        149
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "warhammer",
+      "slot": "weapon",
+      "primary": "metal",
+      "secondary": "wood",
+      "variant": null,
+      "art": "pieces/warhammer.png",
+      "mask": "masks/warhammer.png",
+      "sourceBox": [
+        884,
+        846,
+        996,
+        1024
+      ],
+      "size": [
+        102,
+        157
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "mace",
+      "slot": "weapon",
+      "primary": "metal",
+      "secondary": "wood",
+      "variant": null,
+      "art": "pieces/mace.png",
+      "mask": "masks/mace.png",
+      "sourceBox": [
+        970,
+        846,
+        1072,
+        1024
+      ],
+      "size": [
+        92,
+        152
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "spear",
+      "slot": "weapon",
+      "primary": "metal",
+      "secondary": "wood",
+      "variant": null,
+      "art": "pieces/spear.png",
+      "mask": "masks/spear.png",
+      "sourceBox": [
+        1058,
+        846,
+        1155,
+        1024
+      ],
+      "size": [
+        91,
+        173
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "staff",
+      "slot": "weapon",
+      "primary": "wood",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/staff.png",
+      "mask": "masks/staff.png",
+      "sourceBox": [
+        1145,
+        846,
+        1244,
+        1024
+      ],
+      "size": [
+        89,
+        163
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "bow",
+      "slot": "weapon",
+      "primary": "wood",
+      "secondary": null,
+      "variant": null,
+      "art": "pieces/bow.png",
+      "mask": "masks/bow.png",
+      "sourceBox": [
+        1240,
+        846,
+        1350,
+        1024
+      ],
+      "size": [
+        97,
+        173
+      ],
+      "status": "static art; not rig aligned"
+    },
+    {
+      "id": "crossbow",
+      "slot": "weapon",
+      "primary": "wood",
+      "secondary": "metal",
+      "variant": null,
+      "art": "pieces/crossbow.png",
+      "mask": "masks/crossbow.png",
+      "sourceBox": [
+        1356,
+        846,
+        1536,
+        1024
+      ],
+      "size": [
+        164,
+        141
+      ],
+      "status": "static art; not rig aligned"
+    }
+  ]
+}

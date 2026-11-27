@@ -19,7 +19,7 @@ J = lambda pg, js: pg.evaluate(js)
 def new_char(pg, errs, prof='Mace dexer', name='Aldric'):
     pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('console', lambda m: errs.append('console: ' + m.text) if m.type == 'error' and 'ERR_' not in m.text and 'Failed to load resource' not in m.text else None)
     pg.goto('file://' + f); pg.wait_for_timeout(500); pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_timeout(500)
-    pg.click(f'[data-c=prof][data-p="{prof}"]'); pg.fill('#ccn', name); pg.click('[data-c=go]'); pg.wait_for_timeout(1200)
+    pg.evaluate("o => __CC.quick(o)", {'name': name, 'template': {'Glaive hybrid': 'swordsman', 'Mace dexer': 'maceman', 'Merchant smith': 'blacksmith'}.get(prof, 'swordsman')}); pg.wait_for_timeout(1200)
 
 GIVE = """(ids) => { const S = __SF, SF = S.SF, P = S.P; const out = {}; for (const [id, o] of ids) { const it = SF.EQ.make(id, o || { origin: 'npc' }); SF.addItem(P.pack, it); out[id + (o && o.material ? ':' + o.material : '')] = it.uid; } return out; }"""
 EQS = "() => Object.fromEntries(Object.entries(__SF.P.equip).filter(([k, v]) => v).map(([k, v]) => [k, v.id]))"
@@ -41,7 +41,7 @@ with sync_playwright() as p:
     check(empty_svg, 'empty slots show a silhouette')
     pg.screenshot(path=f'{shots}/01-doll-start.png')
     # give a mixed set and equip by double-click from the backpack
-    J(pg, "__SF.P.str = 100")
+    J(pg, "__SF.P.base.str = __SF.P.str = 100")
     uids = J(pg, GIVE.replace('(ids)', '(ids)') + "", ) if False else J(pg, f"({GIVE})([['plate_chest', {{ material: 'mithril', quality: 'exceptional', creatorName: 'Aldric', origin: 'crafted' }}], ['chain_coif'], ['leather_gloves', {{ material: 'spined' }}], ['plate_leggings'], ['studded_sleeves'], ['plate_gorget'], ['robe'], ['glaive'], ['buckler'], ['ring', {{ material: 'golden' }}]])")
     J(pg, "__SF.ACT.bag()"); pg.wait_for_timeout(250)
     pg.dblclick(f"#panel .bagcell[data-u='{uids['plate_chest:mithril']}']"); pg.wait_for_timeout(200)
@@ -70,7 +70,7 @@ with sync_playwright() as p:
     check(ap and 'hands' in ap and 'torso' in ap, 'equipping fires the appearance-change event with ordered render layers', ap)
     J(pg, "__SF.unequipTo('hands')")
     # tooltip on hover with comparison
-    pg.hover("#eqwin .eqs[data-s=chest]"); pg.wait_for_timeout(200)
+    pg.hover("#eqwin .eqs[data-s=chest]"); pg.wait_for_timeout(450)   # v0.29: tooltips wait about 300 ms
     tip = pg.inner_text('#itip') if pg.is_visible('#itip') else ''
     check('exceptional mithril plate chest' in tip.lower() and 'Armor protection' in tip and 'Crafted by' in tip and 'Aldric' in tip and 'Estimated value' in tip, 'hover tooltip on the doll: name, protection, crafter, value', tip[:200])
     J(pg, f"(() => {{ const it = __SF.SF.EQ.make('plate_chest'); __SF.SF.addItem(__SF.P.pack, it); window._ic = it.uid; }})()"); J(pg, "__SF.ACT.bag()"); pg.wait_for_timeout(200)
@@ -115,7 +115,7 @@ with sync_playwright() as p:
     wts = J(pg, "[...document.querySelectorAll('#panel .bagcell')].map(c => __SF.SF.itemWt(__SF.P.pack.items.find(i => i.uid === +c.dataset.u)))")
     check(wts == sorted(wts, reverse=True), 'Weight sort: heaviest first', wts[:6])
     sp = J(pg, "(() => { const S = __SF, P = S.P; const b = P.pack.items.find(i => i.id === 'bandage'); S.ACT.split({ u: b.uid, q: 4 }); const n = P.pack.items.filter(i => i.id === 'bandage').map(i => i.qty); S.ACT.bagmerge(); return [n, P.pack.items.filter(i => i.id === 'bandage').map(i => i.qty)]; })()")
-    check(sp[0] == [8, 4] and sp[1] == [12], 'split 12 bandages into 8 + 4, then merge back', sp)
+    check(sp[0] == [6, 4] and sp[1] == [10], 'split the 10 starter bandages into 6 + 4, then merge back', sp)
     # hundreds of items: the grid stays small and scrolls
     J(pg, "(() => { const P = __SF.P, SF = __SF.SF; for (let i = 0; i < 600; i++) P.pack.items.push(SF.EQ.make(['dagger', 'ring', 'shirt', 'bascinet', 'leather_cap'][i % 5], { origin: 'loot' })); })()")
     J(pg, "__SF.ACT.bag()"); pg.wait_for_timeout(300)
@@ -129,7 +129,7 @@ with sync_playwright() as p:
     J(pg, "(() => { const P = __SF.P; P.pack.items = P.pack.items.filter(i => !(i.origin === 'loot')); })()")
     # encumbrance: overload, immobile, drop to recover; Strength loss never destroys items
     J(pg, "__SF.ACT.close()")
-    enc = J(pg, """(() => { const S = __SF, P = S.P, SF = S.SF; P.str = 50; const ore = SF.newItem('ore', 90); SF.addItem(P.pack, ore);
+    enc = J(pg, """(() => { const S = __SF, P = S.P, SF = S.SF; P.base.str = P.str = 50; const ore = SF.newItem('ore', 90); SF.addItem(P.pack, ore);
       const e1 = S.encumb(); const x0 = P.x, y0 = P.y; S.JOY.on = false; for (const k of ['u']) {} P.sprintOn = false;
       const KEYS = null; return { stage: e1.stage, n: e1.n, ratio: e1.ratio, ore: SF.count(P.pack, 'ore') }; })()""")
     check(enc['stage'] == 3 and enc['ore'] == 90, 'carrying 90 ore at Strength 50: immobile, nothing destroyed', enc)
@@ -137,9 +137,9 @@ with sync_playwright() as p:
     check(mv < 1e-6, 'an immobile character cannot walk', mv)
     blocked = J(pg, "(() => { const S = __SF, P = S.P, SF = S.SF; const pile = SF.newContainer('pile'); pile.items.push(SF.newItem('gold', 5)); const r = SF.EQ.pickupItem(P, pile, { uid: pile.items[0].uid }); return r.ok; })()")
     check(blocked is False, 'pickups are refused while over capacity')
-    rec = J(pg, "(() => { const S = __SF, P = S.P, SF = S.SF; const ore = P.pack.items.find(i => i.id === 'ore'); S.ACT.drop({ u: ore.uid, q: 70 }); const x0 = P.x, y0 = P.y; document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', bubbles: true })); for (let i = 0; i < 20; i++) S.update(.05); document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'w', bubbles: true })); return [SF.count(P.pack, 'ore'), S.encumb().stage, Math.hypot(P.x - x0, P.y - y0) > .5, S.ents.some(e => e.pile && e.cont.items.some(i => i.id === 'ore' && i.qty === 70))]; })()")
+    rec = J(pg, "(() => { const S = __SF, P = S.P, SF = S.SF; const ore = P.pack.items.find(i => i.id === 'ore'); S.ACT.drop({ u: ore.uid, q: 70, ok: 1 }); const x0 = P.x, y0 = P.y; document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', bubbles: true })); for (let i = 0; i < 20; i++) S.update(.05); document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'w', bubbles: true })); return [SF.count(P.pack, 'ore'), S.encumb().stage, Math.hypot(P.x - x0, P.y - y0) > .5, S.ents.some(e => e.pile && e.cont.items.some(i => i.id === 'ore' && i.qty === 70))]; })()")
     check(rec[0] == 20 and rec[1] <= 1 and rec[2] and rec[3], 'dropping 70 ore recovers movement; the ore lies on the ground', rec)
-    J(pg, "(() => { const P = __SF.P; P.pack.items = P.pack.items.filter(i => i.id !== 'ore'); P.str = 100; })()")
+    J(pg, "(() => { const P = __SF.P; P.pack.items = P.pack.items.filter(i => i.id !== 'ore'); P.base.str = P.str = 100; })()")
     # combat: region mitigation and durability
     cb = J(pg, """(() => { const S = __SF, P = S.P, SF = S.SF; for (const s of SF.EQ.SLOT_IDS) if (P.equip[s] && SF.ITEMS[P.equip[s].id].trade) S.unequipTo(s);
       const ids = ['plate_helm', 'plate_gorget', 'plate_chest', 'plate_arms', 'plate_gauntlets', 'plate_leggings']; for (const id of ids) { const it = SF.EQ.make(id); SF.addItem(P.pack, it); S.equipUid(it.uid); }
@@ -160,7 +160,7 @@ with sync_playwright() as p:
     md = J(pg, "(() => { const S = __SF, P = S.P, SF = S.SF; P.mana = 0; S.update(1); const plate = P.mana; S.unequipTo('chest'); P.mana = 0; S.update(1); return [plate, P.mana]; })()")
     check(md[0] < md[1], 'plate slows mana regeneration', md)
     # effective Dexterity: derived, never stacked
-    dx = J(pg, "(() => { const S = __SF, P = S.P, SF = S.SF; P.dex = 50; const it = P.pack.items.find(i => i.id === 'plate_chest'); S.equipUid(it.uid); S.eqTick(); S.eqTick(); return [P.dex, SF.maxStam(P)]; })()")
+    dx = J(pg, "(() => { const S = __SF, P = S.P, SF = S.SF; P.base.dex = P.dex = 50; const it = P.pack.items.find(i => i.id === 'plate_chest'); S.equipUid(it.uid); S.eqTick(); S.eqTick(); return [P.dex, SF.maxStam(P)]; })()")
     check(dx == [50, 48], 'plate chest: Dexterity 50 stays, stamina cap 48', dx)
     # window drag and close
     hb = pg.locator('#eqwin .eqh b').bounding_box(); pg.mouse.move(hb['x'] + 5, hb['y'] + 5); pg.mouse.down(); pg.mouse.move(hb['x'] + 305, hb['y'] + 125, steps=6); pg.mouse.up(); pg.wait_for_timeout(150)
@@ -171,7 +171,7 @@ with sync_playwright() as p:
     pg.keyboard.press('Escape'); pg.wait_for_timeout(100); pg.keyboard.press('C'); pg.wait_for_timeout(150)
     check(pg.is_visible('#eqwin'), 'C again reopens it')
     # crafting: Armor category with families and material variants
-    cr = J(pg, """(() => { const S = __SF, P = S.P; P.skills.smithing.v = 1000; S.openCraft('anvil'); S.ACT.ccat({ c: 'Armor' }); const subs = [...document.querySelectorAll('#panel [data-a=csub]')].map(b => b.dataset.s);
+    cr = J(pg, """(() => { const S = __SF, P = S.P; P.skills.blacksmithy.v = 1000; S.openCraft('anvil'); S.ACT.ccat({ c: 'Armor' }); const subs = [...document.querySelectorAll('#panel [data-a=csub]')].map(b => b.dataset.s);
       S.ACT.csub({ s: 'Platemail' }); const rows = [...document.querySelectorAll('#panel .crow')].map(r => r.dataset.r); S.ACT.crec({ r: 'plate_chest' }); S.ACT.cmat({ m: 'mithril' });
       const txt = document.querySelector('#panel .pb').innerText; return { subs, rows, mats: document.querySelectorAll('#panel [data-a=cmat]').length, txt }; })()""")
     check('Platemail' in cr['subs'] and 'Helmets' in cr['subs'] and 'Shields' in cr['subs'] and 'Dragon scale' in cr['subs'], 'anvil Armor category lists the metal families', cr['subs'])
@@ -219,7 +219,7 @@ with sync_playwright() as p:
     # ================= phone (touch, landscape) =================
     ctx = b.new_context(viewport={'width': 844, 'height': 390}, is_mobile=True, has_touch=True, device_scale_factor=2); pg = ctx.new_page(); errs = []
     new_char(pg, errs, 'Merchant smith', 'Tap')
-    J(pg, "__SF.P.str = 100"); uids = J(pg, f"({GIVE})([['studded_tunic'], ['norse_helm']])")
+    J(pg, "__SF.P.base.str = __SF.P.str = 100"); uids = J(pg, f"({GIVE})([['studded_tunic'], ['norse_helm']])")
     pg.tap('#b-menu'); pg.wait_for_timeout(200); pg.tap('#menuScr [data-p=eqwin]'); pg.wait_for_timeout(250)
     check(pg.is_visible('#eqwin'), 'phone: Menu → Equip opens the paper doll')
     box = pg.locator('#eqwin').bounding_box()
@@ -228,10 +228,10 @@ with sync_playwright() as p:
     pb = pg.locator('#panel').bounding_box()
     check(pb['x'] >= box['x'] + box['width'] - 4 or pb['x'] + pb['width'] <= box['x'] + 4, 'phone: the backpack sits beside the doll, not under it', [box, pb])
     pg.tap(f"#panel .bagcell[data-u='{uids['studded_tunic']}']"); pg.wait_for_timeout(200)
-    card = pg.inner_text('#panel .bagcard')
-    check('Armor protection' in card and 'vs ' in card, 'phone: tapping an item shows its stats and the comparison', card[:160])
-    pg.tap('#panel .bagcard [data-a=equip]'); pg.wait_for_timeout(200)
-    check(J(pg, "__SF.P.equip.chest && __SF.P.equip.chest.id") == 'studded_tunic', 'phone: Equip from the tap card')
+    card = pg.inner_text('#ipop'); pg.tap('#ipop [data-a=ipcmp]'); pg.wait_for_timeout(150); card2 = pg.inner_text('#ipop')   # v0.29: item popup, Inspect compares
+    check('Armor protection' in card and 'vs ' in card2, 'phone: tapping an item shows its stats; Inspect adds the comparison', card2[:160])
+    pg.tap('#ipop [data-a=equip]'); pg.wait_for_timeout(200)
+    check(J(pg, "__SF.P.equip.chest && __SF.P.equip.chest.id") == 'studded_tunic', 'phone: Equip from the item popup')
     pg.tap("#eqwin .eqs[data-s=chest]"); pg.wait_for_timeout(200)
     check(pg.is_visible('#eqwin .eqcard') and 'studded tunic' in pg.inner_text('#eqwin .eqcard').lower(), 'phone: tapping a slot shows the piece')
     pg.screenshot(path=f'{shots}/05-phone.png')

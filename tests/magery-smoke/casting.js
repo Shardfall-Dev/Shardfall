@@ -1,7 +1,7 @@
 (async () => {
   const S = window.__SF, P = S.P, SF = S.SF, MG = SF.MAGERY; const out = {};
   const step = (sec) => { for (let i = 0; i < Math.round(sec / .05); i++) S.update(.05); };
-  out.start = { sc: P.skills.spellcraft.v, book: [...MG.bookSpells(P.pack)], hot: P.hotbar.slice(0, 4).map(h => h && h.id), regs: SF.count(P.pack, 'black_pearl'), mana: P.mana, int: P.int };
+  out.start = { sc: P.skills.magery.v, book: [...MG.bookSpells(P.pack)], hot: P.hotbar.slice(0, 4).map(h => h && h.id), regs: SF.count(P.pack, 'black_pearl'), mana: P.mana, int: P.int };
   // spawn a dummy creature near the player
   const m = S.ents.find(e => e.kind === 'mon') ;
   const add = (type, dx, dy) => { const d = S.MON[type]; const e = { kind: 'mon', type, name: d.n, x: P.x + dx, y: P.y + dy, hp: d.hp, max: d.hp, state: 'idle', home: { x: P.x + dx, y: P.y + dy }, sect: 0, ward: 0, id: 90000 + Math.floor(Math.random() * 1000), speed: 0 }; S.ents.push(e); return e; };
@@ -17,7 +17,7 @@
   step(.5); const mana0 = P.mana, pearls0 = SF.count(P.pack, 'black_pearl'); S.castSlot('magery.05'); S.damagePlayer(1, null, 'phys'); out.interrupt = { manaLost: Math.round((mana0 - P.mana) * 100) / 100, pearlsBack: SF.count(P.pack, 'black_pearl') === pearls0, prep: !!P.prep };
   // learn Cinderball via scroll & cast; check hold expiry
   SF.addItem(P.pack, SF.newItem('scroll.18', 2)); const r = MG.learn(P.pack, 'scroll.18'); out.learn = r.ok;
-  P.skills.spellcraft.v = 1000; P.skills.focus.v = 1000; P.mana = 100; P.int = 100; P.base.int = 100;
+  P.skills.magery.v = 1000; P.skills.evaluatingintelligence.v = 1000; P.mana = 100; P.int = 100; P.base.int = 100;
   step(.5); S.castSlot('magery.18'); step(1.05); out.held2 = P.held && P.held.sp.id; step(3.1); out.expired = !P.held;
   // Delayed Explosion + Aether Bolt timing
   SF.addItem(P.pack, SF.newItem('scroll.43', 1)); SF.addItem(P.pack, SF.newItem('scroll.42', 1)); MG.learn(P.pack, 'scroll.43'); MG.learn(P.pack, 'scroll.42');
