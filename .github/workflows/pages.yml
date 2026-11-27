@@ -33,6 +33,7 @@ jobs:
           node tests/rules.test.js "$GAME"
           node tests/magery.test.js "$GAME"
           if [ -f tests/wardrobe.test.js ]; then node tests/wardrobe.test.js "$GAME"; fi
+          if [ -f tests/humans.test.js ]; then node tests/humans.test.js "$GAME"; fi
 
       - name: Assemble the site
         run: |

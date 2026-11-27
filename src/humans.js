@@ -5,9 +5,23 @@
    Scout stays the default until the layered art is approved. Turn it on in the menu ("Human art") or with ?humans=layered.
    Performance: SVG is built and decoded off the draw call (a small time-budgeted queue), one strip per
    appearance × action × direction, kept in a bounded LRU; while a strip is pending the old sprite is drawn. */
-const HUMANS = { on: false, scale: 1.12, cap: 96, strips: new Map(), queue: [], queued: new Set(), pumping: false, built: 0, evicted: 0, buildMs: 0, roster: null, errors: 0 };
-{ const q = new URLSearchParams(location.search).get('humans'); HUMANS.on = q ? q === 'layered' : SETTINGS.humans === 'layered'; }
-function humansToggle() { HUMANS.on = !HUMANS.on; SETTINGS.humans = HUMANS.on ? 'layered' : 'classic'; saveSettings(); }
+const HUMANS = { on: false, mode: 'classic', scale: 1.12, cap: 96, strips: new Map(), queue: [], queued: new Set(), pumping: false, built: 0, evicted: 0, buildMs: 0, roster: null, errors: 0 };
+/* modes: 'classic' (the old Scout sheets, default until the painted art is accepted), 'painted' (classic-humans v2.1 painted
+   bodies through the layered compositor, src/compositor.js) and 'rig' (the procedural rig — animation-contract development
+   and testing only, never a release look; reachable only with ?humans=rig). ?humans=layered is the v0.31 name for 'rig'. */
+const HUMAN_MODES = { classic: 1, painted: 1, rig: 1 };
+function humansSetMode(m) { HUMANS.mode = HUMAN_MODES[m] ? m : 'classic'; HUMANS.on = HUMANS.mode !== 'classic'; HUMANS.strips.clear(); HUMANS.queue.length = 0; HUMANS.queued.clear(); if (typeof ents !== 'undefined') for (const e of ents) e._wd = null; }
+{ const q = new URLSearchParams(location.search).get('humans'); const m = q === 'layered' ? 'rig' : q || (SETTINGS.humans === 'layered' ? 'classic' : SETTINGS.humans); humansSetMode(m); }
+function humansToggle() { humansSetMode(HUMANS.mode === 'painted' ? 'classic' : 'painted'); SETTINGS.humans = HUMANS.mode; saveSettings(); }
+/* ---- painted art: the registry from the installed manifest, atlases decoded once into pixel arrays ---- */
+const PAINTED = { reg: null, img: {}, ready: false, missingLog: new Map() };
+(function paintedLoad() {
+  const A = SF.HUMAN_ART_DATA, C = SF.HUMANART; if (!A || !C) return; PAINTED.reg = C.fromManifest(A); let n = 0; const want = Object.keys(A.src);
+  for (const k of want) { const im = new Image(); im.onload = () => { const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const g = c.getContext('2d'); g.drawImage(im, 0, 0);
+    PAINTED.img[k] = { data: g.getImageData(0, 0, im.width, im.height).data, width: im.width }; if (++n === want.length) { PAINTED.ready = true; humansPump(); try { if (!P && !document.querySelector('#cc').hidden) renderCC(); } catch (err) { } } }; im.src = A.src[k]; }
+})();
+const DIR_NAMES = ['S', 'SW', 'W', 'NW', 'N', 'NE', 'E', 'SE'];
+function paintedPlan(D, action, dir) { const P = SF.HUMANART.plan(PAINTED.reg, D, action, DIR_NAMES[dir]); for (const m of P.missing) PAINTED.missingLog.set(m, (PAINTED.missingLog.get(m) || 0) + 1); return P; }
 const HUMAN_MOB = t => !!(SF.WARDROBE.MOB_ROLE[t]);
 const isHumanEnt = e => e && (e.kind === 'player' || e.kind === 'ally' || e.kind === 'npc' || (e.kind === 'mon' && HUMAN_MOB(e.type)));
 /* the player's own appearance identity: chosen once (seeded from the name) and kept in the save; never rerolled on load.
@@ -56,18 +70,37 @@ function humanAnim(e, D) {
   return ['idle', cyc(4, 3)];
 }
 /* ---- strips: one appearance × action × direction, n frames side by side, rendered at HUMANS.scale ---- */
-function humanStrip(D, action, dir, needNow) {
+function humanStrip(D, action, dir, ghost) {
+  if (HUMANS.mode === 'painted') return paintedStrip(D, action, dir, ghost);
   const k = D.key + '#' + action + '#' + dir; const s = HUMANS.strips.get(k);
   if (s) { HUMANS.strips.delete(k); HUMANS.strips.set(k, s); return s; }   // LRU touch
   if (!HUMANS.queued.has(k)) { HUMANS.queued.add(k); HUMANS.queue.push({ k, D, action, dir }); humansPump(); }
   return null;
+}
+/* painted: the plan decides the drawn action and layers; strips are keyed by the plan (so 'walk N' and 'idle N' share one strip) */
+function paintedStrip(D, action, dir, ghost) {
+  if (!PAINTED.reg) return null; const P = paintedPlan(D, action, dir); if (!P.drawn) return null;
+  const k = 'P|' + P.key + (ghost ? '|ghost' : ''); const s = HUMANS.strips.get(k);
+  if (s) { HUMANS.strips.delete(k); HUMANS.strips.set(k, s); s.plan = P; return s; }
+  if (!HUMANS.queued.has(k)) { HUMANS.queued.add(k); HUMANS.queue.push({ k, P, ghost, painted: true }); humansPump(); }
+  return null;
+}
+function paintedBuild(j) {
+  const C = SF.HUMANART, W = C.CANVAS.width, H = C.CANVAS.height, n = j.P.frames, c = document.createElement('canvas'); c.width = W * n; c.height = H; const g = c.getContext('2d');
+  for (let f = 0; f < n; f++) { const px = C.composeFrame(j.P, f, PAINTED.img, PAINTED.img);
+    if (j.ghost) for (let i = 0; i < px.length; i += 4) { if (!px[i + 3]) continue; const l = (px[i] + px[i + 1] + px[i + 2]) / 3; px[i] = l * .7 + 60; px[i + 1] = l * .8 + 80; px[i + 2] = l + 110; px[i + 3] = 150; }
+    g.putImageData(new ImageData(px, W, H), f * W, 0); }
+  c.n = n; c.cw = W; c.painted = true; c.plan = j.P; return c;
 }
 function humansPump() {
   if (HUMANS.pumping) return; HUMANS.pumping = true;
   setTimeout(async () => {
     const t0 = performance.now(), R = SF.RIG, S = HUMANS.scale;
     while (HUMANS.queue.length && performance.now() - t0 < 6) {
-      const j = HUMANS.queue.shift(); const n = R.ANIMATIONS[j.action] || 1, cw = R.CELL.width, ch = R.CELL.height; let body = '';
+      const j = HUMANS.queue.shift();
+      if (j.painted) { if (!PAINTED.ready) { HUMANS.queue.unshift(j); break; } try { HUMANS.strips.set(j.k, paintedBuild(j)); HUMANS.built++; } catch (err) { HUMANS.errors++; console.error(err); } HUMANS.queued.delete(j.k);
+        while (HUMANS.strips.size > HUMANS.cap) { HUMANS.strips.delete(HUMANS.strips.keys().next().value); HUMANS.evicted++; } continue; }
+      const n = R.ANIMATIONS[j.action] || 1, cw = R.CELL.width, ch = R.CELL.height; let body = '';
       try {
         const o = R.fromDescriptor(j.D, { SF, direction: R.DIRECTIONS[j.dir], action: j.action });
         for (let f = 0; f < n; f++) { const svg = R.frameSVG(Object.assign(o, { frame: f })); body += '<g transform="translate(' + f * cw + ' 0)">' + svg.slice(svg.indexOf('>') + 1, svg.lastIndexOf('</svg>')) + '</g>'; }
@@ -80,15 +113,26 @@ function humansPump() {
           .catch(() => { HUMANS.errors++; HUMANS.queued.delete(j.k); });
       } catch (err) { HUMANS.errors++; HUMANS.queued.delete(j.k); console.error(err); }
     }
-    HUMANS.buildMs += performance.now() - t0; HUMANS.pumping = false; if (HUMANS.queue.length) humansPump();
+    HUMANS.buildMs += performance.now() - t0; HUMANS.pumping = false; if (HUMANS.queue.length && (PAINTED.ready || !HUMANS.queue[0].painted)) humansPump();
   }, 0);
 }
-function humanBlit(g, s, f, x, y) { const S = HUMANS.scale, R = SF.RIG.CELL; f = Number.isFinite(f) ? f : 0; g.imageSmoothingEnabled = false; g.drawImage(s, Math.min(f, s.n - 1) * s.cw, 0, s.cw, s.height, Math.round(x - R.anchorX * S), Math.round(y - R.anchorY * S), s.cw, s.height); }
+function humanBlit(g, s, f, x, y) { f = Number.isFinite(f) ? f : 0;
+  if (s.painted) { const C = SF.HUMANART.CANVAS; g.imageSmoothingEnabled = false; g.drawImage(s, Math.min(f, s.n - 1) * s.cw, 0, s.cw, s.height, Math.round(x - C.anchorX), Math.round(y - C.anchorY), s.cw, s.height); return; }
+  const S = HUMANS.scale, R = SF.RIG.CELL; g.imageSmoothingEnabled = false; g.drawImage(s, Math.min(f, s.n - 1) * s.cw, 0, s.cw, s.height, Math.round(x - R.anchorX * S), Math.round(y - R.anchorY * S), s.cw, s.height); }
 /* draw a living human; false → the caller draws the old sprite (flag off, ghost, or the strip is still being built) */
 function drawHuman(g, e, x, y) {
-  if (!HUMANS.on || !isHumanEnt(e) || e.ghost || (e === P && P.ghost)) return false;
+  const ghost = !!(e.ghost || (e === P && P.ghost));
+  if (!HUMANS.on || !isHumanEnt(e) || (ghost && HUMANS.mode !== 'painted')) return false;
   const D = humanDesc(e); if (!D) return false;
-  const [ac, f] = humanAnim(e, D), dir = e.sect || 0;
+  let [ac, f] = humanAnim(e, D); const dir = e.sect || 0;
+  if (ghost) ac = e.speed > .3 ? 'walk' : 'idle';
+  if (HUMANS.mode === 'painted') {
+    const s = humanStrip(D, ac, dir, ghost); if (!s) return false; const P = s.plan;
+    let ox = 0, oy = 0; if (P.fallback && P.fallback.via === 'bob' && e.speed > .3) oy = -(Math.floor(GT * 8) % 2);   // the classic step bob while walking art is missing
+    if (e.lunge) { const k = Math.sin(e.lunge * Math.PI) * 4, a = SECT_ANG[dir] * Math.PI / 180; ox += Math.cos(a) * k; oy += Math.sin(a) * k * .5; }
+    const fr = P.frames > 1 ? (P.drawn === ac || (ac === 'cast1h' && P.drawn === 'cast') ? f : Math.floor(GT * 10) % P.frames) % P.frames : 0;
+    humanBlit(g, s, fr, x + ox, y + oy); return true;
+  }
   let s = humanStrip(D, ac, dir);
   if (!s && ac !== 'idle') { s = humanStrip(D, 'idle', dir); if (s) { humanBlit(g, s, 0, x, y); return true; } }
   if (!s) return false;
@@ -98,20 +142,29 @@ function drawHuman(g, e, x, y) {
 /* corpses keep the last resolved appearance (a snapshot taken at death; loot is untouched and decides nothing here) */
 function humanSnap(e) { if (!isHumanEnt(e)) return null; try { return humanDesc(e); } catch (err) { return null; } }
 function drawHumanCorpse(g, c, x, y) {
-  if (!HUMANS.on || !c.wd) return false; const fresh = GT - (c.t0 || 0) < .6;
+  if (!HUMANS.on || !c.wd || HUMANS.mode === 'painted') return false;   // painted death/corpse art does not exist yet: the previous corpse drawing stays
+  const fresh = GT - (c.t0 || 0) < .6;
   const s = humanStrip(c.wd, fresh ? 'death' : 'corpse', c.sect || 0); if (!s) return false;
   humanBlit(g, s, fresh ? Math.floor((GT - (c.t0 || 0)) / .075) : 0, x, y);
   if (c.cont && c.cont.items && c.cont.items.length) { const tw = (Math.sin(GT * 5 + c.x) + 1) / 2; g.fillStyle = `rgba(255,224,120,${.4 + .6 * tw})`; g.fillRect(Math.round(x + 9), Math.round(y - 12), 2, 2); }
   return true;
 }
 /* the paper doll draws the same descriptor as the world (front view, crisp SVG) */
-function humanDollSrc() { if (!HUMANS.on || !P || P.ghost) return null; try { const D = humanDesc(P), o = SF.RIG.fromDescriptor(D, { SF, direction: 'S', action: (D.weapon && D.weapon.id !== 'unarmed') ? 'ready' : 'idle', frame: 0 }); return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(SF.RIG.frameSVG(o)); } catch (err) { return null; } }
+/* the paper doll and the character creator read the same descriptor as the world. Painted mode: no portrait-specific paperdoll
+   art exists yet (docs/handoffs/paperdoll-v1.md), so the doll shows the painted front-facing frame at an exact 2× — interim. */
+function humanFigureURL(D, dir, ghost) {
+  if (HUMANS.mode === 'painted') { if (!PAINTED.ready) return null; const C = SF.HUMANART, P = SF.HUMANART.plan(PAINTED.reg, D, 'idle', dir || 'S'); if (!P.drawn) return null;
+    const px = C.composeFrame(P, 0, PAINTED.img, PAINTED.img), c = document.createElement('canvas'); c.width = C.CANVAS.width; c.height = C.CANVAS.height; c.getContext('2d').putImageData(new ImageData(px, c.width, c.height), 0, 0); return c.toDataURL(); }
+  const o = SF.RIG.fromDescriptor(D, { SF, direction: dir || 'S', action: (D.weapon && D.weapon.id !== 'unarmed') ? 'ready' : 'idle', frame: 0 }); return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(SF.RIG.frameSVG(o));
+}
+function humanDollSrc() { if (!HUMANS.on || !P || P.ghost) return null; try { return humanFigureURL(humanDesc(P), 'S'); } catch (err) { return null; } }
+function humanDollClass() { return HUMANS.mode === 'painted' ? 'doll painted' : 'doll rig'; }
 /* developer inspector: what a person wears and whether it is real equipment */
 function humanInspect(e) {
   if (!isHumanEnt(e)) return {}; const D = humanDesc(e); if (!D) return {};
   return { wardrobe: D.role + (D.region ? ' · ' + D.region : '') + (D.rank ? ' · ' + D.rank : '') + ' · ' + D.state + (D.fallback ? ' · FALLBACK' : ''),
     outfit: D.source === 'equip' ? 'real equipment (what is worn)' : 'cosmetic preset — not equipment, not loot',
-    look: [D.body, D.skin, D.hair, D.style, D.beard].join(' / '), missingArt: D.missing.length ? D.missing.join(', ') : 'none' };
+    look: [D.body, D.skin, D.hair, D.style, D.beard].join(' / '), missingArt: (HUMANS.mode === 'painted' && PAINTED.reg ? paintedPlan(D, 'idle', e.sect || 0).missing : D.missing).join(', ') || 'none' };
 }
 /* QA lineup for screenshots and art review: every guard rank of every region, every civilian role, every human mob variant */
 function humansLineup(opts) {
@@ -120,4 +173,18 @@ function humansLineup(opts) {
   for (const r in W.ROLES) if (!W.ROLES[r].realEquip) for (const b of ['male', 'female']) { const id = 'npc:lineup-' + r + '-' + b; W.ACTOR_ROLE[id] = r; W.ACTOR_BODY[id] = b; out.push([r + ' (' + b[0] + ')', W.resolve({ kind: 'npc', actorId: id, role: 'resident', name: r, life: { prof: 'x', doing: o.off ? 'social' : 'work' } }, {})]); delete W.ACTOR_ROLE[id]; delete W.ACTOR_BODY[id]; }
   for (const t in W.MOB_ROLE) for (let i = 0; i < W.HOSTILE[W.MOB_ROLE[t]].variants.length; i++) { let k = 0, id; do id = 'mon:' + t + ':' + (k++); while (W.hash32(id + '#v' + W.SEED_REV) % W.HOSTILE[W.MOB_ROLE[t]].variants.length !== i); out.push([t + ' v' + i, W.resolve({ kind: 'mon', type: t, actorId: id }, {})]); }
   return out;
+}
+/* ---- character creation: body type now; every other appearance option appears here as soon as its layer art is registered ---- */
+function humansCreatorLook(cc, name) {   // what a new character saves: the chosen body plus a stable seeded identity for the options without art yet
+  const W = SF.WARDROBE, body = cc.body === 'female' || cc.body === 'male' ? cc.body : W.identityFor('player:' + name).body;
+  return Object.assign({ cloak: cc.cloak || null }, W.identityFor('player:' + name, { body }), { body, wv: W.SEED_REV });
+}
+function humansCreatorHtml(cc) { try { return humansCreatorHtml1(cc); } catch (err) { return ''; } }   // the creator first renders before this file has run
+function humansCreatorHtml1(cc) {
+  if (HUMANS.mode !== 'painted' || !PAINTED.reg) return '';
+  const C = SF.HUMANART, av = C.availability(PAINTED.reg), body = cc.body === 'female' ? 'female' : 'male', dir = DIR_NAMES[cc.hdir || 0];
+  const D = { body, pieces: {}, overlays: [], style: 'short', beard: 'none' }, src = humanFigureURL(D, dir);
+  const off = [['Hairstyle', av.hairStyles.length], ['Hair colour', av.hairStyles.length], ['Beard', av.beards.length], ['Skin tone', av.skinTint], ['Clothing colours', av.clothTint]].filter(x => !x[1]).map(x => x[0]);
+  return `<label>Body</label><div class="chips">${av.bodies.map(b => `<button class="btn sm ${b === body ? 'ac' : ''}" data-c="hbody" data-v="${b}">${b === 'male' ? 'Male' : 'Female'}</button>`).join('')}<button class="btn sm" data-c="hrot" aria-label="turn the preview">↻ ${dir}</button></div>
+  ${src ? `<div class="ccpaint" style="background-image:url(&quot;${src}&quot;)"></div>` : ''}${off.length ? `<p class="note">${off.join(', ')}: coming with the layered character art (the painted bodies have hair and clothes painted in).</p>` : ''}`;
 }
