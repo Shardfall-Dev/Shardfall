@@ -7596,7 +7596,7 @@ function hrDesc(e) {
     lk.cloth = e.kind === 'mon' ? MON[e.type].scout : (NPC_COL[e.role] || (e.life && LIFE_COL[e.life.prof]) || HRIG.CLOTH.linen); }
   const R = HRIG.resolveGear(equip), w = HRIG.weaponOf(equip && equip.weapon && !(equip.weapon.cond === 0) ? equip.weapon : null);
   for (const u of R.unsupported) HR.stats.unsupported.add(u); if (w.unsupported) HR.stats.unsupported.add(w.id);
-  const d = Object.assign({ gear: R.gear, weapon: w }, lk); d.key = [d.body, d.skin, d.hair, d.cloth, d.style, d.beard, HRIG.gearKey(d.gear), w.id + (w.two ? '2' : '')].join('|');
+  const d = Object.assign({ gear: R.gear, weapon: w }, lk); d.key = [HRIG.VERSION, d.body, d.skin, d.hair, d.cloth, d.style, d.beard, HRIG.gearKey(d.gear), w.id + (w.two ? '2' : '')].join('|');
   c.sig = sig; c.d = d; return d;
 }
 /* which animation and frame the actor shows now. Visual only: every time comes from the simulation's own timestamps */
@@ -7668,7 +7668,7 @@ function hrSnapshot(e) { if (!hrHumanKind(e)) return null; const d = hrDesc(e); 
 function hrSnapshotFromItems(items, look, name) {
   const equip = {}; for (const it of items || []) { const dd = it && SF.ITEMS[it.id]; if (dd && dd.slot && !equip[dd.slot]) equip[dd.slot] = it; }
   const R = HRIG.resolveGear(equip), w = HRIG.weaponOf(equip.weapon), lk = hrLookOf(look, name, false), d = Object.assign({ gear: R.gear, weapon: w }, lk);
-  d.key = [d.body, d.skin, d.hair, d.cloth, d.style, d.beard, HRIG.gearKey(d.gear), w.id + (w.two ? '2' : '')].join('|'); return { d, dir: 0, t0: -99 };
+  d.key = [HRIG.VERSION, d.body, d.skin, d.hair, d.cloth, d.style, d.beard, HRIG.gearKey(d.gear), w.id + (w.two ? '2' : '')].join('|'); return { d, dir: 0, t0: -99 };
 }
 function hrDrawCorpse(g, e, x, y) {
   if (!HR.on || !e.hr) return false; const h = e.hr, C = HRIG.CELL, S = HR.scale, dying = GT - h.t0 < .6;
