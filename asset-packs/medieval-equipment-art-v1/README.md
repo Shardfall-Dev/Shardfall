@@ -1,6 +1,8 @@
 # Shardfall Medieval Equipment Art v1.0.0 — integration handoff
 
-Status: original generated medieval equipment artwork, static only. The companion ZIP (Shardfall_Medieval_Equipment_Art_v1.zip) was created locally; binary files are NOT present in this commit. Import the ZIP contents into this directory before integration. Do not treat this README as evidence of uploaded PNGs or completed game integration.
+Status: original generated medieval equipment artwork, static only. The ZIP (`Shardfall_Medieval_Equipment_Art_v1.zip`) is in this directory; `manifest.json` is extracted beside it for review (`preview.html` stays inside the ZIP).
+
+**v0.32 integration:** the pieces and corrected masks are embedded by `tools/embed_equipment_art.py` → `src/equipment-art.js`. They are drawn on the paper doll, fitted to male and female bodies with per-channel material recolouring, behind the "New art" review flag (off by default). World sprites use the layered procedural rig; the painted per-frame world overlays are not made yet. See `docs/equipment/RENDERING.md` for what is done, the mask corrections and the missing art.
 
 ## Pack
 - master.png: transparent original art sheet, 1536 × 1024.
