@@ -68,7 +68,7 @@ SIM.newRegistry = newRegistry;
    Listeners see every event; only non-transient types are kept, in a ring of `cap` records, so the log never grows
    without bound. Movement is transient: it is never kept. */
 SIM.EVENT_TYPES = ['ActorSpawned', 'ActorRemoved', 'ActorMoved', 'ActorDamaged', 'ActorHealed', 'ActorKilled', 'CombatStarted', 'CombatEnded',
-  'ItemTransferred', 'ItemCrafted', 'CrimeCommitted', 'CrimeWitnessed', 'ResourceGathered', 'MerchantArrived', 'CampCleared', 'PopulationReplenished'];
+  'ItemTransferred', 'ItemCrafted', 'CrimeCommitted', 'CrimeWitnessed', 'ResourceGathered', 'MerchantArrived', 'CampCleared', 'PopulationReplenished', 'AppearanceChanged'];   // AppearanceChanged: v0.25 equipment, for the future layered sprites
 SIM.TRANSIENT = { ActorMoved: 1 };
 function newBus(opt) {
   opt = opt || {}; const cap = opt.cap || 256, clock = opt.clock || (() => 0), known = new Set(SIM.EVENT_TYPES);
@@ -238,6 +238,132 @@ SIM.newNavGraph = () => {
 /* a small least-recently-used cache (paths between tiles) */
 SIM.newLRU = cap => { const m = new Map(); return { get(k) { if (!m.has(k)) return undefined; const v = m.get(k); m.delete(k); m.set(k, v); return v; },
   set(k, v) { if (m.has(k)) m.delete(k); m.set(k, v); if (m.size > cap) m.delete(m.keys().next().value); }, clear() { m.clear(); }, get size() { return m.size; } }; };
+
+/* ================= Phase 3: the monster ecosystem (master spec §9–13, §15–16) =================
+   Pure parts only: the faction table, perception, activity hours, decisions with commitment, a spatial index and camp
+   population bookkeeping. The game (src/ecology.js) owns the species profiles and drives the creatures with these. */
+
+/* ---------------- factions and relationships (§11) ----------------
+   Five levels. Same faction is friendly unless a pair says otherwise; an unlisted pair is neutral. Relationships are
+   symmetric. Faction hostility is not a crime: law (notoriety, guards) is evaluated separately in phase 5. Predation is a
+   species matter (a profile's prey list), not a faction level: wolves hunt deer without wildlife being "hostile". */
+SIM.RELATIONS = ['hostile', 'suspicious', 'neutral', 'friendly', 'allied'];
+SIM.HUMANS = ['adventurers', 'citizens', 'guards', 'merchants', 'criminals', 'murderers'];
+SIM.FACTION_LIST = SIM.HUMANS.concat(['orcs', 'goblins', 'undead', 'predators', 'wildlife', 'vermin', 'arachnids', 'lizardfolk', 'giants', 'harpies', 'elementals', 'constructs', 'oozes', 'dragons']);
+SIM.NOT_LIVING = ['undead', 'elementals', 'constructs'];
+SIM.FACTION_RULES = (() => {
+  const H = SIM.HUMANS, r = [];
+  const all = (f, others, rel) => { for (const o of others) if (o !== f) r.push([f, o, rel]); };
+  r.push(['guards', 'citizens', 'allied'], ['guards', 'merchants', 'allied'], ['citizens', 'merchants', 'allied'],
+    ['adventurers', 'citizens', 'friendly'], ['adventurers', 'guards', 'friendly'], ['adventurers', 'merchants', 'friendly'],
+    ['guards', 'criminals', 'hostile'], ['guards', 'murderers', 'hostile'], ['citizens', 'criminals', 'suspicious'], ['merchants', 'criminals', 'suspicious'],
+    ['citizens', 'murderers', 'suspicious'], ['merchants', 'murderers', 'suspicious'], ['adventurers', 'criminals', 'hostile'], ['adventurers', 'murderers', 'suspicious'],
+    ['criminals', 'murderers', 'friendly'], ['orcs', 'goblins', 'friendly'], ['orcs', 'lizardfolk', 'hostile'], ['orcs', 'giants', 'hostile'], ['orcs', 'predators', 'hostile'],
+    ['predators', 'predators', 'neutral'], ['wildlife', 'wildlife', 'neutral'], ['lizardfolk', 'giants', 'suspicious']);
+  for (const f of ['orcs', 'goblins', 'predators', 'vermin', 'arachnids', 'lizardfolk', 'giants', 'harpies', 'elementals', 'constructs', 'oozes', 'dragons']) all(f, H, 'hostile');
+  all('undead', SIM.FACTION_LIST.filter(f => !SIM.NOT_LIVING.includes(f)), 'hostile');   // undead against every living thing
+  all('dragons', SIM.FACTION_LIST.filter(f => f !== 'dragons'), 'hostile');              // dragons against intruders
+  return r; })();
+SIM.newFactions = (rules, opt) => {
+  opt = opt || {}; const m = new Map(), lv = SIM.RELATIONS, self = opt.self || 'friendly', names = new Set(opt.names || SIM.FACTION_LIST);
+  const key = (a, b) => a < b ? a + '|' + b : b + '|' + a;
+  const F = {
+    set(a, b, rel) { if (!lv.includes(rel)) throw new Error('unknown relationship ' + rel); names.add(a); names.add(b); m.set(key(a, b), rel); },
+    rel(a, b) { if (!a || !b) return 'neutral'; const k = m.get(key(a, b)); return k || (a === b ? self : 'neutral'); },
+    level: (a, b) => lv.indexOf(F.rel(a, b)) - 2,      // -2 hostile … +2 allied
+    hostile: (a, b) => F.rel(a, b) === 'hostile',
+    friendly: (a, b) => F.level(a, b) >= 1,
+    names: () => [...names],
+    matrix() { const n = [...names], o = {}; for (const a of n) { o[a] = {}; for (const b of n) o[a][b] = F.rel(a, b); } return o; } };
+  for (const [a, b, rel] of rules || []) F.set(a, b, rel);
+  return F;
+};
+
+/* ---------------- activity hours (§9) ----------------
+   day: active by daylight, resting at night, asleep in the small hours. night: the reverse (undead are dormant, not asleep,
+   by day). dusk: crepuscular hunters, active from sunset through dawn. always: never rests. */
+SIM.ACTIVITY = {
+  day:    { dawn: 'active', day: 'active', sunset: 'active', night: 'rest', deepnight: 'sleep' },
+  night:  { dawn: 'rest', day: 'rest', sunset: 'active', night: 'active', deepnight: 'active' },
+  dusk:   { dawn: 'active', day: 'rest', sunset: 'active', night: 'active', deepnight: 'active' },
+  always: { dawn: 'active', day: 'active', sunset: 'active', night: 'active', deepnight: 'active' } };
+SIM.activityOf = (hours, period) => (SIM.ACTIVITY[hours] || SIM.ACTIVITY.always)[period] || 'active';
+
+/* ---------------- perception (§13) ----------------
+   senseRange(p, c): p = { sight, hear, nightVision 0..1 }, c = { dark 0..1, activity, alert }. Darkness shortens sight for
+   creatures without night vision (to half at full night), sleep cuts it hard and resting a little; an alerted creature
+   (recently hurt or called) sees a little further. detect(p, c, d, o): o = { los, moving, noisy, hidden } → 'seen' | 'heard' | null.
+   A hidden target is never seen or heard from range; only something standing almost on top of it can stumble over it. */
+SIM.SENSE = { nightCut: .5, darkRef: .62, sleep: .3, rest: .8, alert: 1.25, stumble: 1.2 };
+SIM.senseRange = (p, c) => {
+  c = c || {}; const S = SIM.SENSE, dk = Math.min(1, Math.max(0, (c.dark || 0) / S.darkRef));
+  let sight = p.sight * (1 - dk * (1 - (p.nightVision || 0)) * S.nightCut), hear = p.hear || 0;
+  const k = c.activity === 'sleep' ? S.sleep : c.activity === 'rest' ? S.rest : 1; sight *= k; hear *= c.activity === 'sleep' ? .5 : 1;
+  if (c.alert) { sight *= S.alert; hear *= S.alert; }
+  return { sight, hear };
+};
+SIM.detect = (p, c, d, o) => {
+  o = o || {}; if (o.hidden) return d <= SIM.SENSE.stumble ? 'seen' : null;
+  const r = SIM.senseRange(p, c);
+  if (d <= r.sight && o.los) return 'seen';
+  if (d <= r.hear && (o.moving || o.noisy)) return 'heard';
+  return null;
+};
+
+/* ---------------- decisions with commitment and hysteresis (§12) ----------------
+   decide(mem, options, t, cfg): options = [{ act, score, why, force }]. The current act is kept while it is still offered
+   and its commitment time has not run out; after that a different act must beat it by `margin`. A forced option (death,
+   a fresh wound when cowardly) overrides commitment. mem is the actor's own plain record: { act, at, score, why }.
+   An act that is no longer offered (impossible) is dropped at once and the best remaining option is chosen. */
+SIM.decide = (mem, options, t, cfg) => {
+  cfg = cfg || {}; const commit = cfg.commit !== undefined ? cfg.commit : 2, margin = cfg.margin !== undefined ? cfg.margin : .15;
+  let best = null; for (const o of options) if (!best || o.score > best.score) best = o;
+  if (!best) { mem.act = null; mem.why = 'nothing to do'; return null; }
+  const forced = options.find(o => o.force && o.act !== mem.act);
+  const cur = mem.act ? options.find(o => o.act === mem.act) : null;
+  let pick = best;
+  if (forced) pick = forced;
+  else if (cur && best.act !== cur.act && (t - (mem.at || 0) < commit || best.score < cur.score + margin)) pick = cur;
+  if (pick.act !== mem.act) { mem.act = pick.act; mem.at = t; mem.switches = (mem.switches || 0) + 1; }
+  mem.score = pick.score; mem.why = pick.why || pick.act; return pick;
+};
+
+/* ---------------- spatial index (§25, pulled into phase 3) ----------------
+   A uniform hash grid of `cell`-metre squares. add/move/remove keep an entity in one cell (its key is stored on it as _gk);
+   query(x, y, r, fn) visits every entity within r. Replaces the all-against-all scans. */
+SIM.newGrid = (cell) => {
+  cell = cell || 8; const cells = new Map(); let n = 0;
+  const key = (x, y) => (Math.floor(x / cell) & 0xffff) * 65536 + (Math.floor(y / cell) & 0xffff);
+  const G = {
+    cell,
+    add(e) { if (e._gk !== undefined) return G.move(e); const k = key(e.x, e.y); let s = cells.get(k); if (!s) cells.set(k, s = []); s.push(e); e._gk = k; n++; },
+    remove(e) { if (e._gk === undefined) return; const s = cells.get(e._gk); if (s) { const i = s.indexOf(e); if (i >= 0) { s[i] = s[s.length - 1]; s.pop(); n--; } if (!s.length) cells.delete(e._gk); } e._gk = undefined; },
+    move(e) { if (e._gk === undefined) return G.add(e); const k = key(e.x, e.y); if (k === e._gk) return; G.remove(e); G.add(e); },
+    query(x, y, r, fn) { const x0 = Math.floor((x - r) / cell), x1 = Math.floor((x + r) / cell), y0 = Math.floor((y - r) / cell), y1 = Math.floor((y + r) / cell), r2 = r * r;
+      for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) { const s = cells.get((cx & 0xffff) * 65536 + (cy & 0xffff)); if (!s) continue;
+        for (let i = 0; i < s.length; i++) { const e = s[i], dx = e.x - x, dy = e.y - y; if (dx * dx + dy * dy <= r2) fn(e); } } },
+    near(x, y, r) { const out = []; G.query(x, y, r, e => out.push(e)); return out; },
+    clear() { for (const s of cells.values()) for (const e of s) e._gk = undefined; cells.clear(); n = 0; },
+    get size() { return n; }, get cells() { return cells.size; } };
+  return G;
+};
+
+/* ---------------- camp populations (§16) ----------------
+   newCamp({ id, cap, recover, trickle }, saved): a camp is populated up to cap. When its last member dies after it had been
+   populated, it is cleared: the time is recorded and nothing returns for `recover` seconds; then one member returns every
+   `trickle` seconds until the camp is full again. Essential content never goes extinct: recovery always ends. Only the
+   clearance record is saved; members are counted live. */
+SIM.newCamp = (def, saved) => {
+  saved = saved || {}; const C = { id: def.id, cap: def.cap, recover: def.recover || 1200, trickle: def.trickle || 90,
+    alive: 0, ever: !!saved.ever, cleared: !!saved.cleared, clearedAt: saved.clearedAt ?? null, nextAt: saved.nextAt ?? 0, clears: saved.clears || 0 };
+  C.recovering = t => C.cleared && t >= C.clearedAt + C.recover;
+  C.canSpawn = t => { if (C.alive >= C.cap) return false; if (!C.cleared) return true; return C.recovering(t) && t >= C.nextAt; };
+  C.spawned = t => { C.alive++; C.ever = true; let ev = null; if (C.cleared) { ev = 'recovering'; C.nextAt = t + C.trickle; if (C.alive >= C.cap) { C.cleared = false; ev = 'recovered'; } } return ev; };   // every return after a clearance is a replenishment
+  C.died = t => { C.alive = Math.max(0, C.alive - 1); if (C.alive === 0 && C.ever && !C.cleared) { C.cleared = true; C.clearedAt = t; C.nextAt = t + C.recover; C.clears++; return 'cleared'; } return null; };
+  C.removed = () => { C.alive = Math.max(0, C.alive - 1); };           // a member left without dying (unloaded, tamed): no clearance
+  C.save = () => ({ ever: C.ever, cleared: C.cleared, clearedAt: C.clearedAt, nextAt: C.nextAt, clears: C.clears });
+  return C;
+};
 
 /* ---------------- debug view of one actor (developer tools; no gameplay depends on it) ---------------- */
 SIM.inspect = (e, extra) => {

@@ -4,7 +4,7 @@ The roadmap is `docs/WORLD_SIMULATION_MASTER.md` (the full specification, unchan
 
 **Status words:** **Tested** — implemented and covered by an automated test that passes. **Implemented** — in the build, checked by hand only. **Partial** — some of the item is in; the rest is listed. **Planned** — not started. **Blocked** — waiting on something named.
 
-**Current build:** v0.24 (`Shardfall_v0.24.html`), branch `integration/v0.24`. It is `feature/world-expansion` (v0.23, PR #16, which already stacks #10, #11, #12, #13 and everything in v0.19) with the two parallel v0.19 fixes merged on top: #14 (Gear menu fix) and #15 (backpack icons v1.0.0). One PR from `integration/v0.24` to `main` replaces PRs #2–#16; the next Living World phase branches from it.
+**Current build:** v0.26 (`Shardfall_v0.26.html`), branch `integration/v0.26`: phase 3 (`feature/living-world-phase3`, #20, built as v0.25) merged with the equipment and paper doll work (#19, also v0.25, which already contains the missing icons v0.24.1, #18). One PR from `integration/v0.26` replaces #18, #19 and #20; phase 4 branches from it.
 
 ---
 
@@ -17,7 +17,7 @@ The spec's development sequence (§29, phases A–G) is numbered 1–7 here. Eac
 | 1 | A | Audit and architecture: actor ids, archetypes and controllers, shared damage entry, structured events, seeded streams, deterministic tests | — | **Tested** (v0.21) |
 | 2 | B | Clock and navigation: fixed 50 ms simulation step, persistent world clock (120 min day), day/night lighting and local lights, A* plus a waypoint graph, doors, stuck recovery, developer debug panel | 1 | **Tested** (v0.22) |
 | 2½ | — | **World expansion** (asked for between phases 2 and 3): Anniabreen stretched ×1.35 between rigid towns, the Southern Reach, 8 camps, 5 sealed dungeon mouths, world 2620 × 1520 | 2 | **Tested** (v0.23) |
-| 3 | C | Population and monster ecosystem: regions and habitats, species profiles as data, roaming, territories, predator/prey, monster-vs-monster factions, creature audio | 1, 2 | Planned |
+| 3 | C | Population and monster ecosystem: regions and habitats, species profiles as data, roaming, territories, predator/prey, monster-vs-monster factions, creature audio | 1, 2 | **Tested** (v0.25) |
 | 4 | D | Living NPCs: named townsfolk with homes, workplaces and schedules; guards patrolling; merchants travelling; resource workers; basic adventurers | 1, 2, 3 (factions) | Planned |
 | 5 | E | Shared combat and law: NPC-vs-NPC and NPC-vs-monster combat, NPC spellcasting through Magery, actor death and looting, criminal flags, murder counts, guards, witnesses | 1, 3, 4 | Planned |
 | 6 | F | Persistence and optimisation: world-state save (regions, camps, corpses, cargo), simulation tiers A/B/C, spatial index, mobile profiling, regression tests | 1–5 | Planned |
@@ -297,9 +297,178 @@ Requested on 2026-11-26: bigger distances, more camps, and places for dungeons. 
 - **Dungeon interiors:** none yet; each needs its own step.
 - **Missing art and sound.** Bandits use a tinted scout; there are no goblin, drake or dragon creatures. Tents, campfire, totem, huts, webs, bones, cave, crypt and keep are drawn in code in the kit's palette. Asset backlog: dragon and drake art, goblins, cave ambience.
 
+## Phase 3 — Population and monster ecosystem (v0.25) — **Tested**
+
+### What was built
+
+- **Pure core in `src/world.js` (tested in node):**
+  - **Factions (§11).** `SIM.newFactions(SIM.FACTION_RULES)` gives five levels: allied, friendly, neutral, suspicious, hostile. Relationships are symmetric, same faction is friendly and an unlisted pair is neutral.
+    - The 20 factions are the spec's 13 plus vermin, arachnids, lizardfolk, giants, harpies, constructs and oozes.
+    - Some rules: guards–citizens allied, guards–criminals hostile, orcs–goblins friendly, orcs against every human faction and against lizardfolk, giants and predators. The undead are against everything living, dragons against everything.
+    - **Predation is not a faction level.** A profile's prey list decides it, so wolves hunt deer without wildlife being "hostile".
+    - **Faction hostility is never a crime.** Law (notoriety, guards, witnesses) is phase 5 and is evaluated separately.
+  - **Activity hours (§9).** `SIM.activityOf(hours, period)` returns active, rest or sleep.
+    - *day*: rests at night and sleeps 00–05.
+    - *night*: the undead, dormant by day.
+    - *dusk*: wolves and hounds, active from sunset to dawn.
+    - *always*.
+  - **Perception (§13).** `SIM.senseRange` and `SIM.detect` work from sight, hearing and night vision.
+    - Full night halves sight for a creature with no night vision. A wolf keeps 95 %.
+    - Sleep cuts sight to 30 % and hearing to half; rest cuts sight to 80 %. An alerted creature (recently hurt or called) senses 25 % further.
+    - *Seen* needs line of sight. *Heard* needs the target to move or fight within hearing.
+    - A hidden target is never detected from range, only stumbled over within 1.2 m.
+  - **Decisions with commitment and hysteresis (§12).** `SIM.decide(mem, options, t)`.
+    - The current act is kept for its commitment time (1.8 s). After that a rival must beat it by a margin (0.15).
+    - An act that is no longer possible is dropped at once. A forced option (badly wounded) overrides commitment.
+    - Every choice keeps its reason for the debug view.
+  - **Spatial index.** `SIM.newGrid(8)` is a hash grid of 8 m cells with add, move, remove and radius queries. It replaces every all-against-all scan: creature push-apart, perception and calls for help.
+  - **Camp populations (§16).** `SIM.newCamp`.
+    - When the last member dies, the camp is cleared and the time is recorded. Nothing returns for its recovery time; then one member (or pair) returns per trickle interval until it is whole.
+    - A member that leaves alive (tamed, sunk into its grave) never counts as a clearance.
+    - Only the clearance record is saved.
+- **The ecosystem in the game (`src/ecology.js`):**
+  - **Species profiles as data (§9–10).** There are 27 profiles, one for every creature in `MON`. Each holds faction, habitats, hours, temperament, aggression, courage, intelligence, night vision, hearing, territory, pursuit limit, prey, social pattern, group size, retreat rule, flight distance, call radius, how long a meal lasts, respawn time, art source and sound set (with a note where a stand-in or silence is used).
+    - **Sight is each creature's existing aggro radius**, so by day a creature notices the player exactly as far away as before.
+    - Temperaments: *hostile* attacks its faction enemies on sight; *territorial* (boar, bear, snapper, crab, troll, ettin) attacks anything unfriendly within its aggro radius; *timid* (deer, hare) never starts a fight and flees.
+  - **New wildlife.** These are drawn in code in the kit's palette, like the boar and the hound, and listed in the asset backlog:
+    - red deer (herds of 2–4),
+    - brown hare,
+    - brown bear (solitary, territorial, hunts deer and hares, retreats at 15 %).
+  - **Think (`ecoThink`, every ~0.5 s, staggered by id).** The creature asks the spatial index what is within its senses, then scores its options: attack an enemy, hunt prey (only when hungry), flee a threat, or carry on.
+    - **Threats:** a predator that eats it; for timid creatures, anything not of their kind inside the flight distance. A creature with a retreat rule also flees a fight it cannot win and runs when badly wounded.
+    - **Commitment:** it commits through `SIM.decide`, and the chase keeps its target's last known position.
+    - **Calls for help:** its own kind or camp within the call radius join the fight, and a herd bolts together.
+  - **Idle (`ecoIdle`):**
+    - It roams inside its territory while active and stays close to home while resting. Undead roam 1.6× wider at night. Creatures sleep in their hours.
+    - A predator stays at its kill to feed for 12–20 s, then is sated for 5–10 minutes.
+    - **Packs and herds** follow a leader. A follower far behind catches up on the navigator, and when the leader chases, the pack joins in.
+  - **Hunting.** A hungry hunter tracks prey by scent within its hearing. It may run twice its normal pursuit limit, puts on a 25 % burst, and keeps after fleeing creature prey through its wind-up (a pounce).
+    - Fleeing prey sprints for 3 s, then tires to 70 %.
+    - None of this applies against the player, who can still sidestep a telegraph.
+  - **Pursuit limits (§14).** A creature gives up beyond its pursuit limit from its home (or from where its sortie fight started). A creature that is far from home walks back on the navigator, in legs of at most 50 m. Creature trips never build the continent travel graph.
+  - **Populations (§15):**
+    - **Wilderness regions by habitat.** The world is divided into 150-tile cells. Each cell is classified from its own tiles as forest, plains, swamp or mountain and gets a wildlife mix from the seeded stream `population`, so the map is byte-identical. Predators never appear in the Saltmarsh starter slice or in a cell with protected ground.
+    - **Regions for the existing spawners:** camps, graveyards, dungeon levels and the old wilderness points.
+    - **Spawning** happens only inside the habitat, on walkable, unprotected ground of the right level, with nobody standing there. It never happens within 22 m of the player (12 m at boot), so there is no pop-in.
+    - **Respawn** follows each profile's pace instead of a flat 6–12 s. Regional caps are the sums of their spawners' caps.
+  - **Camps (§16):**
+    - The eight camps and the two guarded dungeon mouths are persistent: cleared stays cleared for 25 minutes (15 for mouths), then members return 75 s apart. The clearance survives a reload.
+    - **Sorties:** orcs patrol 45 m down their trail toward the road and back; bandits go to the road, hide and watch for 45 s, then return; wolf packs at the den hunt 30–60 m out. Patrols stay on task (no hunting on the way) but break off to fight an enemy.
+  - **Graveyards rise at night.** The Ashen Barrows and the other skeleton spawners hold 1.5× their daytime dead from sunset to dawn. At dawn the extra dead walk back to their graves and sink out of sight, never in view of the player.
+  - **Creature-against-creature combat** uses the same states and the same resolver as before, so a wolf's bite on a deer is the same blow as a wolf's bite on you. A kill by a creature leaves an ordinary corpse with loot, and the log mentions it only when it happens near you.
+  - **A first simulation tier.** An idle creature more than 80 m from the player (Manhattan distance) thinks and moves at a quarter rate. Creatures that are fighting, fleeing, on a sortie or following a sortie always run at full rate. Phase 6 formalises tiers A/B/C.
+  - **Sound (§23):**
+    - **Detection:** a creature's alert plays when it first targets prey or an enemy. A creature spotting the player plays its alert as before.
+    - **Calls and howls:** a nearby idle creature calls rarely, at 30 % gain, at most one call every 4 s anywhere. At night a wolf or hound may howl within 55 m, at most one howl every 25 s.
+    - **Stand-ins (documented):** dire wolf uses the marsh hound's takes, bear the boar's, giant spider the mire spider's.
+    - **Silent species:** deer, hares, slimes, orcs, lizardmen, harpies, trolls, ettins, gargoyles, elementals and humanoid bandits. They stay silent rather than borrow a wrong sound.
+    - The timing of idle sounds uses its own audio-only random stream, so sound never changes the simulation.
+  - **Developer panel (`?dev`):**
+    - Creatures by faction; regions by kind with counts and caps; every camp (alive / cap, cleared with time left, recovering, on a sortie).
+    - Ecosystem counters: hunts, creature fights, flights, deaths, sorties, camps cleared, dead sunk, think cost.
+    - A faction matrix toggle.
+    - The inspector adds a creature's faction, temperament, activity, current decision and its reason, senses and how many actors it perceives, hunger, pack and leader, camp, region, art source and sound mapping.
+    - The perception overlay draws sight and hearing as they are now (night and sleep included); the territory overlay draws territory and pursuit limit.
+- **Changed in the existing game:**
+  - `killMon` only says "You slay…" and selects the corpse when the player, a pet or Wren made the kill.
+  - A tamed creature leaves its spawner and camp cleanly.
+  - `rmEnt` keeps the index and the spawner counts right.
+  - `navTo` builds the travel graph only for long journeys.
+  - **Save:** a small `eco` block holds the camp clearances. The save version stays 6 because the change is additive: older saves load unchanged and older builds ignore the block.
+- **Not in this phase (stays planned):**
+  - Goblins, zombies, dragons and drakes (no art).
+  - Orc roles (scout, archer, captain, shaman) and Lich commands, which need Magery for NPCs (phase 5).
+  - Bandits stealing cargo and stockpiling supplies (phases 5 and 7).
+  - Separate volume sliders (Master, Music, Ambient, Combat, Monsters, Footsteps) and environment ambience profiles (birds, insects, owls, groans): there are no takes for most of them yet.
+  - Individual creatures are still not saved: they respawn on load, except that cleared camps stay cleared. Full world-state persistence is phase 6.
+
+### Tests
+
+- `node tests/world.test.js`, 126 checks (40 new):
+  - Factions: the spec's example pairs, undead against the living, dragons against all, levels, rejection of unknown relationships, a symmetric matrix, all of the spec's initial factions.
+  - Activity hours for day, night and dusk creatures.
+  - Perception: night with and without night vision, sleep, rest and alert, seen versus heard, hidden targets.
+  - Decisions: best choice, commitment, hysteresis, impossible acts dropped, forced acts, no oscillation between two noisy close options over 60 s, reasons kept.
+  - The spatial index: exact against brute force before and after moving 300 of 600 entities; exact removal.
+  - Camps: fill to cap, no clearance from losses or live departures, clearance on the last death, recovery time, save and load, trickle, recovery always ends.
+- `python3 tests/world-smoke/phase3.py` (called by `world-smoke/run.py`), 34 checks in Chrome. It is seeded, so every scenario plays out the same way each run.
+  1. **Data:** all 27 creature types have a full profile. Every sound mapping points at real takes, and stand-ins and silences are documented. The faction of each actor kind is right.
+  2. **Populations:** 104 regions (forests, plains, mountains, swamps, camps, graveyards, dungeon levels).
+     - 475 creatures at boot, among them 94 deer, 137 hares, 30 wolves and 15 bears.
+     - No spawner is over its cap, and every creature stands on walkable, unprotected ground.
+     - No predators in the Saltmarsh slice.
+  3. **Predator and prey:** a wolf pack kills a deer with no player involved. The herd bolts together, the killer feeds, and the deer never fight back.
+  4. **Factions at war:** orcs and skeletons fight on their own; no crime is recorded; each creature changes its mind at most a few times.
+  5. **Timid wildlife:** a deer bolts from the approaching player at once, runs about 30 m, never attacks, and returns home once the player is gone.
+  6. **Perception:**
+     - A boar notices you at 4 m at noon, but not at midnight.
+     - A wolf sees you at 7 m in the dark.
+     - A hidden player is not detected by an orc 3 m away; an unhidden one is.
+     - A hare asleep at 02:00 senses 1.8 m against 9 m by day.
+  7. **Graveyards:** 11 dead by day, 17 at night (the cap). At dawn the extra dead sink back. Skeletons are dormant by day and active at night.
+  8. **Packs:** hurting one wolf brings the whole pack after you.
+  9. **Pursuit:** a boar gives up 20.3 m from home (limit 20 m) and walks back.
+  10. **Camps:** Kragmaw Camp full (6/6) is cleared with one `CampCleared` event.
+      - Forced spawners do not refill it, and neither does a reload.
+      - After its recovery time it refills 2 → 4 → 6 and is whole again.
+  11. **Sorties:** an orc patrol of two goes about 45 m out, waits and heads home, or breaks off to fight. The travel graph is never built by creatures.
+  12. **Spatial index:** it holds every live actor and answers 30 radius queries exactly.
+  13. **Seeded multi-day run:** three in-game days on a 6-minute day (21,600 steps).
+      - The population stays steady: 535 → 547 actors, peak 583, no spawner ever over its cap.
+      - No species dies out.
+      - The event log stays bounded, there are no stale targets, and every live id is unique and registered.
+      - The ecosystem was busy: 14 hunts, 204 creature fights, 101 deaths.
+      - About 0.5 ms per step, with no heap growth.
+- **Regression.** Every suite was run on v0.25 and on v0.24 in the same container:
+
+| Suite | v0.24 | v0.25 |
+|---|---|---|
+| `rules.test.js`, `magery.test.js`, `combat.test.js` | all pass | all pass |
+| `world.test.js` | 86 pass (the 40 new checks need phase 3) | 126/126 |
+| magery-smoke | `migration.py` failed once (unseeded fizzle, known) | pass |
+| combat-smoke | 5 scenarios and the phone play-test pass; the old-save step cannot run (`main:Shardfall_v0.16.html` is not in a shallow clone) | the same |
+| backpack-smoke | 32/32 | 32/32 |
+| backpack icons | 31/31 | 31/31 |
+| bestiary-smoke | 123/123 | 123/123 |
+| anniabreen-smoke | all pass | all pass; all 19 timed routes identical to v0.24 to 0.1 s |
+| sfx-smoke | 48/48 three times, 47/48 twice ("a whiff": a rat's first strike lands inside the window, known since v0.19) | 48/48 four times, 47/48 twice (the same check) |
+| world-smoke (phase 1, phase 2, expansion) | all pass | all pass |
+| world-smoke phase 3 | — | 34/34 (three full runs on the final build) |
+
+  - **Test updates during the phase:** none of the old suites needed changing.
+  - **Bugs found and fixed while testing:**
+    - A creature lost the target it had just chosen for one step (a stale local variable in `aiMon`), so the first creature to decide in a pack turned back at once.
+    - Creature journeys home built the whole travel graph, freezing the first frames for 3 s; they now use local paths only.
+    - Cautious rats ran from the player in the starter fight; only species with a retreat rule are cautious now.
+    - Roam targets drawn on a disc walked creatures off when tests fix the random generator; they are now drawn like the old wander.
+
+### Decisions
+
+- **A creature notices the player exactly as far away by day as before.** Sight is its existing aggro radius. Night, sleep and Hiding now shorten it, as the spec asks.
+- **Rats, boars and the other old creatures still stand and fight the player.** Only species with a retreat rule (wolves, hounds, bears, bandits) decline a fight they cannot win or run when badly wounded. Deer and hares always flee.
+- **The pounce and the prey's tiring apply only between creatures.** Telegraphs against the player are unchanged, so a player can still sidestep any creature's wind-up.
+- **Wolves are the bestiary's dire wolves; deer, hares and bears are drawn in code** until sheets exist.
+- **Creatures respawn on load as before; camp clearance is the one thing saved now.** Saving every creature is phase 6 (§26).
+- **The quarter-rate tier for distant idle creatures** is a stopgap so the larger population costs less than the old one did. Phase 6 replaces it with the spec's tiers A/B/C.
+
+### Integration (v0.26)
+
+v0.26 merges phase 3 with the equipment and paper doll work (#19, which already contains the missing icons, #18). Both branches had been numbered v0.25.
+
+- **Conflicts resolved:** `build.sh` (both new modules in the build order), `src/game.js` (the equipment v7 save carries the `eco` block, and `__SF` exposes both sets of hooks) and the README.
+- **Fixed while re-testing the merged build:**
+  - A patrol whose leader died left its camp unable to send another.
+  - A camp whose members were all busy hunting waited 200 s before trying again; it now retries after 30 s.
+  - Risen skeletons that could not reach their grave never sank at dawn; they now sink after 45 s, still out of sight.
+  - Patrol legs now have time limits.
+- **Every suite on v0.26:**
+  - Node: rules, equipment, magery, combat and world all pass.
+  - Browser: equipment-smoke 67/67, backpack panels 97/97, backpack 32/32, icons 32/32, bestiary 123/123, magery-smoke, anniabreen-smoke, sfx 48/48, and world-smoke 113/113 (phase 3 three more times).
+  - Combat-smoke: as before, its old-save step needs `main:Shardfall_v0.16.html`, which a shallow clone does not have.
+
 ## Implementation matrix (audit of v0.20 against the spec)
 
-| Spec § | Area | What exists in v0.20 | Status after phase 1 | Next |
+| Spec § | Area | What exists in v0.20 | Status (latest phase) | Next |
 |---|---|---|---|---|
 | 2 | Rules: no engine, offline, saves migrate | Single-file web build via `build.sh`. Works offline after load (`--offline` build embeds audio). Saves v1→v4 with snapshots. | Respected; save v5 | — |
 | 3 | Actor architecture | `ents[]` of plain objects keyed by `kind` (`mon`, `npc`, `pet`, `ally`, `corpse`); player `P` separate; numeric per-session ids | **Tested:** stable ids, archetypes, controllers, optional components | Phase 4 adds civilian/guard/merchant ticks |
@@ -309,23 +478,23 @@ Requested on 2026-11-26: bigger distances, more camps, and places for dungeons. 
 | 6 | Day/night visuals | `darkness()` overlay with radial holes for the player, `LIGHTS` and blasts. Night Sight sets darkness to 0. Dungeons fixed at 0.8. | **Tested** (phase 2): tinted periods, local lights and glow, partial Night Sight, dungeons apart | Torch items and spell light radii when those exist; night gameplay in phase 3 |
 | 7 | NPC life | 58 static NPCs (Saltmarsh + Anniabreen towns), roles, shops, dialogue lines; no movement or schedules | Classified (civilian/merchant/guard) | Phase 4 |
 | 8 | NPC adventurers | Wren: one hireling with skills, equipment, bandaging, ghost/resurrection, follow/wait | Classified (hireling) | Phase 4 |
-| 9–10 | Monster ecosystem | `MON` table (23 types) with aggro, leash, speed, loot, skin; `SPAWNS` point spawners with caps and respawn timers; `aiMon` idle/chase/telegraph/strike/recover/return | Classified (animal/monster/criminal), dispatched by controller | Phase 3: profiles, habitats, activity hours |
-| 11 | Factions | None; creatures target only the player, pets or Wren (or a provoked creature) | Planned | Phase 3 (species), phase 5 (law) |
-| 12 | Utility AI + state machines | `aiMon` state machine; no utility scoring, personality or hysteresis | Planned | Phase 3–4 |
-| 13 | Perception | Aggro radius + `los()`; hidden player ignored; no hearing, sleep or night vision | Planned | Phase 3 |
-| 14 | Pathfinding | None: straight-line steering with a sidestep (`moveBy`); doors, bridges, stairs and moongates exist | **Tested** (phase 2): A* + travel graph, doors, stairs, boats, gates, stuck recovery, budget | Creatures use it in phase 3 (territories, pursuit limits); crowding at doors in phase 4 |
-| 15 | Population | `SPAWNS` point spawners: Saltmarsh, Anniabreen (8: boars, rats, a cemetery pair of skeletons, hounds, snappers, spiders) and dungeon rooms; bestiary creatures have stats but no spawns | **Partial** (v0.23): camp spawners on bestiary creatures | Phase 3 |
-| 16 | Camps | Ashfen outlaw camp (static vendors, smugglers spawner) | **Partial** (v0.23): 8 camp sites with art and provisional spawners | Phase 3: persistent populations, patrols, clearing |
+| 9–10 | Monster ecosystem | `MON` table (23 types) with aggro, leash, speed, loot, skin; `SPAWNS` point spawners with caps and respawn timers; `aiMon` idle/chase/telegraph/strike/recover/return | **Tested** (phase 3): 27 species profiles as data, temperaments, hours, prey, packs and herds, retreat, feeding; deer, hares and bears added | Goblins, zombies, dragons when art exists; orc roles and lich commands with NPC Magery (phase 5) |
+| 11 | Factions | None; creatures target only the player, pets or Wren (or a provoked creature) | **Tested** (phase 3): 20 factions, five levels, symmetric table; creatures fight creatures; hostility is not a crime | Law and notoriety: phase 5 |
+| 12 | Utility AI + state machines | `aiMon` state machine; no utility scoring, personality or hysteresis | **Tested** (phase 3) for creatures: scored options, commitment, hysteresis, forced retreat, reasons in the inspector | Townsfolk and adventurers: phase 4 |
+| 13 | Perception | Aggro radius + `los()`; hidden player ignored; no hearing, sleep or night vision | **Tested** (phase 3): sight, hearing, night vision, sleep and rest, alertness, hidden targets, calls for help, scent for hungry hunters | Visible corpses and dangerous areas: phases 5 and 7 |
+| 14 | Pathfinding | None: straight-line steering with a sidestep (`moveBy`); doors, bridges, stairs and moongates exist | **Tested** (phase 2): A* + travel graph, doors, stairs, boats, gates, stuck recovery, budget; (phase 3) creatures: pursuit limits, walks home and sorties in legs of at most 50 m, never the travel graph | Crowding at doors in phase 4 |
+| 15 | Population | `SPAWNS` point spawners: Saltmarsh, Anniabreen (8: boars, rats, a cemetery pair of skeletons, hounds, snappers, spiders) and dungeon rooms; bestiary creatures have stats but no spawns | **Tested** (phase 3): ~100 regions by habitat, wildlife by habitat from a seeded stream, spawning out of sight on valid ground, profile respawn pace, regional caps, nothing dangerous in the starter slice | Persistence of individual creatures: phase 6 |
+| 16 | Camps | Ashfen outlaw camp (static vendors, smugglers spawner) | **Tested** (phase 3): 8 camps and 2 guarded mouths as persistent populations; clearance saved, gradual recovery; orc patrols, bandit road watches, wolf hunting trips | Supplies, treasure, leadership: phases 5 and 7 |
 | 17 | Dungeons | Sunken Bell, 3 levels, seeded rooms, Bellkeeper boss, chests, stairs; Mynoc mine first chamber | **Partial** (v0.23): 5 sealed mouths placed and reachable; interiors **Planned** | One step per dungeon interior |
 | 18 | Combat between actors | Creatures ↔ player/pets/Wren; provoked creature ↔ creature | Shared entry **Tested** | Phase 5 |
 | 19 | Criminality | Protected zones (`PROT`, guarded towns); theft/pickpocket and snooping exist for the player; no notoriety | Planned | Phase 5 |
 | 20 | Corpses, death, loot | `SF.deathTransaction` for player and Wren, creature corpses with loot rolls, decay timers, skinning, the player's corpse saved | Death once **Tested** | Phase 5 (NPC looting), phase 6 (persist all corpses) |
 | 21 | Economy | Shops with fixed prices, resource nodes deplete/refill and persist, crafting consumes materials | Planned | Phase 7 |
-| 23 | Sound | `SFXA` Web Audio player: buses, positional pan, priorities, area music, ambience per zone, footsteps by surface; volume/mute settings | Untouched | Phase 3 (creature idle/alert); separate volume buses: phase 3 |
+| 23 | Sound | `SFXA` Web Audio player: buses, positional pan, priorities, area music, ambience per zone, footsteps by surface; volume/mute settings | **Implemented** (phase 3): alert on first sight of prey or enemy for every species with takes, documented stand-ins, rare idle calls, night howls; silent where no take exists | Separate volume sliders and environment profiles (birds, insects, owls, groans) when takes exist |
 | 24 | Animation | Player: 8-direction walk/attack clips per weapon family. Rat and skeleton sheets. 11 bestiary sheets (walk, wind-up, impact; no death, cast, sleep). Other creatures procedural. | Untouched | Backlog below |
-| 25 | Performance tiers | Whole-world update each frame; render culls to the viewport | Measured (below) | Phase 6; spatial index in phase 3 |
+| 25 | Performance tiers | Whole-world update each frame; render culls to the viewport | **Partial** (phase 3): spatial index; distant idle creatures at a quarter rate | Tiers A/B/C, phones: phase 6 |
 | 26 | Persistence | localStorage, one key, ~JSON; snapshots for v2/v3/premagery; nodes, player, pets, Wren, the player's corpses, door states | v5 (`sim`) **Tested** | Phase 6 |
-| 27 | Debug tools | `window.__SF` test hooks; no panel | **Tested** (phase 2): `?dev` panel, inspector, controls, overlays | Faction view in phase 3; tier counts in phase 6 |
+| 27 | Debug tools | `window.__SF` test hooks; no panel | **Tested** (phase 2): `?dev` panel, inspector, controls, overlays; (phase 3) factions, regions, camps, ecosystem counters, decision reasons | Tier counts in phase 6 |
 | 28 | First milestone | Two Anniabreen towns + road + forest + cemetery exist as map; nothing lives there yet | Planned | Phases 2–5 |
 
 ### Conflicts and risks found in the audit
@@ -344,23 +513,23 @@ Requested on 2026-11-26: bigger distances, more camps, and places for dungeons. 
 - **Player:** one 8-direction atlas with walk and attack clips for Sword, Glaive, Hammer, Dagger, Unarmed, Shortbow and Crossbow. NPCs reuse it with tinted cloaks (`scoutSheet`). There are no death, cast, sleep or work clips; deaths cut to a corpse sprite.
 - **Creature sheets:** rat and skeleton (`MON_SHEETS`).
 - **Bestiary v1:** 11 sheets of 160×160 cells in 8 facings, with idle, walk, wind-up and impact. No death, sleep or cast frames. The creatures are orc, ettin, troll, lizardman, gargoyle, earth elemental, giant spider, dire wolf, harpy, slime and the Lich Lord (boss).
-- **Procedural creatures:** boar, marsh hound, mud snapper, wreck crab, mire spider, ash wisp, bell sentinel, drowned captain and the Bellkeeper.
+- **Procedural creatures:** boar, marsh hound, mud snapper, wreck crab, mire spider, ash wisp, bell sentinel, drowned captain and the Bellkeeper; since v0.25 also red deer, brown hare and brown bear (stand-ins until sheets exist).
 - **Sound pack v1.0.0:** 107 events.
   - Creature sounds exist for rat, skeleton and hound (alert, attack, death), plus attack-only takes for boar, crab, spider and wisp.
   - Ambience: surf, wind, rain, hearth, gull, marsh, drip, bell and beacon.
   - Footsteps on 7 surfaces.
 - **Music:** five Saltmarsh tracks, mapped to zones.
 - **Gaps for the spec's roster (asset backlog):**
-  - Deer, rabbits, bears, bandits as their own look, zombies, dragons/drakes, fire and water elementals, goblins.
+  - Sheets for deer, hares and bears (drawn in code for now); bandits as their own look; zombies, dragons/drakes, fire and water elementals, goblins.
   - Death animations for everything.
   - Sleep/eat/work clips for townsfolk.
   - Owl, insect, howl and groan ambience.
-  - Creature idle sounds.
-  - Until art exists, reuse is documented per species in phase 3, for example dire wolf for wolves and tinted scouts for bandits. Missing creatures are not spawned invisibly.
+  - Creature idle sounds (alert takes are used softly for now). Takes for dire wolf, bear and giant spider (stand-ins now), and for deer, orcs, lizardmen, harpies, trolls, ettins, gargoyles, elementals and slimes (silent now).
+  - Until art exists, reuse is documented per species in the profiles (`ECO` in `src/ecology.js`: `art`, `snd`, `sndNote`): dire wolf for wolves, tinted scouts for bandits. Missing creatures are not spawned invisibly.
 
 ---
 
-## Performance (desktop Chrome, this container, 212 entities, Saltmarsh Quay)
+## Performance (desktop Chrome, this container, Saltmarsh Quay)
 
 | Build | `update(0.05)` | `render()` by day | `render()` at night |
 |---|---|---|---|
@@ -368,6 +537,8 @@ Requested on 2026-11-26: bigger distances, more camps, and places for dungeons. 
 | v0.21 | 0.80 ms | 4.8 ms | — |
 | v0.22 | 0.80 ms | 4.3 ms | 5.8 ms |
 | v0.23 (256 entities) | 1.20 ms | 4.0 ms | 5.4 ms |
+| v0.24 (256 entities, measured again for phase 3) | 1.21 ms | 3.5 ms | 4.6 ms |
+| v0.25 (554 entities, 475 creatures) | 0.49 ms | 3.7 ms | 4.7 ms |
 
 - Each figure is the average of 3 runs of 4,000 updates and 200 renders.
 - **v0.23 update cost.** It rose from 0.80 to 1.20 ms per step. This is the creature push-apart in `aiMon`, which compares every entity with every other: with 256 entities instead of 212 that is 1.46× the pairs, which matches the measurement. It is still far inside the 50 ms step, but it is the first sign of the quadratic cost the audit flagged. The phase 3 spatial index removes it.
@@ -375,15 +546,17 @@ Requested on 2026-11-26: bigger distances, more camps, and places for dungeons. 
 - Night costs the full-screen tint plus the cached light sprites. Before the sprites were cached it was 7.9 ms.
 - **Path searches** are capped at 3,000 nodes per step. Twelve travellers starting at once stay under the cap, and their whole journeys cost about 0.7 ms per step on average.
 - **The travel graph** is built once, in about 250 ms.
+- **v0.25 update cost.** It fell from 1.21 to 0.49 ms per step although there are more than twice as many actors. Push-apart, perception and calls for help go through the spatial index, and idle creatures more than 80 m away think at a quarter rate. Near a busy camp everything runs at full rate; the seeded three-day run averaged about 0.5 ms per step.
+- **v0.25 start-up:** 1.92 s to enter the world (v0.24 measured again: 1.65 s). The habitat survey and the larger first population add about 0.3 s. Heap after start: about 52 MB (v0.24: about 49 MB in the same run).
 - **Phones are not measured yet.** That is phase 6, but the night pass and the graph build are the two numbers to watch.
 
-## Next task (phase 3, first step)
+## Next task (phase 4, first step)
 
-Turn creatures into a data-driven ecosystem:
+Living NPCs (§7–8), using the actor, decision, perception and index pieces built for creatures:
 
-1. Species profiles (§9–10) for the creatures that have art: rat, boar, hound, dire wolf, skeleton, spider, orc and the rest of the bestiary. Each profile has habitat, activity hours, faction, aggression, courage, group size, territory and pursuit limits.
-2. A faction table (§11).
-3. Perception with night vision (§13).
-4. A chunk-based spatial index, replacing the quadratic push-apart.
+1. Homes and workplaces for the named townsfolk of one town first (Vespar or Mynoc), and a daily schedule on the world clock: sleep, work, eat, socialise, go home. Each townsperson walks on the navigator and opens doors.
+2. Guards patrolling their town on a route, and standing watch at the gates at night.
+3. A merchant travelling between two towns by road, so creatures and bandits can meet travellers.
+4. Crowding at doors and merchants (§14).
 
-Creatures then roam their territories with the phase 2 navigator, and skeletons wake at night.
+The faction table already has citizens, guards and merchants; law, notoriety and guards responding to crimes stay in phase 5.

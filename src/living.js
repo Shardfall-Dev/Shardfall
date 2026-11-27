@@ -156,11 +156,12 @@ const navPlaces = () => navGraph().ids().map(id => navGraph().node(id)).filter(n
 
 /* ---------- the navigator: one actor following a journey leg by leg, opening doors, recovering when stuck ---------- */
 function navTo(e, gx, gy, o) {
-  o = Object.assign({ doors: true, speed: SF.WALK, name: null }, o || {}); const G = navGraph();
+  o = Object.assign({ doors: true, speed: SF.WALK, name: null }, o || {});
   const sameLevel = levelAt(Math.floor(e.x), Math.floor(e.y)) === levelAt(Math.floor(gx), Math.floor(gy)), near = sameLevel && Math.hypot(gx - e.x, gy - e.y) < 60;
   let legs = [];
   if (near) legs = [{ kind: 'walk', x: gx, y: gy }];
   else {
+    const G = navGraph();   // built on first long journey only: short trips (creatures going home, packs) never pay for it
     const lvl = n => levelAt(Math.floor(n.x), Math.floor(n.y)), ls = levelAt(Math.floor(e.x), Math.floor(e.y)), lg = levelAt(Math.floor(gx), Math.floor(gy));
     const a = G.nearest(e.x, e.y, n => lvl(n) === ls), b = G.nearest(gx, gy, n => lvl(n) === lg), r = a && b && G.route(a.id, b.id);
     if (!r) { e.nav = { state: 'failed', reason: 'no route', goal: { x: gx, y: gy, name: o.name }, o }; return e.nav; }
@@ -219,7 +220,7 @@ function devTraveller(placeId, from) {
 }
 
 /* ---------- developer panel (§27): only with ?dev in the address; never reachable in normal play ---------- */
-const DEV = { on: /[?&#]dev\b/.test(location.search + location.hash), open: false, show: { paths: true, perception: false, territory: false, collision: false }, fps: 0, frames: 0, fpsT: 0, aiMs: 0, steps: 0, stepRate: 0, lastSave: null, advance: 0 };
+const DEV = { on: /[?&#]dev\b/.test(location.search + location.hash), open: false, show: { paths: true, perception: false, territory: false, collision: false, factions: false }, fps: 0, frames: 0, fpsT: 0, aiMs: 0, steps: 0, stepRate: 0, lastSave: null, advance: 0 };
 function devInit() {
   if (!DEV.on || document.getElementById('devp')) return;
   const b = document.createElement('button'); b.id = 'devb'; b.textContent = 'DEV'; b.style.cssText = 'position:fixed;left:4px;bottom:4px;z-index:60;font:10px monospace;padding:3px 6px;background:#402020;color:#ffd0a0;border:1px solid #a06040;border-radius:4px;opacity:.8';
@@ -263,22 +264,33 @@ function devRender() {
   time ${SIM.fmtHour(h)} · day ${C.dayAt(GT)} · ${PERIOD_NAME[C.periodAt(GT)]} · ${C.dayMinutes} min/day · light ${lightNow().dark.toFixed(2)}<br>
   paths: queue ${NAV.jobs.length} · cache ${NAV.cache.size} · searched ${NAV.searches} · failed ${NAV.failed} · cache hits ${NAV.hits}<br>
   AI ${DEV.aiMs.toFixed(3)} ms/step · audio voices ${SFXA.stats.voices} · save ${saveKB} · last save ${ls ? (ls.ok ? 'ok' : 'FAILED') + ' at ' + Math.round(ls.at) + ' s' : '—'}<br>
-  factions: none yet <span style="color:#889">(phase 3)</span>
+  ${devEco()}
   <hr style="border-color:#334">
   ${B('hour', 'Dawn', 'data-h="5.5"')}${B('hour', 'Noon', 'data-h="12"')}${B('hour', 'Dusk', 'data-h="17.8"')}${B('hour', 'Midnight', 'data-h="0"')}${B('shift', '−1 h', 'data-h="-1"')}${B('shift', '+1 h', 'data-h="1"')}${B('daynight', 'Day/night')}<br>
   ${B('pause', SIMPAUSE ? 'Resume' : 'Pause')}${B('step', 'Step')}${B('adv', 'Run +1 min', 'data-s="60"')}${B('adv', 'Run +10 min', 'data-s="600"')}${DEV.advance ? ' running… ' + Math.ceil(DEV.advance) + ' s' : ''}${B('save', 'Save now')}<br>
   <select id="devdest" style="font:10px monospace;max-width:170px">${opts}</select>${B('spawn', 'Spawn traveller')}${B('clearT', 'Remove travellers')}<br>
-  ${['paths', 'perception', 'territory', 'collision'].map(k => `<label><input type="checkbox" data-show="${k}" ${DEV.show[k] ? 'checked' : ''}>${k}</label>`).join(' ')}
+  ${['paths', 'perception', 'territory', 'collision', 'factions'].map(k => `<label><input type="checkbox" data-show="${k}" ${DEV.show[k] ? 'checked' : ''}>${k}</label>`).join(' ')}
   <hr style="border-color:#334">${ins ? '<b>' + esc(ins.name || ins.actorId) + '</b><br>' + Object.entries(ins).map(([k, v]) => k + ': ' + esc(typeof v === 'object' ? JSON.stringify(v) : String(v))).join('<br>') : '<span style="color:#889">tap an actor to inspect it</span>'}
   <hr style="border-color:#334"><b>recent events</b><br>${WS.bus.recent(8).reverse().map(ev => `${ev.t.toFixed(1)} ${ev.type} ${esc(ev.actor || '')}${ev.amount ? ' −' + ev.amount : ''}`).join('<br>')}`;
   if (prevSel) document.getElementById('devdest').value = prevSel;
+}
+/* ecosystem lines (Living World phase 3): creatures by faction, camps, regions, what the ecosystem has been doing */
+function devEco() {
+  const by = {}; for (const e of ents) if (e.kind === 'mon' && !e.gone) { const f = factionOf(e); by[f] = (by[f] || 0) + 1; }
+  const camps = [...ECOS.camps.values()].map(c => `${esc(c.name)} ${c.alive}/${c.cap}${c.cleared ? (c.recovering(GT) ? ' recovering' : ' <b style="color:#fc8">cleared</b> ' + Math.max(0, Math.ceil(c.clearedAt + c.recover - GT)) + ' s') : ''}${c.sortie ? ' · sortie' : ''}`).join(' · ');
+  const rc = ecoRegionCounts(), rk = {}; for (const k in rc) { const r = rc[k]; const o = rk[r.kind] || (rk[r.kind] = { n: 0, cap: 0, k: 0 }); o.n += r.n; o.cap += r.cap; o.k++; }
+  const fm = DEV.show.factions ? '<br>' + ECO_FACTIONS.names().map(a => `<b>${a}</b> ✕ ${ECO_FACTIONS.names().filter(b => b !== a && ECO_FACTIONS.hostile(a, b)).join(', ') || '—'}`).join('<br>') : '';
+  return `factions: ${Object.entries(by).sort((a, b) => b[1] - a[1]).map(([k, v]) => k + ' ' + v).join(', ')}<br>
+  regions: ${Object.entries(rk).map(([k, o]) => `${k} ${o.k} (${o.n}/${o.cap})`).join(', ')}<br>
+  camps: ${camps}<br>
+  ecosystem: hunts ${ECOS.hunts} · creature fights ${ECOS.mvm} · flights ${ECOS.flees} · deaths ${ECOS.kills} · sorties ${ECOS.sorties} · camps cleared ${ECOS.cleared} · risen dead sunk ${ECOS.sunk} · think ${(ECOS.thinkMs / Math.max(1, ECOS.stepN)).toFixed(3)} ms/step${fm}`;
 }
 function devInspect(e) {
   const n = e.nav, d = e.type && MON[e.type];
   return SIM.inspect(e, Object.assign({ goal: n ? (n.goal.name || Math.round(n.goal.x) + ',' + Math.round(n.goal.y)) + ' · ' + n.state + (n.reason ? ' (' + n.reason + ')' : '') : null,
     destination: n && n.legs && n.legs[n.li] ? Math.round(n.legs[n.li].x) + ',' + Math.round(n.legs[n.li].y) + ' leg ' + (n.li + 1) + '/' + n.legs.length : null,
-    territory: d ? 'leash ' + d.leash + ' m, aggro ' + d.aggro + ' m' : null, reason: e.state ? 'state ' + e.state + (e.target ? ' → ' + aidOf(e.target) : '') : null,
-    criminal: SIM.hasComponent(e.archetype, 'notoriety') ? 'innocent (law: phase 5)' : null }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null));
+    territory: d ? 'territory ' + ecoP(e.type).terr + ' m, pursuit ' + (ecoP(e.type).pur || d.leash) + ' m, aggro ' + d.aggro + ' m' : null, reason: e.state ? 'state ' + e.state + (e.target ? ' → ' + aidOf(e.target) : '') : null,
+    criminal: SIM.hasComponent(e.archetype, 'notoriety') ? 'innocent (law: phase 5)' : null }, ecoInspect(e), e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null));
 }
 /* world-space debug overlays, drawn after the light so they read at night */
 function devDraw(camX, camY) {
@@ -286,8 +298,8 @@ function devDraw(camX, camY) {
   const ell = (x, y, r, col, fill) => { g.beginPath(); g.ellipse(SX(x, y), SY(x, y), r * HW * 1.414, r * HH * 1.414, 0, 0, 7); if (fill) { g.fillStyle = col; g.fill(); } else { g.strokeStyle = col; g.lineWidth = 1; g.stroke(); } };
   if (DEV.show.collision) { const cx = Math.floor(P.x), cy = Math.floor(P.y); g.fillStyle = 'rgba(255,40,40,.28)'; for (let y = cy - 14; y <= cy + 14; y++) for (let x = cx - 14; x <= cx + 14; x++) if (!navStatic(x, y) || (doorOn(x, y) && !doorOn(x, y).open)) { const X = SX(x, y), Y = SY(x, y); g.beginPath(); g.moveTo(X, Y); g.lineTo(X + HW, Y + HH); g.lineTo(X, Y + TH); g.lineTo(X - HW, Y + HH); g.closePath(); g.fill(); } }
   for (const e of ents) { if (e.gone || Math.hypot(e.x - P.x, e.y - P.y) > 45) continue; const d = e.type && MON[e.type];
-    if (DEV.show.perception && d && e.kind === 'mon') ell(e.x, e.y, d.aggro, 'rgba(255,220,80,.7)');
-    if (DEV.show.territory && d && e.kind === 'mon' && e.home) { ell(e.home.x, e.home.y, d.leash, 'rgba(120,200,255,.6)'); ell(e.home.x, e.home.y, .4, 'rgba(120,200,255,.8)', true); }
+    if (DEV.show.perception && d && e.kind === 'mon') { const r = SIM.senseRange(ecoSenseOf(e), ecoSenseCtx(e)); ell(e.x, e.y, r.sight, 'rgba(255,220,80,.7)'); if (r.hear > .5) ell(e.x, e.y, r.hear, 'rgba(255,160,80,.35)'); }
+    if (DEV.show.territory && d && e.kind === 'mon' && e.home) { ell(e.home.x, e.home.y, ecoP(e.type).terr, 'rgba(120,200,255,.6)'); ell(e.home.x, e.home.y, ecoP(e.type).pur || d.leash, 'rgba(120,200,255,.25)'); ell(e.home.x, e.home.y, .4, 'rgba(120,200,255,.8)', true); }
     if (DEV.show.paths && e.nav && e.nav.wp && e.nav.state === 'moving') { g.strokeStyle = 'rgba(120,255,160,.9)'; g.lineWidth = 2; g.beginPath(); g.moveTo(SX(e.x, e.y), SY(e.x, e.y)); for (let i = e.nav.wi; i < e.nav.wp.length; i++) g.lineTo(SX(e.nav.wp[i][0], e.nav.wp[i][1]), SY(e.nav.wp[i][0], e.nav.wp[i][1])); g.stroke(); } }
   g.restore();
 }

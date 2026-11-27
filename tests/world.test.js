@@ -137,4 +137,65 @@ eq(NG.route('e', 'a').legs.map(l => l.to), ['d', 'c', 'b', 'a'], 'edges run both
 NG.addNode('z', { x: 9, y: 9 }); eq(NG.route('a', 'z'), null, 'no route to an isolated node');
 eq(NG.nearest(498, 3).id, 'd', 'nearest node');
 const lru = SIM.newLRU(2); lru.set(1, 'a'); lru.set(2, 'b'); lru.get(1); lru.set(3, 'c'); eq([lru.get(1), lru.get(2), lru.get(3), lru.size], ['a', undefined, 'c', 2], 'LRU evicts the least recently used');
+
+// ---- Phase 3: factions (§11)
+const FA = SIM.newFactions(SIM.FACTION_RULES);
+eq([FA.rel('guards', 'citizens'), FA.rel('citizens', 'guards'), FA.rel('guards', 'criminals'), FA.rel('orcs', 'goblins')], ['allied', 'allied', 'hostile', 'friendly'], 'the spec\'s example pairs: guards–citizens allied, guards–bandits hostile, orcs–goblins friendly');
+eq(['adventurers', 'citizens', 'guards', 'merchants', 'criminals'].every(h => FA.hostile('orcs', h)), true, 'orcs are hostile to every human faction');
+eq(SIM.FACTION_LIST.filter(f => !SIM.NOT_LIVING.includes(f) && f !== 'undead').every(f => FA.hostile('undead', f)), true, 'undead are hostile to every living faction');
+eq([FA.hostile('undead', 'elementals'), FA.hostile('undead', 'constructs')], [false, false], 'undead leave the unliving alone');
+eq([FA.rel('predators', 'wildlife'), FA.rel('wildlife', 'adventurers'), FA.rel('predators', 'predators'), FA.rel('orcs', 'orcs')], ['neutral', 'neutral', 'neutral', 'friendly'], 'predation is not faction hostility; same faction is friendly unless a rule says otherwise');
+eq(SIM.FACTION_LIST.filter(f => f !== 'dragons').every(f => FA.hostile('dragons', f)), true, 'dragons treat every intruder as hostile');
+eq([FA.level('guards', 'citizens'), FA.level('guards', 'criminals'), FA.level('x', 'y')], [2, -2, 0], 'levels run from −2 hostile to +2 allied; unknown pairs are neutral');
+throws(() => FA.set('a', 'b', 'frenemies'), 'an unknown relationship is rejected');
+const mx = FA.matrix(); eq(Object.keys(mx).length === SIM.FACTION_LIST.length && Object.keys(mx).every(a => Object.keys(mx).every(b => mx[a][b] === mx[b][a])), true, 'the relationship matrix covers every faction and is symmetric');
+eq(['citizens', 'guards', 'adventurers', 'merchants', 'criminals', 'murderers', 'orcs', 'goblins', 'undead', 'predators', 'wildlife', 'dragons', 'elementals'].every(f => SIM.FACTION_LIST.includes(f)), true, 'the spec\'s initial factions all exist');
+
+// ---- Phase 3: activity hours and perception (§9, §13)
+eq(['dawn', 'day', 'sunset', 'night', 'deepnight'].map(p => SIM.activityOf('day', p)), ['active', 'active', 'active', 'rest', 'sleep'], 'day creatures rest at night and sleep in the small hours');
+eq(['day', 'night', 'deepnight'].map(p => SIM.activityOf('night', p)), ['rest', 'active', 'active'], 'night creatures (undead) are dormant by day, active at night');
+eq(['day', 'sunset', 'night'].map(p => SIM.activityOf('dusk', p)), ['rest', 'active', 'active'], 'dusk hunters wake at sunset');
+const sB = { sight: 10, hear: 6, nightVision: 0 }, sW = { sight: 10, hear: 6, nightVision: .9 };
+const r2d = v => Math.round(v * 100) / 100;
+eq([r2d(SIM.senseRange(sB, { dark: 0 }).sight), r2d(SIM.senseRange(sB, { dark: .62 }).sight), r2d(SIM.senseRange(sW, { dark: .62 }).sight)], [10, 5, 9.5], 'night halves sight without night vision; a wolf keeps nearly all of it');
+eq([r2d(SIM.senseRange(sB, { activity: 'sleep' }).sight), r2d(SIM.senseRange(sB, { activity: 'rest' }).sight), r2d(SIM.senseRange(sB, { alert: true }).sight)], [3, 8, 12.5], 'sleep cuts awareness hard, rest a little; an alerted creature sees further');
+eq([SIM.detect(sB, {}, 8, { los: true }), SIM.detect(sB, {}, 8, { los: false }), SIM.detect(sB, {}, 5, { los: false, moving: true }), SIM.detect(sB, {}, 5, { los: false })], ['seen', null, 'heard', null], 'seen needs line of sight; heard needs movement or noise within hearing');
+eq([SIM.detect(sB, {}, 3, { los: true, hidden: true, moving: true }), SIM.detect(sB, {}, 1, { los: true, hidden: true })], [null, 'seen'], 'a hidden target is not detected from range, only stumbled over');
+
+// ---- Phase 3: decisions with commitment and hysteresis (§12)
+let mem = {}; const D = (opts, t) => SIM.decide(mem, opts, t, { commit: 2, margin: .15 }).act;
+eq(D([{ act: 'idle', score: .2 }, { act: 'attack', score: .6 }], 0), 'attack', 'the best option is chosen');
+eq(D([{ act: 'idle', score: .2 }, { act: 'attack', score: .6 }, { act: 'flee', score: .9 }], .5), 'attack', 'commitment: a better option waits until the commitment time has passed');
+eq(D([{ act: 'attack', score: .6 }, { act: 'flee', score: .7 }], 3), 'attack', 'hysteresis: after commitment a rival must beat the current act by the margin');
+eq(D([{ act: 'attack', score: .6 }, { act: 'flee', score: .8 }], 3.1), 'flee', '…and switches when it does');
+eq(D([{ act: 'idle', score: .2 }], 3.2), 'idle', 'an act that is no longer possible is dropped at once');
+eq(D([{ act: 'idle', score: .2 }, { act: 'flee', score: .3, force: true }], 3.3), 'flee', 'a forced option overrides commitment');
+mem = {}; let sw = 0, last = null; for (let t = 0; t < 60; t += .5) { const a = D([{ act: 'fight', score: .5 + .1 * Math.sin(t * 5) }, { act: 'flee', score: .5 + .1 * Math.cos(t * 5) }], t); if (a !== last) { sw++; last = a; } }
+eq(sw <= 4, true, 'two options with noisy, close scores do not oscillate (' + sw + ' choices in 60 s)');
+eq(mem.why !== undefined && mem.switches >= 1, true, 'the decision keeps a reason for debug view');
+
+// ---- Phase 3: spatial index
+const SG = SIM.newGrid(8); const pts = []; const prng = SIM.newRng(5);
+for (let i = 0; i < 600; i++) { const e = { x: prng() * 400, y: prng() * 400 }; pts.push(e); SG.add(e); }
+eq(SG.size, 600, 'the index holds every entity once');
+let same = true; for (let k = 0; k < 40; k++) { const x = prng() * 400, y = prng() * 400, r = 1 + prng() * 30; const a = SG.near(x, y, r).length, b = pts.filter(e => Math.hypot(e.x - x, e.y - y) <= r).length; if (a !== b) same = false; }
+eq(same, true, 'radius queries match a brute-force scan (40 random queries)');
+for (const e of pts.slice(0, 300)) { e.x = prng() * 400; e.y = prng() * 400; SG.move(e); }
+let same2 = true; for (let k = 0; k < 40; k++) { const x = prng() * 400, y = prng() * 400, r = 1 + prng() * 30; if (SG.near(x, y, r).length !== pts.filter(e => Math.hypot(e.x - x, e.y - y) <= r).length) same2 = false; }
+eq([same2, SG.size], [true, 600], 'after moving half of them the index still matches and holds each once');
+for (const e of pts.slice(0, 100)) SG.remove(e); SG.remove(pts[0]); eq(SG.size, 500, 'removal is exact and idempotent');
+
+// ---- Phase 3: camp populations (§16)
+const camp = SIM.newCamp({ id: 'k', cap: 4, recover: 100, trickle: 10 });
+eq([camp.canSpawn(0), camp.cleared], [true, false], 'a new camp may populate');
+for (let i = 0; i < 4; i++) camp.spawned(0); eq([camp.alive, camp.canSpawn(1)], [4, false], 'it fills to its cap and no further');
+eq([camp.died(5), camp.died(6), camp.died(7)], [null, null, null], 'losses below the last member do not clear it');
+camp.removed(); eq([camp.alive, camp.cleared], [0, false], 'a member leaving alive (tamed, sunk) never counts as a clearance');
+camp.spawned(8); eq(camp.died(9), 'cleared', 'the last death clears the camp');
+eq([camp.cleared, camp.clearedAt, camp.canSpawn(50), camp.canSpawn(108)], [true, 9, false, false], 'a cleared camp stays empty for its recovery time');
+const csave = camp.save(); const camp2 = SIM.newCamp({ id: 'k', cap: 4, recover: 100, trickle: 10 }, csave);
+eq([camp2.cleared, camp2.clearedAt, camp2.canSpawn(60)], [true, 9, false], 'clearance survives save and load');
+eq(camp2.canSpawn(110), true, 'after recovery the first member returns'); eq(camp2.spawned(110), 'recovering', '…as a replenishment event');
+eq([camp2.canSpawn(115), camp2.canSpawn(120)], [false, true], 'the rest return one by one, a trickle apart');
+for (let t = 120; camp2.alive < 4; t += 10) camp2.spawned(t); eq([camp2.cleared, camp2.alive, camp2.clears], [false, 4, 1], 'recovery always ends: the camp is whole again, never extinct');
 console.log(fails ? fails + ' FAILED' : 'ALL PASS'); process.exit(fails ? 1 : 0);

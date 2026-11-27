@@ -13,7 +13,7 @@ def check(ok, msg, got=None):
     if not ok: fails.append(msg)
 
 FILL = """() => { const S = __SF, P = S.P, SF = S.SF; P.pack.items.length = 0;
-  for (const [id, q] of [['sword',1],['chain',1],['bandage',5],['draught',3],['cookedmeat',2],['reedash',12],['pine',4],['gold',40]]) SF.addItem(P.pack, SF.newItem(id, q));
+  for (const [id, q] of [['sword',1],['chain_tunic',1],['bandage',5],['draught',3],['cookedmeat',2],['reedash',12],['pine',4],['gold',40]]) SF.addItem(P.pack, SF.newItem(id, q));
   S.save(); }"""
 NAMES = "() => [...document.querySelectorAll('#panel .bagcell small')].map(e => e.textContent)"
 GROUPS = "() => [...document.querySelectorAll('#panel .baggroup')].map(e => e.textContent)"
@@ -41,7 +41,7 @@ with sync_playwright() as p:
     ctx = b.new_context(viewport={'width': 1280, 'height': 720}); pg = ctx.new_page(); errs = []
     start(pg, errs, True)
     got = pack(pg)
-    check(got == {'sword': 1, 'chain': 1, 'bandage': 5, 'draught': 3, 'cookedmeat': 2, 'reedash': 12, 'pine': 4, 'gold': 40}, 'saved character reloads with its pack', got)
+    check(got == {'sword': 1, 'chain_tunic': 1, 'bandage': 5, 'draught': 3, 'cookedmeat': 2, 'reedash': 12, 'pine': 4, 'gold': 40}, 'saved character reloads with its pack', got)
     pg.evaluate("__SF.ACT.bag()"); pg.wait_for_timeout(200)
     check(pg.inner_text('#panel .ph b') == 'Backpack', 'backpack panel opens')
     check(pg.evaluate("document.querySelectorAll('body').length") == 1, 'single <body> in built page')
@@ -49,7 +49,7 @@ with sync_playwright() as p:
     check(pg.get_attribute(sortb('Category'), 'class').split()[-1] == 'on', 'Category is the default sort')
     cat = pg.evaluate(NAMES); groups = pg.evaluate(GROUPS)
     check(groups == ['Armor', 'Coin', 'Food', 'Medic', 'Potion', 'Reagent', 'Timber', 'Weapon'], 'Category sort: groups in order', groups)
-    check(cat == ['Iron chain armor', 'Gold', 'Roast meat', 'Bandage', 'Healing draught', 'Reed ash', 'Pine log', 'Iron Quay sword'], 'Category sort: tiles in order', cat)
+    check(cat == ['Iron chainmail tunic', 'Gold', 'Roast meat', 'Bandage', 'Healing draught', 'Reed ash', 'Pine log', 'Iron Quay sword'], 'Category sort: tiles in order', cat)
     pg.click(sortb('Name')); pg.wait_for_timeout(100)
     nm = pg.evaluate(NAMES)
     check(nm == sorted(nm, key=str.lower) and len(nm) == 8 and pg.evaluate(GROUPS) == [], 'Name sort: alphabetical, no group headers', nm)
@@ -62,9 +62,9 @@ with sync_playwright() as p:
     check(tipvis('Iron Quay sword') == 'none', 'tooltip hidden before hover')
     pg.hover(cell('Iron Quay sword')); pg.wait_for_timeout(100)
     tip = pg.inner_text(cell('Iron Quay sword') + ' .bagtip')
-    check(tipvis('Iron Quay sword') == 'block' and 'Base damage' in tip and 'Reach' in tip and 'kg' in tip, 'desktop hover shows weapon stats', tip)
-    pg.hover(cell('Iron chain armor')); pg.wait_for_timeout(100)
-    check(('Base armor ' + str(pg.evaluate("__SF.SF.ARMOR[__SF.SF.ITEMS.chain.armor]"))) in pg.inner_text(cell('Iron chain armor') + ' .bagtip') and tipvis('Iron Quay sword') == 'none', 'hover moves to armor stats')
+    check(tipvis('Iron Quay sword') == 'block' and 'Damage' in tip and 'Speed' in tip and 'Weight' in tip, 'desktop hover shows weapon stats (damage, speed, weight units)', tip)
+    pg.hover(cell('Iron chainmail tunic')); pg.wait_for_timeout(100)
+    check('Armor protection' in pg.inner_text(cell('Iron chainmail tunic') + ' .bagtip') and 'Chainmail' in pg.inner_text(cell('Iron chainmail tunic') + ' .bagtip') and tipvis('Iron Quay sword') == 'none', 'hover moves to armor stats')
     pg.mouse.move(5, 5)
     # actions after sorting (Quantity sort still active)
     pg.click(cell('Healing draught')); pg.wait_for_timeout(100)
@@ -82,7 +82,7 @@ with sync_playwright() as p:
     pg.click(cell('Bandage')); pg.click(cardbtn('Slot')); pg.wait_for_timeout(100)
     check(pg.evaluate("__SF.PANEL") == 'assign' and 'Bandage' in pg.inner_text('#panel'), 'Slot opens hotbar assignment for the bandage')
     pg.evaluate("__SF.ACT.bag()"); pg.wait_for_timeout(100)
-    pg.click(cell('Iron chain armor')); pg.click(cardbtn('Appraise')); pg.wait_for_timeout(100)
+    pg.click(cell('Iron chainmail tunic')); pg.click(cardbtn('Appraise')); pg.wait_for_timeout(100)
     check(not errs, 'Appraise runs without errors', errs)
     pg.evaluate("__SF.ACT.bag()"); pg.click(cell('Roast meat')); pg.click(cell('Roast meat')); pg.wait_for_timeout(100)
     check(pg.evaluate(CARD) is None, 'clicking the selected tile again closes the card')
@@ -95,19 +95,19 @@ with sync_playwright() as p:
     check(pg.evaluate("__SF.P.equip.weapon && __SF.P.equip.weapon.id") == 'sword' and pack(pg).get('draught') == 2, 'phone continues the same saved character')
     pg.evaluate("__SF.ACT.bag()"); pg.wait_for_timeout(200)
     check(pg.evaluate("matchMedia('(hover:hover)').matches") is False, 'phone context has no hover')
-    pg.tap(cell('Iron chain armor')); pg.wait_for_timeout(150)
+    pg.tap(cell('Iron chainmail tunic')); pg.wait_for_timeout(150)
     card = pg.evaluate(CARD)
-    check(card and card['title'] == 'Iron chain armor' and 'Equip' in card['acts'], 'tap pins armor card', card)
-    check(pg.eval_on_selector(cell('Iron chain armor') + ' .bagtip', 'e => getComputedStyle(e).display') == 'none', 'no floating tooltip on phone tap')
+    check(card and card['title'] == 'Iron chainmail tunic' and 'Equip' in card['acts'], 'tap pins armor card', card)
+    check(pg.eval_on_selector(cell('Iron chainmail tunic') + ' .bagtip', 'e => getComputedStyle(e).display') == 'none', 'no floating tooltip on phone tap')
     box = pg.eval_on_selector('#panel .bagcard', 'e => { const r = e.getBoundingClientRect(); return [r.left, r.right, r.width]; }')
     check(box[0] >= 0 and box[1] <= 844, 'card fits phone width', box)
     tiles = pg.eval_on_selector_all('#panel .bagcell', 'es => es.map(e => Math.round(e.getBoundingClientRect().height))')
     check(min(tiles) >= 44, 'tiles are at least 44 px tall', tiles)
     pg.screenshot(path='/tmp/backpack-phone.png')
     pg.tap(sortb('Quantity')); pg.wait_for_timeout(100)
-    check(pg.evaluate(CARD)['title'] == 'Iron chain armor', 'selection survives re-sorting')
+    check(pg.evaluate(CARD)['title'] == 'Iron chainmail tunic', 'selection survives re-sorting')
     pg.tap(cardbtn('Equip')); pg.wait_for_timeout(100)
-    check(pg.evaluate("__SF.P.equip.armor && __SF.P.equip.armor.id") == 'chain', 'tap Equip after sort equips the armor')
+    check(pg.evaluate("__SF.P.equip.chest && __SF.P.equip.chest.id") == 'chain_tunic', 'tap Equip after sort equips the armor')
     pg.tap(cell('Bandage')); pg.wait_for_timeout(100); pg.evaluate("__SF.P.hp = 5"); pg.tap(cardbtn('Bandage self')); pg.wait_for_timeout(300)
     check(not errs, 'tap Bandage self on bandage runs without errors', errs)
     pg.tap(cell('Gold')); pg.wait_for_timeout(100); pg.tap(cell('Gold')); pg.wait_for_timeout(100)

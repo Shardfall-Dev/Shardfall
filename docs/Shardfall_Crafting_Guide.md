@@ -344,3 +344,12 @@ Use these to check terminology and inspiration. Use the Shardfall tables above f
 - Deeded furnishings, cross-trade inputs and professional tools. [UO • Carpentry](https://uo.com/wiki/ultima-online-wiki/skills/carpentry/)
 - The separate bow/ammunition profession that informs Shardfall's two existing skills. [UO • Bowcraft and Fletching](https://uo.com/wiki/ultima-online-wiki/skills/bowcraft-and-fletching/)
 - Historical small and large smith orders, matching material, quality and quantities. [UO • Publish 14](https://uo.com/wiki/ultima-online-wiki/technical/previous-publishes/2001-2/2001-publish-14-14th-november/)
+
+## Addendum (v0.25): armor, Mithril and hides
+
+The equipment system adds an **Armor** category to the bench (Tailoring: cloth, leather, studded leather, bone; Carpentry: wooden
+shield) and the anvil (Blacksmithing: ringmail, chainmail, platemail, helmets, metal shields, dragon scale, accessories). Recipes are
+generated from one definition per piece and the shared material registries, so every metal makes every metal piece and every hide
+every leather piece. **Mithril** joins the metals (mine and smelt 100, smith 98; grade-3 regions only, weight 3 in 100): the lightest
+metal (armor weight ×0.45). Leather comes in eight hides with their own Tailoring gates (thick 30, wolf 40, spined 55, horned 65,
+troll 70, barbed 80, dragon 95). Armor multipliers, gates and repairs: `docs/equipment/STATUS.md`.

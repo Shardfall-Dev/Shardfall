@@ -29,11 +29,11 @@
   // self poison takes 18 s
   S.setRng(() => .5); P.poison = { tier: 1, ticks: 99, next: S.GT + 99 }; P.hp = SF.maxHp(P); S.useSlot(0); out.cure.selfDur = P.bandage.t1 - P.bandage.t0; step(18.1); out.cure.selfCured = !P.poison; P.poison = null;
   // ghost: Wren falls; at 79.9/100 the attempt fails; at 80/80 under 25% she returns at 25% HP and takes her gear back
-  place(); wren.hp = 5; S.damageAlly(wren, 50, null, 'phys'); out.ghost = { ghost: wren.ghost, body: S.ents.some(e => e.allyBody === 'wren'), armorOnBody: (S.ents.find(e => e.allyBody === 'wren') || { cont: { items: [] } }).cont.items.some(i => i.id === 'leather') };
+  place(); wren.hp = 5; S.damageAlly(wren, 50, null, 'phys'); out.ghost = { ghost: wren.ghost, body: S.ents.some(e => e.allyBody === 'wren'), armorOnBody: (S.ents.find(e => e.allyBody === 'wren') || { cont: { items: [] } }).cont.items.some(i => i.id === 'leather_tunic') };
   P.sel = wren; S.update(.05); S.refreshHud(); out.ghost.button = (document.querySelector('#tgt [data-a=bandother]') || {}).textContent;
   setSk(79.9, 100); S.setRng(() => 0); S.firstAidOther(); out.ghost.dur = P.bandage.t1 - P.bandage.t0; step(10.1); out.ghost.low = { still: wren.ghost, log: lastLog() };
   setSk(80, 80); S.setRng(() => .3); S.firstAidOther(); step(10.1); out.ghost.fail80 = wren.ghost;
-  S.setRng(() => .2); S.firstAidOther(); step(10.1); out.ghost.res = { alive: !wren.ghost, hp: Math.round(wren.hp), max: wren.max, armor: wren.equip.armor && wren.equip.armor.id, weapon: wren.equip.weapon && wren.equip.weapon.id, bodyGone: !S.ents.some(e => e.allyBody === 'wren' && !e.gone) };
+  S.setRng(() => .2); S.firstAidOther(); step(10.1); out.ghost.res = { alive: !wren.ghost, hp: Math.round(wren.hp), max: wren.max, armor: wren.equip.chest && wren.equip.chest.id, weapon: wren.equip.weapon && wren.equip.weapon.id, bodyGone: !S.ents.some(e => e.allyBody === 'wren' && !e.gone) };
   // self-resurrection is impossible: a ghost player cannot bandage
   // pets go through Veterinary
   out.bandagesLeft = band();

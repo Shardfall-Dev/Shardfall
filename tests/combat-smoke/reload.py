@@ -46,7 +46,7 @@ with sync_playwright() as p:
   cont(pg, new)
   n1 = pg.evaluate("""() => { const S = __SF, P = S.P; const sk = k => P.skills[k] && [P.skills[k].v, P.skills[k].lock]; return { sw: sk('swordsmanship'), parry: sk('parrying'), heal: sk('healing'), wrest: sk('wrestling'), mace: sk('macefighting'), fence: sk('fencing'), tac: sk('tactics'),
     pool: P.skillPool, total: S.SF.totalSkill(P), legacy: ['blades', 'polearms', 'hammers', 'knives', 'brawling', 'shieldwork', 'medicine'].filter(k => P.skills[k]), hot: P.hotbar.map(h => h && h.k + ':' + h.id),
-    weapon: P.equip.weapon && [P.equip.weapon.id, P.equip.weapon.quality, P.equip.weapon.maker, P.equip.weapon.cond], armor: P.equip.armor && P.equip.armor.id, snap: localStorage.getItem('shardfall.save.v1.precombat'),
+    weapon: P.equip.weapon && [P.equip.weapon.id, P.equip.weapon.quality, P.equip.weapon.maker, P.equip.weapon.cond], armor: P.equip.chest && P.equip.chest.id, legs: P.equip.legs && P.equip.legs.id, snap: localStorage.getItem('shardfall.save.v1.precombat'),
     savedV: JSON.parse(localStorage.getItem('shardfall.save.v1')).v, log: S.LOG.slice(-6).map(l => l.t) }; }""")
   snap = n1.pop('snap')
   pg.evaluate("__SF.save()"); cont(pg, new)
@@ -59,7 +59,7 @@ with sync_playwright() as p:
   check(n1['parry'] == [250, 'lower'] and n1['heal'] == [333, 'raise'] and n1['wrest'] == [120, 'raise'] and n1['mace'] == [44, 'raise'] and n1['fence'] == [0, 'hold'] and n1['tac'] == [200, 'raise'], 'values and locks carried to Parrying, Healing, Wrestling, Mace Fighting, Fencing; Tactics untouched')
   check(n1['total'] + n1['pool'] == o1['total'] and not n1['legacy'], 'no points cloned or erased; legacy keys gone')
   check(n1['hot'][:4] == ['item:bandage', 'spell:magery.05', 'act:brace', 'item:draught'] and n1['hot'][5] == 'act:track' and 'act:bandother' in n1['hot'], 'hotbar bindings kept; Bandage other added to a free slot')
-  check(n1['weapon'] == ['glaive', 'exceptional', 'Oldie', 77] and n1['armor'] == 'chain', 'equipment and crafted quality kept')
+  check(n1['weapon'] == ['glaive', 'exceptional', 'Oldie', 77] and n1['armor'] == 'chain_tunic' and n1['legs'] == 'chain_leggings', 'equipment and crafted quality kept; the worn v0.16 chain suit became chainmail pieces (v0.25)')
   snapc = json.loads(snap) if snap else {}
   check(snapc.get('v') == 2 and all(snapc['char']['skills'][k] == v for k, v in o1['skills'].items()) and n1['savedV'] >= 3, 'pre-migration snapshot preserved; save now v3 or later (v4 since Anniabreen)')
   check(n2['sw'] == 500 and n2['pool'] == 300 and n2['total'] == n1['total'] and n2['hot'] == n1['hot'] and n2['snapSame'] == snap, 'loading again is idempotent')
