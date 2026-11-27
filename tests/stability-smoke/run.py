@@ -24,8 +24,8 @@ def page(b, mobile):
   pg = ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('console', lambda m: errs.append(m.text) if m.type == 'error' else None)
   return ctx, pg, errs
 def fresh(pg, name='Stab'):
-  pg.goto(URL); pg.wait_for_timeout(300); pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_selector('[data-c=go]')
-  pg.fill('#ccn', name); pg.click('[data-c=go]'); pg.wait_for_function('window.__SF && __SF.P')
+  pg.goto(URL); pg.wait_for_timeout(300); pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_selector('[data-c=new]')
+  pg.evaluate("o => __CC.quick(o)", {'name': name, 'template': 'advanced', 'stats': [45, 10, 25], 'skills': [['swordsmanship', 50], ['magery', 30], ['tactics', 20]]}); pg.wait_for_function('window.__SF && __SF.P')
 def put(pg, val):
   pg.goto(URL); pg.wait_for_selector('#cc'); pg.evaluate("(v) => localStorage.setItem('shardfall.save.v1', v)", val); pg.reload()
 def cont(pg):
@@ -100,13 +100,13 @@ with sync_playwright() as p:
     elif val == 'FUTURE': o = json.loads(raw); o['v'] = 99; val = json.dumps(o)
     elif val == 'BADNUM': o = json.loads(raw); o['char']['x'] = None; val = json.dumps(o)
     errs.clear(); put(pg, val); pg.wait_for_selector('#ccrecover', timeout=6000)
-    st = J(pg, """() => ({ cont: !!document.querySelector('[data-c=cont]'), restore: !!document.querySelector('[data-c=restore]'), export: !!document.querySelector('[data-c=export]'), go: !!document.querySelector('[data-c=go]'), kept: localStorage.getItem('shardfall.save.v1') })""")
+    st = J(pg, """() => ({ cont: !!document.querySelector('[data-c=cont]'), restore: !!document.querySelector('[data-c=restore]'), export: !!document.querySelector('[data-c=export]'), go: !!document.querySelector('[data-c=new]'), kept: localStorage.getItem('shardfall.save.v1') })""")
     check(not st['cont'] and st['restore'] and st['export'] and st['go'] and st['kept'] == val and not [e for e in errs if 'save could not' not in e], f'save {name}: recovery shown, stored save untouched, no crash', [st['cont'], st['restore'], errs[:3]])
   # restore the last good save from the recovery screen
   pg.click('[data-c=restore]'); pg.wait_for_selector('[data-c=cont]'); pg.click('[data-c=cont]'); pg.wait_for_function('window.__SF && __SF.P')
   check(J(pg, '__SF.P.name') == 'Good' and J(pg, "() => !!localStorage.getItem('shardfall.save.v1.damaged')"), 'restore brings back the last good save and keeps the damaged one aside')
   # a new character over a damaged save keeps a copy of it
-  put(pg, '{oops'); pg.wait_for_selector('#ccrecover'); pg.fill('#ccn', 'Newer'); pg.click('[data-c=go]'); pg.wait_for_function('window.__SF && __SF.P')
+  put(pg, '{oops'); pg.wait_for_selector('#ccrecover'); pg.evaluate("o => __CC.quick(o)", {'name': 'Newer'}); pg.wait_for_function('window.__SF && __SF.P')
   check(J(pg, "() => localStorage.getItem('shardfall.save.v1.damaged')") == '{oops' and J(pg, '__SF.P.name') == 'Newer', 'a new character over a damaged save keeps the damaged save aside')
   # a save that fails after migration does not boot into broken data
   raw = J(pg, "() => { __SF.save(); return localStorage.getItem('shardfall.save.v1'); }"); o = json.loads(raw); o['char']['equip'] = 5

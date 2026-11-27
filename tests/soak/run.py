@@ -39,7 +39,7 @@ with sync_playwright() as p:
   pg.on('console', lambda m: errs.append('console.error: ' + m.text) if m.type == 'error' else None)
   pg.on('requestfailed', lambda r: failed.append(r.url + ' ' + str(r.failure)))
   pg.on('response', lambda r: failed.append(r.url + ' HTTP %d' % r.status) if r.status >= 400 else None)
-  pg.goto(URL); pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_selector('[data-c=go]'); pg.fill('#ccn', 'Soak'); pg.click('[data-c=go]'); pg.wait_for_function('window.__SF && __SF.P')
+  pg.goto(URL); pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_selector('[data-c=new]'); pg.evaluate("o => __CC.quick(o)", {'name': 'Soak', 'template': 'advanced', 'stats': [45, 10, 25], 'skills': [['swordsmanship', 50], ['magery', 30], ['tactics', 20]]}); pg.wait_for_function('window.__SF && __SF.P')
   pg.mouse.click(640, 360)   # a first gesture so the audio unlocks and starts loading like a real session
   pg.wait_for_timeout(1500)
   places = pg.evaluate("() => { try { return __SF.navPlaces().filter(p => p && Number.isFinite(p.x)).map(p => ({ name: p.name, x: p.x, y: p.y })).slice(0, 40); } catch (e) { return []; } }")

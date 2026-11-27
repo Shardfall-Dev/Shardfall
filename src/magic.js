@@ -420,8 +420,8 @@ function magicArmor(a) { const g = a.mg; return g && g.armor && g.armor.until > 
 function recomputeStats() {
   if (!P.base) P.base = { str: P.str, dex: P.dex, int: P.int };
   const g = P.mg || {}; const eff = P._eff || {};
-  for (const s of ['str', 'dex', 'int']) { if (eff[s] !== undefined && P[s] !== eff[s]) P.base[s] += P[s] - eff[s];   // trained outside magic: keep the change on the base
-    P[s] = MG.effectiveStat(P.base[s], g.mods, s, GT); eff[s] = P[s]; }
+  // P.base holds the natural attributes and only SF.STATS changes them (v0.30); P.str/dex/int are always derived from it
+  for (const s of ['str', 'dex', 'int']) { P[s] = MG.effectiveStat(P.base[s], g.mods, s, GT); eff[s] = P[s]; }
   P._eff = eff;
   // pools never fill on a cap increase; they clamp down on a decrease. A living character keeps at least 1 HP.
   P.hp = Math.min(P.hp, SF.maxHp(P)); if (!P.ghost) P.hp = Math.max(1, P.hp); P.stam = Math.min(P.stam, SF.maxStam(P)); P.mana = Math.min(P.mana, SF.maxMana(P));
@@ -528,11 +528,6 @@ function magicItemActions(it) {
   if (d.spell) { a += btn('mread', 'Read', { s: d.spell }); if (SF.count(P.pack, 'spellbook') && !knownSpells().has(d.spell)) a += btn('mlearn', 'Learn', { s: d.spell }); }
   if (it.id === 'spellbook') a += btn('open', 'Open', { p: 'spells' });
   return a;
-}
-function mageryStarter(add) {
-  if (P.skills.magery.v < 100) P.skills.magery.v = 100;            // magic starters begin with at least 10.0 Magery
-  P.pack.items.push(SF.newItem('spellbook', 1, { spells: MG.STARTER.slice() }));
-  for (const r of Object.keys(MG.REAGENTS)) add(r, 12); add('rune', 1);
 }
 
 /* ---------- boot: shops, loot, migration, panels, actions ---------- */

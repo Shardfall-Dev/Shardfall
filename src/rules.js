@@ -9,8 +9,15 @@ const roundHalfUp = v => Math.floor(v + 0.5);
 SF.clamp = clamp; SF.roundHalfUp = roundHalfUp;
 
 /* ---------------- attributes ---------------- */
-SF.STAT_MIN = 10; SF.STAT_MAX = 100; SF.STAT_CAP = 225; SF.CREATE_STATS = 150; SF.CREATE_STAT_MIN = 25;
-SF.SKILL_MAX = 1000; SF.SKILL_CAP = 7000; SF.CREATE_SKILLS = 100; SF.CREATE_SKILL_MAX = 50;   // tenths
+SF.STAT_MIN = 10; SF.STAT_MAX = 100; SF.STAT_CAP = 225;
+SF.SKILL_MAX = 1000; SF.SKILL_CAP = 7000;   // tenths: 100.0 per skill, 700.0 in total
+/* character creation (Character Creation v2.0, docs/design/character-creation-v2.md): the early Second Age start.
+   80 attribute points, each 10–60 (late 1999, the same limits as src/skills.js SK.CREATE); 100 skill points (whole numbers)
+   over two or three different skills, each at most 50.
+   The 225 / 100 attribute caps and the 700.0 / 100.0 skill caps above are the progression caps; creation limits never apply
+   to an existing character. Validation lives in src/creation.js (SF.CREATION.validate). */
+SF.CREATE_STATS = 80; SF.CREATE_STAT_MIN = 10; SF.CREATE_STAT_MAX = 60;
+SF.CREATE_SKILLS = 100; SF.CREATE_SKILL_MAX = 50; SF.CREATE_SKILL_SLOTS = 3;   // whole skill points (not tenths)
 SF.maxHp = c => Math.floor(50 + 0.5 * c.str);
 SF.maxStam = c => Math.max(1, c.dex + (c.eqDex || 0));   // eqDex: transient equipment Dexterity modifier (SF.EQ.refresh), never saved
 SF.maxMana = c => c.int;

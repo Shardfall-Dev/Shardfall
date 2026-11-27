@@ -21,7 +21,7 @@ def page(b):
 def new_char(pg, seed=None):
   pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_timeout(400)
   if seed is not None: pg.evaluate('(' + (SEED % seed) + ')(__SF)')
-  pg.fill('#ccn', 'Tess'); pg.click('[data-c=go]'); pg.wait_for_timeout(300)
+  pg.evaluate("o => __CC.quick(o)", {'name': 'Tess'}); pg.wait_for_timeout(300)
 J = lambda pg, js: pg.evaluate(js)
 HELP = """() => { const S = __SF; window.__T = {
   L: () => S.LIFE.npcs, by: n => S.LIFE.npcs.find(e => e.name.startsWith(n)),

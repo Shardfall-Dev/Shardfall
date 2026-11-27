@@ -33,7 +33,8 @@ def sub(exp, got, path=''):
   return bad
 def new_char(pg, prof='Glaive hybrid', name='Tess'):
   pg.goto('file://' + f); pg.wait_for_timeout(500); pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_timeout(500)
-  pg.click(f'[data-c=prof][data-p="{prof}"]'); pg.fill('#ccn', name); pg.click('[data-c=go]'); pg.wait_for_timeout(900)
+  pg.evaluate("o => __CC.quick(o)", {'name': name, 'template': {'Glaive hybrid': 'swordsman', 'Mace dexer': 'maceman', 'Merchant smith': 'blacksmith'}.get(prof, 'swordsman')}); pg.wait_for_timeout(900)
+  if prof == 'Glaive hybrid': pg.evaluate(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'legacy-profile.js')).read())
 fails = 0; report = {}
 with sync_playwright() as p:
   b = p.chromium.launch(executable_path=chrome, args=['--no-sandbox'])

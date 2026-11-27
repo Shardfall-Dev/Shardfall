@@ -31,13 +31,23 @@ def stick(page, jx, jy, ms):
 PLUS_Y, MINUS_Y, PLUS_X = (-80, 40), (80, -40), (80, 40)
 def tp(page, x, y): J(page, "([x, y]) => { const P = __SF.P; P.x = x; P.y = y; P.sel = null; P.armed = false; P.task = null; }", [x, y])
 
+# fixture: the timings below were tuned on the old 150-point profile (55 / 45 / 50); v0.30 characters start at 65 points,
+# so swing and cast timing would differ. The sound checks are about which cue plays, not about attributes.
+OLDSTATS = "(() => { const P = __SF.P; Object.assign(P.base, { str: 55, dex: 45, int: 50 }); P.str = 55; P.dex = 45; P.int = 50; P.stam = 45; P.mana = 50; P.hp = __SF.SF.maxHp(P); })()"
 def create(page, name, keyboard=False):
-    page.goto(HTML); page.wait_for_selector('#ccn')
+    # the real creator (v0.30): title → New character → name → Next ×3 → Begin; by keyboard or by mouse
+    page.goto(HTML); page.wait_for_selector('[data-c=new]')
     if keyboard:
-        page.focus('#ccn'); page.keyboard.type(name); page.focus('[data-c=go]'); page.keyboard.press('Enter')
+        page.focus('[data-c=new]'); page.keyboard.press('Enter'); page.wait_for_selector('#ccn'); page.focus('#ccn'); page.keyboard.type(name); page.keyboard.press('Enter')
+        for _ in range(2): page.wait_for_selector('[data-c=next]'); page.focus('[data-c=next]'); page.keyboard.press('Enter')
+        if page.locator('[data-c=replace]').count(): page.focus('[data-c=replace]'); page.keyboard.press('Space')
+        page.wait_for_selector('[data-c=go]:not([disabled])'); page.focus('[data-c=go]'); page.keyboard.press('Enter')
     else:
-        page.fill('#ccn', name); page.click('[data-c=go]')
-    page.wait_for_function('window.__SF && __SF.P'); J(page, HOOK)
+        page.click('[data-c=new]'); page.fill('#ccn', name)
+        for _ in range(3): page.click('[data-c=next]')
+        if page.locator('[data-c=replace]').count(): page.check('[data-c=replace]')
+        page.click('[data-c=go]')
+    page.wait_for_function('window.__SF && __SF.P'); J(page, HOOK); J(page, OLDSTATS)
 
 with sync_playwright() as pw:
     br = pw.chromium.launch(executable_path='/usr/bin/google-chrome', args=['--mute-audio'])
@@ -45,10 +55,10 @@ with sync_playwright() as pw:
     # ---------- mobile: first gesture is a HUD tap ----------
     ctx = br.new_context(viewport={'width': 844, 'height': 390}, has_touch=True, is_mobile=True, device_scale_factor=2); ctx.set_offline(OFFLINE)
     page = ctx.new_page(); errs = []; page.on('pageerror', lambda e: errs.append(str(e)))
-    page.goto(HTML); page.wait_for_selector('#ccn')
+    page.goto(HTML); page.wait_for_selector('[data-c=new]')
     st0 = J(page, "SFXA.ctx ? SFXA.ctx.state : 'none'")
-    page.fill('#ccn', 'Mobi'); J(page, "document.querySelector('#rot') && 0")
-    page.tap('[data-c=go]'); page.wait_for_function('window.__SF && __SF.P'); J(page, HOOK)
+    J(page, "__CC.quick({ name: 'Mobi' })")             # no gesture yet: the first touch is the HUD tap below
+    page.wait_for_function('window.__SF && __SF.P'); J(page, HOOK); J(page, OLDSTATS)
     if J(page, "!document.querySelector('#rot').hidden"): J(page, "document.querySelector('#rot').hidden = true")
     page.tap('#b-run'); page.wait_for_timeout(1200)
     st = J(page, "SFXA.ctx && SFXA.ctx.state")

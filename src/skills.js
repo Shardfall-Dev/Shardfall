@@ -100,7 +100,7 @@ SK.learn = (ch, key, chance, success, ctx) => {
     }
     if (amt > 0) { s.v += amt; out.gained = true; out.amount = amt; out.value = s.v; }
   } else out.reason = 'skill is at 100';
-  const st = SK.statGain(ctx.stats || ch, key, rng); if (st) out.stat = st;   // ctx.stats: the unbuffed stats when temporary effects are active
+  const st = SK.statGain(ctx.stats || ch, key, rng, ctx.locks || ch.statLocks); if (st) out.stat = st;   // ctx.stats: the unbuffed stats when temporary effects are active
   return out;
 };
 /* a check against a window: rolls success, then learns if the use was a challenge. Returns { success, chance, learn } */
@@ -119,23 +119,29 @@ SK.use = (ch, key, chance, success, ctx, win) => {
 };
 
 /* ---------- natural attribute progression ----------
-   Each gain event may raise the stats its skill leans on: chance weight / 33.3 per stat (SF.SKILL[k].gain). A stat stops at 100;
-   at the 225 total a gain in one stat lowers another (Second Age atrophy, no stat locks in this era). Stats never fall below 10. */
+   Each gain event may raise the stats its skill leans on: chance weight / 33.3 per stat (SF.SKILL[k].gain). A stat stops at 100.
+   Stat locks (docs/stats/STAT_SYSTEM_REWORK_v1.0.md, src/stats.js): only a stat set to Raise gains; at the 225 total a gain moves
+   exactly one point from the highest stat set to Lower (above 10), and with none set to Lower nothing changes. Without locks
+   (an old caller) every stat counts as Raise and nothing is lowered. Stats never fall below 10. */
 SK.STAT_DIV = 33.3;
 SK.statTotal = ch => (ch.str || 0) + (ch.dex || 0) + (ch.int || 0);
-SK.statGain = (ch, key, rng) => {
+SK.statGain = (ch, key, rng, locks) => {
   const d = SF.SKILL[key]; if (!d) return null;
-  for (const st of ['str', 'dex', 'int']) { const w = d.gain[st]; if (w > 0 && rng() < w / SK.STAT_DIV) { const r = SK.raiseStat(ch, st, rng); if (r) return r; } }
+  for (const st of ['str', 'dex', 'int']) { const w = d.gain[st]; if (w > 0 && rng() < w / SK.STAT_DIV) { const r = SK.raiseStat(ch, st, locks); if (r) return r; } }
   return null;
 };
-SK.raiseStat = (ch, st, rng) => {
+/* the stat that gives a point at the cap: the highest natural stat set to Lower above 10, never `not`; ties go Strength, Dexterity,
+   Intelligence (Shardfall tuning, docs/stats/STAT_SYSTEM_REWORK_v1.0.md §Stat locks) */
+SK.statDonor = (b, locks, not) => { let best = null; for (const s of ['str', 'dex', 'int']) if (s !== not && locks && locks[s] === 'lower' && b[s] > SF.STAT_MIN && (!best || b[s] > b[best])) best = s; return best; };
+SK.raiseStat = (ch, st, locks) => {
+  if (locks && locks[st] !== 'raise') return null;
   if ((ch[st] || 0) >= SF.STAT_MAX) return null;
   let lowered = null;
   if (SK.statTotal(ch) + 1 > SF.STAT_CAP) {
-    const others = ['str', 'dex', 'int'].filter(o => o !== st && (ch[o] || 0) > SF.STAT_MIN); if (!others.length) return null;
-    lowered = others[Math.floor(rng() * others.length)]; ch[lowered]--;
+    lowered = SK.statDonor(ch, locks, st); if (!lowered) return null;
+    ch[lowered]--;
   }
-  ch[st] = (ch[st] || 0) + 1; return { stat: st, value: ch[st], lowered };
+  ch[st] = (ch[st] || 0) + 1; return { stat: st, value: ch[st], lowered, lowValue: lowered ? ch[lowered] : undefined };
 };
 
 /* ---------- character creation (late 1999): 80 stat points, each 10–60; up to three different skills, 100 points, at most 50 each ----------
@@ -154,7 +160,11 @@ SK.validateCreation = o => {
   return e;
 };
 SF.validateCreation = SK.validateCreation;
-Object.assign(SF, { CREATE_STATS: SK.CREATE.stats, CREATE_STAT_MIN: SK.CREATE.statMin });
+SF.SKILL_NOCREATE = { stealth: 'Stealth needs Hiding 80 first and cannot be a starting skill.', removetrap: 'Remove Trap needs Lockpicking and Detecting Hidden first and cannot be a starting skill.' };
+/* skillKey: a skill id, an old Shardfall id (SK.RENAME) or a display name ('Animal Taming') → the runtime key, else null */
+SF.skillKey = id => { if (typeof id !== 'string' || !id) return null; if (SF.SKILL[id]) return id; const m = SK.RENAME[id]; if (m && SF.SKILL[m]) return m;
+  const n = id.toLowerCase().replace(/[^a-z]/g, ''); if (SF.SKILL[n]) return n; if (SK.RENAME[n] && SF.SKILL[SK.RENAME[n]]) return SK.RENAME[n]; const d = Object.values(SF.SKILL).find(x => x.n.toLowerCase().replace(/[^a-z]/g, '') === n); return d ? d.k : null; };
+Object.assign(SF, { CREATE_STATS: SK.CREATE.stats, CREATE_STAT_MIN: SK.CREATE.statMin, CREATE_STAT_MAX: SK.CREATE.statMax, CREATE_SKILLS: SK.CREATE.skills, CREATE_SKILL_MAX: SK.CREATE.skillMax, CREATE_SKILL_SLOTS: SK.CREATE.count });
 
 /* ---------- NPC trainers ----------
    Townsfolk teach their profession's skills (UOSA NPC trainer table, mapped onto Shardfall's people), up to 30.0, at one gold per

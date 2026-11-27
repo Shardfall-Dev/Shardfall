@@ -32,7 +32,7 @@ with sync_playwright() as p:
   for _ in range(5): pg.click('[data-c=st][data-i="0"][data-d="5"]')
   st = J("() => [...document.querySelectorAll('.stat b')].map(b => +b.textContent)")
   check(max(st) <= 60 and sum(st) <= 80, 'the stat buttons stop at 60 and 80 in all', st)
-  pg.click('[data-c=prof][data-p="Tamer"]'); pg.fill('#ccn', 'Tess'); pg.click('[data-c=go]'); pg.wait_for_timeout(900)
+  pg.evaluate("o => __CC.quick(o)", {'name': 'Tess', 'template': 'tamer'}); pg.wait_for_timeout(900)
   c0 = J("() => { const P = __SF.P; return { s: [P.str, P.dex, P.int], k: ['animaltaming', 'animallore', 'veterinary'].map(k => P.skills[k].v), n: Object.keys(P.skills).length, gold: __SF.SF.count(P.pack, 'gold'), free: P.freeLessons }; }")
   check(c0 == {'s': [20, 10, 50], 'k': [500, 300, 200], 'n': 49, 'gold': 150, 'free': 0}, 'the Tamer idea makes a 20/10/50 character with 50/30/20 and 49 skills', c0)
   # ---------- the Skills page ----------
@@ -68,7 +68,7 @@ with sync_playwright() as p:
   # ---------- a real v0.28.1 save migrates to the 49 skills ----------
   if os.path.exists(old):
     pg.goto('file://' + old); pg.wait_for_timeout(600); J('localStorage.clear()'); pg.reload(); pg.wait_for_timeout(600)
-    pg.click('[data-c=prof][data-p="Group healer"]'); pg.fill('#ccn', 'Oldie'); pg.click('[data-c=go]'); pg.wait_for_timeout(900)
+    pg.evaluate("o => __CC.quick(o)", {'name': 'Oldie', 'template': 'advanced', 'stats': [20, 10, 50], 'skills': [['magery', 50], ['healing', 30], ['meditation', 20]]}); pg.wait_for_timeout(900)
     o = J("""() => { const S = __SF, P = S.P; Object.assign(P.skills, { spellcraft: { v: 452, lock: 'raise' }, focus: { v: 311, lock: 'hold' }, skinning: { v: 205, lock: 'raise' }, foraging: { v: 77, lock: 'lower' }, smithing: { v: 640, lock: 'raise' }, concealment: { v: 123, lock: 'lower' }, taming: { v: 88, lock: 'raise' } });
       P.hotbar[4] = { k: 'act', id: 'lullaby' }; P.hotbar[5] = { k: 'act', id: 'pick' }; P.lowerRank = ['foraging', 'concealment']; S.save(); const s = JSON.parse(localStorage.getItem('shardfall.save.v1'));
       return { v: s.v, sum: Object.values(s.char.skills).reduce((a, x) => a + x.v, 0), n: Object.keys(s.char.skills).length, pool: s.char.skillPool || 0, gold: S.SF.count(P.pack, 'gold'), str: P.str }; }""")
@@ -92,7 +92,7 @@ with sync_playwright() as p:
   # ---------- each skill's action in the live game ----------
   if os.path.exists(SCEN):
     pg.goto('file://' + new); pg.wait_for_timeout(500); J('localStorage.clear()'); pg.reload(); pg.wait_for_timeout(600)
-    pg.click('[data-c=prof][data-p="Glaive hybrid"]'); pg.fill('#ccn', 'Ada'); pg.click('[data-c=go]'); pg.wait_for_timeout(900)
+    pg.evaluate("o => __CC.quick(o)", {'name': 'Ada', 'template': 'advanced', 'stats': [45, 10, 25], 'skills': [['swordsmanship', 50], ['magery', 30], ['tactics', 20]]}); pg.wait_for_timeout(900)
     res = pg.evaluate(open(SCEN).read())
     for name, r in res.items(): check(r.get('ok'), 'scenario ' + name, r)
   check(not errs, 'no page errors', errs[:5])

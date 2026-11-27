@@ -16,7 +16,7 @@ def page(b, hold=True, q=''):
   if hold: pg.add_init_script(HOLD)
   pg.goto('file://' + f + q); pg.wait_for_timeout(400); return ctx, pg, errs
 def new_char(pg):
-  pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_timeout(400); pg.fill('#ccn', 'Tess'); pg.click('[data-c=go]'); pg.wait_for_timeout(300)
+  pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_timeout(400); pg.evaluate("o => __CC.quick(o)", {'name': 'Tess'}); pg.wait_for_timeout(300)
 J = lambda pg, js: pg.evaluate(js)
 CALM = "for (const m of S.ents) if (m.kind === 'mon') m.pacified = 1e9;"   # creatures leave travellers alone (combat between actors is phase 5)
 

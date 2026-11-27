@@ -20,6 +20,9 @@ Progress saves to the browser's local storage. If a save cannot be read, the sta
 - `src/head.html` — page markup and CSS (HUD, panels).
 - `src/rules.js` — the pure rules module (`SF`): items, the 49-skill registry (`SF.SKILL_DEFS`), recipes, materials, crafting and repair math, and the Second Age combat and First Aid rules. No DOM.
 - `src/skills.js` — the skill engine (`SF.SK`): the v8 skill migration, skill checks and gains, real and displayed values, stat gains, creation rules, trainers, every skill's rules (Meditation, Stealth, taming, bard songs, stealing, poisoning, locks and traps, the ten added skills), the content that gives each skill a road to 100.0, and `SK.routes` that proves it. No DOM.
+- `src/rules.js` — the pure rules module (`SF`): items, skills, recipes, materials, crafting and repair math, and the Second Age combat and First Aid rules. No DOM.
+- `src/stats.js` — the attribute progression module (`SF.STATS`): natural Strength, Dexterity and Intelligence grow by using skills; locks (raise / hold / lower), the 225 cap transfer, the skill → attribute weights, the gain cooldown and its own random stream. No DOM.
+- `src/creation.js` — the character creation rules (`SF.CREATION`): the shared validator (`validate`, used by the creator, boot and a future server), appearance allowlists, the twelve starting templates, the five starting towns, the skill-driven starter kit and the save conversion of appearances. No DOM.
 - `src/equipment.js` — the equipment rules module (`SF.EQ`): 18 equipment slots, armor families and pieces, material variants (metals, hides, cloth, bone, dragon scale), body-region armor, weight units and carrying capacity, encumbrance, effective attributes, durability and repair risk, the validated item commands (`equipItem`, `unequipItem`, `moveItem`, `dropItem`, `pickupItem`, `splitStack`, `mergeStacks`, `craftItem`, `repairItem`), appearance data and the v0.24 → v0.25 save conversion. No DOM.
 - `src/magery.js` — the Magery rules module (`SF.MAGERY`): the 64 spells (data from `docs/magery/spells.json`), success, resistance, damage, statuses, save migration. No DOM.
 - `src/audio.js` — the Web Audio player for the sound pack (`SFXA`).
@@ -40,6 +43,7 @@ Progress saves to the browser's local storage. If a save cannot be read, the sta
 - `src/townlife.js` — town life (Living World phase 4): homes, workplaces and daily schedules for Vespar and Mynoc, residents, resource workers gathering real ore, wood and fish, guard patrols and the night watch, the travelling merchant on the cart road, shop hours, fear of creatures and resuming the day after a load.
 - `src/npcfight.js` — NPC combat (Living World phase 5, step 1): fighting profiles for townsfolk and guards, creatures targeting townsfolk outside protected ground, guards leaving their patrol to fight creatures in their jurisdiction, knock-downs and getting up, the NPC combat counters.
 - `src/game.js` — the game: world generation, rendering, input, NPCs, quests, crafting UI, save/load, and the one physical-combat resolver every swing goes through.
+- `src/creation-ui.js` — the title screen and the four-step character creator (identity and appearance, profession, stats and skills, town and review) with the live portrait and world-sprite preview; it starts the game loop.
 - `src/equipment-ui.js` — the equipment UI: paper doll window, backpack (search, sorts, filters, split and merge, virtualized grid), item tooltips with comparison, drag and drop, context menu, the Armor crafting category.
 - `src/hud-ui.js` — the HUD UI (v0.29): the delayed item tooltip, the item information popup with actions and drop confirmation, one popup manager (Escape order, outside taps never reach the world) and the compact target frame with its retention rules (`TARGET_RETAIN`).
 - `src/tail.html` — closes the game script block and the page.
@@ -47,8 +51,11 @@ Progress saves to the browser's local storage. If a save cannot be read, the sta
 - `Shardfall_v0.30.html` — the current built game.
 - `build.sh` — joins the parts into the game: `./build.sh 0.30.0` → `Shardfall_v0.30.0.html` (web build, 7.3 MB); `./build.sh 0.30.0 --offline` → `Shardfall_v0.30.0_offline.html` (22 MB, every sound inside, not committed). Needs `python3`.
 - `Shardfall_v0.30.0.html` — the current built game.
+- `build.sh` — joins the parts into the game: `./build.sh 0.30` → `Shardfall_v0.30.html` (web build, 7.1 MB); `./build.sh 0.30 --offline` → `Shardfall_v0.30_offline.html` (22 MB, every sound inside, not committed). Needs `python3`.
+- `Shardfall_v0.30.html` — the current built game.
 - `.github/workflows/pages.yml` — publishes the newest build to GitHub Pages as `index.html`, with the audio beside it.
 - `docs/WORLD_SIMULATION_MASTER.md` — the Living World master roadmap (the full specification). `docs/WORLD_SIMULATION_PROGRESS.md` — what is built, phase by phase, the audit matrix, asset gaps and the next task.
+- `docs/design/character-creation-v2.md` — the creation spec; `docs/design/character-creation-v2-status.md` — what v0.30 built, the decisions where the stat and skill designs disagreed, tuning, tests and the missing character art (`assets/character/missing-character-art.json`).
 - `docs/Shardfall_Audio.md` — what plays when, the audio pipeline and sound-release versioning.
 - `docs/Shardfall_Crafting_Guide.md` — the crafting design guide the build follows.
 - `docs/equipment/STATUS.md` — equipment, paper doll, inventory and armor: the model, slots, families, materials, weight, UI, save conversion, approximations.
@@ -59,6 +66,9 @@ Progress saves to the browser's local storage. If a save cannot be read, the sta
 - `tests/rules.test.js` — deterministic rules tests: `node tests/rules.test.js Shardfall_v0.30.html`
 - `tests/equipment.test.js` — equipment rules tests (slots, layering, carrying capacity, Mithril, exceptional, two-handed, requirements, encumbrance, crafting variants, durability, repair risk, atomic rollback, split/merge, death, migration): `node tests/equipment.test.js Shardfall_v0.30.html`
 - `tests/equipment-smoke/run.py` — paper doll in Chrome (C key, double-click, mouse and touch drag, drop validation, two-handed, context menu, tooltips and comparison, search/sort/filter, split/merge, 600 stacks, encumbrance and recovery, region mitigation, broken armor, meditation, window drag, Armor crafting, vendors, save/reload, v6 → v7 migration, phone): `python3 tests/equipment-smoke/run.py Shardfall_v0.30.html`
+- `tests/creation.test.js` — character creation rules (every template, budgets, duplicates and aliases, names, appearance, kits, towns): `node tests/creation.test.js Shardfall_v0.30.html`
+- `tests/stats.test.js` — attribute progression rules (locks, cap transfer, cooldown, eligibility, determinism, measured rates): `node tests/stats.test.js Shardfall_v0.30.html`
+- `tests/creation-smoke/run.py` — the creator in Chrome on desktop and three phone sizes, every template and town, first fights, casting, mining and smithing, natural gains, Continue, Replace, old v7 saves: `python3 tests/creation-smoke/run.py Shardfall_v0.30.html`
 - `tests/magery.test.js` — Magery rules tests: `node tests/magery.test.js Shardfall_v0.30.html`
 - `tests/combat.test.js` — combat and First Aid rules tests: `node tests/combat.test.js Shardfall_v0.30.html`
 - `tests/magery-smoke/run.py` — in-browser Magery scenarios (Playwright + Chrome): `python3 tests/magery-smoke/run.py Shardfall_v0.30.html`
@@ -188,6 +198,28 @@ and old characters carried over point for point. Full status, sources and deviat
 - **Skills page:** the classic groups, search, real or displayed values, locks, one-tap Use, help and prerequisite badges.
 - **Saves:** v7 → v8 once, with a backup; values, locks, gold, gear and the world are kept.
 - New tests: `tests/skills.test.js` (+ `skills-gain`, `skills-mech`), `tests/skills-smoke/`.
+- `tests/sfx-smoke/run.py` — browser checks for sound, music, doors and footsteps (Playwright + Chrome; serves the web build on a local port): `python3 tests/sfx-smoke/run.py "$PWD/Shardfall_v0.30.html"`
+- `tests/anniabreen-smoke/run.py` — Anniabreen walk-through (Playwright + Chrome): a scripted walker drives the joystick through the real update loop and times the routes; mine/smelt/bank, ferries, boats, moongates, doors, touch and mouse over a bridge, reload, save migration, phone map: `python3 tests/anniabreen-smoke/run.py Shardfall_v0.30.html [--shots DIR]`
+- `tests/bestiary-smoke/run.py` — bestiary checks in the built game (sheets load, pixel-exact cells, 8 facings, walk / wind-up / impact against the player; preview screenshots when the pack is extracted): `python3 tests/bestiary-smoke/run.py Shardfall_v0.30.html [chrome] [screenshot-dir]`
+- `tests/world.test.js` — world simulation core tests: `node tests/world.test.js Shardfall_v0.30.html`
+- `tests/world-smoke/run.py` — Living World checks in the built game: phase 1 (actor ids, controllers, shared damage, death once, bounded events, save/load identity, v4 → v5 migration, seeded determinism), then `phase2.py` (clock, light, travel graph, journeys by road, boat, moongate and stairs, doors, stuck recovery, search budget, live step rate, developer panel) and `expansion.py` (towns unchanged tile for tile, sites and camps, causeway and islands, long journeys, v0.22 → v0.23 save migration) and `phase3.py` (species profiles and factions, regional populations, predator and prey, creature-against-creature fights, timid wildlife, perception at night and in hiding, graveyards rising at night, persistent camps through a reload, packs, pursuit limits, camp patrols, the spatial index, and a seeded three-day run) and `phase4.py` (homes, workplaces and schedules, a full accelerated day, shop hours, miners on real rock faces, guard patrols and the night watch, the travelling merchant, fear of creatures, crowds spreading out, resuming the day after a reload): `python3 tests/world-smoke/run.py Shardfall_v0.30.html`
+
+## v0.30 — Character Creation v2.0
+
+- **A new creator.** A title screen (Continue / New character) and four steps: Identity & Appearance, Starting Profession, Stats & Skills, Starting Town & Review. Dark wood, brass and parchment; works with mouse, keyboard and touch, from desktop down to a small phone held either way.
+  - **Male or female**, skin tone, hairstyle, hair colour, facial hair, shirt colour and cloak. A live portrait shows every choice and the world sprite (turnable) shows your skin and cloak. Appearance never changes stats, gear, weight or combat. Female sprite sheets and hair, beard and clothing layers are not drawn yet: see *Missing art* below.
+  - **Twelve editable templates** (Swordsman, Maceman, Fencer, Archer, Mage, Blacksmith, Carpenter, Rogue, Healer, Bard, Animal Tamer, Advanced). They only fill in numbers; change anything and you are Custom. There are no classes.
+  - **Early Second Age start:** 65 attribute points (each 10–45) and 100 skill points over two or three different skills (each up to 50). Counters, sliders, ± buttons and typed values can never overspend. Every other skill starts at 0.0 and every lock at Raise.
+  - **Five starting towns:** Saltmarsh Quay (the tutorial, recommended), Vespar, Mynoc, Skara Bryn and Moonglen. You start beside the town shrine with your soul bound there.
+  - **A starter kit that follows your skills:** plain clothes, journal, food, 100 gold, 10 bandages, and a weapon or tool for each skill that uses one (a sword, mace, dagger or bow you are strong enough for, a buckler beside a one-handed weapon with Parrying, pickaxe, hatchet, tongs, sewing kit, rod, lockpicks, a lute, a first-circle spellbook with its reagents). Starter tools and clothes cannot be sold back.
+  - The review lists everything before you begin; Begin stays disabled, with the reason, until the character is valid. Starting a new character over a saved one asks first, offers a download of the old save, and keeps a copy.
+- **Attributes grow naturally.** Using skills raises Strength, Dexterity and Intelligence (up to 100 each, 225 together). Each attribute has a lock on the Character page and the paper doll: ▲ raise, ■ hold, ▼ lower; at 225 a gain takes a point from an attribute set to Lower. Trainers no longer sell attribute points.
+- **Classic skill names everywhere:** Magery, Evaluating Intelligence, Resisting Spells, Hiding, Stealth, Detecting Hidden, Stealing, Lockpicking, Remove Trap, Animal Taming, Animal Lore, Peacemaking, Lumberjacking, Blacksmithy, Bowcraft & Fletching, Tinkering, Item Identification, Poisoning. Saved skill values are untouched.
+- **Saves:** v8. Old characters keep their stats (even above the new creation limits), skills, items, position and quests, get attribute locks and a character id, and are never given a second kit. A copy of the v7 save is kept once.
+
+### Missing art
+
+Female sheets, an unhooded base body, and hair, facial hair, cloak and clothing layers for every clip and facing, plus front-view paper-doll bodies. Details: `docs/design/character-creation-v2-status.md`, list: `assets/character/missing-character-art.json`.
 
 ## v0.28.1 — Life around Vespar (fix)
 

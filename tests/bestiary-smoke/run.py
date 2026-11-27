@@ -51,7 +51,7 @@ with sync_playwright() as p:
   b = p.chromium.launch(executable_path=chrome, args=['--no-sandbox'])
   errs = []; pg = b.new_page(viewport={'width': 1280, 'height': 720}); pg.on('pageerror', lambda e: errs.append(str(e)))
   pg.goto('file://' + f); pg.wait_for_timeout(600); pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_timeout(600)
-  pg.click('[data-c=prof][data-p="Group healer"]'); pg.fill('#ccn', 'Tess'); pg.click('[data-c=go]'); pg.wait_for_timeout(1200)
+  pg.evaluate("o => __CC.quick(o)", {'name': 'Tess', 'template': 'mage'}); pg.wait_for_timeout(1200)
   out = pg.evaluate(open(os.path.join(here, 'scenario.js')).read())
   W, H = man['frame']['width'] * len(man['columns']), man['frame']['height'] * len(man['rows'])
   check('game embeds exactly the merged pack set', sorted(m['id'] for m in pg.evaluate('window.__SF.BESTIARY.mobs')) == sorted(ids))
@@ -106,7 +106,7 @@ with sync_playwright() as p:
   ctx = b.new_context(viewport={'width': 844, 'height': 390}, device_scale_factor=3, is_mobile=True, has_touch=True)
   ph = ctx.new_page(); perrs = []; ph.on('pageerror', lambda e: perrs.append(str(e)))
   ph.goto('file://' + f); ph.wait_for_timeout(600); ph.evaluate('localStorage.clear()'); ph.reload(); ph.wait_for_timeout(600)
-  ph.click('[data-c=prof][data-p="Group healer"]'); ph.fill('#ccn', 'Tess'); ph.click('[data-c=go]'); ph.wait_for_timeout(1200)
+  ph.evaluate("o => __CC.quick(o)", {'name': 'Tess', 'template': 'advanced', 'stats': [20, 10, 50], 'skills': [['magery', 50], ['healing', 30], ['meditation', 20]]}); ph.wait_for_timeout(1200)
   cdp = ctx.new_cdp_session(ph); cdp.send('Emulation.setCPUThrottlingRate', {'rate': 4})
   perf = ph.evaluate("""async (NEW) => { const S = window.__SF, P = S.P; for (let i = 0; i < 100 && NEW.some(id => !S.BSI[id]); i++) await new Promise(r => setTimeout(r, 50));
     for (const e of S.ents) if (e.kind === 'mon') e.gone = true; const crowd = [];

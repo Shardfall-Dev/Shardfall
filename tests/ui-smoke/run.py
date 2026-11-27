@@ -35,7 +35,7 @@ def start(pg, errs, n=0):
     pg.on('console', lambda m: errs.append(m.text) if m.type == 'error' and 'Failed to load resource' not in m.text and 'fonts.g' not in m.text else None)
     pg.goto('file://' + f); pg.wait_for_timeout(500)
     pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_timeout(500)
-    pg.click('[data-c=prof][data-p="Group healer"]'); pg.fill('#ccn', 'Tess'); pg.click('[data-c=go]'); pg.wait_for_timeout(900)
+    pg.evaluate("o => __CC.quick(o)", {'name': 'Tess', 'template': 'advanced', 'stats': [20, 10, 50], 'skills': [['magery', 50], ['healing', 30], ['meditation', 20]]}); pg.wait_for_timeout(900)
     pg.evaluate(FILL, n); pg.reload(); pg.wait_for_timeout(500)
     pg.click('[data-c=cont]'); pg.wait_for_timeout(800)
     pg.evaluate("() => { __SF.P.str = 100; __SF.P.stam = 100; }")

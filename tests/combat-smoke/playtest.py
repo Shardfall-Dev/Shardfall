@@ -18,7 +18,10 @@ with sync_playwright() as p:
     xy = ev(f"(() => {{ const e = {js_ent}; return e ? __SF.screenOf(e) : null; }})()"); pg.touchscreen.tap(xy['x'], xy['y'] - 18); pg.wait_for_timeout(250); return xy
   def shot(n): pg.screenshot(path=os.path.join(shots, n))
   pg.goto('file://' + f); pg.wait_for_timeout(500); ev('localStorage.clear()'); pg.reload(); pg.wait_for_timeout(600)
-  tap_sel('[data-c=prof][data-p="Glaive hybrid"]'); pg.fill('#ccn', 'Pip'); tap_sel('[data-c=go]'); pg.wait_for_timeout(1200)
+  # the real creator by touch: New character → name → Next ×3 → Begin (Swordsman, the default template)
+  tap_sel('[data-c=new]'); pg.fill('#ccn', 'Pip')
+  for _ in range(3): tap_sel('[data-c=next]')
+  tap_sel('[data-c=go]'); pg.wait_for_timeout(1200); pg.evaluate(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'legacy-profile.js')).read())
   # walk to the rat warren north-west of the Quay (a teleport stands in for the walk), let it populate
   ev("""() => { const S = __SF, P = S.P; for (let r = 0; r < 30; r++) for (let k = 0; k < 24; k++) { const x = 84 + Math.cos(k / 24 * 6.28) * r, y = 258 + Math.sin(k / 24 * 6.28) * r; if (!S.BLK[S.tAt(Math.floor(x), Math.floor(y))] && S.tAt(Math.floor(x), Math.floor(y)) !== S.T.WA && !S.protAt(Math.floor(x), Math.floor(y))) { P.x = Math.floor(x) + .5; P.y = Math.floor(y) + .5; return; } } }""")
   pg.wait_for_timeout(1500)
