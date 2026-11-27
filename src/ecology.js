@@ -1,4 +1,4 @@
-/* ================= THE MONSTER ECOSYSTEM (Living World phase 3, v0.25; master spec §9–13, §15–16, §23) =================
+/* ================= THE MONSTER ECOSYSTEM (Living World phase 3, v0.25, integrated in v0.26; master spec §9–13, §15–16, §23) =================
    Creatures stop being fixed enemies waiting for the player. Each species has a profile (data, below): faction, habitat,
    activity hours, temperament, senses, territory, pursuit limit, prey, social behaviour and group size, retreat rule,
    respawn pace, art and sound. The pure parts live in src/world.js (SIM: factions, perception, activity, decisions with

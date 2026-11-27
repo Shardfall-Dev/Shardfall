@@ -5,7 +5,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="screen-orientation" content="landscape">
-<title>Shardfall v0.25</title>
+<title>Shardfall v0.26</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=Alegreya+Sans:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -109,6 +109,51 @@ body.portrait #ghost{left:8px;top:calc(env(safe-area-inset-top) + 112px);width:c
 #log{top:calc(env(safe-area-inset-top) + 110px);font-size:12px;width:min(36vw,300px)}
 @media(max-height:420px){#me{width:180px}#tgt,#ghost{left:calc(env(safe-area-inset-left) + 196px)}}
 
+/* v0.25 equipment: paper doll window, item tooltips, context menu, drag and drop, backpack tools */
+#eqwin{position:fixed;z-index:12;background:linear-gradient(#162139,#0a1122);width:min(318px,calc(100vw - 16px));max-height:calc(100vh - 12px);display:flex;flex-direction:column}
+#eqwin[hidden],#itip[hidden],#ctxm[hidden]{display:none}
+.eqh{display:flex;align-items:center;gap:8px;padding:2px 2px 2px 10px;border-bottom:1px solid var(--edge);cursor:move;touch-action:none}
+.eqh b{font:700 15px var(--px);color:#f2dfa8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.eqh .note{flex:1;font:11px var(--px);text-align:right;white-space:nowrap}
+.eqb{overflow:auto;-webkit-overflow-scrolling:touch;padding:6px 8px 8px;touch-action:pan-y}
+.eqdoll{display:grid;grid-template-columns:auto 1fr auto;gap:6px}
+.eqcol{display:flex;flex-direction:column;gap:4px}
+.eqrow{display:flex;gap:4px;justify-content:center;margin-top:5px}
+.eqs{position:relative;width:42px;height:42px;padding:0;border-radius:5px;background:linear-gradient(145deg,#39312a,#191918 75%);border:1px solid #77654c;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer}
+.eqs.on{outline:2px solid #efd084;outline-offset:-2px}.eqs.worn{border-color:#f0a040}.eqs.broken{border-color:#e04838;box-shadow:inset 0 0 8px rgba(224,72,56,.6)}
+.eqs .dur{position:absolute;left:2px;bottom:2px;height:3px;border-radius:2px}
+.eqs.twohand{opacity:.6}.eqs .two{position:relative;display:block}.eqs .two small{position:absolute;right:-4px;bottom:-5px;font:700 9px var(--px);color:#f2dfa8}
+.eqfig{display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid rgba(184,154,90,.35);border-radius:6px;background:radial-gradient(circle at 50% 42%,rgba(95,196,192,.14),transparent 70%);min-height:150px;overflow:hidden}
+.doll{display:block;width:96px;height:96px;background-repeat:no-repeat;background-position:0 0;image-rendering:pixelated;transform:scale(1.7);transform-origin:center 62%;pointer-events:none}
+.eqcard{margin-top:6px;padding:6px;border:1px solid rgba(184,154,90,.4);border-radius:6px;background:rgba(0,0,0,.25);font-size:12.5px}
+.eqcard .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}.eqcard .baghead span{font-size:13px}
+.eqstat{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font:12px var(--px);margin-top:7px}.eqstat span:nth-child(odd){color:var(--dim)}
+.eqstat .warn,.tipkv .warn{color:#f0b060}.eqstat .bad,.tipkv .bad{color:#ff7a6a}
+.eqhint{font-size:11px;margin:6px 0 0}
+#itip{position:fixed;z-index:40;background:linear-gradient(#162139,#0a1122);width:max-content;max-width:min(300px,90vw);padding:8px 10px;pointer-events:none;font-size:13px}
+.tipkv,.bagcard .tipkv{display:grid;grid-template-columns:auto 1fr;gap:1px 10px;font:12px/1.35 var(--px);margin-top:4px}.tipkv span:nth-child(odd){color:var(--dim)}
+.tiptitle{font-variant-caps:all-small-caps;letter-spacing:.03em}.baghead .tiptitle{font:700 13px/1.2 var(--px);color:#f2dfa8}.baghead .tiptitle.q-exc{color:#ffe08a}.baghead .tiptitle.q-rare{color:#ff9a6a}
+.cmp,.bagcard .cmp{display:flex;flex-wrap:wrap;gap:2px 8px;margin-top:5px;font:12px var(--px)}.cmp .up{color:#7ee08a}.cmp .dn{color:#ff7a6a}.bagcard .cmp span,.bagtip .cmp span{display:inline}
+#ctxm{position:fixed;z-index:41;background:linear-gradient(#162139,#0a1122);display:flex;flex-direction:column;gap:3px;padding:6px;min-width:150px}
+.ctxh{font:700 12px var(--px);color:#f2dfa8;padding:0 2px 3px;border-bottom:1px solid var(--edge)}
+.dragghost{position:fixed;z-index:50;pointer-events:none;opacity:.92;filter:drop-shadow(0 3px 6px #000)}
+body.dragging,body.dragging *{cursor:grabbing!important}
+.dropok{outline:2px solid var(--acc)!important;outline-offset:-2px}
+.lift{transform:scale(1.06)}
+.bagico,.bagglyph{position:relative}.matchip{position:absolute;right:1px;top:1px;width:9px;height:9px;border-radius:2px;border:1px solid #000}
+.eqglyph svg{display:block}
+.bagtools{display:flex;gap:6px;align-items:center;margin:7px 0 0}.bagtools input{flex:1;min-width:0;font-size:15px;padding:6px 9px;border-radius:7px;border:1px solid var(--edge);background:#0c1424;color:var(--ink)}
+.bagfilters{margin-top:0}.bagfilters .btn{min-height:30px;font-size:11.5px}
+.bagv{position:relative}.bagwin{position:absolute;left:0;right:0}
+.bagrow{display:grid;gap:5px;height:66px;margin-bottom:5px}
+.bagrow .bagcell{height:66px;min-height:0;overflow:hidden}
+.bagv .baggroup{display:block;height:23px;margin:7px 0 0}
+.wornmark{position:absolute;left:3px;top:2px;font:700 9px var(--px);font-style:normal;color:#ff9a6a}
+.encbar{position:relative;height:6px;border-radius:3px;background:#1a2236;margin:4px 0 0}.encbar i{display:block;height:100%;border-radius:3px;background:#5fd068}.encbar.s1 i{background:#f0c040}.encbar.s2 i{background:#f08040}.encbar.s3 i{background:#e04838}.encbar b{position:absolute;top:-2px;width:1px;height:10px;background:#c8b48a}
+.subtabs{margin-top:-2px}.subtabs .btn{min-height:30px;font-size:11.5px}
+@media(min-width:900px){body.eqopen #panel{left:calc(50% + 150px)}}
+@media(max-width:899px){body.eqopen #panel{left:auto;right:6px;transform:translateY(-50%);width:min(540px,calc(100vw - 340px))}}
+@media(max-height:460px){.eqs{width:35px;height:35px}.eqcol{gap:3px}.eqfig{min-height:110px}.doll{transform:scale(1.25)}#eqwin{width:min(290px,calc(100vw - 16px))}}
+
 /* M4 HUD states */
 #b-run{position:fixed;left:calc(env(safe-area-inset-left) + 14px);bottom:calc(env(safe-area-inset-bottom) + 14px);width:58px;height:58px;border-radius:50%;z-index:6}
 .mirror #b-run{left:auto;right:calc(env(safe-area-inset-right) + 14px)}
@@ -146,6 +191,7 @@ ol.steps{margin:4px 0 6px;padding-left:22px}ol.steps li{margin:3px 0}ol.steps li
 .bagcell[aria-pressed=true],.bagcell:focus-visible{outline:2px solid #efd084;outline-offset:-2px}
 .bagcell i,.bagcell small,.bagcard span,.bagtip span{display:block}
 .bagico,.bagglyph{display:block;flex:none;background-repeat:no-repeat;image-rendering:auto}.bagcell .bagico,.bagcell .bagglyph{margin:0 auto 2px}
+.row>.bagico,.row>.bagglyph,.crow>.bagico,.crow>.bagglyph{border:1px solid #4a3c2b;border-radius:3px;background-color:#221d18}
 .bagglyph{font-family:Georgia;font-style:normal;color:#dcbb79;line-height:1;display:flex;align-items:center;justify-content:center}
 .bagcell small{font-size:11px;overflow-wrap:anywhere}
 .bagcell strong{position:absolute;top:3px;right:3px;z-index:1;min-width:18px;padding:1px 5px;border-radius:9px;background:rgba(10,10,12,.82);border:1px solid #8a744f;color:#fff;font:bold 12px/15px system-ui;text-align:center;text-shadow:0 1px 2px #000;pointer-events:none}
@@ -178,9 +224,12 @@ ol.steps{margin:4px 0 6px;padding-left:22px}ol.steps li{margin:3px 0}ol.steps li
 </div>
 <button class="round" id="b-run" data-a="sprint">Sprint</button>
 <div id="menuScr" class="scr" hidden><div class="scrbar"><b>Menu <small style="opacity:.6;font-size:11px">v0.17 · sound v1.0.0</small></b><button class="btn" data-a="scrclose">✕ Close</button></div>
- <div class="mgrid"><button data-a="mgo" data-p="bag">Pack</button><button data-a="mgo" data-p="gear">Gear</button><button data-a="mgo" data-p="skills">Skills</button><button data-a="mgo" data-p="spells">Spells</button><button data-a="mgo" data-p="journal">Journal</button><button data-a="map">Map</button><button data-a="mgo" data-p="logp">Log</button><button data-a="mgo" data-p="menu">Options</button></div></div>
+ <div class="mgrid"><button data-a="mgo" data-p="bag">Pack</button><button data-a="mgo" data-p="gear">Gear</button><button data-a="mgo" data-p="eqwin">Equip</button><button data-a="mgo" data-p="skills">Skills</button><button data-a="mgo" data-p="spells">Spells</button><button data-a="mgo" data-p="journal">Journal</button><button data-a="map">Map</button><button data-a="mgo" data-p="logp">Log</button><button data-a="mgo" data-p="menu">Options</button></div></div>
 <div id="mapScr" class="scr" hidden><div class="scrbar"><b>Map</b><span class="note">north is up · gold = protected · red edge = full-loot boundary · pinch to zoom</span><button class="btn" data-a="mapfit">Fit</button><button class="btn" data-a="mapall">World</button><button class="btn" data-a="scrclose">✕ Close</button></div><canvas id="mapc"></canvas></div>
 <div id="ghost" class="panel" hidden><b>You are a ghost</b><p></p><button class="btn ac" data-a="ghostret"></button></div>
 <div id="panel" class="panel" hidden></div>
+<div id="eqwin" class="panel" hidden></div>
+<div id="itip" class="panel" hidden></div>
+<div id="ctxm" class="panel" hidden></div>
 <div id="rot" hidden><b>Turn your phone sideways</b><div class="note">Shardfall is built for landscape play.</div><button class="btn" data-a="rotok">Play in portrait anyway</button></div>
 <div id="cc"><div id="ccin"></div></div>

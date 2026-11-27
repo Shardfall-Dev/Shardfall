@@ -26,7 +26,7 @@
       const h0 = wren.hp; const fx = S.FX.length; const ok = S.swingAt(P, wren); const f = S.FX.slice(fx); if (ok) { legal++; if (!f.some(x => x.t === 'miss')) hits++; } dmg += h0 - wren.hp; S.FX.length = 0; }
     S.setRng(null); return { legal, rate: Math.round(hits / legal * 1000) / 1000, avg: Math.round(dmg / Math.max(1, hits) * 10) / 10 }; };
   for (const k of ['swordsmanship', 'anatomy', 'tactics']) P.skills[k].lock = 'hold'; P.skills.tactics.v = 1000;
-  equip('sword'); wren.equip.armor = null; wren.equip.shield = null;
+  equip('sword'); for (const s of SF.EQ.SLOT_IDS) if (s !== 'weapon') wren.equip[s] = null;   // bare: no armor on any region, no shield
   out.pvp = { equal: vs(100, 100, 0), high: vs(100, 50, 0), low: vs(50, 100, 0), equalAna100: vs(100, 100, 100) };
   out.pvpOk = out.pvp.equal.legal === 3000 && out.pvp.low.legal === 3000 && near(out.pvp.equal.rate, .5, .03) && near(out.pvp.high.rate, .75, .03) && near(out.pvp.low.rate, 1 / 3, .03) && near(out.pvp.equalAna100.rate, .5, .03) && out.pvp.equalAna100.avg > out.pvp.equal.avg;
   return out;

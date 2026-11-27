@@ -4,7 +4,7 @@ The roadmap is `docs/WORLD_SIMULATION_MASTER.md` (the full specification, unchan
 
 **Status words:** **Tested** — implemented and covered by an automated test that passes. **Implemented** — in the build, checked by hand only. **Partial** — some of the item is in; the rest is listed. **Planned** — not started. **Blocked** — waiting on something named.
 
-**Current build:** v0.25 (`Shardfall_v0.25.html`), branch `feature/living-world-phase3`, from `main` at v0.24 (PR #17). Phase 3 is the monster ecosystem.
+**Current build:** v0.26 (`Shardfall_v0.26.html`), branch `integration/v0.26`: phase 3 (`feature/living-world-phase3`, #20, built as v0.25) merged with the equipment and paper doll work (#19, also v0.25, which already contains the missing icons v0.24.1, #18). One PR from `integration/v0.26` replaces #18, #19 and #20; phase 4 branches from it.
 
 ---
 

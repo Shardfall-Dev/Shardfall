@@ -89,7 +89,7 @@ crafted quality and condition are untouched; a **Bandage other** action is added
 
 | Topic | Choice | Why |
 |---|---|---|
-| Hit location | Shardfall has one body armor piece, so every blow lands on it. AR: cloth 3, leather 13, chain 28, plate 40 (UO body pieces); buckler 7. | No per-location armor in Shardfall |
+| Hit location | Since v0.25 every blow picks a body region (torso 40 %, legs 20 %, arms 15 %, head 15 %, hands 7 %, neck 3 %) and meets the strongest piece worn there; full-suit AR: cloth 2, leather 12, studded 16, ringmail 20, bone 22, chain 23, plate 30, dragon 35; helmets 18–32; shields 7–18 (buckler 7). See `docs/equipment/STATUS.md`. (v0.18–v0.24: one body piece, cloth 3, leather 13, chain 28, plate 40.) | Region odds and AR values are Shardfall tuning |
 | Range units | 1 UO tile = 1 world metre (as in `docs/magery/spells.json`). Melee reach 1.5 m (adjacent tile incl. diagonal + slack); bows 10 m. | |
 | Archery aim time | 0.5 s standing still. UOSA posts range from "stop for ~300 ms" to "2 s" (1999 era). | Sources disagree |
 | Archery flight | Damage 1 s after release (UOSA patch notes); moving > 0.3 m before impact spoils the shot. | |
