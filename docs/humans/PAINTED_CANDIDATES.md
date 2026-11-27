@@ -64,7 +64,56 @@ Reasons (a frame can have several): baked dark background 59 · wrong facing 31 
 - Male Cast and Unarmed_Attack look almost identical. Female Unarmed_Attack S shows no strike.
 - Idle side views are painted mid-stride.
 
-## Remaining art work (see `missing.json`)
+## Backlog coverage (see `backlog.json`)
+
+This pack was drawn against the painted-art backlog of classic humans v2.1 (`docs/humans/STATUS.md` on PR #40). `tools/painted_backlog.py` measures it item by item and writes `assets/humans/painted-candidates-v0.1/backlog.json`. Statuses: **exists** (usable as delivered), **partial** (some real art, not the full requirement), **mirrored** (covered only by a mirror or duplicate), **missing** (no art). Item ids come from the game data, and `tests/painted.test.js` checks them against the build.
+
+**Result: 0 exist, 4 partial, 0 mirrored, 11 missing.**
+
+| backlog item | status | what v0.1 actually has |
+|---|---|---|
+| Walk and cast in S, W, NW, N, NE, E | partial | accepted candidate poses per direction (S W NW N NE E):<br>male walk 0 2 0 0 0 3<br>male cast 0 3 3 2 0 1<br>female walk 0 3 3 1 0 3<br>female cast 0 3 3 3 0 3<br>None is an 8-frame cycle. S and NE are missing for every body and action. |
+| A real SW walk and cast | partial | SW walk and cast: 3 accepted poses for each body, **painted separately, not mirrored** (pixel test below). Still 3 candidate poses, not the 8-frame cycle. Not yet registered in the v2.1 compositor. |
+| Running | missing | — |
+| All 13 weapon attacks | partial | Only `unarmed` has candidate art (accepted directions: male SW W E SE; female SW W N E SE). The other 12 attacks (slash, chop, blunt, thrust 1h/2h, polearm, staff, bow, crossbow) have none. |
+| Two-handed and staff casting | missing | Cast is one unsplit one-handed set. **Temporary fallback:** `cast2h` and `caststaff` show the one-handed Cast candidates (`SF.PAINTED.TEMP_FALLBACKS`, listed in the PAINTED inspector). Strict mode never reaches it (a staff or two-handed weapon is worn); only the bodies QA view does. |
+| Block, hit, death, corpse | missing | — |
+| Gathering and crafting (mine, chopwood, smith, fish, bandage) | missing | — |
+| Base bodies without clothes or hair, plus skin masks | partial | No shirt, trousers or shoes are painted in: the bodies wear only a loincloth (plus a bandeau on the female). Hair is still painted into every frame. No skin masks. |
+| 8 hairstyles, front and back | missing | short, long, ponytail, pageboy, receding, mohawk, buns, pigtails |
+| 4 beards | missing | stubble, goatee, short, full |
+| Clothing layers with colour masks | missing | shirt, trousers, shoes, boots, belt, robe, tabard, cloak front and back, cloth cap, cloth gloves |
+| 56 equipment pieces plus the buckler, with material masks | missing | every `SF.EQ.DEFS` id plus `buckler`, listed in `backlog.json` |
+| 15 weapon shapes with hand positions per frame | missing | every weapon item, listed in `backlog.json` |
+| Paperdoll portrait layers | missing | The paper doll keeps its current art. |
+| One matching style | missing | v0.1 is a **third** style. See below. |
+
+### Mirror and copy check
+
+Every v0.1 frame was compared with every other frame of the same body, both flipped (mirror) and as is (copy). Figures are aligned on their bounding box, and a pair counts as a duplicate at silhouette IoU ≥ 0.95 and mean RGB difference ≤ 8.
+
+- **None found.**
+- The closest flipped pairs are front-facing S candidates of one row: the male Idle S/2 and S/1 overlap 0.951, but their colours differ by 11.7. Those S rows are rejected anyway (baked background).
+- The same test on the classic humans v2 pack (`--v2`) scores all 32 v2 SW walk/cast frames as **exact** flips of SE (IoU 1.0, difference 0). That confirms the handedness swap reported in v2.1, and shows the test catches a real mirror.
+- No v0.1 walk or cast frame is a copy or mirror of v2 art. The best match is 0.81, about what any two upright poses score.
+
+### Style
+
+These are measured from the alpha channel: soft = semi-transparent edge pixels; outline = boundary pixels darker than luminance 60.
+
+| set | figure height (median) | soft alpha | dark outline |
+|---|---|---|---|
+| v2 idle (original) | 69 px | 0% | 99.8% |
+| v2 walk/cast SE | 62 px | 93% | 97% |
+| v0.1, every sheet | 56–65 px | 0% | 17–24% |
+
+v0.1 is consistent with itself in edge treatment: hard alpha and no outline. But it matches neither v2 set, so it does not settle the one-style item. Its own heights also jump between actions: male Idle 65 px vs Walk 60 px, and female Unarmed 56 px vs Cast 64 px. Part of that is pose, but an upright walk 5 px shorter than standing is a scale mismatch. One painting pass at one scale is still needed.
+
+### Two human renderers on open PRs
+
+This integration sits on #38's `SF.GEAR` path. PR #40 introduces a separate compositor, `SF.HUMANART`, with its own contract (`docs/humans/CONTRACT.md`: 96×92 canvas, anchor (48,86), per-entry cell and anchor, its layer order). Both claim to draw every human. The v0.1 frames fit either contract as body entries: 128 px cells, anchor (64,106), and figure heights close to v2.1's 63 px. But players and NPCs can only share **one** layered system once one of the two is chosen. Nothing here registers v0.1 frames in `SF.HUMANART`.
+
+## Remaining art work (see `missing.json` and `backlog.json`)
 
 1. **Re-export the S and NE rows** for every body and action: S without the background between the legs, NE as a real back three-quarter view. Then male Idle N/NW/E, male Walk N/NW (wrong facing), and male Unarmed N/NW.
 2. **Full cycles:** Idle 4, Walk 8, run 8, Unarmed 8, and Cast split into CastPrepare / CastHold / CastRelease. Three candidates per direction are not cycles.
@@ -78,3 +127,5 @@ Reasons (a frame can have several): baked dark background 59 · wrong facing 31 
 - `node tests/painted.test.js Shardfall_v0.32.1.html`: embedded data equals the QA; no duplicated, borrowed or mirrored frames; frame mapping; eligibility from real equipment; NPC presets on the same rule; missing list honest.
 - `python3 tests/painted-smoke/run.py Shardfall_v0.32.1.html`: flag off untouched (also `?painted` without `?dev`); strict mode on a bare player (painted where accepted, fallback facing S/N, run, tunic equipped); NPCs fall back; nothing saved; reload; bodies mode on a female character and 58 NPCs; atlas preview and rejection reasons; phone.
 - `python3 tools/painted_candidates.py --check` keeps the generated files honest.
+- `python3 tools/painted_backlog.py --check` keeps `backlog.json` current (re-run with `--v2 asset-packs/classic-humans-v2/Shardfall_Classic_Humans_Painted_v2.zip` from a checkout that has it to refresh the cross-pack section).
+- `node tests/painted.test.js` also checks `backlog.json` against the build: the 56 equipment ids plus the buckler, the 15 weapons, the 8 hairstyles, the 4 beards, the 13 attacks, accepted counts, no mirrors, and the declared temporary fallbacks.

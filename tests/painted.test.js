@@ -53,4 +53,32 @@ eq(missing.complete, [], 'missing.json marks nothing complete');
 eq(missing.directionGaps.length, qa.summary.directionsWithNoAcceptedFrame.length, 'every empty direction is listed as a gap');
 eq(['hair', 'armour', 'weapon', 'shield'].every(w => missing.missingLayers.some(l => l.includes(w))), true, 'hair, armour, weapon and shield layers are listed as missing');
 
+// ---- backlog.json (tools/painted_backlog.py): the painted-art backlog, measured against the game data
+const bl = JSON.parse(fs.readFileSync(__dirname + '/../assets/humans/painted-candidates-v0.1/backlog.json', 'utf8'));
+const item = id => bl.backlog.find(i => i.id === id);
+const STAT = ['exists', 'partial', 'mirrored', 'missing'];
+eq(bl.backlog.every(i => STAT.includes(i.status)), true, 'every backlog item has one of exists / partial / mirrored / missing');
+eq(bl.backlog.filter(i => i.status === 'exists').map(i => i.id), [], 'no backlog item is marked as existing');
+eq([bl.summary.itemsExist, bl.summary.itemsPartial, bl.summary.itemsMirrored, bl.summary.itemsMissing], STAT.map(s => bl.backlog.filter(i => i.status === s).length), 'summary counts match the items');
+eq([bl.summary.accepted, bl.summary.rejected], [ART.counts.accepted, ART.counts.rejected], 'backlog uses the same verdicts as the embedded art');
+eq(Object.keys(item('equipment').detail), EQ.DEFS.map(d => d.id).concat(['buckler']), 'equipment backlog lists exactly the 56 SF.EQ.DEFS ids plus the buckler');
+eq([EQ.DEFS.length, SF.ITEMS.buckler.slot], [56, 'shield'], 'there are 56 equipment definitions and the buckler is a shield');
+eq(Object.keys(item('weapons').detail).sort(), Object.keys(SF.ITEMS).filter(k => SF.ITEMS[k].slot === 'weapon').sort(), 'weapon backlog lists every weapon item (15)');
+eq(Object.keys(item('hair').detail), CR.HAIR_STYLES.map(h => h.id).filter(h => h !== 'bald'), 'hair backlog lists the 8 creation hairstyles (bald needs no layer)');
+eq(Object.keys(item('beards').detail), [...new Set(Object.values(g.HUMAN_RIG.BEARD))].filter(b => b !== 'none'), 'beard backlog lists the 4 rig beard shapes');
+eq(Object.keys(item('weapon-attacks').detail).length, 13, 'all 13 weapon attack animations are listed');
+eq(item('weapon-attacks').detail.unarmed.status, 'partial', 'unarmed is partial (candidate poses), the other 12 attacks are missing');
+eq(Object.entries(item('weapon-attacks').detail).filter(([k]) => k !== 'unarmed').every(([, v]) => v.status === 'missing'), true, 'no weapon attack other than unarmed has art');
+eq(bl.mirrorCheck.found, [], 'no v0.1 frame is a mirror or copy of another v0.1 frame');
+eq(Object.values(item('true-sw').detail).map(d => [d.mirror, d.status]), Array(4).fill([false, 'partial']), 'v0.1 SW walk/cast are painted, not mirrored, but still partial (no full cycle)');
+for (const [k, dirs] of Object.entries(item('walk-cast-other-directions').detail)) {
+  const [body, act] = k.split(' '), A = act === 'walk' ? 'Walk' : 'Cast';
+  eq(Object.entries(dirs).map(([d, v]) => v.acceptedCandidatePoses), Object.keys(dirs).map(d => ART.accepted[body][A][d].length), `${k}: other-direction counts equal the accepted frames`);
+}
+eq(bl.crossPack && [bl.crossPack.v2SWisMirrorOfSE.minIoU, bl.crossPack.v2SWisMirrorOfSE.maxDiff], [1, 0], 'the v2 SW rows are recorded as exact mirrors of SE (the mirror test catches a real mirror)');
+eq(bl.crossPack.v01CopiedFromV2.bestIoU < 0.95, true, 'no v0.1 frame is copied or mirrored from v2 art');
+eq(item('one-style').status, 'missing', 'one matching style is not achieved');
+eq(['hair', 'skinMasks'].map(k => item('base-bodies').detail[k].status), ['missing', 'missing'], 'base bodies: hair and skin masks still missing');
+eq(PT.TEMP_FALLBACKS.cast2h === 'Cast' && PT.TEMP_FALLBACKS.caststaff === 'Cast', true, 'cast2h / caststaff → one-handed Cast is a declared temporary fallback');
+
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASS'); process.exit(fails ? 1 : 0);
