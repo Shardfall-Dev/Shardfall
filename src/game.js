@@ -1807,7 +1807,7 @@ function renderPanel(top) {
 }
 let bagSort = 'Category', bagUid = null;
 const bagSymbols = { weapon:'⚔', shield:'⛨', armor:'♜', coin:'◉', ore:'◆', metal:'▰', timber:'▥', reagent:'✧', potion:'⚗', tool:'⚒', food:'❧', medic:'✚', ammo:'➶', cloth:'▧' };
-/* Backpack icons v1.0.0 (src/backpack-icons.js): one atlas, looked up by the item's id; the atlas is set once as a CSS background
+/* Backpack icons v1.0.1 (src/backpack-icons.js): one atlas, looked up by the item's id; the atlas is set once as a CSS background
    so each tile only carries its offset. Items without a painted icon keep the category glyph. */
 { const st = document.createElement('style'); st.textContent = '.bagico{background-image:url(' + BAG_ICONS.src + ')}'; document.head.appendChild(st); }
 function bagIcon(it, size) {
@@ -1816,6 +1816,9 @@ function bagIcon(it, size) {
   const k = size / r[2];
   return '<i class="bagico" aria-hidden="true" data-icon="' + esc(it.id) + '" style="width:' + size + 'px;height:' + size + 'px;background-size:' + BAG_ICONS.w * k + 'px ' + BAG_ICONS.h * k + 'px;background-position:' + -r[0] * k + 'px ' + -r[1] * k + 'px"></i>';
 }
+
+// the same atlas tile, small, in front of item rows elsewhere (Character, loot, bank, shops, crafting)
+const rowIcon = it => SF.ITEMS[it.id] ? bagIcon(it, 28) : '';
 
 function bagStats(it) {
   const def = SF.ITEMS[it.id], weapon = SF.WEAPONS[def.wpn];
@@ -1872,7 +1875,7 @@ function bagActions(it) {
 const PANELS = {
   bag: bagPanel,
   gear: () => { const t = (k, n) => `<span>${n}</span><span>${P[k]}</span>`; let h = `<div class="kv">${t('str', 'Strength')}${t('dex', 'Dexterity')}${t('int', 'Intellect')}<span>Stat total</span><span>${P.str + P.dex + P.int} / 225</span><span>Health</span><span>${Math.floor(P.hp)} / ${SF.maxHp(P)}</span><span>Stamina</span><span>${Math.floor(P.stam)} / ${SF.maxStam(P)}</span><span>Mana</span><span>${Math.floor(P.mana)} / ${SF.maxMana(P)}</span><span>Armor</span><span>${armorVal()} (${armorType()})</span><span>Weapon</span><span>${wDef().fam} · ${wDef().dmg.join('–')} · reach ${wDef().reach} m · swing every ${SF.swingDelay(P.stam, wDef().speed).toFixed(2)} s</span><span>Bound shrine</span><span>${SHRINES.find(s => s.id === P.bound).n}</span><span>Skills</span><span>${f1(SF.totalSkill(P))} / 700.0</span></div><div class="sec">Equipped</div>`;
-    for (const s of ['weapon', 'shield', 'armor']) { const it = P.equip[s]; h += `<div class="row"><span class="v" style="width:4.5em">${s}</span><span class="nm">${it ? esc(iname(it)) : '<span class="note">empty</span>'}</span>${it && SF.WEARABLE(it.id) && it.cond !== undefined && it.cond < (it.maxc || 100) ? btn('repair', 'Repair', { u: it.uid }) : ''}${it && SF.ITEMS[it.id].trade ? btn('uneq', 'Remove', { s }) : ''}</div>`; }
+    for (const s of ['weapon', 'shield', 'armor']) { const it = P.equip[s]; h += `<div class="row"><span class="v" style="width:4.5em">${s}</span>${it ? rowIcon(it) : ''}<span class="nm">${it ? esc(iname(it)) : '<span class="note">empty</span>'}</span>${it && SF.WEARABLE(it.id) && it.cond !== undefined && it.cond < (it.maxc || 100) ? btn('repair', 'Repair', { u: it.uid }) : ''}${it && SF.ITEMS[it.id].trade ? btn('uneq', 'Remove', { s }) : ''}</div>`; }
     return ['Character', h + '<p class="note">Stats do not grow by use. Buy points from Master Vey (up to 225 total).</p>']; },
   skills: () => { let h = `<div class="note">Total ${f1(SF.totalSkill(P))} / 700.0 · ▲ raise · ■ hold · ▼ lower (gives points when you hit the cap)</div>`;
     if (P.skillPool > 0) h += `<div class="sec">Combat reform</div><p class="note">${f1(P.skillPool)} trained points from skills that merged in the combat reform are waiting. Tap +1.0 on a skill to place them (never past 100.0 or the 700.0 total).</p>`;
@@ -1884,17 +1887,17 @@ const PANELS = {
   assign: () => ['Choose a slot', `<p class="note">Assign ${esc(ASSIGN.k === 'spell' ? SF.SPELL[ASSIGN.id].n : ASSIGN.k === 'item' ? SF.ITEMS[ASSIGN.id].n : (ABIL[ASSIGN.id] ? ABIL[ASSIGN.id].n : ASSIGN.id))} to:</p><div class="grid2">${P.hotbar.map((_, i) => btn('setslot', 'Bar ' + (1 + Math.floor(i / 3)) + ' · ' + (i % 3 + 1) + ': ' + esc(slotLabel(P.hotbar[i])[0]), { i })).join('')}</div>`],
   loot: () => { const c = P.lootOpen; if (!c || c.gone) return null; const ls = c.cont ? SF.lootStatus(c.cont, P.id, GT) : { label: '' }; let h = `<div class="note">${c.mine ? 'Your body · ' : ''}${esc(ls.label || '')} · crumbles in ${Math.ceil((c.expires - GT) / 60)} min · pack ${P.pack.items.length}/${SF.SLOTS}, ${packKg().toFixed(1)}/${SF.carryKg(P).toFixed(1)} kg</div>`;
     if (!c.cont.items.length) h += '<p class="note">Empty.</p>'; else h += btn('takeall', 'Take all', {}, 'ac');
-    for (const it of c.cont.items) h += `<div class="row"><span class="nm">${esc(iname(it))}</span>${btn('take', 'Take', { u: it.uid })}${it.qty > 1 ? btn('take', 'Half', { u: it.uid, half: 1 }) : ''}</div>`;
+    for (const it of c.cont.items) h += `<div class="row">${rowIcon(it)}<span class="nm">${esc(iname(it))}</span>${btn('take', 'Take', { u: it.uid })}${it.qty > 1 ? btn('take', 'Half', { u: it.uid, half: 1 }) : ''}</div>`;
     if (c.mon && !c.skinned) h += '<p>' + btn('skin', 'Skin the remains', {}) + '</p>';
     return [cap1(c.name), h]; },
   bank: () => { let h = `<div class="note">Bank storage is safe when you die. One account at every bank: the Quay, Mynoc, Vespar, Skara Bryn, Moonglen and the camp strongbox.</div>${btn('depgold', 'Deposit all gold', {}, 'ac')}<div class="sec">Bank (${SF.count(P.bank, 'gold')} gold)</div>`;
-    if (!P.bank.items.length) h += '<p class="note">Empty.</p>'; for (const it of P.bank.items) h += `<div class="row"><span class="nm">${esc(iname(it))}</span>${btn('wd', 'Withdraw', { u: it.uid })}</div>`;
-    h += '<div class="sec">Pack</div>'; for (const it of P.pack.items) if (SF.ITEMS[it.id].trade) h += `<div class="row"><span class="nm">${esc(iname(it))}</span>${btn('dep', 'Deposit', { u: it.uid })}</div>`;
-    for (const s of ['weapon', 'shield', 'armor']) { const it = P.equip[s]; if (it && SF.ITEMS[it.id].trade) h += `<div class="row"><span class="nm">${esc(iname(it))} <span class="note">worn</span></span>${btn('depeq', 'Deposit', { s })}</div>`; }
+    if (!P.bank.items.length) h += '<p class="note">Empty.</p>'; for (const it of P.bank.items) h += `<div class="row">${rowIcon(it)}<span class="nm">${esc(iname(it))}</span>${btn('wd', 'Withdraw', { u: it.uid })}</div>`;
+    h += '<div class="sec">Pack</div>'; for (const it of P.pack.items) if (SF.ITEMS[it.id].trade) h += `<div class="row">${rowIcon(it)}<span class="nm">${esc(iname(it))}</span>${btn('dep', 'Deposit', { u: it.uid })}</div>`;
+    for (const s of ['weapon', 'shield', 'armor']) { const it = P.equip[s]; if (it && SF.ITEMS[it.id].trade) h += `<div class="row">${rowIcon(it)}<span class="nm">${esc(iname(it))} <span class="note">worn</span></span>${btn('depeq', 'Deposit', { s })}</div>`; }
     return [P.talkTo ? P.talkTo.name : 'Bank', h]; },
   shop: () => { const n = P.talkTo; if (!n || dist(n, P) > 4) return null; const stock = SHOPS[n.role] || []; const tab = PTAB || 'buy'; let h = `<div class="tabs">${btn('tab', 'Buy', { t: 'buy' }, tab === 'buy' ? 'ac' : '')}${btn('tab', 'Sell', { t: 'sell' }, tab === 'sell' ? 'ac' : '')}<span class="note" style="margin-left:auto">${SF.count(P.pack, 'gold')} gold</span></div>`;
-    if (tab === 'buy') for (const id of stock) { const p = SF.PRICES[id]; const st = SF.ITEMS[id].stack; h += `<div class="row"><span class="nm">${esc(SF.itemName({ id, qty: 1 }))}</span><span class="v">${p} gp</span>${btn('buy', 'Buy', { id, n: 1 })}${st ? btn('buy', '×10', { id, n: 10 }) : ''}</div>`; }
-    else for (const it of P.pack.items) { if (!SF.ITEMS[it.id].trade || it.id === 'gold') continue; const p = Math.max(1, Math.floor((SF.PRICES[it.id] || 1) * .4)); h += `<div class="row"><span class="nm">${esc(iname(it))}</span><span class="v">${p} gp ea</span>${btn('sell', 'Sell 1', { u: it.uid })}${it.qty > 1 ? btn('sell', 'All', { u: it.uid, all: 1 }) : ''}</div>`; }
+    if (tab === 'buy') for (const id of stock) { const p = SF.PRICES[id]; const st = SF.ITEMS[id].stack; h += `<div class="row">${rowIcon({ id })}<span class="nm">${esc(SF.itemName({ id, qty: 1 }))}</span><span class="v">${p} gp</span>${btn('buy', 'Buy', { id, n: 1 })}${st ? btn('buy', '×10', { id, n: 10 }) : ''}</div>`; }
+    else for (const it of P.pack.items) { if (!SF.ITEMS[it.id].trade || it.id === 'gold') continue; const p = Math.max(1, Math.floor((SF.PRICES[it.id] || 1) * .4)); h += `<div class="row">${rowIcon(it)}<span class="nm">${esc(iname(it))}</span><span class="v">${p} gp ea</span>${btn('sell', 'Sell 1', { u: it.uid })}${it.qty > 1 ? btn('sell', 'All', { u: it.uid, all: 1 }) : ''}</div>`; }
     return [n.name, h]; },
   trainer: () => { const tab = PTAB || 'skills'; let h = `<div class="tabs">${btn('tab', 'Lessons', { t: 'skills' }, tab === 'skills' ? 'ac' : '')}${btn('tab', 'Attributes', { t: 'stats' }, tab === 'stats' ? 'ac' : '')}<span class="note" style="margin-left:auto">${SF.count(P.pack, 'gold')} gold · ${P.freeLessons} free lessons</span></div>`;
     if (tab === 'skills') { h += '<p class="note">Lessons raise a skill to 30. Your first two are free. Skills set to Hold or Lower cannot be trained.</p>'; for (const [k, n, , live] of SF.SKILLS) { if (!live) continue; const v = P.skills[k].v / 10; if (v >= 30) continue; const cost = P.freeLessons > 0 ? 0 : SF.trainCost(v, 30); h += `<div class="row"><span class="nm">${n} <span class="note">${v.toFixed(1)} → 30</span></span><span class="v">${cost ? cost + ' gp' : 'free'}</span>${btn('train', 'Learn', { k })}</div>`; } }
@@ -2182,7 +2185,7 @@ function craftPanel() {
   const cats = [...new Set(list.map(recipeCat))]; if (!CUI.cat || !cats.includes(CUI.cat)) CUI.cat = CUI.st === 'forge' ? 'Smelt' : CUI.st === 'anvil' ? 'Fittings' : cats[0];
   let h = `<div class="tabs">${cats.map(c => btn('ccat', c, { c }, c === CUI.cat ? 'ac' : '')).join('')}</div>`;
   for (const r of list.filter(r => recipeCat(r) === CUI.cat)) { const [st, cls] = rowStatus(r); const q = r.qty > 1 ? ` ×${r.qty}` : '';
-    h += `<button class="crow ${cls}" data-a="crec" data-r="${r.id}"><span class="nm">${esc(recipeName(r))}${q}<br><span class="note">${SF.SKILL[r.skill].n} ${r.min}${r.prim ? '+ · any metal' : ''}${r.fixedMat && r.fixedMat !== 'iron' ? ' · ' + SF.METAL[r.fixedMat].n : ''}</span></span><span class="v">${esc(st)}</span><span class="chev">›</span></button>`; }
+    h += `<button class="crow ${cls}" data-a="crec" data-r="${r.id}">${rowIcon({ id: r.out })}<span class="nm">${esc(recipeName(r))}${q}<br><span class="note">${SF.SKILL[r.skill].n} ${r.min}${r.prim ? '+ · any metal' : ''}${r.fixedMat && r.fixedMat !== 'iron' ? ' · ' + SF.METAL[r.fixedMat].n : ''}</span></span><span class="v">${esc(st)}</span><span class="chev">›</span></button>`; }
   return [STATION_N[CUI.st], h + `<p class="note">Failed attempts lose a quarter of each input, rounded up. Skill minimums are hard limits.</p>`];
 }
 function craftDetail(r) {
@@ -2194,7 +2197,7 @@ function craftDetail(r) {
   if (mats) h += `<div class="note">Metal</div><div class="mats">${mats.map(m => { const M = SF.METAL[m], have = SF.count(P.pack, SF.ingotId(m)), lock = sv(r.skill) < Math.max(r.min, M.smith); return `<button class="mat ${m === CUI.mat ? 'on' : ''} ${lock ? 'lk' : ''}" data-a="cmat" data-m="${m}"><i style="background:${M.col}"></i>${M.n}<small>${lock ? 'Smith ' + Math.max(r.min, M.smith) : have + ' ingot' + (have === 1 ? '' : 's')}</small></button>`; }).join('')}</div>`;
   h += `<div class="mk">${can ? '' : `<p class="warn" style="margin:2px 0">${esc(cap1(why))}</p>`}<div class="row">${btn('cmake', 'Make 1', { n: 1 }, can ? 'ac' : '')}${btn('cmake', 'Make 5', { n: 5 })}<span class="step">${btn('cn', '−', { d: -1 })}<b>${CUI.n}</b>${btn('cn', '+', { d: 1 })}</span>${btn('cmake', 'Make ' + CUI.n, { n: CUI.n })}</div></div>`;
   h += '<div class="sec">Inputs per attempt</div>';
-  for (const l of p.lines) { const nm = (l.mat ? SF.matName(l.mat) + ' ' : '') + SF.ITEMS[l.id].n.toLowerCase(); h += `<div class="row"><span class="nm">${l.qty} × ${esc(nm)}</span><span class="v ${l.have < l.qty ? 'warn' : ''}">have ${l.have}${l.have < l.qty ? ' · need ' + (l.qty - l.have) : ''}</span></div>`; }
+  for (const l of p.lines) { const nm = (l.mat ? SF.matName(l.mat) + ' ' : '') + SF.ITEMS[l.id].n.toLowerCase(); h += `<div class="row">${rowIcon({ id: l.id })}<span class="nm">${l.qty} × ${esc(nm)}</span><span class="v ${l.have < l.qty ? 'warn' : ''}">have ${l.have}${l.have < l.qty ? ' · need ' + (l.qty - l.have) : ''}</span></div>`; }
   if (r.tool) h += `<div class="row"><span class="nm">Tool</span><span class="v ${tool.ok ? '' : 'warn'}">${esc(tool.t)}${tool.it ? ' · 1 use per attempt' : ''}</span></div>`;
   h += `<div class="row"><span class="nm">Station</span><span class="v ${stn.st ? '' : 'warn'}">${stn.st ? (r.station === 'anvil' ? 'anvil, forge alongside ✓' : r.station + ' ✓') : esc(stn.why)}</span></div>`;
   const gateTxt = p.gate > r.min ? ` · ${SF.matName(p.mat)} needs ${p.gate}` : '';
