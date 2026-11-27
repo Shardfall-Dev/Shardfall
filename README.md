@@ -54,6 +54,7 @@ Progress saves to the browser's local storage. If a save cannot be read, the sta
 - `src/painted-art.js` — Painted Human Candidates v0.1, accepted cells only (generated: `python3 tools/painted_candidates.py --embed`; `--check` verifies it, `qa.json` and `missing.json` are current).
 - `src/painted.js` — `SF.PAINTED` (pure): which human, state and direction has a validated painted frame. `src/painted-render.js` draws it before the layered renderer, developer flag only.
 - `assets/humans/painted-candidates-v0.1/` — `review.json` (manual QA verdicts), `qa.json` (every frame, metrics, accepted/rejected and why), `missing.json` (art still needed). `docs/humans/PAINTED_CANDIDATES.md` explains them.
+- `tools/sprites3d/` — the 3D → sprite pipeline (v1.0.0): `sf_render.py` renders a rigged Blender character and each armour piece as separate layers with material masks, in 8 directions; `sf_pack.py` packs and checks them into the 128×128 / anchor (64, 106) contract. How-to: `tools/sprites3d/README.md`; tests: `python3 tools/sprites3d/test_pack.py`.
 - `docs/art/SPRITES_PAPERDOLL_EQUIPMENT_GAPS.md` — what art is still missing for world sprites, the paper doll, icons and NPC outfits, in priority order.
 - `docs/archive/superseded-renderers/` — docs, manifests and screenshots from the renderers v0.33 did not keep (#35, #36, #37, #39's rig, #40).
 - `docs/equipment/RENDERING.md` — how equipment is drawn, the material channels, occlusion, caches, the review flag and the art still missing.

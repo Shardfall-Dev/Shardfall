@@ -42,6 +42,8 @@ The 44 borrowed icons only show while the toggle is on. Once the toggle becomes 
 
 ## 3. World sprites (the largest job)
 
+**Chosen route (v0.33+):** render humans and armour from 3D, with each piece as its own layer. Image generators could not keep frames consistent. The pipeline is in `tools/sprites3d/` (README there). The first test is one body with Idle and Walk in 8 directions, plus the plate set.
+
 Contract: `asset-packs/classic-humans-v2/` (the rig) and `docs/equipment/RENDERING.md`. Cells are 112×100 with the feet anchor at (56, 86). Rows run S, SW, W, NW, N, NE, E, SE.
 
 The procedural rig already plays every animation with real equipment and materials, so the game is playable with it. What is missing is painted art. The painted equipment pieces are static and must not be pasted onto a moving body. A painted world needs a layered set:
