@@ -205,7 +205,7 @@ function lifeGather(e, dt) {
   const st = nodeStock(g.nx, g.ny); if (st.n <= 0) { const f = lifeField(e); Object.assign(g, f); g.nx = f.nx; g.ny = f.ny; return lifeGo(e, g); }
   st.n--; if (st.n <= 0) st.t = GT + 300; L.carry++; LIFE.events.strokes++;
   faceToward(e, g.nx + .5, g.ny + .5); sndAt(L.prof === 'miner' ? 'gather.mine' : 'gather.chop', e, { gain: .4, key: 'npcgather' + e.id });
-  simEmit('ResourceGathered', { actor: aidOf(e), skill: L.prof === 'miner' ? 'mining' : 'woodcutting', item: LIFE_ITEM[L.prof], qty: 1, node: g.ny * W + g.nx, x: g.nx, y: g.ny });
+  simEmit('ResourceGathered', { actor: aidOf(e), skill: L.prof === 'miner' ? 'mining' : 'lumberjacking', item: LIFE_ITEM[L.prof], qty: 1, node: g.ny * W + g.nx, x: g.nx, y: g.ny });
 }
 function lifeSell(e) {
   const L = e.life, item = LIFE_ITEM[L.prof], q = L.carry, pay = q * (SF.PRICES[item] || 2);

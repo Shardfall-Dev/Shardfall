@@ -78,7 +78,7 @@ r = EQ.pickupItem(c, pile, { uid: pile.items[0].uid }); eq([r.ok, pile.items[0].
 r = EQ.pickupItem(c, pile, { uid: pile.items[0].uid, qty: 20 }); eq([r.ok, SF.count(c.pack, 'ore'), pile.items[0].qty], [true, 20, 1], 'a smaller pickup fits');
 
 // crafting material variants
-c = mk(); c.skills.smithing.v = 1000; SF.addItem(c.pack, SF.newItem('ingot_mithril', 30)); SF.addItem(c.pack, SF.newItem('ironbar', 30)); SF.addItem(c.pack, EQ.make('tongs'));
+c = mk(); c.skills.blacksmithy.v = 1000; SF.addItem(c.pack, SF.newItem('ingot_mithril', 30)); SF.addItem(c.pack, SF.newItem('ironbar', 30)); SF.addItem(c.pack, EQ.make('tongs'));
 let plan = SF.craftPlan(c, c.pack, SF.RECIPE.plate_chest, 'mithril');
 eq([plan.ok, plan.lines[0].id, plan.lines[0].qty, plan.gate], [true, 'ingot_mithril', 25, 98], 'mithril plate chest needs 25 mithril ingots, smith gate 98');
 r = SF.craftAttempt(c, c.pack, plan, seq([.01, .99]), EQ.capFor(c), {});
@@ -108,7 +108,7 @@ eq(regs, { torso: 2, legs: 2, arms: 2, head: 2, hands: 2, neck: 2 }, 'region thr
 // repair risk
 const it2 = EQ.make('plate_arms'); it2.cond = 10; r = SF.repair(it2, { skill: 100, rng: () => .5 }); eq([r.ok, r.lost, it2.cond, it2.maxc], [true, 0, 50, 50], 'skilled repair (risk 20 %) without loss');
 it2.cond = 10; r = SF.repair(it2, { skill: 100, rng: () => .1 }); eq([r.lost, it2.maxc], [2, 48], 'unlucky repair loses 3 % of the original maximum');
-eq([SF.repairRisk(20), SF.repairRisk(100), SF.repairSkill('plate_arms'), SF.repairSkill('studded_tunic'), SF.repairSkill('wooden_shield')], [1, .2, 'smithing', 'tailoring', 'carpentry'], 'repair risk and repair skills');
+eq([SF.repairRisk(20), SF.repairRisk(100), SF.repairSkill('plate_arms'), SF.repairSkill('studded_tunic'), SF.repairSkill('wooden_shield')], [1, .2, 'blacksmithy', 'tailoring', 'carpentry'], 'repair risk and repair skills');
 
 // atomic transactions: a failure in the middle restores everything
 c = mk({ str: 100 }); const a1 = give(c, 'plate_helm'), a2 = give(c, 'chain_coif'); EQ.equipItem(c, { uid: a1.uid });

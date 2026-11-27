@@ -171,7 +171,7 @@ with sync_playwright() as p:
     pg.keyboard.press('Escape'); pg.wait_for_timeout(100); pg.keyboard.press('C'); pg.wait_for_timeout(150)
     check(pg.is_visible('#eqwin'), 'C again reopens it')
     # crafting: Armor category with families and material variants
-    cr = J(pg, """(() => { const S = __SF, P = S.P; P.skills.smithing.v = 1000; S.openCraft('anvil'); S.ACT.ccat({ c: 'Armor' }); const subs = [...document.querySelectorAll('#panel [data-a=csub]')].map(b => b.dataset.s);
+    cr = J(pg, """(() => { const S = __SF, P = S.P; P.skills.blacksmithy.v = 1000; S.openCraft('anvil'); S.ACT.ccat({ c: 'Armor' }); const subs = [...document.querySelectorAll('#panel [data-a=csub]')].map(b => b.dataset.s);
       S.ACT.csub({ s: 'Platemail' }); const rows = [...document.querySelectorAll('#panel .crow')].map(r => r.dataset.r); S.ACT.crec({ r: 'plate_chest' }); S.ACT.cmat({ m: 'mithril' });
       const txt = document.querySelector('#panel .pb').innerText; return { subs, rows, mats: document.querySelectorAll('#panel [data-a=cmat]').length, txt }; })()""")
     check('Platemail' in cr['subs'] and 'Helmets' in cr['subs'] and 'Shields' in cr['subs'] and 'Dragon scale' in cr['subs'], 'anvil Armor category lists the metal families', cr['subs'])

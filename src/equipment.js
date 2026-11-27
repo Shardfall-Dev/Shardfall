@@ -51,12 +51,12 @@ EQ.FAMILIES = {
   leather:  { n: 'Leather', ar: 12, med: 0, spd: 0, dur: 35, repair: 'tailoring' },
   studded:  { n: 'Studded leather', ar: 16, med: .10, spd: 0, dur: 40, repair: 'tailoring' },
   bone:     { n: 'Bone', ar: 22, med: .15, spd: .01, dur: 45, repair: 'tailoring' },
-  ringmail: { n: 'Ringmail', ar: 20, med: .15, spd: .02, dur: 45, repair: 'smithing' },
-  chain:    { n: 'Chainmail', ar: 23, med: .20, spd: .03, dur: 50, repair: 'smithing' },
-  plate:    { n: 'Platemail', ar: 30, med: .35, spd: .06, dur: 50, repair: 'smithing' },
-  helm:     { n: 'Helmet', ar: 24, med: .30, spd: 0, dur: 45, repair: 'smithing' },
-  dragon:   { n: 'Dragon scale', ar: 35, med: .25, spd: .03, dur: 60, repair: 'smithing' },
-  shield:   { n: 'Shield', ar: 0, med: 0, spd: 0, dur: 50, repair: 'smithing' },
+  ringmail: { n: 'Ringmail', ar: 20, med: .15, spd: .02, dur: 45, repair: 'blacksmithy' },
+  chain:    { n: 'Chainmail', ar: 23, med: .20, spd: .03, dur: 50, repair: 'blacksmithy' },
+  plate:    { n: 'Platemail', ar: 30, med: .35, spd: .06, dur: 50, repair: 'blacksmithy' },
+  helm:     { n: 'Helmet', ar: 24, med: .30, spd: 0, dur: 45, repair: 'blacksmithy' },
+  dragon:   { n: 'Dragon scale', ar: 35, med: .25, spd: .03, dur: 60, repair: 'blacksmithy' },
+  shield:   { n: 'Shield', ar: 0, med: 0, spd: 0, dur: 50, repair: 'blacksmithy' },
   jewelry:  { n: 'Jewelry', ar: 0, med: 0, spd: 0, dur: 0, repair: null } };
 
 /* ---------------- materials ---------------- */
@@ -244,7 +244,7 @@ EQ.broken = broken;
 /* AR of a region this piece covers, before wear */
 EQ.baseRegionAR = it => { const d = SF.ITEMS[it.id]; if (!d || !d.fam || d.cat === 'shield' || d.cat === 'jewelry') return 0; const a = d.ar !== undefined ? d.ar : EQ.FAMILIES[d.fam].ar; return a * EQ.mat(d.fixedMat || SF.matOf(it)).prot * EQ.qual(it).prot; };
 /* after wear: broken gives nothing; under 20 % condition the badly-worn −15 % (SF.condFactor) */
-EQ.regionAR = it => broken(it) ? 0 : EQ.baseRegionAR(it) * SF.condFactor(it.cond, it.maxc);
+EQ.regionAR = it => broken(it) ? 0 : EQ.baseRegionAR(it) * SF.condFactor(it.cond, it.maxc) + (it.magic && it.magic.k === 'def' ? it.magic.l : 0);   // + a magic piece's defense level
 /* the piece's share of the suit: what the tooltip calls its protection (region AR × body coverage) */
 EQ.protection = it => { const d = SF.ITEMS[it.id]; return d && d.slot ? EQ.regionAR(it) * EQ.coverage(d.slot) : 0; };
 EQ.baseProtection = it => { const d = SF.ITEMS[it.id]; return d && d.slot ? EQ.baseRegionAR(it) * EQ.coverage(d.slot) : 0; };
@@ -254,7 +254,7 @@ EQ.value = it => { const d = SF.ITEMS[it.id]; if (!d) return 0; const base = d.v
   const c = it.cond === undefined ? 1 : .5 + .5 * clamp(0, 1, it.cond / (it.maxc || 1)); return Math.round(base * EQ.mat(d.fixedMat || SF.matOf(it)).val * EQ.qual(it).val * c); };
 SF.itemWt = it => SF.itemKg(it) * SF.WU;
 SF.repairSkill = id => { const d = SF.ITEMS[id]; if (d.repair) return d.repair; if (d.fam && EQ.FAMILIES[d.fam].repair) return EQ.FAMILIES[d.fam].repair;
-  if (d.wpn === 'shortbow' || d.wpn === 'crossbow' || d.wpn === 'heavycrossbow') return 'carpentry'; if (d.armor === 'cloth' || d.armor === 'leather') return 'tailoring'; return 'smithing'; };
+  if (d.wpn === 'shortbow' || d.wpn === 'crossbow' || d.wpn === 'heavycrossbow') return 'bowcraft'; if (d.armor === 'cloth' || d.armor === 'leather') return 'tailoring'; return 'blacksmithy'; };
 
 /* ---------------- character totals ---------------- */
 EQ.equipKg = ch => { let k = 0; for (const s in ch.equip || {}) if (ch.equip[s]) k += SF.itemKg(ch.equip[s]) + (ch.equip[s].items ? SF.containerKg(ch.equip[s]) : 0); return k; };
@@ -421,7 +421,7 @@ const R = [];
 const rec = (sub, out, skill, min, station, tool, lines, x) => R.push(Object.assign({ id: out, name: SF.ITEMS[out].n, out, qty: 1, skill, min, station, tool, cat: 'Armor', sub, lines }, x || {}));
 const tailorCloth = (out, min, n) => rec('Cloth', out, 'tailoring', min, 'bench', 'sewkit', [{ item: 'cloth', qty: n }], { fixedMat: 'cloth' });
 const tailorHide = (sub, out, min, n, extra) => rec(sub, out, 'tailoring', min, 'bench', 'sewkit', [{ form: 'hide', qty: n }].concat(extra || []), { prim: 'hide', defMat: 'regular' });
-const smith = (sub, out, min, n, extra) => rec(sub, out, 'smithing', min, 'anvil', 'tongs', [{ form: 'ingot', qty: n }].concat(extra || []), { prim: 'metal', defMat: 'iron' });
+const smith = (sub, out, min, n, extra) => rec(sub, out, 'blacksmithy', min, 'anvil', 'tongs', [{ form: 'ingot', qty: n }].concat(extra || []), { prim: 'metal', defMat: 'iron' });
 tailorCloth('cloth_cap', 0, 2); tailorCloth('shirt', 0, 4); tailorCloth('trousers', 0, 4); tailorCloth('cloth_gloves', 5, 2); tailorCloth('tabard', 10, 5); tailorCloth('cloak', 15, 7); tailorCloth('robe', 20, 8);
 tailorHide('Leather', 'leather_cap', 10, 2); tailorHide('Leather', 'leather_gloves', 15, 3); tailorHide('Leather', 'leather_gorget', 20, 4); tailorHide('Leather', 'leather_sleeves', 25, 8);
 tailorHide('Leather', 'leather_leggings', 30, 10); tailorHide('Leather', 'leather_tunic', 35, 12); tailorHide('Leather', 'shoes', 5, 2); tailorHide('Leather', 'boots', 15, 4); tailorHide('Leather', 'belt', 5, 2);
@@ -436,7 +436,7 @@ smith('Helmets', 'bascinet', 10, 15); smith('Helmets', 'open_helm', 30, 15); smi
 smith('Shields', 'metal_shield', 25, 14, [{ item: 'strap', qty: 1 }]); smith('Shields', 'kite_shield', 45, 16, [{ item: 'strap', qty: 1 }]); smith('Shields', 'heater_shield', 65, 18, [{ item: 'strap', qty: 2 }]);
 rec('Shields', 'wooden_shield', 'carpentry', 10, 'bench', 'knife', [{ form: 'log', qty: 6 }, { item: 'strap', qty: 1 }], { prim: 'wood', defMat: 'pine' });
 for (const [out, min, n] of [['dragon_gloves', 85, 8], ['dragon_helm', 87, 10], ['dragon_arms', 90, 14], ['dragon_legs', 92, 18], ['dragon_chest', 95, 22]])
-  rec('Dragon scale', out, 'smithing', min, 'anvil', 'tongs', [{ item: 'dragonscale', qty: n }, { item: 'strap', qty: Math.ceil(n / 4) }], { fixedMat: 'dragonscale' });
+  rec('Dragon scale', out, 'blacksmithy', min, 'anvil', 'tongs', [{ item: 'dragonscale', qty: n }, { item: 'strap', qty: Math.ceil(n / 4) }], { fixedMat: 'dragonscale' });
 smith('Accessories', 'ring', 20, 1); smith('Accessories', 'bracelet', 25, 2); smith('Accessories', 'necklace', 30, 2);
 // woods: the generic lineItem knows ingots and ores; logs follow the same pattern
 const baseLine2 = SF.lineItem; SF.lineItem = (ln, m, s) => ln.form === 'log' ? { id: SF.logId(m), mat: null } : baseLine2(ln, m, s);

@@ -33,6 +33,7 @@ def start(pg, errs, fresh):
     if fresh:
         pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_timeout(600)
         pg.click('[data-c=prof][data-p="Group healer"]'); pg.fill('#ccn', 'Tess'); pg.click('[data-c=go]'); pg.wait_for_timeout(1000)
+        pg.evaluate("__SF.P.str = 60; if (__SF.P.base) __SF.P.base.str = 60; __SF.save()")   # v0.30 healers start at STR 20; the sword and chain tunic below want more
         pg.evaluate(FILL); pg.reload(); pg.wait_for_timeout(600)
     pg.click('[data-c=cont]'); pg.wait_for_timeout(900)
 
@@ -83,8 +84,8 @@ with sync_playwright() as p:
     pg.click(cell('Bandage')); pg.click(cardbtn('Slot')); pg.wait_for_timeout(100)
     check(pg.evaluate("__SF.PANEL") == 'assign' and 'Bandage' in pg.inner_text('#panel'), 'Slot opens hotbar assignment for the bandage')
     pg.evaluate("__SF.ACT.bag()"); pg.wait_for_timeout(100)
-    pg.click(cell('Iron chainmail tunic')); pg.click(cardbtn('Appraise')); pg.wait_for_timeout(100)
-    check(not errs, 'Appraise runs without errors', errs)
+    pg.click(cell('Iron chainmail tunic')); pg.click(cardbtn('Identify')); pg.wait_for_timeout(100)
+    check(not errs, 'Identify (Item Identification) runs without errors', errs)
     pg.evaluate("__SF.ACT.bag()"); pg.click(cell('Roast meat')); pg.click(cell('Roast meat')); pg.wait_for_timeout(100)
     check(pg.evaluate(CARD) is None, 'clicking the selected tile again closes the card')
     pg.evaluate("__SF.save()"); SAVE['raw'] = pg.evaluate("localStorage.getItem('shardfall.save.v1')")

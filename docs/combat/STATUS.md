@@ -1,5 +1,7 @@
 # Combat and First Aid — UO Second Age rules (issue #3)
 
+> v0.30.0: skill gains for every combat skill now come from the classic check (`docs/skills/STATUS.md`): weapon skills learn from the swing's own hit chance, Tactics and Anatomy from every hit, Parrying from every block roll, Healing from every treatment up to 100.0. Braced Guard is an explicit Shardfall extension, switched off in parity mode.
+
 Build: `Shardfall_v0.18.html`. Rules live in `src/rules.js` (pure, tested in node); the world adapter is the
 "physical combat" block in `src/game.js`. Every physical blow — your touch or keyboard attack, the ally, pets,
 summons and creatures — goes through one path: `swingAt` / `strikeOne` → `applyBlow` → `SF.rawDamage` → `SF.mitigate`.
