@@ -1,0 +1,106 @@
+{
+  "version": "1.1.0-draft01",
+  "frame": {
+    "width": 160,
+    "height": 160,
+    "pivot": [
+      80,
+      137
+    ]
+  },
+  "rows": [
+    "S",
+    "SW",
+    "W",
+    "NW",
+    "N",
+    "NE",
+    "E",
+    "SE"
+  ],
+  "columns": [
+    "stepA",
+    "neutral",
+    "stepB",
+    "windup",
+    "impact"
+  ],
+  "animations": {
+    "idle": {
+      "frames": [
+        1
+      ],
+      "durationMs": [
+        1000
+      ],
+      "loop": true
+    },
+    "walk": {
+      "frames": [
+        0,
+        1,
+        2,
+        1
+      ],
+      "durationMs": [
+        125,
+        100,
+        125,
+        100
+      ],
+      "loop": true
+    },
+    "attack": {
+      "frames": [
+        3,
+        4,
+        1
+      ],
+      "durationMs": [
+        230,
+        110,
+        170
+      ],
+      "loop": false,
+      "contactIndex": 1
+    }
+  },
+  "mobs": [
+    {
+      "id": "boar",
+      "name": "Reed boar",
+      "atlas": "boar.png",
+      "boss": false
+    },
+    {
+      "id": "hound",
+      "name": "Marsh hound",
+      "atlas": "hound.png",
+      "boss": false
+    },
+    {
+      "id": "snapper",
+      "name": "Mud snapper",
+      "atlas": "snapper.png",
+      "boss": false
+    },
+    {
+      "id": "spider",
+      "name": "Mire spider",
+      "atlas": "spider.png",
+      "boss": false
+    },
+    {
+      "id": "deer",
+      "name": "Red deer",
+      "atlas": "deer.png",
+      "boss": false
+    },
+    {
+      "id": "hare",
+      "name": "Brown hare",
+      "atlas": "hare.png",
+      "boss": false
+    }
+  ]
+}

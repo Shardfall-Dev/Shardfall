@@ -475,7 +475,7 @@ function drawSummon(g, e, x, y) {
   else { g.fillStyle = c; g.beginPath(); g.ellipse(x, y - 22, 11, 20, 0, 0, 7); g.fill(); g.fillStyle = 'rgba(255,255,255,.7)'; g.fillRect(x - 5, y - 32, 3, 3); g.fillRect(x + 2, y - 32, 3, 3); }
   g.globalAlpha = 1;
 }
-function drawForm(g, e, x, y) { const f = e === P && P.mg && P.mg.form; if (!f) return false; if (MSI[f.type]) return drawSheet(g, f.type, P.sect, P.speed > .3 ? Math.floor(GT * 9) % 4 : 0, x, y); const s = beastSprite({ type: f.type, speed: P.speed, sect: P.sect, state: '' }); g.imageSmoothingEnabled = false; g.drawImage(s, Math.round(x - s.ox), Math.round(y - s.oy)); return true; }
+function drawForm(g, e, x, y) { const f = e === P && P.mg && P.mg.form; if (!f) return false; if (BSI[f.type] && drawBestiary(g, { type: f.type, sect: P.sect, speed: P.speed, state: '', id: 0 }, x, y)) return true; if (MSI[f.type]) return drawSheet(g, f.type, P.sect, P.speed > .3 ? Math.floor(GT * 9) % 4 : 0, x, y); const s = beastSprite({ type: f.type, speed: P.speed, sect: P.sect, state: '' }); g.imageSmoothingEnabled = false; g.drawImage(s, Math.round(x - s.ox), Math.round(y - s.oy)); return true; }
 
 /* ---------- hotbar signs: drag on desktop, "Assign to slot" or long-press on touch ---------- */
 function magicSlots() {
