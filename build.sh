@@ -8,12 +8,13 @@
 # src/bestiary-art.js is generated: python3 tools/embed_bestiary.py
 # src/backpack-icons.js is generated: python3 tools/embed_backpack_icons.py
 # src/equipment-art.js is generated: python3 tools/embed_equipment_art.py > src/equipment-art.js
+# Painted Human Candidates v0.1 (experimental, ?dev&painted=strict): src/painted-art.js is generated (python3 tools/painted_candidates.py --embed); src/painted.js (SF.PAINTED) is pure; src/painted-render.js draws it before the layered renderer.
 # Equipment appearance: src/gear.js (SF.GEAR, after creation) and src/human-rig.js (HUMAN_RIG) are pure; src/gear-render.js draws them (after the equipment UI).
 set -e
 V="${1:?usage: ./build.sh <version> [--offline]}"
 cd "$(dirname "$0")"
 if [ "$2" = "--offline" ]; then OUT="Shardfall_v${V}_offline.html"; MODE=""; else OUT="Shardfall_v$V.html"; MODE="--hosted"; fi
 python3 tools/embed_audio.py assets/audio $MODE > .sfx_embed.tmp
-cat src/head.html src/rules.js src/magery.js src/equipment.js src/stats.js src/creation.js src/gear.js src/human-rig.js src/world.js .sfx_embed.tmp src/audio.js src/assets.js src/magery-art.js src/bestiary-art.js src/backpack-icons.js src/equipment-art.js src/magic.js src/anniabreen.js src/frontier.js src/living.js src/ecology.js src/townlife.js src/game.js src/equipment-ui.js src/gear-render.js src/creation-ui.js src/tail.html > "$OUT"
+cat src/head.html src/rules.js src/magery.js src/equipment.js src/stats.js src/creation.js src/gear.js src/human-rig.js src/painted-art.js src/painted.js src/world.js .sfx_embed.tmp src/audio.js src/assets.js src/magery-art.js src/bestiary-art.js src/backpack-icons.js src/equipment-art.js src/magic.js src/anniabreen.js src/frontier.js src/living.js src/ecology.js src/townlife.js src/game.js src/equipment-ui.js src/gear-render.js src/painted-render.js src/creation-ui.js src/tail.html > "$OUT"
 rm -f .sfx_embed.tmp
 echo "built $OUT ($(du -h "$OUT" | cut -f1))"
