@@ -149,7 +149,7 @@ function stepSound(m) {
   SND.stepAcc += m; if (SND.stepAcc < stride) return; SND.stepAcc %= stride;
   snd(surfaceStep(P.x, P.y), { key: 'P', gain: P.hidden ? .4 : 1 });
 }
-const CRAFT_SND = { tailoring: 'craft.stitch', carpentry: 'craft.saw', fletching: 'craft.fletch', alchemy: 'craft.alchemy', venomcraft: 'craft.alchemy', cooking: 'craft.cook', engineering: 'craft.tinker', trapcraft: 'craft.tinker' };
+const CRAFT_SND = { tailoring: 'craft.stitch', carpentry: 'craft.saw', bowcraft: 'craft.fletch', alchemy: 'craft.alchemy', cooking: 'craft.cook', tinkering: 'craft.tinker', inscription: 'craft.stitch', cartography: 'craft.stitch' };
 function craftSound(r, ok) { if (!sndOnce('craft', .5)) return; snd(!ok ? 'craft.fail' : recipeCat(r) === 'Smelt' ? 'craft.smelt' : CRAFT_SND[r.skill] || (r.station === 'anvil' ? 'craft.smith' : 'craft.saw')); }
 /* spell effects sound at the target or ground point: by spell where it has a clear voice, else by effect, else magic.release */
 const SPELL_SND = { mend: 'magic.heal', gmend: 'magic.heal', cleanse: 'magic.heal', stoneveil: 'magic.ward', step: 'magic.blink', lantern: 'magic.blink', siltbind: 'magic.root', venom: 'magic.poison', hex: 'magic.hex', unweave: 'magic.dispel', reedling: 'magic.summon', ember: 'magic.fire', cinderseal: 'magic.fire', bellfire: 'magic.fire', saltstorm: 'magic.storm', tidelance: 'magic.frost',
@@ -191,7 +191,7 @@ function sndTick() {
 
 /* ---------- player ---------- */
 function newChar(o) {
-  const c = { kind: 'player', pid: 'p1', name: o.name, x: 92.5, y: 304.5, sect: 0, str: o.str, dex: o.dex, int: o.int, skills: SF.newSkills(), pack: SF.newContainer('pack', 'p1'), bank: SF.newContainer('bank', 'p1'), equip: emptyEquip(), eqMig: SF.EQ.MIGRATION, look: o.look || {}, bound: 'quay', freeLessons: 2, hotbar: [null, null, null, null], sw: SF.newSwing(), combatMig: SF.COMBAT_MIGRATION };
+  const c = { kind: 'player', pid: 'p1', name: o.name, x: 92.5, y: 304.5, sect: 0, str: o.str, dex: o.dex, int: o.int, skills: SF.newSkills(), pack: SF.newContainer('pack', 'p1'), bank: SF.newContainer('bank', 'p1'), equip: emptyEquip(), eqMig: SF.EQ.MIGRATION, look: o.look || {}, bound: 'quay', freeLessons: 2, hotbar: [null, null, null, null], sw: SF.newSwing(), combatMig: SF.COMBAT_MIGRATION, t2aMig: SF.SK.MIGRATION };
   c.id = 'p1'; for (const [k, v] of Object.entries(o.skills)) c.skills[k].v = v * 10;
   c.hp = SF.maxHp(c); c.stam = SF.maxStam(c); c.mana = SF.maxMana(c); return c;
 }
@@ -202,10 +202,10 @@ function starterKit() {
   const w = { swordsmanship: P.skills.parrying.v > 0 || P.str < SF.WEAPONS.glaive.str ? 'sword' : 'glaive', fencing: 'dagger', macefighting: 'mace', archery: 'shortbow' }[top];
   if (P.skills[top].v > 0) { P.equip.weapon = SF.newItem(w, 1); if (w === 'shortbow') add('arrow', 80); } else add('dagger', 1);
   if (P.skills.parrying.v > 0 && !(P.equip.weapon && SF.weaponOf(P.equip.weapon).two)) P.equip.shield = SF.EQ.make('buckler', { origin: 'npc' });
-  for (const [k, tool] of [['woodcutting', 'hatchet'], ['mining', 'pickaxe'], ['skinning', 'knife'], ['fishing', 'rod'], ['smithing', 'tongs'], ['tailoring', 'sewkit'], ['carpentry', 'knife'], ['fletching', 'knife']]) if (P.skills[k].v > 0 && !SF.count(P.pack, tool)) add(tool, 1);
-  if (P.skills.spellcraft.v > 0) mageryStarter(add);
+  for (const [k, tool] of [['lumberjacking', 'hatchet'], ['mining', 'pickaxe'], ['fishing', 'rod'], ['blacksmithy', 'tongs'], ['tailoring', 'sewkit'], ['carpentry', 'knife'], ['bowcraft', 'knife']]) if (P.skills[k].v > 0 && !SF.count(P.pack, tool)) add(tool, 1);
+  if (P.skills.magery.v > 0) mageryStarter(add);
   if (P.skills.alchemy.v > 0) add('vial', 6);
-  P.hotbar = [{ k: 'item', id: 'bandage' }, P.skills.spellcraft.v > 0 ? { k: 'spell', id: 'magery.04' } : { k: 'item', id: 'draught' }, P.skills.spellcraft.v > 0 ? { k: 'spell', id: 'magery.05' } : P.skills.concealment.v > 0 ? { k: 'act', id: 'hide' } : { k: 'act', id: 'track' }, { k: 'act', id: 'meditate' }, { k: 'act', id: 'bandother' }];
+  P.hotbar = [{ k: 'item', id: 'bandage' }, P.skills.magery.v > 0 ? { k: 'spell', id: 'magery.04' } : { k: 'item', id: 'draught' }, P.skills.magery.v > 0 ? { k: 'spell', id: 'magery.05' } : P.skills.hiding.v > 0 ? { k: 'act', id: 'hide' } : { k: 'act', id: 'track' }, { k: 'act', id: 'meditate' }, { k: 'act', id: 'bandother' }];
 }
 /* equipment and weight (src/equipment.js, SF.EQ). Weight is shown in weight units (SF.WU per authored kg); worn gear counts. */
 const emptyEquip = () => { const e = {}; for (const s of SF.EQ.SLOT_IDS) e[s] = null; return e; };
@@ -254,7 +254,7 @@ function onPlayerMoved(m) {
   if (P.meditating) { P.meditating = null; log('You stop meditating.'); }
   if (P.prep && !P.prep.sp.walk && Math.hypot(P.x - P.prep.x0, P.y - P.prep.y0) > SF.PREP_DRIFT) interruptPrep('You moved and lost your spell preparation.');
   if (P.task && P.task.still && Math.hypot(P.x - P.task.x0, P.y - P.task.y0) > .5) { log(P.task.label + ' interrupted by movement.'); P.task = null; }
-  if (P.hidden) { P.stepAcc = (P.stepAcc || 0) + m; while (P.stepAcc >= .8) { P.stepAcc -= .8; P.stepBudget--; if (ents.some(e => e.kind === 'mon' && alive(e) && dist(e, P) < 10)) gain('shadowstep', 40); if (P.stepBudget < 0) { reveal('You run out of quiet steps and are revealed.'); break; } } }
+  if (P.hidden) { P.stepAcc = (P.stepAcc || 0) + m; while (P.stepAcc >= .8) { P.stepAcc -= .8; P.stepBudget--; if (ents.some(e => e.kind === 'mon' && alive(e) && dist(e, P) < 10)) gain('stealth', 40); if (P.stepBudget < 0) { reveal('You run out of quiet steps and are revealed.'); break; } } }
   if (P.lootOpen && dist(P.lootOpen, P) > 3) { closePanel(); P.lootOpen = null; }
   if (P.batch && Math.hypot(P.x - P.batch.x0, P.y - P.batch.y0) > .5) stopBatch('You moved; the batch stops.');
   if (PANEL === 'craft' && CUI && Math.hypot(P.x - CUI.x0, P.y - CUI.y0) > .5) closePanel();
@@ -695,10 +695,10 @@ function hide() {
 }
 function finishHide() {
   const threats = ents.filter(e => e.kind === 'mon' && alive(e) && dist(e, P) < 12);
-  const ok = R() < SF.opposed(sv('concealment'), threats.length ? 40 : 10);
-  if (threats.length) gain('concealment', 40);
+  const ok = R() < SF.opposed(sv('hiding'), threats.length ? 40 : 10);
+  if (threats.length) gain('hiding', 40);
   if (!ok) return log('You fail to find cover.', '#a8a8a8');
-  P.hidden = true; P.stepBudget = 2 + Math.floor(sv('shadowstep') / 20); P.stepAcc = 0; log('You are hidden. Walking spends quiet steps; sprinting, attacking or casting reveals you.', '#9fd0ff');
+  P.hidden = true; P.stepBudget = 2 + Math.floor(sv('stealth') / 20); P.stepAcc = 0; log('You are hidden. Walking spends quiet steps; sprinting, attacking or casting reveals you.', '#9fd0ff');
   for (const m of ents) if (m.target === P) { m.target = null; m.state = 'return'; }
 }
 function reveal(msg) { if (!P.hidden) return; P.hidden = false; log(msg || 'You are revealed.', '#ffb070'); }
@@ -745,7 +745,7 @@ function interact() {
   const st = nearestStation(['forge', 'anvil', 'bench', 'still', 'fire']); if (st) return openCraft(st.k);
   for (let r = 1; r <= 2; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { const n = nodeAt(Math.floor(P.x) + dx, Math.floor(P.y) + dy); if (n && n.skill !== 'fishing' && Math.hypot(n.x + .5 - P.x, n.y + .5 - P.y) <= 2) { P.sel = n; return startGather(n); } }
   for (let r = 1; r <= 7; r++) for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2, x = Math.floor(P.x + Math.cos(a) * r), y = Math.floor(P.y + Math.sin(a) * r); if (tAt(x, y) === T.WA && SF.count(P.pack, 'rod')) { const n = { kind: 'node', x, y, t: T.WA, skill: 'fishing', name: 'fishing water' }; P.sel = n; return startGather(n); } }
-  if (sel && sel.kind === 'node') return log('Move closer to the ' + (sel.skill === 'mining' || sel.skill === 'woodcutting' ? nodeLabel(sel) : sel.name) + '.');
+  if (sel && sel.kind === 'node') return log('Move closer to the ' + (sel.skill === 'mining' || sel.skill === 'lumberjacking' ? nodeLabel(sel) : sel.name) + '.');
   log('Nothing to interact with here.');
 }
 /* is something other than the door the more likely intent? explicit selection in reach, or anything usable nearer */
@@ -759,34 +759,35 @@ function nearerThanDoor(dd) {
 function startGather(n) {
   if (P.ghost) return; const tl = gatherTool(n);
   if (!tl.ok) return log('You need a ' + SF.ITEMS[tl.id].n.toLowerCase() + '.', '#ffb070');
-  if (n.skill !== 'fishing') { const tier = nodeTier(n.x, n.y), nm = nodeLabel(n); if (sv(n.skill) < SF.NODE_TIER_MIN[tier]) return log(`This ${nm} is grade ${tier + 1}; it needs ${SF.SKILL[n.skill].n} ${SF.NODE_TIER_MIN[tier]}.`, '#ffb070'); if (nodeStock(n.x, n.y).n <= 0) return log('This ' + nm + ' is exhausted for now.'); }
+  if (n.skill !== 'fishing') { const tier = nodeTier(n.x, n.y), nm = nodeLabel(n); if (n.skill !== 'forage' && sv(n.skill) < SF.NODE_TIER_MIN[tier]) return log(`This ${nm} is grade ${tier + 1}; it needs ${SF.SKILL[n.skill].n} ${SF.NODE_TIER_MIN[tier]}.`, '#ffb070'); if (nodeStock(n.x, n.y).n <= 0) return log('This ' + nm + ' is exhausted for now.'); }
   if (overweight()) return log('You are carrying too much.', '#ffb070');
-  P.task = { kind: 'gather', node: n, label: SF.SKILL[n.skill].n, t0: GT, t1: GT + SF.GATHER_TIME[n.skill], still: true, x0: P.x, y0: P.y }; faceToward(P, n.x + .5, n.y + .5);
+  P.task = { kind: 'gather', node: n, label: n.skill === 'forage' ? 'Foraging' : SF.SKILL[n.skill].n, t0: GT, t1: GT + SF.GATHER_TIME[n.skill], still: true, x0: P.x, y0: P.y }; faceToward(P, n.x + .5, n.y + .5);
   if (n.skill === 'fishing') snd('fish.cast', { key: 'P' });   // the committed cast
 }
+function fishCheck(diff) { gain('fishing', diff); return R() < SF.opposed(sv('fishing'), diff); }
 function finishGather(n) {
-  if (n.skill === 'mining' || n.skill === 'woodcutting') return finishStroke(n);
+  if (n.skill === 'mining' || n.skill === 'lumberjacking') return finishStroke(n);
   const sk = n.skill, tier = sk === 'fishing' ? (Math.hypot(n.x - 92, n.y - 300) < 120 ? 0 : 1) : nodeTier(n.x, n.y), diff = SF.NODE_TIER_DIFF[tier];
   if (sk === 'fishing') { const rod = findTool('rod'); if (!rod) return log('You need a fishing rod.', '#ffb070'); if (spendTool(rod)) log('Your fishing rod snaps.', '#ff6a5a'); }
-  gain(sk, diff, { target: 'node:' + n.x + ',' + n.y });
-  if (R() >= SF.opposed(sv(sk), diff)) { log({ woodcutting: 'You chop but get nothing usable.', mining: 'You break loose rock but no ore.', foraging: 'You find nothing worth taking.', fishing: 'Nothing bites.' }[sk]); if (sk === 'foraging') sndAt('gather.forage', { x: n.x + .5, y: n.y + .5 }); return again(); }
+  if (sk === 'fishing' && !fishCheck(diff)) { log('Nothing bites.'); return again(); }   // forage: picking reagents takes no skill in the Second Age
   if (sk === 'fishing') { give('fish', 1, tier ? { q: tier } : null); simEmit('ResourceGathered', { actor: aidOf(P), skill: sk, item: 'fish', qty: 1, x: n.x, y: n.y }); log('You land a brine perch.'); snd('fish.catch', { key: 'P' }); return again(); }
   const st = nodeStock(n.x, n.y); st.n--; if (st.n <= 0) st.t = GT + 300;
-  const out = NODE_OUT[n.t]; const q = sk === 'foraging' ? 1 + (tier >= 2 ? 1 : 0) : 1; give(out, q, tier ? { q: tier } : null); simEmit('ResourceGathered', { actor: aidOf(P), skill: sk, item: out, qty: q, node: n.y * W + n.x, x: n.x, y: n.y });
+  const out = NODE_OUT[n.t]; const q = sk === 'forage' ? 1 + (tier >= 2 ? 1 : 0) : 1; give(out, q, tier ? { q: tier } : null); simEmit('ResourceGathered', { actor: aidOf(P), skill: sk, item: out, qty: q, node: n.y * W + n.x, x: n.x, y: n.y });
   if (sk === 'mining' && R() < .12) give('ironshard', 2);
   log(`You gather ${q} ${SF.ITEMS[out].n.toLowerCase()}${tier ? ' (grade ' + (tier + 1) + ')' : ''}.`); sndAt('gather.forage', { x: n.x + .5, y: n.y + .5 });
   if (st.n <= 0) { log('The ' + n.name + ' is exhausted.'); return; }
   again();
   function again() { at(.15, () => { if (!P.task && !P.ghost && P.sel === n && Math.hypot(n.x + .5 - P.x, n.y + .5 - P.y) <= (sk === 'fishing' ? 8 : 2) && !overweight() && P.speed < .1) startGather(n); }); }
 }
+/* carving a corpse: any blade does it and it takes no skill (the Second Age had no Skinning skill); hides, meat, sinew and bone as before */
+const carveBlade = () => { const w = P.equip.weapon && SF.weaponOf(P.equip.weapon); return (findTool('knife') || SF.count(P.pack, 'knife') || SF.count(P.pack, 'dagger') || (w && (w.skill === 'swordsmanship' || w.skill === 'fencing'))) ? true : false; };
 function skin(c) {
-  if (!findTool('knife') && !SF.count(P.pack, 'knife')) return log('You need a skinning knife.', '#ffb070'); if (c.skinned) return log('Already skinned.');
-  P.task = { kind: 'skin', corpse: c, label: 'Skinning', t0: GT, t1: GT + SF.GATHER_TIME.skinning, still: true, x0: P.x, y0: P.y };
+  if (!carveBlade()) return log('You need a blade to carve with: a skinning knife, a dagger or an edged weapon in hand.', '#ffb070'); if (c.skinned) return log('Already carved.');
+  P.task = { kind: 'skin', corpse: c, label: 'Carving', t0: GT, t1: GT + SF.GATHER_TIME.carve, still: true, x0: P.x, y0: P.y };
 }
 function finishSkin(c) {
-  const d = MON[c.mon]; gain('skinning', d.diff); c.skinned = true; sndAt('skin.cut', c);
-  if (R() >= SF.opposed(sv('skinning'), d.diff)) { log('You ruin the hide.'); renderPanel(); return; }
-  for (const k in d.skin) { const q = rnd(d.skin[k][0], d.skin[k][1]); if (q) give(k, q); } log('You skin the ' + d.n + '.'); renderPanel();
+  const d = MON[c.mon]; c.skinned = true; sndAt('skin.cut', c);
+  for (const k in d.skin) { const q = rnd(d.skin[k][0], d.skin[k][1]); if (q) give(k, q); } log('You carve the ' + d.n + '.'); renderPanel();
 }
 function openCorpse(c) {
   if (P.ghost) return; if (dist(c, P) > 2) return log('Move within 2 m.'); if (!los(P, c)) return log('No line of sight.');
@@ -873,7 +874,7 @@ const W = 2620, H = 1520, SW = 600;   // v0.23: Saltmarsh keeps its 600×600 sli
 const T = { G: 0, TR: 1, WA: 2, RK: 3, SA: 4, RD: 5, FL: 6, WL: 7, DI: 8, SH: 9, FG: 10, AN: 11, BR: 12, DR: 13, AK: 14, LP: 15, BN: 16, ST: 17, FP: 18, RB: 19, SB: 20, HB: 21, SC: 22, FN: 23, BL: 24, MR: 25, SD: 26, SU: 27, CH: 28, CF: 29 };
 const BLK = new Uint8Array(64); for (const t of [T.TR, T.WA, T.RK, T.WL, T.FG, T.AN, T.AK, T.LP, T.BN, T.ST, T.FP, T.FN, T.BL, T.MR, T.CH]) BLK[t] = 1;
 const LOSB = new Uint8Array(64); SOFT[T.TR] = .2; SOFT[T.RK] = .22; SOFT[T.MR] = .16; for (const t of [T.WL, T.RK, T.FG, T.BL]) LOSB[t] = 1;     // trees and reeds are foliage: no LOS block
-const NODE = { [T.TR]: 'woodcutting', [T.RK]: 'mining', [T.RB]: 'foraging', [T.SB]: 'foraging', [T.HB]: 'foraging', [T.SC]: 'foraging' };
+const NODE = { [T.TR]: 'lumberjacking', [T.RK]: 'mining', [T.RB]: 'forage', [T.SB]: 'forage', [T.HB]: 'forage', [T.SC]: 'forage' };   // forage: reagent picking, an activity with no skill (T2A)
 const NODE_OUT = { [T.TR]: 'pine', [T.RK]: 'ore', [T.RB]: 'reedash', [T.SB]: 'shelldust', [T.HB]: 'marshroot', [T.SC]: 'blacksalt' };
 const NODE_NAME = { [T.TR]: 'tree', [T.RK]: 'rock face', [T.RB]: 'reed bed', [T.SB]: 'shell bank', [T.HB]: 'marshroot clump', [T.SC]: 'salt crust' };
 const map = new Uint8Array(W * H);
@@ -1163,53 +1164,53 @@ function selMon(range, needAware) {
 const ABIL = {
   bandother: { n: 'Bandage other', fn: () => firstAidOther() },
   anatomy: { n: 'Anatomy', cd: 1, fn: () => { if (cdReady('anatomy', 1)) anatomyCheck(); } },
-  search: { n: 'Search', cd: SF.SEARCH.cd, fn: () => { if (P.ghost || !cdReady('search', SF.SEARCH.cd)) return; P.task = { kind: 'search', label: 'Searching', t0: GT, t1: GT + SF.SEARCH.wind, still: true, x0: P.x, y0: P.y }; } },
-  tame: { n: 'Tame', fn: () => { const m = selMon(SF.TAME.range); if (!m) return; const d = MON[m.type]; if (!d.tame || d.boss || d.scout) return log('That creature cannot be tamed.', '#ffb070'); if (sv('taming') < d.tame - 40) return log(`You have no chance with a ${d.n} (difficulty ${d.tame}).`, '#ffb070'); P.task = { kind: 'tame', m, label: 'Taming ' + d.n, t0: GT, t1: GT + SF.TAME.time, still: true, x0: P.x, y0: P.y }; say(P, pick(['Easy now...', 'Steady, steady.', 'Nobody will hurt you.'])); } },
+  detect: { n: 'Detect Hidden', cd: SF.SEARCH.cd, fn: () => { if (P.ghost || !cdReady('detect', SF.SEARCH.cd)) return; P.task = { kind: 'search', label: 'Searching', t0: GT, t1: GT + SF.SEARCH.wind, still: true, x0: P.x, y0: P.y }; } },
+  tame: { n: 'Tame', fn: () => { const m = selMon(SF.TAME.range); if (!m) return; const d = MON[m.type]; if (!d.tame || d.boss || d.scout) return log('That creature cannot be tamed.', '#ffb070'); if (sv('animaltaming') < d.tame - 40) return log(`You have no chance with a ${d.n} (difficulty ${d.tame}).`, '#ffb070'); P.task = { kind: 'tame', m, label: 'Taming ' + d.n, t0: GT, t1: GT + SF.TAME.time, still: true, x0: P.x, y0: P.y }; say(P, pick(['Easy now...', 'Steady, steady.', 'Nobody will hurt you.'])); } },
   vet: { n: 'Treat pet', fn: () => { const p = P.sel && P.sel.kind === 'pet' ? P.sel : ents.find(e => e.kind === 'pet' && !e.gone && dist(e, P) <= SF.VET.range); if (!p || !p.type) return log('Select one of your tamed pets.', '#ffb070'); if (dist(p, P) > SF.VET.range) return log('Stand within 1.5 m of your pet.'); if (!SF.count(P.pack, 'bandage')) return log('You need a bandage.', '#ffb070'); if (p.hp >= p.max) return log('Your pet is not hurt.'); SF.removeQty(P.pack, 'bandage', 1); P.task = { kind: 'vet', p, label: 'Treating ' + p.name, t0: GT, t1: GT + SF.VET.time }; } },
-  lullaby: { n: 'Lullaby', cd: SF.BARD.cd, fn: () => bard('lullaby') },
-  discord: { n: 'Discord', cd: SF.BARD.cd, fn: () => bard('discord') },
+  peace: { n: 'Peacemaking', cd: SF.BARD.cd, fn: () => bard('lullaby') },
+  entice: { n: 'Enticement', cd: SF.BARD.cd, fn: () => bard('discord') },
   provoke: { n: 'Provoke', cd: SF.BARD.cd, fn: () => bard('provocation') },
-  pick: { n: 'Pickpocket', fn: () => { const m = P.sel; if (!m || m.kind !== 'mon' || !MON[m.type].purse) return log('Select an unaware smuggler to pick their pocket.', '#ffb070'); if (dist(m, P) > SF.PICK_RANGE) return log('Get within 1.5 m.', '#ffb070'); if (m.target === P) return log('They are watching you too closely.', '#ffb070'); m.pickCd = m.pickCd || 0; if (GT < m.pickCd) return log('Wait before trying that pocket again.'); m.pickCd = GT + SF.PICK_COOLDOWN; P.task = { kind: 'pick', m, label: 'Pickpocketing', t0: GT, t1: GT + SF.PICK_TIME, still: true, x0: P.x, y0: P.y }; } },
-  coat: { n: 'Coat weapon', fn: () => { const w = P.equip.weapon; if (!w || wDef().ammo || wDef() === SF.WEAPONS.unarmed) return log('Equip a melee weapon to coat.', '#ffb070'); if (wDef().skill === 'macefighting') return log('Mace Fighting weapons cannot carry poison.', '#ffb070'); if (!SF.count(P.pack, 'venom')) return log('You need a mire venom vial (craft one at an alchemy still).', '#ffb070'); const tier = SF.venomTier(sv('venomcraft')); if (!tier) return log('Coating needs Venomcraft 30.', '#ffb070'); P.task = { kind: 'coat', label: 'Coating', t0: GT, t1: GT + 1, still: true, x0: P.x, y0: P.y }; } },
+  steal: { n: 'Steal', fn: () => { const m = P.sel; if (!m || m.kind !== 'mon' || !MON[m.type].purse) return log('Select an unaware smuggler to pick their pocket.', '#ffb070'); if (dist(m, P) > SF.PICK_RANGE) return log('Get within 1.5 m.', '#ffb070'); if (m.target === P) return log('They are watching you too closely.', '#ffb070'); m.pickCd = m.pickCd || 0; if (GT < m.pickCd) return log('Wait before trying that pocket again.'); m.pickCd = GT + SF.PICK_COOLDOWN; P.task = { kind: 'pick', m, label: 'Pickpocketing', t0: GT, t1: GT + SF.PICK_TIME, still: true, x0: P.x, y0: P.y }; } },
+  poison: { n: 'Poison weapon', fn: () => { const w = P.equip.weapon; if (!w || wDef().ammo || wDef() === SF.WEAPONS.unarmed) return log('Equip a melee weapon to coat.', '#ffb070'); if (wDef().skill === 'macefighting') return log('Mace Fighting weapons cannot carry poison.', '#ffb070'); if (!SF.count(P.pack, 'venom')) return log('You need a mire venom vial (craft one at an alchemy still).', '#ffb070'); const tier = SF.venomTier(sv('poisoning')); if (!tier) return log('Applying poison needs Poisoning 30.', '#ffb070'); P.task = { kind: 'coat', label: 'Coating', t0: GT, t1: GT + 1, still: true, x0: P.x, y0: P.y }; } },
   trap: { n: 'Set snare', fn: () => { if (!SF.count(P.pack, 'trapkit')) return log('You need a snare kit.', '#ffb070'); if (TRAPS.filter(t => t.owner === 'P').length >= SF.TRAP.max) return log('You already have two snares set.', '#ffb070'); if (TRAPS.some(t => Math.hypot(t.x - P.x, t.y - P.y) < SF.TRAP.spacing)) return log('Snares must be at least 4 m apart.', '#ffb070'); P.task = { kind: 'trap', label: 'Setting snare', t0: GT, t1: GT + SF.TRAP.place, still: true, x0: P.x, y0: P.y }; } } };
 function bard(skill) {
-  const id = { lullaby: 'lullaby', discord: 'discord', provocation: 'provoke' }[skill];
+  const id = { lullaby: 'peace', discord: 'entice', provocation: 'provoke' }[skill];
   if (!SF.count(P.pack, 'lute')) return log('You need an instrument (a reed lute from the provisioner).', '#ffb070');
   if (GT < (P.bardReady || 0)) return log('Your hands are still recovering from the last song.');
   const m = selMon(SF.BARD.range); if (!m) return; if (MON[m.type].boss) return log(cap1(MON[m.type].n) + ' cannot be swayed by music.', '#ffb070');
   if (skill === 'provocation' && !ents.some(o => o.kind === 'mon' && o !== m && alive(o) && dist(o, m) < 8 && !MON[o.type].boss)) return log('There is no other creature near it to provoke against.', '#ffb070');
   if (!cdReady(id, SF.BARD.cd)) return; P.bardReady = GT + SF.BARD.shared;
-  P.task = { kind: 'bard', skill, m, label: SF.SKILL[skill].n, t0: GT, t1: GT + SF.BARD.prep };
+  P.task = { kind: 'bard', skill, m, label: { lullaby: 'Peacemaking', discord: 'Enticement', provocation: 'Provocation' }[skill], t0: GT, t1: GT + SF.BARD.prep };
 }
 const TASKS = {
-  search: () => { const r = SF.SEARCH.radius(sv('search')); let found = 0, any = 0;
-    for (const m of ents) if (m.kind === 'mon' && m.hidden && dist(m, P) <= r) { any++; if (R() < SF.opposed(sv('search'), 50)) { m.hidden = false; found++; floater(m.x, m.y, 'found!', '#ffe08a'); } }
-    for (const t of TRAPS) if (t.hidden && Math.hypot(t.x - P.x, t.y - P.y) <= r) { any++; if (R() < SF.opposed(sv('search'), t.diff)) { t.hidden = false; found++; } }
-    if (any) gain('search', 45); log(found ? `You uncover ${found} hidden thing${found > 1 ? 's' : ''}.` : 'You find nothing hidden nearby.', found ? '#ffe08a' : undefined); FX.push({ k: 'ring', x: P.x, y: P.y, c: '#ffe08a', t0: GT, dur: .8 }); },
+  search: () => { const r = SF.SEARCH.radius(sv('detectinghidden')); let found = 0, any = 0;
+    for (const m of ents) if (m.kind === 'mon' && m.hidden && dist(m, P) <= r) { any++; if (R() < SF.opposed(sv('detectinghidden'), 50)) { m.hidden = false; found++; floater(m.x, m.y, 'found!', '#ffe08a'); } }
+    for (const t of TRAPS) if (t.hidden && Math.hypot(t.x - P.x, t.y - P.y) <= r) { any++; if (R() < SF.opposed(sv('detectinghidden'), t.diff)) { t.hidden = false; found++; } }
+    if (any) gain('detectinghidden', 45); log(found ? `You uncover ${found} hidden thing${found > 1 ? 's' : ''}.` : 'You find nothing hidden nearby.', found ? '#ffe08a' : undefined); FX.push({ k: 'ring', x: P.x, y: P.y, c: '#ffe08a', t0: GT, dur: .8 }); },
   tame: t => { const m = t.m, d = MON[m.type]; if (!alive(m) || dist(m, P) > SF.TAME.range + .5) return log('The creature is no longer close enough.');
     const need = d.strong ? 2 : 1; if (petSlotsUsed() + need > SF.TAME.slots) return log(`No free control slots (${d.n} needs ${need}).`, '#ffb070');
-    gain('taming', d.tame); if (R() < SF.opposed(sv('taming'), d.tame)) { m.kind = 'pet'; if (m.sp) { m.sp.n--; if (m.sp.camp) m.sp.camp.removed(); m.sp = null; } if (m.sortie) ecoSortieEnd(m); m.leader = null; m.order = 'follow'; m.slots = need; m.name = 'your ' + d.n; m.state = ''; m.target = null; m.hidden = false; for (const e of ents) if (e.target === m) { e.target = null; e.state = 'return'; } P.sel = m; log(`The ${d.n} accepts you. It follows on command.`, '#7ee08a'); }
+    gain('animaltaming', d.tame); if (R() < SF.opposed(sv('animaltaming'), d.tame)) { m.kind = 'pet'; if (m.sp) { m.sp.n--; if (m.sp.camp) m.sp.camp.removed(); m.sp = null; } if (m.sortie) ecoSortieEnd(m); m.leader = null; m.order = 'follow'; m.slots = need; m.name = 'your ' + d.n; m.state = ''; m.target = null; m.hidden = false; for (const e of ents) if (e.target === m) { e.target = null; e.state = 'return'; } P.sel = m; log(`The ${d.n} accepts you. It follows on command.`, '#7ee08a'); }
     else { log('It shies away from you.'); if (R() < d.bite) { m.target = P; m.state = 'chase'; log('It turns on you!', '#ff8a6a'); } } },
   vet: t => { const p = t.p; if (p.gone || dist(p, P) > SF.VET.range + .3) return log('Your pet moved away.'); gain('veterinary', 40); if (R() < SF.opposed(sv('veterinary'), 30)) { const b = p.hp; p.hp = Math.min(p.max, p.hp + SF.VET.heal(sv('veterinary'))); floater(p.x, p.y, '+' + Math.round(p.hp - b), '#7ee08a'); } else log('The treatment does not take.'); },
   bard: t => { const m = t.m; if (!alive(m)) return; const diff = cl(MON[m.type].diff, 25, 75);
     gain('musicianship', diff); if (R() >= SF.opposed(sv('musicianship'), diff)) { log('Your playing falters and draws attention.', '#ffb070'); if (!m.target) { m.target = P; m.state = 'chase'; } return; }
-    snd('bard.' + { lullaby: 'lullaby', discord: 'discord', provocation: 'provoke' }[t.skill], { key: 'P' }); gain(t.skill, diff); if (R() >= SF.opposed(sv(t.skill), diff)) { log('The creature shrugs off your song.', '#ffb070'); if (!m.target) { m.target = P; m.state = 'chase'; } return; }
+    snd('bard.' + { lullaby: 'lullaby', discord: 'discord', provocation: 'provoke' }[t.skill], { key: 'P' }); { const bk = { lullaby: 'peacemaking', discord: 'enticement', provocation: 'provocation' }[t.skill]; gain(bk, diff); if (R() >= SF.opposed(sv(bk), diff)) { log('The creature shrugs off your song.', '#ffb070'); if (!m.target) { m.target = P; m.state = 'chase'; } return; } }
     if (t.skill === 'lullaby') { m.pacified = GT + SF.BARD.lullaby; m.target = null; m.state = 'idle'; if (P.sel === m) P.armed = false; floater(m.x, m.y, 'lulled', '#9fd0ff'); }
     if (t.skill === 'discord') { m.discordUntil = GT + SF.BARD.discordFor; floater(m.x, m.y, 'discorded', '#c97bff'); }
     if (t.skill === 'provocation') { const o = ents.filter(e => e.kind === 'mon' && e !== m && alive(e) && !MON[e.type].boss).sort((a, b) => dist(a, m) - dist(b, m))[0]; if (!o || dist(o, m) > 8) return log('Nothing nearby to set it against.'); m.target = o; m.provoked = GT + SF.BARD.provoke; m.state = 'chase'; floater(m.x, m.y, 'provoked!', '#ff9a6a'); log(`The ${MON[m.type].n} turns on the ${MON[o.type].n}.`); } },
   pick: t => { const m = t.m; if (!alive(m) || dist(m, P) > SF.PICK_RANGE + .2) return log('Your mark slips away.');
-    const units = Math.min(SF.PICK_MAX_UNITS, m.purse || 0); gain('pickpocketing', 55);
+    const units = Math.min(SF.PICK_MAX_UNITS, m.purse || 0); gain('stealing', 55);
     if (!units) return log('Their purse is empty.');
-    if (units * SF.ITEMS.gold.kg > SF.pickMaxKg(sv('pickpocketing'))) return log('Too heavy to lift unnoticed.');
-    if (R() < SF.pickChance(sv('pickpocketing'), units * SF.ITEMS.gold.kg)) { m.purse -= units; give('gold', units); log(`You lift ${units} gold.`, '#ffe08a'); snd('loot.coin', { gain: .6 }); }
+    if (units * SF.ITEMS.gold.kg > SF.pickMaxKg(sv('stealing'))) return log('Too heavy to lift unnoticed.');
+    if (R() < SF.pickChance(sv('stealing'), units * SF.ITEMS.gold.kg)) { m.purse -= units; give('gold', units); log(`You lift ${units} gold.`, '#ffe08a'); snd('loot.coin', { gain: .6 }); }
     else { m.hidden = false; m.target = P; m.state = 'chase'; reveal('You are caught in the act!'); say(m, 'Thief!'); } },
-  coat: () => { const tier = SF.venomTier(sv('venomcraft')); SF.removeQty(P.pack, 'venom', 1); gain('venomcraft', [0, 30, 55, 80][tier]); P.equip.weapon.venom = { tier, charges: SF.VENOM_CHARGES }; log(`Your weapon carries tier ${tier} venom for ${SF.VENOM_CHARGES} hits.`, '#7be07b'); },
+  coat: () => { const tier = SF.venomTier(sv('poisoning')); SF.removeQty(P.pack, 'venom', 1); gain('poisoning', [0, 30, 55, 80][tier]); P.equip.weapon.venom = { tier, charges: SF.VENOM_CHARGES }; log(`Your weapon carries tier ${tier} venom for ${SF.VENOM_CHARGES} hits.`, '#7be07b'); },
   trap: () => { SF.removeQty(P.pack, 'trapkit', 1); snd('trap.set', { key: 'P' }); TRAPS.push({ x: P.x, y: P.y, owner: 'P', hidden: false, armedAt: GT + SF.TRAP.arm, until: GT + SF.TRAP.life, diff: 40 }); log('Snare set. It arms in a second and lasts 3 minutes.'); },
-  disarm: t => { const tr = t.trap; gain('trapcraft', tr.diff); if (R() < SF.opposed(sv('trapcraft'), tr.diff)) { TRAPS.splice(TRAPS.indexOf(tr), 1); give('ironshard', 1); log('You disarm the snare and salvage a shard.'); } else if (R() < .3) { TRAPS.splice(TRAPS.indexOf(tr), 1); springOnPlayer(); } else log('You fail to disarm it.'); },
-  lock: t => { const c = t.chest, diff = SF.CHEST_DIFF[c.tier]; gain('lockwork', diff, { target: 'chest:' + c.x + ',' + c.y });
-    if (R() < SF.opposed(sv('lockwork'), diff)) { c.open = true; c.refill = GT + 600; c.cont = chestLoot(c.tier); log('The lock clicks open.', '#ffe08a'); sndAt('door.unlock', { x: c.x + .5, y: c.y + .5 }); openChest(c, true); }
+  disarm: t => { const tr = t.trap; gain('removetrap', tr.diff); if (R() < SF.opposed(sv('removetrap'), tr.diff)) { TRAPS.splice(TRAPS.indexOf(tr), 1); give('ironshard', 1); log('You disarm the snare and salvage a shard.'); } else if (R() < .3) { TRAPS.splice(TRAPS.indexOf(tr), 1); springOnPlayer(); } else log('You fail to disarm it.'); },
+  lock: t => { const c = t.chest, diff = SF.CHEST_DIFF[c.tier]; gain('lockpicking', diff, { target: 'chest:' + c.x + ',' + c.y });
+    if (R() < SF.opposed(sv('lockpicking'), diff)) { c.open = true; c.refill = GT + 600; c.cont = chestLoot(c.tier); log('The lock clicks open.', '#ffe08a'); sndAt('door.unlock', { x: c.x + .5, y: c.y + .5 }); openChest(c, true); }
     else { SF.removeQty(P.pack, 'lockpick', 1); log('Your lockpick snaps.'); } },
-  appraise: t => { const it = t.item, d = SF.ITEMS[it.id], p = SF.PRICES[it.id] || 1, err = (1 - sv('appraisal') / 100) * .5; gain('appraisal', 30, { target: 'item:' + it.id });
+  appraise: t => { const it = t.item, d = SF.ITEMS[it.id], p = SF.PRICES[it.id] || 1, err = (1 - sv('itemidentification') / 100) * .5; gain('itemidentification', 30, { target: 'item:' + it.id });
     const lo = Math.max(1, Math.round(p * .4 * (1 - err))), hi = Math.round(p * 1.2 * (1 + err));
     log(`${SF.itemName(it)}${it.quality === 'exceptional' ? ' (exceptional)' : ''}: ${it.maker ? 'made by ' + it.maker + ', ' : ''}${it.cond !== undefined ? 'condition ' + Math.round(it.cond) + '/' + (it.maxc || 100) + ', ' : ''}worth about ${lo}–${hi} gold${d.trade ? '' : ', cannot be traded'}.`, '#e8d8b0'); },
   repair: t => { const it = t.item, k = SF.repairSkill(it.id); const rp = SF.repairPlan(it); if (!rp.ok) return log(cap1(rp.reason), '#ffb070'); if (!SF.removeQty(P.pack, 'repairkit', 1)) return log('You need a repair kit.'); gain(k, 30);
@@ -1823,7 +1824,7 @@ function renderTarget() {
   else if (t.kind === 'pet') { const f = cl(t.hp / t.max, 0, 1); body = `<span class="badge neu">●</span><b>${esc(t.name)}</b> <span class="note">${t.order} · ${t.slots || 1} slot${(t.slots || 1) > 1 ? 's' : ''}</span><div class="bar sm"><i style="width:${f * 100}%;background:#5fd068"></i></div>`; btns = btn('petcmd', 'Follow', { c: 'follow' }) + btn('petcmd', 'Stay', { c: 'stay' }) + (t.type ? btn('abil', 'Treat', { id: 'vet' }) : '') + btn('petcmd', 'Dismiss', { c: 'dismiss' }); }
   else if (t.kind === 'npc') { body = `<span class="badge neu" title="neutral">●</span><b>${esc(t.name)}</b>`; btns = `<button class="btn sm ac" data-a="interact">Talk</button>`; }
   else if (t.kind === 'corpse') { const ls = t.cont ? SF.lootStatus(t.cont, P.id, GT) : { label: '' }; body = `<b>${esc(t.name)}</b> <span class="note">${t.mine ? ls.label + ' · ' : ''}${t.cont ? t.cont.items.length + ' stacks' : ''} · ${dist(t, P).toFixed(1)} m</span>`; btns = `<button class="btn sm ac" data-a="interact">Open</button>${t.mon && !t.skinned ? '<button class="btn sm" data-a="skin">Skin</button>' : ''}`; }
-  else if (t.kind === 'node') { const tier = t.skill === 'fishing' ? 0 : nodeTier(t.x, t.y), rw = t.skill === 'mining' || t.skill === 'woodcutting'; const st = t.skill === 'fishing' ? '' : ' · ' + (rw ? nodeNote(t) : `${nodeStock(t.x, t.y).n} left`) + (isQuayNode(t.x, t.y) ? ' · training' : ''); body = `<b>${esc(cap1(rw ? nodeLabel(t) : t.name))}</b> <span class="note">${SF.SKILL[t.skill].n} · grade ${tier + 1} (needs ${SF.NODE_TIER_MIN[tier]})${st} · ${Math.hypot(t.x + .5 - P.x, t.y + .5 - P.y).toFixed(1)} m</span>`; btns = `<button class="btn sm ac" data-a="interact">Gather</button>` + (rw ? `<button class="btn sm" data-a="survey">${t.skill === 'mining' ? 'Survey' : 'Read grain'}</button>` : ''); }
+  else if (t.kind === 'node') { const tier = t.skill === 'fishing' ? 0 : nodeTier(t.x, t.y), rw = t.skill === 'mining' || t.skill === 'lumberjacking'; const st = t.skill === 'fishing' ? '' : ' · ' + (rw ? nodeNote(t) : `${nodeStock(t.x, t.y).n} left`) + (isQuayNode(t.x, t.y) ? ' · training' : ''); body = `<b>${esc(cap1(rw ? nodeLabel(t) : t.name))}</b> <span class="note">${SF.SKILL[t.skill].n} · grade ${tier + 1} (needs ${SF.NODE_TIER_MIN[tier]})${st} · ${Math.hypot(t.x + .5 - P.x, t.y + .5 - P.y).toFixed(1)} m</span>`; btns = `<button class="btn sm ac" data-a="interact">Gather</button>` + (rw ? `<button class="btn sm" data-a="survey">${t.skill === 'mining' ? 'Survey' : 'Read grain'}</button>` : ''); }
   const html = `<div class="trow">${body}<button class="x" data-a="desel" aria-label="Clear target">×</button></div>${btns ? '<div class="acts">' + btns + '</div>' : ''}`; if (el._h !== html) { el.innerHTML = html; el._h = html; }
 }
 const cap1 = s => s[0].toUpperCase() + s.slice(1);
@@ -1916,17 +1917,17 @@ const PANELS = {
     for (const s of SF.EQ.SLOT_IDS) { const it = P.equip[s]; if (!it && !['weapon', 'shield', 'chest'].includes(s)) continue; h += `<div class="row"><span class="v" style="width:5.5em">${SF.EQ.SLOT[s].n}</span>${it ? rowIcon(it) : ''}<span class="nm">${it ? esc(iname(it)) : '<span class="note">empty</span>'}</span>${it && SF.WEARABLE(it.id) && it.cond !== undefined && it.cond < (it.maxc || 100) ? btn('repair', 'Repair', { u: it.uid }) : ''}${it && SF.ITEMS[it.id].trade ? btn('uneq', 'Remove', { s }) : ''}</div>`; }
     return ['Character', h + '<p class="note">Stats do not grow by use. Buy points from Master Vey (up to 225 total).</p>']; },
   skills: () => { let h = `<div class="note">Total ${f1(SF.totalSkill(P))} / 700.0 · ▲ raise · ■ hold · ▼ lower (gives points when you hit the cap)</div>`;
-    if (P.skillPool > 0) h += `<div class="sec">Combat reform</div><p class="note">${f1(P.skillPool)} trained points from skills that merged in the combat reform are waiting. Tap +1.0 on a skill to place them (never past 100.0 or the 700.0 total).</p>`;
+    if (P.skillPool > 0) h += `<div class="sec">Skill reform</div><p class="note">${f1(P.skillPool)} trained points from skills that merged or were retired are waiting. Tap +1.0 on a skill to place them (never past 100.0 or the 700.0 total).</p>`;
     for (const [k, n, g, live] of SF.SKILLS) { const s = P.skills[k]; const lk = s.lock === 'raise' ? '▲' : s.lock === 'hold' ? '■' : '▼'; const tip = SF.SKILL_TIP[k]; h += `<div class="row ${live ? '' : 'na'}"${tip ? ` title="${esc(tip)}"` : ''}><span class="nm">${n}${live ? '' : ' <span class="note">later milestone</span>'}${tip ? `<br><span class="note">${esc(tip)}</span>` : ''}</span><span class="v">${f1(s.v)}</span>${P.skillPool > 0 && s.v < SF.SKILL_MAX ? btn('pool', '+1.0', { k }) : ''}${btn('lock', lk, { k })}</div>`; }
     h += '<div class="sec">Recent skill checks</div>' + (SKLOG.slice(-14).reverse().map(l => `<div class="note">${SF.SKILL[l.k].n}: ${esc(l.r)}</div>`).join('') || '<p class="note">None yet.</p>');
     return ['Skills', h]; },
   spells: () => spellbookPanel(),
-  abilities: () => ['Abilities', `<p class="note">Use now or put an action on a hotbar slot (two bars of four).</p>` + [['bandother', 'Bandage other (Healing: an ally or a player ghost)'], ['anatomy', 'Anatomy (judge a living target)'], ['hide', 'Hide (Concealment)'], ['track', 'Track (Tracking)'], ['meditate', 'Meditate'], ['brace', 'Braced Guard (Parrying 50)'], ['search', 'Search (finds hidden foes and snares)'], ['tame', 'Tame (Taming)'], ['vet', 'Treat pet (Veterinary)'], ['lullaby', 'Lullaby (needs a lute)'], ['discord', 'Discord (needs a lute)'], ['provoke', 'Provoke (needs a lute)'], ['pick', 'Pickpocket a smuggler'], ['coat', 'Coat weapon with venom (Venomcraft 30)'], ['trap', 'Set a snare (Trapcraft)']].map(([id, n]) => `<div class="row"><span class="nm">${n}</span>${ABIL[id] ? btn('abil', 'Use', { id }) : ''}${btn('assign', 'Slot', { k: 'act', id })}</div>`).join('')],
+  abilities: () => ['Abilities', `<p class="note">Use now or put an action on a hotbar slot (two bars of four).</p>` + [['bandother', 'Bandage other (Healing: an ally or a player ghost)'], ['anatomy', 'Anatomy (judge a living target)'], ['hide', 'Hide (Hiding)'], ['track', 'Track (Tracking)'], ['meditate', 'Meditate (Meditation)'], ['detect', 'Detect Hidden (finds hidden foes and snares)'], ['tame', 'Tame (Animal Taming)'], ['vet', 'Treat pet (Veterinary)'], ['peace', 'Peacemaking (needs an instrument)'], ['entice', 'Enticement (needs an instrument)'], ['provoke', 'Provocation (needs an instrument)'], ['steal', 'Steal (Stealing)'], ['poison', 'Poison a weapon (Poisoning 30)'], ['trap', 'Set a snare (a tinker\'s snare kit)']].map(([id, n]) => `<div class="row"><span class="nm">${n}</span>${ABIL[id] ? btn('abil', 'Use', { id }) : ''}${btn('assign', 'Slot', { k: 'act', id })}</div>`).join('')],
   assign: () => ['Choose a slot', `<p class="note">Assign ${esc(ASSIGN.k === 'spell' ? SF.SPELL[ASSIGN.id].n : ASSIGN.k === 'item' ? SF.ITEMS[ASSIGN.id].n : (ABIL[ASSIGN.id] ? ABIL[ASSIGN.id].n : ASSIGN.id))} to:</p><div class="grid2">${P.hotbar.map((_, i) => btn('setslot', 'Bar ' + (1 + Math.floor(i / 3)) + ' · ' + (i % 3 + 1) + ': ' + esc(slotLabel(P.hotbar[i])[0]), { i })).join('')}</div>`],
   loot: () => { const c = P.lootOpen; if (!c || c.gone) return null; const ls = c.cont ? SF.lootStatus(c.cont, P.id, GT) : { label: '' }; let h = `<div class="note">${c.mine ? 'Your body · ' : ''}${esc(ls.label || '')} · crumbles in ${Math.ceil((c.expires - GT) / 60)} min · pack ${P.pack.items.length}/${SF.SLOTS}, ${packKg().toFixed(1)}/${SF.carryKg(P).toFixed(1)} kg</div>`;
     if (!c.cont.items.length) h += '<p class="note">Empty.</p>'; else h += btn('takeall', 'Take all', {}, 'ac');
     for (const it of c.cont.items) h += `<div class="row">${rowIcon(it)}<span class="nm">${esc(iname(it))}</span>${btn('take', 'Take', { u: it.uid })}${it.qty > 1 ? btn('take', 'Half', { u: it.uid, half: 1 }) : ''}</div>`;
-    if (c.mon && !c.skinned) h += '<p>' + btn('skin', 'Skin the remains', {}) + '</p>';
+    if (c.mon && !c.skinned) h += '<p>' + btn('skin', 'Carve the remains', {}) + '</p>';
     return [cap1(c.name), h]; },
   bank: () => { let h = `<div class="note">Bank storage is safe when you die. One account at every bank: the Quay, Mynoc, Vespar, Skara Bryn, Moonglen and the camp strongbox.</div>${btn('depgold', 'Deposit all gold', {}, 'ac')}<div class="sec">Bank (${SF.count(P.bank, 'gold')} gold)</div>`;
     if (!P.bank.items.length) h += '<p class="note">Empty.</p>'; for (const it of P.bank.items) h += `<div class="row">${rowIcon(it)}<span class="nm">${esc(iname(it))}</span>${btn('wd', 'Withdraw', { u: it.uid })}</div>`;
@@ -1945,7 +1946,7 @@ const PANELS = {
   picker: () => ['Which one?', PICK.map((e, i) => `<div class="row"><span class="nm">${esc(e.name)}</span><span class="v">${dist(e, P).toFixed(1)} m</span>${btn('pick', 'Select', { i })}</div>`).join('')],
   menu: () => ['Menu', `<div class="grid2">${btn('open', 'Abilities', { p: 'abilities' })}${btn('open', 'Log', { p: 'log' })}${btn('zoom', 'Zoom ×' + ZOOM)}${btn('mirror', SETTINGS.mirror ? 'Right-handed layout' : 'Left-handed layout')}${btn('sprintt', SETTINGS.stickSprint ? 'Stick sprint: on (push far)' : 'Stick sprint: off (button only)')}${btn('mute', muted ? 'Sound off' : 'Sound on')}${btn('music', SFXA.musicOn ? 'Music on' : 'Music off')}${btn('savenow', 'Save now')}${btn('open', 'How to play', { p: 'help' })}</div><p class="note" style="margin-top:12px">Shardfall web slice · offline M1. ${btn('wipe', 'Delete character', {}, 'on')}</p>`],
   quest: () => questPanel(), journal: () => journalPanel(),
-  help: () => ['How to play', `<p><b>Move</b> with the floating stick on the left. Press <b>Sprint</b> to run faster; it drains 7 stamina a second and switches off when you run out. Tapping the world never moves you.</p><p><b>Target</b> by tapping a creature, person, corpse or resource, or press <b>Target</b> to cycle nearby creatures. Tap your portrait to target yourself.</p><p><b>Attack</b> arms your basic attack on the selected creature; with nothing selected it picks the nearest creature you can see. Enemy spells do the same. You swing whenever it is in reach and your weapon is ready. It never chases, picks targets, casts or loots for you. <b>Cancel</b> disarms and stops actions.</p><p><b>Combat</b> follows the Second Age rules: your weapon skill against the defender's sets the hit chance; Tactics, Anatomy and Strength set the damage; armor absorbs part of each blow; a shield parries with half your Parrying as a percent. Swing speed comes from the weapon and your current stamina. Bows and crossbows reload while you move, but you must stand still to aim, and the shot lands a second later.</p><p><b>First Aid</b>: the bandage slot treats you (15 s; poison 18 s). Tap an ally or a ghost and press <b>Bandage</b> to treat them (5 s; poison 6 s; resurrection 10 s at 80 Healing and Anatomy). Being hit makes your fingers slip and the bandage heal less. Wren, a sellsword by the plaza, will follow you if asked.</p><p><b>Spells</b>: tap a spell slot to prepare (stand still), it is then held for 3 s; tap a target or tap the slot again to release. Ground spells need a tap on the ground. Casting stows your weapon.</p><p><b>Interact</b> gathers, opens bodies and chests, disarms revealed snares, talks and uses stations in reach. Stairs in the Sunken Bell ruin and the north Ashfen hatch lead down three levels to the Bellkeeper.</p><p><b>Menu → Abilities</b> holds Search, Tame, pet care, bard songs, pickpocketing, venom and snares. <b>Bar</b> cycles through three pages of three slots.</p><p><b>Death</b> in the wilderness leaves tradeable gear on your body for 12 minutes. On protected roads you keep your gear. Walk to a shrine or healer, or wait 12 s to return to your bound shrine. Bank what you cannot afford to lose.</p><p><b>Crafting</b>: Interact at the forge, anvil, bench, still or fire. Pick a category, then a recipe: the detail shows every input, the metal, your odds and what a failure costs before you commit. Mining and smithing mentors stand by the public forge.</p><p><b>Skills</b> rise 0.1 at a time from real use against suitable difficulty, to 100 each and 700 total.</p><p class="note">Keyboard: WASD/arrows move, Shift sprints, Space attack, E interact, B bandage self, 1–3 current bar slots, Tab target, Esc cancel.</p>`] };
+  help: () => ['How to play', `<p><b>Move</b> with the floating stick on the left. Press <b>Sprint</b> to run faster; it drains 7 stamina a second and switches off when you run out. Tapping the world never moves you.</p><p><b>Target</b> by tapping a creature, person, corpse or resource, or press <b>Target</b> to cycle nearby creatures. Tap your portrait to target yourself.</p><p><b>Attack</b> arms your basic attack on the selected creature; with nothing selected it picks the nearest creature you can see. Enemy spells do the same. You swing whenever it is in reach and your weapon is ready. It never chases, picks targets, casts or loots for you. <b>Cancel</b> disarms and stops actions.</p><p><b>Combat</b> follows the Second Age rules: your weapon skill against the defender's sets the hit chance; Tactics, Anatomy and Strength set the damage; armor absorbs part of each blow; a shield parries with half your Parrying as a percent. Swing speed comes from the weapon and your current stamina. Bows and crossbows reload while you move, but you must stand still to aim, and the shot lands a second later.</p><p><b>First Aid</b>: the bandage slot treats you (15 s; poison 18 s). Tap an ally or a ghost and press <b>Bandage</b> to treat them (5 s; poison 6 s; resurrection 10 s at 80 Healing and Anatomy). Being hit makes your fingers slip and the bandage heal less. Wren, a sellsword by the plaza, will follow you if asked.</p><p><b>Spells</b>: tap a spell slot to prepare (stand still), it is then held for 3 s; tap a target or tap the slot again to release. Ground spells need a tap on the ground. Casting stows your weapon.</p><p><b>Interact</b> gathers, opens bodies and chests, disarms revealed snares, talks and uses stations in reach. Stairs in the Sunken Bell ruin and the north Ashfen hatch lead down three levels to the Bellkeeper.</p><p><b>Menu → Abilities</b> holds every skill you can use: Detect Hidden, Animal Taming, pet care, the bardic skills, Stealing, Poisoning and more. <b>Bar</b> cycles through three pages of three slots.</p><p><b>Death</b> in the wilderness leaves tradeable gear on your body for 12 minutes. On protected roads you keep your gear. Walk to a shrine or healer, or wait 12 s to return to your bound shrine. Bank what you cannot afford to lose.</p><p><b>Crafting</b>: Interact at the forge, anvil, bench, still or fire. Pick a category, then a recipe: the detail shows every input, the metal, your odds and what a failure costs before you commit. Mining and Blacksmithy mentors stand by the public forge.</p><p><b>Skills</b> rise 0.1 at a time from real use against suitable difficulty, to 100 each and 700 total.</p><p class="note">Keyboard: WASD/arrows move, Shift sprints, Space attack, E interact, B bandage self, 1–3 current bar slots, Tab target, Esc cancel.</p>`] };
 let PICK = [];
 function uiOpen(k) { openPanel(k); snd('ui.open'); }   // deliberate panel changes only, never on re-render
 
@@ -1961,11 +1962,11 @@ const ACT = {
   qwick: () => { if (Q().beacon !== 1 || hasWick()) return; SF.addItem(P.pack, SF.newItem('wick', 1)); log('The Quaywarden hands you another wick.', '#ffe08a'); closePanel(); save(); },
   qturn: () => { if (Q().beacon !== 2) return; Q().beacon = 3; snd('quest.complete'); SF.addItem(P.pack, SF.newItem('bandage', 5)); SF.addItem(P.pack, SF.newItem('gold', 40)); log('Quest complete: A Light for the Quay. +5 bandages, +40 gold.', '#7ee08a'); log('Brine Road runs east to the gate. Past the gate pillars, full-loot wilderness rules begin.', '#ffb070'); closePanel(); save(); },
   atk: toggleArm, interact, bandother: () => firstAidOther(), allycmd: d => allyCommand(d.c),
-  pool: d => { const n = SF.assignPool(P, d.k, 10); if (n) { log(`${SF.SKILL[d.k].n} +${f1(n)} from the combat reform (${f1(P.skillPool)} left).`, '#7fd4ff'); save(); } else log('That skill or your total is at its cap.', '#ffb070'); renderPanel(); }, cancel: () => { P.armed = false; if (P.prep || P.held) cancelCast(); AIM = null; P.batch = null; if (P.task) { log(P.task.label + ' cancelled.'); P.task = null; } P.meditating = null; },
+  pool: d => { const n = SF.assignPool(P, d.k, 10); if (n) { log(`${SF.SKILL[d.k].n} +${f1(n)} from the skill reform (${f1(P.skillPool)} left).`, '#7fd4ff'); save(); } else log('That skill or your total is at its cap.', '#ffb070'); renderPanel(); }, cancel: () => { P.armed = false; if (P.prep || P.held) cancelCast(); AIM = null; P.batch = null; if (P.task) { log(P.task.label + ' cancelled.'); P.task = null; } P.meditating = null; },
   cycle: () => { const L = ents.filter(e => e.kind === 'mon' && alive(e) && dist(e, P) < 16 && los(P, e)).sort((a, b) => dist(a, P) - dist(b, P)); if (!L.length) return log('No creatures in sight.'); const i = L.indexOf(P.sel); P.sel = L[(i + 1) % L.length]; },
   slot: d => useSlot(+d.i + (P.hbPage || 0) * 3), page: () => { P.hbPage = ((P.hbPage || 0) + 1) % 3; },
   abil: d => { ABIL[d.id].fn(); }, petcmd: d => petCommand(d.c), appraise: d => { const it = findU(P.pack, d.u); if (!it) return; closePanel(); P.task = { kind: 'appraise', item: it, label: 'Appraising', t0: GT, t1: GT + SF.APPRAISE_TIME, still: true, x0: P.x, y0: P.y }; },
-  repair: d => { const it = findU(P.pack, d.u) || Object.values(P.equip).find(e => e && e.uid === +d.u); if (!it) return; const k = SF.repairSkill(it.id); const st = nearestStation(k === 'smithing' ? ['anvil', 'forge'] : ['bench']); if (!st) return log(k === 'smithing' ? 'Repair metal at the smithy anvil.' : 'Repair this at a workbench.', '#ffb070'); if (!SF.count(P.pack, 'repairkit')) return log('You need a repair kit.', '#ffb070'); const rp = SF.repairPlan(it); if (!rp.ok) return log(cap1(rp.reason), '#ffb070'); P.task = { kind: 'repair', item: it, label: 'Repairing', t0: GT, t1: GT + SF.CRAFT_TIME, still: true, x0: P.x, y0: P.y }; }, self: () => { P.sel = P; if (P.held && SF.SPELL[P.held.sp.id].t === 'ally') releaseHeld(P); },
+  repair: d => { const it = findU(P.pack, d.u) || Object.values(P.equip).find(e => e && e.uid === +d.u); if (!it) return; const k = SF.repairSkill(it.id); const st = nearestStation(k === 'blacksmithy' ? ['anvil', 'forge'] : ['bench']); if (!st) return log(k === 'blacksmithy' ? 'Repair metal at the smithy anvil.' : 'Repair this at a workbench.', '#ffb070'); if (!SF.count(P.pack, 'repairkit')) return log('You need a repair kit.', '#ffb070'); const rp = SF.repairPlan(it); if (!rp.ok) return log(cap1(rp.reason), '#ffb070'); P.task = { kind: 'repair', item: it, label: 'Repairing', t0: GT, t1: GT + SF.CRAFT_TIME, still: true, x0: P.x, y0: P.y }; }, self: () => { P.sel = P; if (P.held && SF.SPELL[P.held.sp.id].t === 'ally') releaseHeld(P); },
   desel: () => { P.sel = null; P.armed = false; }, ghostret: () => { if (GT - P.ghostAt >= 12) { const s = SHRINES.find(z => z.id === P.bound); resurrect({ x: s.x + .5, y: s.y + .5 }); } },
   equip: d => { equipUid(d.u, d.slot); renderPanel(); },
   uneq: d => { unequipTo(d.s); renderPanel(); }, useitem: d => { const def = SF.ITEMS[d.id]; if (d.id === 'bandage') firstAid(P); else if (def.use === 'eat') eat(d.id); else useConsumable(d.id); renderPanel(); },
@@ -2016,7 +2017,7 @@ const QUAY_FORGE = () => STATIONS.find(s => s.k === 'forge');
 /* ---------- node generations (§3): one specialty per generation, stock and refill from the region table ---------- */
 function nodeRegion(x, y) { return SF.REGIONS[nodeTier(x, y)]; }
 function newNode(x, y, kind, gen) {
-  if (kind === 'mining' || kind === 'woodcutting') { const reg = nodeRegion(x, y); const tab = kind === 'mining' ? reg.ore : reg.wood; return { gen, n: reg.stock, max: reg.stock, t: 0, spec: SF.rollTable(tab, R) }; }
+  if (kind === 'mining' || kind === 'lumberjacking') { const reg = nodeRegion(x, y); const tab = kind === 'mining' ? reg.ore : reg.wood; return { gen, n: reg.stock, max: reg.stock, t: 0, spec: SF.rollTable(tab, R) }; }
   const n = 6 + (hash(x, y) % 6); return { gen, n, max: n, t: 0 };
 }
 function nodeStock(x, y) {
@@ -2027,7 +2028,7 @@ function nodeStock(x, y) {
 }
 const surveyOf = (x, y) => { const s = P.cx.survey[y * W + x], o = RES.get(y * W + x); return s && o && s.gen === o.gen ? s : null; };
 function nodeLabel(n) {
-  if (n.skill !== 'mining' && n.skill !== 'woodcutting') return n.name;
+  if (n.skill !== 'mining' && n.skill !== 'lumberjacking') return n.name;
   const sv0 = surveyOf(n.x, n.y); const seam = n.skill === 'mining';
   if (!sv0) return seam ? 'rock face' : 'tree';
   if (!sv0.id) return seam ? 'unidentified seam' : 'unfamiliar grain';
@@ -2042,7 +2043,7 @@ function nodeNote(n) {
 function findTool(id) { const it = SF.findTool(P.pack, id); if (it) return it; const w = P.equip.weapon; return w && w.id === id && SF.toolUses(w) > 0 ? w : null; }
 function spendTool(it) { if (P.equip.weapon === it) { it.uses = SF.toolUses(it) - 1; if (it.uses <= 0) { P.equip.weapon = null; weaponChanged(); return true; } return false; } return SF.spendTool(P.pack, it); }
 function gatherTool(n) {
-  const id = { woodcutting: 'hatchet', mining: 'pickaxe', fishing: 'rod' }[n.skill]; if (!id) return { ok: true };
+  const id = { lumberjacking: 'hatchet', mining: 'pickaxe', fishing: 'rod' }[n.skill]; if (!id) return { ok: true };
   const it = findTool(id); if (it) return { ok: true, it, id };
   if (n.skill === 'mining' && isQuayNode(n.x, n.y) && pickLoan()) return { ok: true, loan: 'Dena\'s pick', id };
   return { ok: false, id };
@@ -2066,7 +2067,7 @@ function finishStroke(n) {
     log(`You ${sk === 'mining' ? 'break loose' : 'fell'} ${q} ${SF.ITEMS[id].n.toLowerCase()}${mat !== SF.commonOf(sk) ? '!' : '.'}`, mat !== SF.commonOf(sk) ? '#ffe08a' : undefined);
     if (sk === 'mining' && R() < .12) { const r2 = SF.addItem(P.pack, SF.newItem('ironshard', 2), cap()); if (r2.ok) log('Two iron shards come away with it.'); else log('Two iron shards fell away: no room.', '#a8a8a8'); }
     questEvent({ type: 'harvest', skill: sk, mat, qty: q, quay: isQuayNode(n.x, n.y) }); simEmit('ResourceGathered', { actor: aidOf(P), skill: sk, item: id, qty: q, node: n.y * W + n.x, x: n.x, y: n.y });
-  } else log({ woodcutting: 'You chop but get nothing usable.', mining: 'You break loose rock but no ore.' }[sk]);
+  } else log({ lumberjacking: 'You chop but get nothing usable.', mining: 'You break loose rock but no ore.' }[sk]);
   sndAt(sk === 'mining' ? 'gather.mine' : 'gather.chop', { x: n.x + .5, y: n.y + .5 }); gain(sk, gdiff, { target: 'node:' + n.x + ',' + n.y });
   if (tl.it && spendTool(tl.it)) log('Your ' + SF.ITEMS[tl.id].n.toLowerCase() + ' breaks.', '#ff6a5a');
   if (st.n <= 0) { log('The ' + nm + ' is exhausted.'); return; }
@@ -2074,7 +2075,7 @@ function finishStroke(n) {
 }
 /* survey / read the grain: 2 s, needs the tool, no cost, no skill gain */
 function startSurvey(n) {
-  if (P.ghost || !n || (n.skill !== 'mining' && n.skill !== 'woodcutting')) return;
+  if (P.ghost || !n || (n.skill !== 'mining' && n.skill !== 'lumberjacking')) return;
   if (Math.hypot(n.x + .5 - P.x, n.y + .5 - P.y) > 2) return log('Move within 2 m.');
   const tl = gatherTool(n); if (!tl.ok) return log('Surveying needs a ' + SF.ITEMS[tl.id].n.toLowerCase() + '.', '#ffb070');
   const tier = nodeTier(n.x, n.y); if (sv(n.skill) < SF.NODE_TIER_MIN[tier]) return log(`This ground needs ${SF.SKILL[n.skill].n} ${SF.NODE_TIER_MIN[tier]}.`, '#ffb070');
@@ -2104,14 +2105,14 @@ const GQD = {
       { t: 'Show Dena an iron bar (you keep it)', short: 'Show Dena your bar', show: () => SF.count(P.pack, 'ironbar') >= 1, at: () => npcBy('assay') }],
     reward: { gold: 12, pins: ['quarry', 'forge'] }, done: '“Good clean bar. Keep it — the first one is always yours. Mara pays for rivets, if you want to see it worked.”',
     next: 'A Map That Pays (Mining 30) opens in a later build.' },
-  S1: { id: 'S1', guild: 'smithing', npc: 'qsmith', skill: 'smithing', min: 0, n: 'Holdfast',
+  S1: { id: 'S1', guild: 'smithing', npc: 'qsmith', skill: 'blacksmithy', min: 0, n: 'Holdfast',
     say: '“The next tide will pull that ring out. I need four good iron rivets.”',
     steps: [
       { t: 'Get 1 iron bar: Harl sells them, or mine 3 ore at a marked Quay face and smelt it', short: 'Get an iron bar', have: () => SF.count(P.pack, 'ironbar') >= 1, at: () => SF.count(P.pack, 'ore') >= 3 ? QUAY_FORGE() : markedFace() },
       { t: 'Forge 8 iron rivets at the anvil (Mara lends tongs there)', short: 'Forge iron rivets', need: 8, ev: e => e.type === 'make' && e.out === 'rivet' && e.mat === 'iron' ? e.qty : 0, at: () => QUAY_ANVIL() },
       { t: 'Give Mara 4 iron rivets (keep the other four)', short: 'Give Mara 4 rivets', deliver: { id: 'rivet', mat: 'iron', n: 4 }, at: () => npcBy('qsmith') }],
     reward: { gold: 15, pins: ['anvil'], ledger: true }, done: '“That will hold. Keep the other four — a carpenter will want them for hinges. Here is my supply ledger.”',
-    next: 'An Edge for Brine Road (Smithing 20) opens in a later build.' } };
+    next: 'An Edge for Brine Road (Blacksmithy 20) opens in a later build.' } };
 function gqAll() { const q = Q(); return q.guild || (q.guild = {}); }
 function gq(id) { const g = gqAll(); return g[id] || { s: 'none' }; }
 const npcBy = role => ents.find(e => e.kind === 'npc' && e.role === role);
@@ -2316,7 +2317,16 @@ function migrateSave(s, raw) {
   }
   if (s.v < 6) migrateV6(s, raw);
   if (s.v < 7) migrateV7(s, raw);
+  if (s.v < 8) migrateV8(s, raw);
   return s;
+}
+/* v0.30 Second Age skills: 41 Shardfall skills become the 49 classic ones (src/skills.js SF.SK.migrateSkills). Values move in tenths with
+   their locks; Skinning and Foraging points (and any collision) wait in the recoverable skill pool; hotbar actions follow. Once, with a snapshot. */
+function migrateV8(s, raw) {
+  try { if (raw && !localStorage.getItem(SAVEKEY + '.pret2a')) localStorage.setItem(SAVEKEY + '.pret2a', raw); } catch (e) { }
+  const r = SF.SK.migrateSkills(s.char);
+  if (s.ally && s.ally.skills) SF.SK.migrateSkills(s.ally, { pool: false });   // a companion has no pool; her removed points simply lapse (she had none)
+  s.t2aReform = r; s.v = 8;
 }
 /* v0.23 world expansion: the grid grew from 2100 × 900 to W × H and Anniabreen was stretched (annStretch). Everything saved at
    an Anniabreen position follows it: towns move by whole tiles, so town records stay exact; wilderness resource and survey
@@ -2369,7 +2379,7 @@ function petCommand(c) {
   if (c === 'dismiss') { const p = P.sel && P.sel.kind === 'pet' ? P.sel : pets[0]; rmEnt(p); P.sel = null; log(p.name + ' is released into the wild.'); return; }
   const tgt = c === 'attack' ? P.sel : null; if (c === 'attack' && (!tgt || tgt.kind !== 'mon')) return log('Select a creature for your pets to attack.');
   for (const p of (P.sel && P.sel.kind === 'pet' ? [P.sel] : pets)) { if (!los(P, p)) { log(p.name + ' cannot see you.'); continue; }
-    const strong = (p.slots || 1) > 1, ch = p.type ? cl(.6 + sv('beasthandling') / 200 - (strong ? .2 : 0), .3, .98) : 1; if (p.type) gain('beasthandling', strong ? 55 : 30);
+    const strong = (p.slots || 1) > 1, ch = p.type ? cl(.6 + sv('animallore') / 200 - (strong ? .2 : 0), .3, .98) : 1; if (p.type) gain('animallore', strong ? 55 : 30);
     if (R() > ch) { log(p.name + ' ignores you.'); continue; } p.order = c; p.tgt = tgt; }
   say(P, c === 'attack' ? 'Attack!' : c === 'follow' ? 'Heel.' : 'Stay.'); }
 function unequipTo(s) { const r = SF.EQ.unequipItem(P, { slot: s }); if (!r.ok) return false; snd('item.equip'); if (s === 'weapon') weaponChanged(); eqChanged(); return true; }
@@ -2424,7 +2434,7 @@ let deletingSave = false;
 const SAVEKEY = 'shardfall.save.v1';
 function save() {
   if (!P || deletingSave) return false; try {
-    const c = {}; for (const k of ['name', 'x', 'y', 'str', 'dex', 'int', 'hp', 'stam', 'mana', 'skills', 'pack', 'bank', 'equip', 'look', 'bound', 'quest', 'freeLessons', 'hotbar', 'ghost', 'ghostAt', 'gainLog', 'recipeN', 'cx', 'skillPool', 'combatMig', 'eqMig', 'bandSeq', 'bandDone', 'lowerRank']) c[k] = P[k];
+    const c = {}; for (const k of ['name', 'x', 'y', 'str', 'dex', 'int', 'hp', 'stam', 'mana', 'skills', 'pack', 'bank', 'equip', 'look', 'bound', 'quest', 'freeLessons', 'hotbar', 'ghost', 'ghostAt', 'gainLog', 'recipeN', 'cx', 'skillPool', 'combatMig', 't2aMig', 'eqMig', 'bandSeq', 'bandDone', 'lowerRank']) c[k] = P[k];
     c.bandage = bandageSave();
     if (P.base) Object.assign(c, P.base); c.magery = { mig: (P.mg && P.mg.mig) || 0 };
     const corpses = ents.filter(e => e.mine && !e.gone).map(e => ({ x: e.x, y: e.y, items: e.cont.items, left: e.expires - GT, diedAgo: GT - e.cont.diedAt }));
@@ -2432,7 +2442,7 @@ function save() {
     const pets = ents.filter(e => e.kind === 'pet' && e.type && !e.summon && !e.gone && e.hp > 0).map(e => ({ type: e.type, hp: e.hp, order: e.order === 'stay' ? 'stay' : 'follow', slots: e.slots, name: e.name, dx: e.x - P.x, dy: e.y - P.y }));
     const nodes = []; for (const [k, o] of RES) nodes.push([k, o.gen || 1, o.spec || 0, o.n, o.max || 0, Math.round(o.t * 10) / 10]);
     const ally = allySave(); if (ally) { Object.values(ally.equip || {}).forEach(scan); ally.pack.forEach(scan); if (ally.body) ally.body.items.forEach(scan); }
-    localStorage.setItem(SAVEKEY, JSON.stringify({ v: 7, char: c, corpses, pets, nodes, ally, sim: WS ? WS.save() : null, eco: ecoSave(), life: lifeSave(), uid: maxUid + 1, gt: GT, savedAt: Date.now() }));
+    localStorage.setItem(SAVEKEY, JSON.stringify({ v: 8, char: c, corpses, pets, nodes, ally, sim: WS ? WS.save() : null, eco: ecoSave(), life: lifeSave(), uid: maxUid + 1, gt: GT, savedAt: Date.now() }));
     DEV.lastSave = { ok: true, at: GT }; return true;
   } catch (e) { DEV.lastSave = { ok: false, at: GT }; return false; }
 }
@@ -2440,12 +2450,12 @@ function loadSave() { try { const s = localStorage.getItem(SAVEKEY); return s ? 
 
 /* ---------- boot & creation ---------- */
 const PROFILES = {
-  'Glaive hybrid': { s: [55, 45, 50], k: { swordsmanship: 50, spellcraft: 30, tactics: 20 }, ideal: 'Swordsmanship, Tactics, Spellcraft, Spell Focus, Wardcraft, Meditation, Wrestling' },
-  'Venom skirmisher': { s: [50, 60, 40], k: { fencing: 50, tactics: 30, healing: 20 }, ideal: 'Fencing, Tactics, Anatomy, Healing, Wardcraft, Venomcraft, Concealment' },
-  'Group healer': { s: [40, 40, 70], k: { spellcraft: 50, healing: 30, meditation: 20 }, ideal: 'Spellcraft, Spell Focus, Wardcraft, Meditation, Wrestling, Healing, Anatomy' },
-  'Archer scout': { s: [45, 65, 40], k: { archery: 50, tactics: 30, concealment: 20 }, ideal: 'Archery, Tactics, Anatomy, Healing, Tracking, Concealment, Shadowstep' },
-  'Mace dexer': { s: [60, 60, 30], k: { macefighting: 50, tactics: 30, healing: 20 }, ideal: 'Mace Fighting, Tactics, Anatomy, Healing, Parrying, Wardcraft, Wrestling' },
-  'Merchant smith': { s: [60, 50, 40], k: { mining: 40, smithing: 40, woodcutting: 20 }, ideal: 'Mining, Smithing, Engineering, Carpentry, Woodcutting, Appraisal, Tailoring' } };
+  'Glaive hybrid': { s: [55, 45, 50], k: { swordsmanship: 50, magery: 30, tactics: 20 }, ideal: 'Swordsmanship, Tactics, Magery, Evaluating Intelligence, Resisting Spells, Meditation, Wrestling' },
+  'Venom skirmisher': { s: [50, 60, 40], k: { fencing: 50, tactics: 30, healing: 20 }, ideal: 'Fencing, Tactics, Anatomy, Healing, Resisting Spells, Poisoning, Hiding' },
+  'Group healer': { s: [40, 40, 70], k: { magery: 50, healing: 30, meditation: 20 }, ideal: 'Magery, Evaluating Intelligence, Resisting Spells, Meditation, Wrestling, Healing, Anatomy' },
+  'Archer scout': { s: [45, 65, 40], k: { archery: 50, tactics: 30, hiding: 20 }, ideal: 'Archery, Tactics, Anatomy, Healing, Tracking, Hiding, Stealth' },
+  'Mace dexer': { s: [60, 60, 30], k: { macefighting: 50, tactics: 30, healing: 20 }, ideal: 'Mace Fighting, Tactics, Anatomy, Healing, Parrying, Resisting Spells, Wrestling' },
+  'Merchant smith': { s: [60, 50, 40], k: { mining: 40, blacksmithy: 40, lumberjacking: 20 }, ideal: 'Mining, Blacksmithy, Tinkering, Carpentry, Lumberjacking, Item Identification, Tailoring' } };
 let CC = { name: '', prof: 'Glaive hybrid', s: [55, 45, 50], k: Object.entries(PROFILES['Glaive hybrid'].k), cloak: '' };
 const CLOAKS = ['', '#8a2a2a', '#2a3a8a', '#5a2a6a', '#3a3a3a', '#8a6a2a'];
 function renderCC() {
@@ -2492,6 +2502,7 @@ function boot(saved, fresh) {
   log('Welcome to Saltmarsh Quay, ' + P.name + '. Bank what you cannot afford to lose.', '#ffe08a');
   log('Left stick moves; the Sprint button runs. Tap to target. Attack arms your swings. Interact gathers, loots and talks.', '#b6a68a');
   if (P.ghost) log('You are a ghost. Follow the golden arrow to a shrine or healer.', '#ff6a5a');
+  if (saved && saved.t2aReform && saved.t2aReform.changed) { log('Your skills now follow the Second Age: 49 classic skills under their own names. Every trained point moved with them.', '#ffe08a'); if (saved.t2aReform.displaced) log(`Skinning and Foraging are activities now, not skills: their ${f1(saved.t2aReform.displaced)} points wait on your Skills page to be placed.`, '#ffe08a'); }
   if (saved && saved.combatReform && saved.combatReform.changed) { log('The combat skills now follow the Second Age: Swordsmanship, Mace Fighting, Fencing, Archery, Wrestling, Parrying and Healing. Your trained points moved with them.', '#ffe08a'); if (P.skillPool > 0) log(`${f1(P.skillPool)} points from merged skills wait on your Skills page.`, '#ffe08a'); }
   if (!saved) log('Wren, a quay sellsword, nurses a wound by the plaza. Tap her to bandage her or ask her to follow you.', '#b6a68a');
   if (VH > VW) $('#rot').hidden = false; save(); refreshHud();

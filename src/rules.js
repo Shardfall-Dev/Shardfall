@@ -23,32 +23,73 @@ SF.carryKg = c => SF.carryCap(c) / SF.WU;
 SF.SLOTS = Infinity;                                                      // no backpack stack limit (v0.25)
 SF.WALK = 4.1; SF.SPRINT = 5.3; SF.SPRINT_DRAIN = 7; SF.STAM_REGEN = 5; SF.STAM_REGEN_COMBAT = 3; SF.STAM_DELAY = 0.75;
 
-/* ---------------- skills (41) ---------------- */
-// [key, name, group, implemented in this build]. Combat keys follow UO Second Age (issue #3); old saves migrate once (SF.migrateCombatSkills).
-SF.SKILLS = [
- ['swordsmanship','Swordsmanship','combat',1],['macefighting','Mace Fighting','combat',1],['fencing','Fencing','combat',1],['archery','Archery','combat',1],
- ['wrestling','Wrestling','combat',1],['tactics','Tactics','combat',1],['anatomy','Anatomy','combat',1],['parrying','Parrying','combat',1],
- ['healing','Healing','support',1],['spellcraft','Spellcraft','magic',1],['focus','Spell Focus','magic',1],
- ['wardcraft','Wardcraft','magic',1],['meditation','Meditation','magic',1],['alchemy','Alchemy','craft',1],['venomcraft','Venomcraft','stealth',1],
- ['concealment','Concealment','stealth',1],['shadowstep','Shadowstep','stealth',1],['search','Search','stealth',1],['tracking','Tracking','wild',1],
- ['pickpocketing','Pickpocketing','stealth',1],['lockwork','Lockwork','stealth',1],['trapcraft','Trapcraft','stealth',1],['taming','Taming','wild',1],
- ['beasthandling','Beast Handling','wild',1],['veterinary','Veterinary','wild',1],['musicianship','Musicianship','bard',1],['lullaby','Lullaby','bard',1],
- ['discord','Discord','bard',1],['provocation','Provocation','bard',1],['woodcutting','Woodcutting','gather',1],['mining','Mining','gather',1],
- ['foraging','Foraging','gather',1],['skinning','Skinning','gather',1],['fishing','Fishing','gather',1],['smithing','Smithing','craft',1],
- ['carpentry','Carpentry','craft',1],['tailoring','Tailoring','craft',1],['fletching','Fletching','craft',1],['engineering','Engineering','craft',1],
- ['cooking','Cooking','craft',1],['appraisal','Appraisal','craft',1]];
-SF.SKILL_TIP = {
-  swordsmanship: 'Hit chance with swords, axes, the glaive and the skinning knife. Also your defence while one is in hand.',
-  macefighting: 'Hit chance with maces, war hammers, staves and the war axe. Mace and war hammer hits drain 3–5 stamina and wear the armor they strike.',
-  fencing: 'Hit chance with daggers, kryss and spears. Also your defence while one is in hand.',
-  archery: 'Hit chance with bows (arrows) and crossbows (bolts). Stand still to aim; the shot lands a second later.',
-  wrestling: 'Unarmed attack and unarmed defence.',
-  tactics: 'Weapon damage: 50% of the rolled damage at 0, 150% at 100. Does not change hit chance.',
-  anatomy: 'Adds up to 20% weapon damage and raises bandage healing. Use it on a living target to judge strength and dexterity (and stamina above 80).',
-  parrying: 'With a shield: half your Parrying as a percent chance to block part of a physical hit.',
-  healing: 'First Aid with bandages: heal wounds; cure poison at 60 Healing and 60 Anatomy; resurrect another player at 80 and 80.' };
-SF.SKILL = {}; for (const [k, n, g, live] of SF.SKILLS) SF.SKILL[k] = { k, n, g, live: !!live };
-
+/* ---------------- skills: the 49 classic skills of UO The Second Age (docs/skills/T2A_SKILL_PARITY_v1.md) ----------------
+   One authoritative registry. Each row: id, display name, classic skill-window group, active (has a use button), target mode,
+   usage delay (s), dependencies, stat-gain weights {str, dex, int} (chance per skill gain = weight / 33.3, RunUO-style; a
+   reconstruction, not verified per patch), stat-bonus weights (how much each stat lifts the displayed value), state, help.
+   state: 'live' = real mechanics in this build, 'partial' = works but with a documented gap, 'pending' = not yet usable.
+   The engine (gain, stats, migration, per-skill mechanics) lives in src/skills.js (SF.SK). */
+SF.SKILL_GROUPS = [['misc', 'Miscellaneous'], ['combat', 'Combat'], ['trade', 'Trade skills'], ['magic', 'Magic'], ['wild', 'Wilderness'], ['thief', 'Thieving'], ['bard', 'Bardic']];
+SF.SKILL_DEFS = [
+  // id, name, group, active, target, delay, deps, gain weights [s,d,i], bonus weights [s,d,i], state, help
+  ['alchemy', 'Alchemy', 'trade', 0, 'craft', 0, [], [0, .5, .5], [0, .5, .5], 'live', 'Brew potions at an alchemy still: healing, cure, stamina, mana, explosion and four strengths of poison.'],
+  ['anatomy', 'Anatomy', 'misc', 1, 'creature', 1, [], [.15, .15, .7], [0, 0, 1], 'live', 'Adds up to 20% weapon damage and improves bandage healing. Use it on a living target to judge its strength and dexterity.'],
+  ['animallore', 'Animal Lore', 'wild', 1, 'creature', 1, [], [0, 0, 1], [0, 0, 1], 'live', 'Study a creature: its health, strength, diet and, for pets, how content it is. Helps you control difficult pets and treat them.'],
+  ['itemidentification', 'Item Identification', 'misc', 1, 'item', 1, [], [0, 0, 1], [0, 0, 1], 'live', 'Reveal an item\'s hidden properties, maker, condition and fair price.'],
+  ['armslore', 'Arms Lore', 'misc', 1, 'item', 1, [], [.75, .15, .1], [0, .5, .5], 'pending', 'Judge a weapon or piece of armor: condition, quality, how hard it hits or how well it protects.'],
+  ['parrying', 'Parrying', 'combat', 0, 'none', 0, [], [.75, .25, 0], [0, 1, 0], 'live', 'With a shield: half your Parrying as a percent chance to block part of a physical hit.'],
+  ['begging', 'Begging', 'misc', 1, 'npc', 10, [], [0, 0, 0], [0, 0, 1], 'pending', 'Plead with townsfolk for a few coins. Each person gives at most once in a while.'],
+  ['blacksmithy', 'Blacksmithy', 'trade', 0, 'craft', 0, [], [1, 0, 0], [.5, .5, 0], 'live', 'Forge weapons, armor and fittings at an anvil, and repair metal gear.'],
+  ['bowcraft', 'Bowcraft & Fletching', 'trade', 0, 'craft', 0, [], [.6, 1.6, 0], [0, 1, 0], 'live', 'Make bows, crossbows, arrows and bolts at a bench.'],
+  ['peacemaking', 'Peacemaking', 'bard', 1, 'self', 10, ['musicianship'], [0, 0, 0], [0, .5, .5], 'live', 'Play to calm every creature around you; fighting stops for a few moments. Needs an instrument and a Musicianship check.'],
+  ['camping', 'Camping', 'wild', 1, 'item', 2, [], [2, 1.5, 1.5], [0, .5, .5], 'pending', 'Light kindling into a campfire. After a while the camp is secure: make camp with a bedroll to rest and save safely.'],
+  ['carpentry', 'Carpentry', 'trade', 0, 'craft', 0, [], [2, .5, 0], [.5, .5, 0], 'live', 'Work wood into shields, furniture and kits at a bench, and repair wooden gear.'],
+  ['cartography', 'Cartography', 'misc', 1, 'craft', 0, [], [0, .75, .75], [0, .5, .5], 'pending', 'Draw maps with a mapmaker\'s pen, and decode treasure maps.'],
+  ['cooking', 'Cooking', 'trade', 0, 'craft', 0, [], [0, 2, 3], [0, .5, .5], 'live', 'Cook meat, fish and meals over a fire.'],
+  ['detectinghidden', 'Detecting Hidden', 'thief', 1, 'self', 10, [], [0, .4, .6], [0, 0, 1], 'live', 'Search the area around you for hidden creatures and traps. Range grows with skill.'],
+  ['enticement', 'Enticement', 'bard', 1, 'creature', 10, ['musicianship'], [0, .25, .25], [0, .5, .5], 'live', 'Lure a creature to you with music: it leaves what it was doing and comes to listen.'],
+  ['evaluatingintelligence', 'Evaluating Intelligence', 'magic', 1, 'creature', 1, [], [0, 0, 1], [0, 0, 1], 'live', 'Raises the damage of your spells. Use it on a creature to judge its intelligence and mana.'],
+  ['healing', 'Healing', 'misc', 0, 'none', 0, ['anatomy'], [.6, .6, .8], [0, .5, .5], 'live', 'First Aid with bandages: heal wounds; cure poison at 60 Healing and 60 Anatomy; resurrect another player at 80 and 80.'],
+  ['fishing', 'Fishing', 'wild', 0, 'ground', 0, [], [.5, .5, 0], [0, .5, .5], 'live', 'Fish open water with a rod. Skilled anglers sometimes pull up more than fish.'],
+  ['forensicevaluation', 'Forensic Evaluation', 'misc', 1, 'corpse', 1, [], [0, .2, .8], [0, 0, 1], 'pending', 'Examine a body or a forced lock: who did it and how long ago.'],
+  ['herding', 'Herding', 'wild', 1, 'creature', 1, [], [1, 1, .1], [0, .5, .5], 'pending', 'With a shepherd\'s crook, direct an animal to walk to a spot you choose.'],
+  ['hiding', 'Hiding', 'thief', 1, 'self', 10, [], [0, .8, .2], [0, 1, 0], 'live', 'Slip out of sight. Walking reveals you unless you also have Stealth; acting or being found reveals you.'],
+  ['provocation', 'Provocation', 'bard', 1, 'creature2', 10, ['musicianship'], [0, .45, .05], [0, .5, .5], 'live', 'Play to set one creature against another: choose the first, then the second. Failure turns them on you.'],
+  ['inscription', 'Inscription', 'magic', 0, 'craft', 0, ['magery'], [0, .2, .8], [0, 0, 1], 'pending', 'Write spell scrolls from your spellbook onto blank scrolls with the spell\'s reagents and mana.'],
+  ['lockpicking', 'Lockpicking', 'thief', 1, 'item', 2, [], [0, 2, 0], [0, 1, 0], 'live', 'Pick locked chests and boxes with lockpicks.'],
+  ['magery', 'Magery', 'magic', 0, 'none', 0, [], [0, 0, 1.5], [0, 0, 1], 'live', 'Cast the eight circles of spells from your spellbook. Higher circles need more skill.'],
+  ['resistingspells', 'Resisting Spells', 'magic', 0, 'none', 0, [], [.25, .25, .5], [0, 0, 0], 'live', 'A chance to halve the damage of hostile spells. It rises when resistible magic strikes you.'],
+  ['tactics', 'Tactics', 'combat', 0, 'none', 0, [], [2, 0, 0], [0, 0, 0], 'live', 'Weapon damage: 50% of the rolled damage at 0, 150% at 100. Does not change hit chance.'],
+  ['snooping', 'Snooping', 'thief', 1, 'creature', 1, [], [0, 2.5, 0], [0, 1, 0], 'pending', 'Peek into someone\'s pack without being noticed. Needed to see what you might steal.'],
+  ['musicianship', 'Musicianship', 'bard', 1, 'self', 5, [], [0, .8, .2], [0, 1, 0], 'live', 'Play an instrument well. Every bardic skill checks it first.'],
+  ['poisoning', 'Poisoning', 'thief', 1, 'item', 2, [], [0, .4, 1.6], [0, 0, 1], 'live', 'Apply a poison potion to a bladed or piercing weapon, or to food.'],
+  ['archery', 'Archery', 'combat', 0, 'none', 0, [], [.25, .75, 0], [0, 1, 0], 'live', 'Hit chance with bows (arrows) and crossbows (bolts). Stand still to aim; the shot lands a second later.'],
+  ['spiritspeak', 'Spirit Speak', 'magic', 1, 'self', 10, [], [0, 0, 1], [0, 0, 1], 'pending', 'Open your ears to the dead for a while: ghosts and restless spirits speak plainly to you.'],
+  ['stealing', 'Stealing', 'thief', 1, 'item', 10, [], [0, 1, 0], [0, 1, 0], 'live', 'Take an item from someone\'s pack. Heavier items are harder; being caught has consequences.'],
+  ['tailoring', 'Tailoring', 'trade', 0, 'craft', 0, [], [.38, 1.63, .5], [0, 1, 0], 'live', 'Sew cloth and leather into clothing and armor, and make bandages.'],
+  ['animaltaming', 'Animal Taming', 'wild', 1, 'creature', 10, [], [1.4, .2, .4], [0, 0, 1], 'live', 'Tame a wild creature. Each kind needs a minimum skill; stronger creatures need an experienced master to obey.'],
+  ['tasteidentification', 'Taste Identification', 'misc', 1, 'item', 1, [], [.2, 0, .8], [0, 0, 1], 'pending', 'Taste food, drink or a potion to find poison and how strong it is.'],
+  ['tinkering', 'Tinkering', 'trade', 0, 'craft', 0, [], [.5, .2, .3], [0, .5, .5], 'live', 'Make tools, lockpicks, lockboxes, traps and devices.'],
+  ['tracking', 'Tracking', 'wild', 1, 'self', 10, [], [0, 1.25, 1.25], [0, .5, .5], 'live', 'Choose animals, monsters or people, then one of them: an arrow follows its trail.'],
+  ['veterinary', 'Veterinary', 'wild', 1, 'creature', 0, ['animallore'], [.8, .4, .4], [0, .5, .5], 'live', 'Bandage a pet: heal it; cure its poison at 60 Veterinary and 60 Animal Lore.'],
+  ['swordsmanship', 'Swordsmanship', 'combat', 0, 'none', 0, [], [.75, .25, 0], [.5, .5, 0], 'live', 'Hit chance with swords, axes, the halberd and the skinning knife. Also your defence while one is in hand.'],
+  ['macefighting', 'Mace Fighting', 'combat', 0, 'none', 0, [], [.9, .1, 0], [1, 0, 0], 'live', 'Hit chance with maces, war hammers, staves and the war axe. Mace and war hammer hits drain stamina and wear armor.'],
+  ['fencing', 'Fencing', 'combat', 0, 'none', 0, [], [.45, .55, 0], [0, 1, 0], 'live', 'Hit chance with daggers, kryss and spears. Also your defence while one is in hand.'],
+  ['wrestling', 'Wrestling', 'combat', 0, 'none', 0, [], [.9, .1, 0], [1, 0, 0], 'live', 'Unarmed attack and unarmed defence.'],
+  ['lumberjacking', 'Lumberjacking', 'trade', 0, 'ground', 0, [], [2, 0, 0], [1, 0, 0], 'live', 'Chop logs from trees with a hatchet or axe. Rare woods need high skill.'],
+  ['mining', 'Mining', 'trade', 0, 'ground', 0, [], [2, 0, 0], [1, 0, 0], 'live', 'Dig ore with a pickaxe and smelt it at a forge. Coloured ores need high skill.'],
+  ['meditation', 'Meditation', 'magic', 1, 'self', 10, [], [0, 0, 2], [0, 0, 1], 'live', 'Passively speeds mana return in light armor; meditate to double it (at most 2 mana per second). Metal armor and anything in hand block it.'],
+  ['stealth', 'Stealth', 'thief', 1, 'self', 10, ['hiding'], [0, 0, 0], [0, 1, 0], 'live', 'While hidden, with 80 Hiding: move a step for every 10 points of Stealth without being seen. Heavy armor makes it harder.'],
+  ['removetrap', 'Remove Trap', 'thief', 1, 'item', 10, ['lockpicking', 'detectinghidden'], [0, 1, 0], [0, 1, 0], 'live', 'Disarm a trapped box or snare. Needs 50 Lockpicking and 50 Detecting Hidden.']];
+/* tuples for older callers: [id, name, group, usable now] in alphabetical display order */
+SF.SKILLS = SF.SKILL_DEFS.map(d => [d[0], d[1], d[2], d[9] === 'pending' ? 0 : 1]).sort((a, b) => a[1].localeCompare(b[1]));
+SF.SKILL = {}; SF.SKILL_TIP = {};
+for (const d of SF.SKILL_DEFS) {
+  const [k, n, g, act, tgt, cd, deps, gw, bw, state, help] = d;
+  SF.SKILL[k] = { k, n, g, live: state !== 'pending', active: !!act, tgt, cd, deps, gain: { str: gw[0], dex: gw[1], int: gw[2] }, bonus: { str: bw[0], dex: bw[1], int: bw[2] }, state, help };
+  SF.SKILL_TIP[k] = help;
+}
+SF.SKILL_COUNT = SF.SKILL_DEFS.length;   // 49
 SF.newSkills = () => { const s = {}; for (const [k] of SF.SKILLS) s[k] = { v: 0, lock: 'raise' }; return s; };
 SF.totalSkill = ch => Object.values(ch.skills).reduce((a, s) => a + s.v, 0);
 SF.sv = (ch, k) => (ch.skills && ch.skills[k] ? ch.skills[k].v / 10 : (ch.sk && ch.sk[k]) || 0);
@@ -325,9 +366,9 @@ SF.ITEMS = {
   cinder:     { n: 'Cinder flask', kg: .4, stack: 1, cat: 'potion', use: 'consume' },
   arrow:      { n: 'Arrow', kg: .01, stack: 1, cat: 'ammo' },
   bolt:       { n: 'Bolt', kg: .02, stack: 1, cat: 'ammo' },
-  hatchet:    { n: 'Hatchet', kg: 1.5, cat: 'tool', tool: 'woodcutting', slot: 'weapon', wpn: 'hatchet' },
+  hatchet:    { n: 'Hatchet', kg: 1.5, cat: 'tool', tool: 'lumberjacking', slot: 'weapon', wpn: 'hatchet' },
   pickaxe:    { n: 'Pickaxe', kg: 2.5, cat: 'tool', tool: 'mining', slot: 'weapon', wpn: 'pickaxe' },
-  knife:      { n: 'Skinning knife', kg: .3, cat: 'tool', tool: 'skinning', slot: 'weapon', wpn: 'knife' },
+  knife:      { n: 'Skinning knife', kg: .3, cat: 'tool', tool: 'carve', slot: 'weapon', wpn: 'knife' },
   rod:        { n: 'Fishing rod', kg: 1, cat: 'tool', tool: 'fishing' },
   tongs:      { n: 'Smith tongs', kg: 1, cat: 'tool', tool: 'smithing' },
   sewkit:     { n: 'Sewing kit', kg: .3, cat: 'tool', tool: 'tailoring' },
@@ -421,25 +462,25 @@ SF.unitsOf = conts => { const m = {}; for (const c of conts) for (const it of (c
 /* ---------------- recipes (§9) ---------------- */
 // out, qty, skill, min (hard threshold), diff, station, tool, inputs
 SF.RECIPES = [
-  { id: 'ironbar', out: 'ironbar', qty: 1, skill: 'smithing', min: 0, diff: 15, station: 'forge', inputs: { ore: 3 } },
-  { id: 'ironshard', out: 'ironshard', qty: 6, skill: 'smithing', min: 0, diff: 10, station: 'anvil', tool: 'tongs', inputs: { ironbar: 1 } },
-  { id: 'dagger', out: 'dagger', qty: 1, skill: 'smithing', min: 10, diff: 25, station: 'anvil', tool: 'tongs', inputs: { ironbar: 1, strap: 1 } },
-  { id: 'sword', out: 'sword', qty: 1, skill: 'smithing', min: 20, diff: 35, station: 'anvil', tool: 'tongs', inputs: { ironbar: 3, strap: 1 } },
+  { id: 'ironbar', out: 'ironbar', qty: 1, skill: 'blacksmithy', min: 0, diff: 15, station: 'forge', inputs: { ore: 3 } },
+  { id: 'ironshard', out: 'ironshard', qty: 6, skill: 'blacksmithy', min: 0, diff: 10, station: 'anvil', tool: 'tongs', inputs: { ironbar: 1 } },
+  { id: 'dagger', out: 'dagger', qty: 1, skill: 'blacksmithy', min: 10, diff: 25, station: 'anvil', tool: 'tongs', inputs: { ironbar: 1, strap: 1 } },
+  { id: 'sword', out: 'sword', qty: 1, skill: 'blacksmithy', min: 20, diff: 35, station: 'anvil', tool: 'tongs', inputs: { ironbar: 3, strap: 1 } },
   { id: 'strap', out: 'strap', qty: 2, skill: 'tailoring', min: 0, diff: 10, station: 'bench', tool: 'sewkit', inputs: { hide: 1 } },
   { id: 'bandage', out: 'bandage', qty: 5, skill: 'tailoring', min: 5, diff: 15, station: 'bench', tool: 'sewkit', inputs: { cloth: 2 } },
   { id: 'leather', out: 'leather', qty: 1, skill: 'tailoring', min: 30, diff: 45, station: 'bench', tool: 'sewkit', inputs: { hide: 6, sinew: 2 } },
-  { id: 'shortbow', out: 'shortbow', qty: 1, skill: 'carpentry', min: 15, diff: 30, station: 'bench', tool: 'knife', inputs: { pine: 4, sinew: 1 } },
+  { id: 'shortbow', out: 'shortbow', qty: 1, skill: 'bowcraft', min: 15, diff: 30, station: 'bench', tool: 'knife', inputs: { pine: 4, sinew: 1 } },
   { id: 'buckler', out: 'buckler', qty: 1, skill: 'carpentry', min: 20, diff: 35, station: 'bench', tool: 'knife', inputs: { pine: 3, strap: 1 } },
-  { id: 'arrows', out: 'arrow', qty: 20, skill: 'fletching', min: 10, diff: 20, station: 'bench', tool: 'knife', inputs: { pine: 1, ironshard: 1 } },
+  { id: 'arrows', out: 'arrow', qty: 20, skill: 'bowcraft', min: 10, diff: 20, station: 'bench', tool: 'knife', inputs: { pine: 1, ironshard: 1 } },
   { id: 'draught', out: 'draught', qty: 1, skill: 'alchemy', min: 25, diff: 40, station: 'still', inputs: { shelldust: 1, marshroot: 1, vial: 1 } },
   { id: 'antidote', out: 'antidote', qty: 1, skill: 'alchemy', min: 15, diff: 30, station: 'still', inputs: { marshroot: 2, vial: 1 } },
   { id: 'cinder', out: 'cinder', qty: 1, skill: 'alchemy', min: 40, diff: 55, station: 'still', inputs: { reedash: 2, lanternoil: 1, vial: 1 } },
   { id: 'cookedmeat', out: 'cookedmeat', qty: 1, skill: 'cooking', min: 0, diff: 15, station: 'fire', inputs: { meat: 1 } },
   { id: 'cookedfish', out: 'cookedfish', qty: 1, skill: 'cooking', min: 0, diff: 20, station: 'fire', inputs: { fish: 1 } },
-  { id: 'lockpick', out: 'lockpick', qty: 5, skill: 'engineering', min: 0, diff: 15, station: 'anvil', tool: 'tongs', inputs: { ironshard: 2 } },
-  { id: 'trapkit', out: 'trapkit', qty: 1, skill: 'trapcraft', min: 0, diff: 25, station: 'bench', tool: 'knife', inputs: { ironshard: 3, sinew: 1 } },
-  { id: 'repairkit', out: 'repairkit', qty: 1, skill: 'engineering', min: 20, diff: 35, station: 'bench', tool: 'knife', inputs: { ironbar: 1, strap: 1, pine: 1 } },
-  { id: 'venom', out: 'venom', qty: 1, skill: 'venomcraft', min: 0, diff: 25, station: 'still', inputs: { marshroot: 1, blacksalt: 1, vial: 1 } },
+  { id: 'lockpick', out: 'lockpick', qty: 5, skill: 'tinkering', min: 0, diff: 15, station: 'anvil', tool: 'tongs', inputs: { ironshard: 2 } },
+  { id: 'trapkit', out: 'trapkit', qty: 1, skill: 'tinkering', min: 0, diff: 25, station: 'bench', tool: 'knife', inputs: { ironshard: 3, sinew: 1 } },
+  { id: 'repairkit', out: 'repairkit', qty: 1, skill: 'tinkering', min: 20, diff: 35, station: 'bench', tool: 'knife', inputs: { ironbar: 1, strap: 1, pine: 1 } },
+  { id: 'venom', out: 'venom', qty: 1, skill: 'alchemy', min: 0, diff: 25, station: 'still', inputs: { marshroot: 1, blacksalt: 1, vial: 1 } },
   { id: 'silkband', out: 'bandage', qty: 8, skill: 'tailoring', min: 25, diff: 40, station: 'bench', tool: 'sewkit', inputs: { silk: 3 } }];
 SF.RECIPE = {}; for (const r of SF.RECIPES) SF.RECIPE[r.id] = r;
 SF.CRAFT_TIME = 1.5; SF.CRAFT_FAIL_LOSS = .25;
@@ -542,7 +583,7 @@ SF.commonOf = skill => skill === 'mining' ? 'iron' : 'pine';
 SF.gateFor = (skill, m) => skill === 'mining' ? SF.METAL[m].mine : SF.WOOD[m].fell;
 /* which material a successful stroke yields: the node's specialty only at or above its gate, and then 50% */
 SF.strokeMaterial = (skill, spec, sk, rng) => { const com = SF.commonOf(skill); if (!spec || spec === com || sk < SF.gateFor(skill, spec)) return com; return rng() < .5 ? spec : com; };
-SF.STROKE_YIELD = { mining: 3, woodcutting: 2 };
+SF.STROKE_YIELD = { mining: 3, lumberjacking: 2 };
 SF.stockLabel = (n, max) => n <= 0 ? 'Exhausted' : n >= max ? 'Fresh' : n > max / 3 ? 'Worked' : 'Nearly empty';
 
 /* ---------------- craft resolution (crafting guide §4) ---------------- */
@@ -603,9 +644,9 @@ Object.assign(SF.RECIPE.ironbar, { cat: 'Smelt', name: 'Smelt iron bar' });
 Object.assign(SF.RECIPE.ironshard, { cat: 'Fittings', name: 'Cut iron shards', fixedMat: 'iron' });
 for (const [id, n, nm] of [['dagger', 1, 'Dagger'], ['sword', 3, 'Quay sword']]) { const r = SF.RECIPE[id]; Object.assign(r, { name: nm, prim: 'metal', defMat: 'iron', cat: 'Weapons', lines: [{ form: 'ingot', qty: n }, { item: 'strap', qty: 1 }] }); delete r.inputs; }
 SF.RECIPES.push(
-  { id: 'rivets', name: 'Mooring rivets', out: 'rivet', qty: 8, skill: 'smithing', min: 0, station: 'anvil', tool: 'tongs', prim: 'metal', defMat: 'iron', cat: 'Fittings', lines: [{ form: 'ingot', qty: 1 }] },
-  { id: 'nails', name: 'Nail strip', out: 'nail', qty: 12, skill: 'smithing', min: 0, station: 'anvil', tool: 'tongs', prim: 'metal', defMat: 'iron', cat: 'Fittings', lines: [{ form: 'ingot', qty: 1 }] },
-  { id: 'hinges', name: 'Hinge pair', out: 'hinge', qty: 2, skill: 'smithing', min: 10, station: 'anvil', tool: 'tongs', prim: 'metal', defMat: 'iron', cat: 'Fittings', lines: [{ form: 'ingot', qty: 1 }, { item: 'rivet', qty: 4, match: true }] });
+  { id: 'rivets', name: 'Mooring rivets', out: 'rivet', qty: 8, skill: 'blacksmithy', min: 0, station: 'anvil', tool: 'tongs', prim: 'metal', defMat: 'iron', cat: 'Fittings', lines: [{ form: 'ingot', qty: 1 }] },
+  { id: 'nails', name: 'Nail strip', out: 'nail', qty: 12, skill: 'blacksmithy', min: 0, station: 'anvil', tool: 'tongs', prim: 'metal', defMat: 'iron', cat: 'Fittings', lines: [{ form: 'ingot', qty: 1 }] },
+  { id: 'hinges', name: 'Hinge pair', out: 'hinge', qty: 2, skill: 'blacksmithy', min: 10, station: 'anvil', tool: 'tongs', prim: 'metal', defMat: 'iron', cat: 'Fittings', lines: [{ form: 'ingot', qty: 1 }, { item: 'rivet', qty: 4, match: true }] });
 for (const M of SF.METALS.slice(1).map(a => SF.METAL[a[0]])) SF.RECIPES.push({ id: 'smelt_' + M.id, name: 'Smelt ' + M.n.toLowerCase(), out: SF.ingotId(M.id), qty: 1, skill: 'mining', min: M.mine, diff: M.mine, station: 'forge', fixedMat: M.id, cat: 'Smelt', inputs: { [SF.oreId(M.id)]: 3 } });
 SF.reindexRecipes = () => { for (const k in SF.RECIPE) delete SF.RECIPE[k]; for (const r of SF.RECIPES) SF.RECIPE[r.id] = r; };
 SF.reindexRecipes();
@@ -613,8 +654,8 @@ SF.reindexRecipes();
 /* ---------------- gathering (§5 table) ---------------- */
 SF.NODE_TIER_DIFF = [15, 45, 70, 85];
 SF.NODE_TIER_MIN = [0, 30, 55, 80];
-SF.GATHER_TIME = { woodcutting: 2, mining: 2, foraging: 1.4, skinning: 1.4, fishing: 2.5 };
-SF.GATHER_RANGE = { woodcutting: 2, mining: 2, foraging: 2, skinning: 2, fishing: 8 };
+SF.GATHER_TIME = { lumberjacking: 2, mining: 2, forage: 1.4, carve: 1.4, fishing: 2.5 };   // forage and carve are activities, not skills (T2A had neither skill)
+SF.GATHER_RANGE = { lumberjacking: 2, mining: 2, forage: 2, carve: 2, fishing: 8 };
 
 /* ---------------- M3 rules: theft, locks, traps, pets, bard, condition ---------------- */
 // §3 pickpocketing
@@ -636,7 +677,7 @@ SF.venomTier = s => s >= 80 ? 3 : s >= 55 ? 2 : s >= 30 ? 1 : 0;
 SF.VENOM_CHARGES = 5;
 // §9 condition and repair: each repair restores to max minus 3% of the original maximum; below 40% replace
 SF.WEARABLE = id => ['weapon', 'shield', 'armor'].includes(SF.ITEMS[id].cat) && SF.ITEMS[id].trade;
-SF.repairSkill = id => { const d = SF.ITEMS[id]; if (d.wpn === 'shortbow' || d.wpn === 'crossbow' || d.wpn === 'heavycrossbow' || id === 'buckler') return 'carpentry'; if (d.armor === 'cloth' || d.armor === 'leather') return 'tailoring'; return 'smithing'; };
+SF.repairSkill = id => { const d = SF.ITEMS[id]; if (d.wpn === 'shortbow' || d.wpn === 'crossbow' || d.wpn === 'heavycrossbow') return 'bowcraft'; if (id === 'buckler') return 'carpentry'; if (d.armor === 'cloth' || d.armor === 'leather') return 'tailoring'; return 'blacksmithy'; };
 SF.trainCost = (skill, to) => Math.max(0, Math.round((to * to - skill * skill) * 0.6));
 SF.statTrainCost = n => n * 25;
 

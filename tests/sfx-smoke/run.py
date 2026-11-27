@@ -156,7 +156,7 @@ with sync_playwright() as pw:
     pl = played(page)
     check('shooting from range: bow.release at the shot, flesh impact on arrival', 'bow.release' in pl and 'hit.flesh' in pl and pl.index('bow.release') < pl.index('hit.flesh') and not [e for e in pl if e.startswith('swing')], pl)
     # spell kill
-    J(page, f"""(() => {{ const S = __SF, P = S.P, SF = S.SF, MG = SF.MAGERY; P.skills.spellcraft.v = 1000; P.skills.focus.v = 1000; P.mana = 999; if (!SF.count(P.pack, 'spellbook')) SF.addItem(P.pack, SF.newItem('spellbook', 1)); SF.addItem(P.pack, SF.newItem('scroll.18', 1)); MG.learn(P.pack, 'scroll.18'); for (const r of SF.SPELL['magery.18'].regs) SF.addItem(P.pack, SF.newItem(r, 30)); const m = S.ents.find(e => e.id === {bid}); m.hp = 2; m.pacified = S.GT + 999; m.state = 'idle'; m.target = null; P.sel = m; P.spellReadyAt = 0; }})()"""); purge(bid)
+    J(page, f"""(() => {{ const S = __SF, P = S.P, SF = S.SF, MG = SF.MAGERY; P.skills.magery.v = 1000; P.skills.evaluatingintelligence.v = 1000; P.mana = 999; if (!SF.count(P.pack, 'spellbook')) SF.addItem(P.pack, SF.newItem('spellbook', 1)); SF.addItem(P.pack, SF.newItem('scroll.18', 1)); MG.learn(P.pack, 'scroll.18'); for (const r of SF.SPELL['magery.18'].regs) SF.addItem(P.pack, SF.newItem(r, 30)); const m = S.ents.find(e => e.id === {bid}); m.hp = 2; m.pacified = S.GT + 999; m.state = 'idle'; m.target = null; P.sel = m; P.spellReadyAt = 0; }})()"""); purge(bid)
     clear(page); J(page, "__SF.castSlot('magery.18')"); page.wait_for_timeout(2600)
     held = J(page, "!!__SF.P.held"); pl1 = [e for e in played(page) if e.startswith('magic.')]
     J(page, "__SF.castSlot('magery.18')"); page.wait_for_timeout(1500); pl = [e for e in played(page) if e.startswith('magic.') or e.startswith('hit.')]
@@ -177,7 +177,7 @@ with sync_playwright() as pw:
     check('resurrection plays player.revive', 'player.revive' in played(page), played(page))
 
     # ---------- gathering and crafting ----------
-    J(page, "(() => { const S = __SF, P = S.P, SF = S.SF; P.hp = 999; SF.addItem(P.pack, SF.newItem('pickaxe', 1)); P.skills.mining.v = 1000; P.skills.smithing.v = 1000; })()")
+    J(page, "(() => { const S = __SF, P = S.P, SF = S.SF; P.hp = 999; SF.addItem(P.pack, SF.newItem('pickaxe', 1)); P.skills.mining.v = 1000; P.skills.blacksmithy.v = 1000; })()")
     rock = J(page, "__SF.QUAY_ROCKS[0]"); tp(page, rock[0] + .5, rock[1] + 1.4); page.wait_for_timeout(200); clear(page)
     J(page, f"(() => {{ const S = __SF; S.startGather(S.nodeAt({rock[0]}, {rock[1]})); }})()"); page.wait_for_timeout(300)
     stick(page, *PLUS_X, 300); page.wait_for_timeout(2500)

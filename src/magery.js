@@ -142,7 +142,7 @@ MG.MIGRATION = 1;
 // c: saved character. Idempotent: a second run changes nothing. Returns { changed, book }.
 MG.migrateChar = (c, legacySpells) => {
   if (c.magery && c.magery.mig >= MG.MIGRATION) return { changed: false };
-  const sc = c.skills && c.skills.spellcraft ? c.skills.spellcraft.v / 10 : 0;
+  const sc = c.skills ? ((c.skills.magery || c.skills.spellcraft || {}).v || 0) / 10 : 0   /* spellcraft: a save not yet moved to the v0.30 registry */;
   const book = new Set();
   if (sc > 0) { for (const s of MG.STARTER) book.add(s); for (const [old, nu] of Object.entries(MG.LEGACY_MAP)) { const L = legacySpells && legacySpells[old]; if (!L || sc >= L.min) book.add(nu); } }
   for (const h of c.hotbar || []) if (h && h.k === 'spell' && MG.LEGACY_MAP[h.id]) book.add(MG.LEGACY_MAP[h.id]);
