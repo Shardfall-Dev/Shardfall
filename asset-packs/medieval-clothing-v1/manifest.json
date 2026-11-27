@@ -45,5 +45,26 @@
     "source is derived from existing prototype rig; future merge must reconcile",
     "cosmetic shirt/trousers are baseline rig geometry, not separate removable painted layers",
     "depth and corpse clipping need visual QA"
-  ]
+  ],
+  "cosmeticSVGExports": {
+    "frame": "garmentFrameSVG",
+    "atlas": "garmentAtlasSVG",
+    "phases": [
+      "back",
+      "under",
+      "outer",
+      "head"
+    ],
+    "note": "No base shirt/trousers layers; heraldry requires tabard; SVG only, no painted masks."
+  },
+  "samples": [
+    "samples/role-lineup.svg",
+    "samples/guard-lineup.svg",
+    "samples/apron-long-walk-outer.svg"
+  ],
+  "validation": {
+    "sampledFinalFrames": 20416,
+    "errors": 0,
+    "scope": "role × body × direction × action final frame; evaluated committed JS after stripping module declarations; not browser, pixel or full frame tests"
+  }
 }
