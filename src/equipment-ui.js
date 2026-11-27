@@ -262,7 +262,7 @@ function bagCell(it, selected) {
 }
 function bagPanel2() {
   const all = P.pack.items, items = bagItems(), en = encumb(), gold = SF.count(P.pack, 'gold');
-  let h = `<div class="note">${all.length} stack${all.length === 1 ? '' : 's'} · ${f1w(en.wt)} / ${f1w(en.cap)} weight · ${gold} gold${en.stage ? ' · <span class="' + (en.stage >= 2 ? 'warn' : '') + '">' + en.n.toLowerCase() + (en.stage >= 3 ? ': drop something to move' : en.stage === 2 ? ': no running' : '') + '</span>' : ''}</div>`;
+  let h = `<div class="note">${all.length} stack${all.length === 1 ? '' : 's'} · ${carriedText()} · ${gold} gold${en.stage ? ' · <span class="' + (en.stage >= 2 ? 'warn' : '') + '">' + en.n.toLowerCase() + (en.stage >= 3 ? ': drop something to move' : en.stage === 2 ? ': no running' : '') + '</span>' : ''}</div>`;
   h += `<div class="encbar s${en.stage}" title="${en.n}"><i style="width:${Math.min(100, en.ratio / 1.25 * 100)}%"></i><b style="left:${.75 / 1.25 * 100}%"></b><b style="left:${100 / 1.25}%"></b></div>`;
   h += `<div class="bagtools"><input id="bagq" type="search" placeholder="Search the backpack" value="${esc(BAG.q)}" autocomplete="off" aria-label="Search the backpack">${btn('bagmerge', 'Merge stacks')}${btn('eqwin', 'Paper doll')}</div>`;
   h += '<div class="bagsorts">Sort ' + Object.keys(BAG_SORTS).map(s => btn('bagsort', s, { s }, s === bagSort ? 'on' : '')).join('') + '</div>';
