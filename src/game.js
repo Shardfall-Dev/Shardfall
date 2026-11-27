@@ -1,30 +1,30 @@
 /* ================= GAME: actors, intents, combat, magic, gathering, crafting, death ================= */
 const MON = {
   rat:   { n: 'dock rat',    col: '#7a6a62', size: .7,  h: 34, hp: 20, atk: 22, def: 20, dmg: [3, 6],  reach: 1.15, tele: .45, rec: 1.3,  speed: 3.6, aggro: 6,   leash: 16, armor: 4,  diff: 15, loot: { gold: [2, 9] }, skin: { hide: [1, 1] } },
-  boar:  { n: 'reed boar',   col: '#6e4c34', size: 1.15, h: 46, hp: 55, atk: 40, def: 38, dmg: [8, 12], reach: 1.4,  tele: .8,  rec: 1.9,  speed: 4.5, aggro: 4.5, leash: 20, armor: 14, diff: 40, loot: { gold: [0, 4] }, skin: { hide: [3, 3], sinew: [1, 2], meat: [2, 2] } },
+  boar:  { n: 'reed boar',   col: '#6e4c34', size: 1.15, h: 46, hp: 55, atk: 40, def: 38, dmg: [8, 12], reach: 1.4,  tele: .8,  rec: 1.9,  speed: 4.5, aggro: 4.5, leash: 20, armor: 14, diff: 40, loot: { gold: [0, 4] }, skin: { hide_thick: [3, 3], sinew: [1, 2], meat: [2, 2] } },
   hound: { n: 'marsh hound', col: '#5c645a', size: 1,   h: 46, hp: 46, atk: 58, def: 55, dmg: [6, 9],  reach: 1.3,  tele: .42, rec: 1.05, speed: 4.6, aggro: 9,   leash: 26, armor: 10, diff: 60, loot: { gold: [3, 14], reedash: [0, 2] }, skin: { hide: [2, 2], sinew: [2, 2], meat: [1, 1] } } };
 Object.assign(MON.rat, { tame: 25, bite: .2 }); Object.assign(MON.boar, { tame: 55, bite: .5 }); Object.assign(MON.hound, { tame: 55, bite: .45 });
 Object.assign(MON, {
-  snapper:   { n: 'mud snapper', col: '#5e5a38', size: 1.05, h: 34, hp: 60, atk: 45, def: 50, dmg: [9, 14], reach: 1.2, tele: .7, rec: 1.6, speed: 2.8, aggro: 4, leash: 14, armor: 30, diff: 50, tame: 80, strong: 1, bite: .6, loot: { shelldust: [1, 3] }, skin: { hide: [2, 2], meat: [2, 3] } },
+  snapper:   { n: 'mud snapper', col: '#5e5a38', size: 1.05, h: 34, hp: 60, atk: 45, def: 50, dmg: [9, 14], reach: 1.2, tele: .7, rec: 1.6, speed: 2.8, aggro: 4, leash: 14, armor: 30, diff: 50, tame: 80, strong: 1, bite: .6, loot: { shelldust: [1, 3] }, skin: { hide_thick: [2, 2], meat: [2, 3] } },
   spider:    { n: 'mire spider', col: '#2a2630', size: .95, h: 30, hp: 40, atk: 55, def: 50, dmg: [5, 8], reach: 1.2, tele: .5, rec: 1.1, speed: 4.3, aggro: 7, leash: 20, armor: 8, diff: 55, poison: [1, .35], tame: 80, strong: 1, bite: .5, loot: { silk: [2, 4], marshroot: [0, 2] }, skin: { sinew: [1, 2] } },
   smuggler:  { n: 'brine smuggler', scout: '#6a2a2a', size: 1, h: 66, hp: 60, atk: 55, def: 55, dmg: [7, 11], reach: 1.3, tele: .35, rec: .95, speed: 4.2, aggro: 7, leash: 22, armor: 20, diff: 55, hideChance: .5, purse: [10, 30], loot: { gold: [8, 25], bandage: [0, 3], lockpick: [0, 2], arrow: [0, 8] } },
   wisp:      { n: 'ash wisp', col: '#ff8a30', size: .8, h: 40, hp: 30, atk: 60, def: 45, dmg: [9, 13], reach: 7, tele: .8, rec: 1.6, speed: 3.4, aggro: 9, leash: 18, armor: 0, diff: 60, ranged: 1, keep: 4, loot: { reedash: [2, 4], lanternoil: [1, 2] } },
   sentinel:  { n: 'bell sentinel', col: '#7a6a48', size: 1.3, h: 70, hp: 120, atk: 65, def: 70, dmg: [12, 18], reach: 1.6, tele: 1.1, rec: 2.2, speed: 3.2, aggro: 6, leash: 16, armor: 40, diff: 75, ward: 20, loot: { ironbar: [1, 3], bellshard: [0, 1], gold: [10, 30] }, rare: [['mace', .2], ['waraxe', .1]] },
-  captain:   { n: 'drowned captain', scout: '#1e4a5a', size: 1.1, h: 70, hp: 160, atk: 75, def: 75, dmg: [14, 20], reach: 1.6, tele: .6, rec: 1.3, speed: 4.0, aggro: 8, leash: 20, armor: 25, diff: 85, loot: { gold: [60, 120], bellshard: [1, 2], draught: [0, 2] }, rare: [['chain', .25], ['glaive', .2], ['crossbow', .15], ['heavycrossbow', .1]] },
-  bellkeeper:{ n: 'the Bellkeeper', col: '#8a6a30', size: 2.2, h: 120, hp: 450, atk: 80, def: 80, dmg: [18, 26], reach: 2.6, tele: 1.4, rec: 2.0, speed: 2.6, aggro: 12, leash: 14, armor: 35, diff: 95, boss: 1, aoe: 2.6, ward: 40, wardEvery: 20, ranged2: { dmg: [12, 18], range: 9, tele: 1.0 }, loot: { gold: [300, 500], bellshard: [3, 6], blacksalt: [4, 8] }, rare: [['plate', .5], ['glaive', .3]] } });
+  captain:   { n: 'drowned captain', scout: '#1e4a5a', size: 1.1, h: 70, hp: 160, atk: 75, def: 75, dmg: [14, 20], reach: 1.6, tele: .6, rec: 1.3, speed: 4.0, aggro: 8, leash: 20, armor: 25, diff: 85, loot: { gold: [60, 120], bellshard: [1, 2], draught: [0, 2] }, rare: [['chain_tunic', .25], ['glaive', .2], ['crossbow', .15], ['heavycrossbow', .1]] },
+  bellkeeper:{ n: 'the Bellkeeper', col: '#8a6a30', size: 2.2, h: 120, hp: 450, atk: 80, def: 80, dmg: [18, 26], reach: 2.6, tele: 1.4, rec: 2.0, speed: 2.6, aggro: 12, leash: 14, armor: 35, diff: 95, boss: 1, aoe: 2.6, ward: 40, wardEvery: 20, ranged2: { dmg: [12, 18], range: 9, tele: 1.0 }, loot: { gold: [300, 500], bellshard: [3, 6], blacksalt: [4, 8] }, rare: [['plate_chest', .5], ['plate_leggings', .35], ['great_helm', .2], ['glaive', .3]] } });
 /* Bestiary v1 creatures (art: src/bestiary-art.js). Stats are provisional placeholders on the existing tiers; spawn placement and balance are separate work, so none are in SPAWNS yet. h = sprite height in px. */
 Object.assign(MON, {
   slime:           { n: 'bog slime',       size: .8,  h: 42,  hp: 35,  atk: 35, def: 25, dmg: [4, 7],   reach: 1.1, tele: .7,  rec: 1.4, speed: 2.2, aggro: 5,  leash: 14, armor: 2,  diff: 30, poison: [1, .25], loot: { gold: [0, 6], marshroot: [0, 2] } },
-  dire_wolf:       { n: 'dire wolf',       size: 1.05, h: 70, hp: 70,  atk: 65, def: 60, dmg: [8, 12],  reach: 1.3, tele: .45, rec: 1.1, speed: 4.8, aggro: 10, leash: 26, armor: 12, diff: 65, loot: { gold: [0, 6] }, skin: { hide: [2, 3], sinew: [2, 2], meat: [2, 2] } },
+  dire_wolf:       { n: 'dire wolf',       size: 1.05, h: 70, hp: 70,  atk: 65, def: 60, dmg: [8, 12],  reach: 1.3, tele: .45, rec: 1.1, speed: 4.8, aggro: 10, leash: 26, armor: 12, diff: 65, loot: { gold: [0, 6] }, skin: { hide_wolf: [2, 3], sinew: [2, 2], meat: [2, 2], bone: [1, 2] } },
   giant_spider:    { n: 'giant spider',    size: 1.2, h: 66,  hp: 75,  atk: 62, def: 55, dmg: [8, 12],  reach: 1.3, tele: .55, rec: 1.2, speed: 4.2, aggro: 7,  leash: 20, armor: 12, diff: 65, poison: [2, .35], loot: { silk: [3, 6] }, skin: { sinew: [1, 2] } },
   orc:             { n: 'orc',             size: 1.05, h: 82, hp: 80,  atk: 60, def: 55, dmg: [9, 14],  reach: 1.4, tele: .6,  rec: 1.3, speed: 4.0, aggro: 8,  leash: 22, armor: 22, diff: 60, loot: { gold: [10, 30], bandage: [0, 2] } },
-  lizardman:       { n: 'lizardman',       size: 1,   h: 92,  hp: 75,  atk: 62, def: 60, dmg: [8, 13],  reach: 1.6, tele: .55, rec: 1.2, speed: 4.3, aggro: 8,  leash: 22, armor: 18, diff: 60, loot: { gold: [8, 24] }, skin: { hide: [2, 3] } },
+  lizardman:       { n: 'lizardman',       size: 1,   h: 92,  hp: 75,  atk: 62, def: 60, dmg: [8, 13],  reach: 1.6, tele: .55, rec: 1.2, speed: 4.3, aggro: 8,  leash: 22, armor: 18, diff: 60, loot: { gold: [8, 24] }, skin: { hide_spined: [2, 3] } },
   harpy:           { n: 'harpy',           size: 1.05, h: 84, hp: 65,  atk: 60, def: 62, dmg: [7, 11],  reach: 1.3, tele: .5,  rec: 1.1, speed: 4.8, aggro: 9,  leash: 24, armor: 8,  diff: 60, loot: { gold: [5, 20] }, skin: { meat: [1, 2] } },
-  gargoyle:        { n: 'gargoyle',        size: 1.2, h: 78,  hp: 110, atk: 68, def: 68, dmg: [11, 16], reach: 1.4, tele: .75, rec: 1.6, speed: 3.8, aggro: 8,  leash: 18, armor: 36, diff: 72, loot: { gold: [20, 50], ironbar: [0, 2] } },
-  troll:           { n: 'troll',           size: 1.4, h: 96,  hp: 160, atk: 70, def: 60, dmg: [14, 20], reach: 1.6, tele: .9,  rec: 1.8, speed: 3.6, aggro: 7,  leash: 18, armor: 24, diff: 78, loot: { gold: [25, 60] }, skin: { hide: [4, 5], meat: [3, 4] } },
-  ettin:           { n: 'ettin',           size: 1.5, h: 94,  hp: 190, atk: 72, def: 62, dmg: [15, 22], reach: 1.7, tele: 1.0, rec: 2.0, speed: 3.4, aggro: 7,  leash: 18, armor: 26, diff: 80, loot: { gold: [30, 70] } },
+  gargoyle:        { n: 'gargoyle',        size: 1.2, h: 78,  hp: 110, atk: 68, def: 68, dmg: [11, 16], reach: 1.4, tele: .75, rec: 1.6, speed: 3.8, aggro: 8,  leash: 18, armor: 36, diff: 72, loot: { gold: [20, 50], ironbar: [0, 2] }, skin: { hide_barbed: [1, 3] } },
+  troll:           { n: 'troll',           size: 1.4, h: 96,  hp: 160, atk: 70, def: 60, dmg: [14, 20], reach: 1.6, tele: .9,  rec: 1.8, speed: 3.6, aggro: 7,  leash: 18, armor: 24, diff: 78, loot: { gold: [25, 60] }, skin: { hide_troll: [4, 5], meat: [3, 4], bone: [2, 3] } },
+  ettin:           { n: 'ettin',           size: 1.5, h: 94,  hp: 190, atk: 72, def: 62, dmg: [15, 22], reach: 1.7, tele: 1.0, rec: 2.0, speed: 3.4, aggro: 7,  leash: 18, armor: 26, diff: 80, loot: { gold: [30, 70] }, skin: { hide_horned: [2, 4], bone: [2, 4] } },
   earth_elemental: { n: 'earth elemental', size: 1.5, h: 100, hp: 220, atk: 70, def: 70, dmg: [14, 21], reach: 1.6, tele: 1.1, rec: 2.1, speed: 2.6, aggro: 6,  leash: 14, armor: 45, diff: 82, loot: { gold: [10, 40], ironbar: [1, 4] } },
-  lich_lord:       { n: 'the Lich Lord',   size: 1.6, h: 106, hp: 520, atk: 85, def: 82, dmg: [16, 24], reach: 1.8, tele: 1.0, rec: 1.7, speed: 3.0, aggro: 12, leash: 16, armor: 30, diff: 95, boss: 1, fallLine: 'The cold light leaves its eyes.', ranged2: { dmg: [13, 19], range: 9, tele: 1.0 }, loot: { gold: [300, 500], bellshard: [2, 4], blacksalt: [3, 6] }, rare: [['plate', .4]] } });
+  lich_lord:       { n: 'the Lich Lord',   size: 1.6, h: 106, hp: 520, atk: 85, def: 82, dmg: [16, 24], reach: 1.8, tele: 1.0, rec: 1.7, speed: 3.0, aggro: 12, leash: 16, armor: 30, diff: 95, boss: 1, fallLine: 'The cold light leaves its eyes.', ranged2: { dmg: [13, 19], range: 9, tele: 1.0 }, loot: { gold: [300, 500], bellshard: [2, 4], blacksalt: [3, 6], bone: [6, 10] }, rare: [['plate_chest', .4]] } });
 const SPAWNS = [
   { type: 'rat', x: 80, y: 246, r: 18, max: 5 }, { type: 'rat', x: 80, y: 356, r: 18, max: 5 }, { type: 'rat', x: 150, y: 300, r: 16, max: 4 },
   { type: 'boar', x: 215, y: 300, r: 42, max: 9 }, { type: 'boar', x: 290, y: 250, r: 40, max: 7 }, { type: 'boar', x: 300, y: 350, r: 36, max: 6 },
@@ -116,7 +116,7 @@ function hitSound(t, kind, src, hx, lethal) {
   if (!hx.quiet && !hx.area) {
     let ev = 'hit.flesh';
     if (hx.blocked) ev = 'block.shield';
-    else if (me) ev = armorType() === 'chain' || armorType() === 'plate' ? 'hit.armor' : 'hit.flesh';
+    else if (me) ev = metalTorso(P) ? 'hit.armor' : 'hit.flesh';
     else if (t.type === 'skeleton') ev = 'hit.bone';
     else if (ARMORED[t.type]) ev = 'hit.armor';
     else if (hx.w && (hx.w.fam === 'Hammer' || hx.w.fam === 'Unarmed')) ev = 'hit.blunt';
@@ -191,25 +191,31 @@ function sndTick() {
 
 /* ---------- player ---------- */
 function newChar(o) {
-  const c = { kind: 'player', pid: 'p1', name: o.name, x: 92.5, y: 304.5, sect: 0, str: o.str, dex: o.dex, int: o.int, skills: SF.newSkills(), pack: SF.newContainer('pack', 'p1'), bank: SF.newContainer('bank', 'p1'), equip: { weapon: null, shield: null, armor: null }, look: o.look || {}, bound: 'quay', freeLessons: 2, hotbar: [null, null, null, null], sw: SF.newSwing(), combatMig: SF.COMBAT_MIGRATION };
+  const c = { kind: 'player', pid: 'p1', name: o.name, x: 92.5, y: 304.5, sect: 0, str: o.str, dex: o.dex, int: o.int, skills: SF.newSkills(), pack: SF.newContainer('pack', 'p1'), bank: SF.newContainer('bank', 'p1'), equip: emptyEquip(), eqMig: SF.EQ.MIGRATION, look: o.look || {}, bound: 'quay', freeLessons: 2, hotbar: [null, null, null, null], sw: SF.newSwing(), combatMig: SF.COMBAT_MIGRATION };
   c.id = 'p1'; for (const [k, v] of Object.entries(o.skills)) c.skills[k].v = v * 10;
   c.hp = SF.maxHp(c); c.stam = SF.maxStam(c); c.mana = SF.maxMana(c); return c;
 }
 function starterKit() {
   const add = (id, q) => SF.addItem(P.pack, SF.newItem(id, q));
-  add('journal', 1); P.equip.armor = SF.newItem('clothvest', 1); add('gold', 150); add('bandage', 12); add('cookedmeat', 3);
+  add('journal', 1); P.equip.shirt = SF.EQ.make('shirt', { origin: 'npc' }); P.equip.trousers = SF.EQ.make('trousers', { origin: 'npc' }); P.equip.feet = SF.EQ.make('shoes', { origin: 'npc' }); add('gold', 150); add('bandage', 12); add('cookedmeat', 3);
   const top = ['swordsmanship', 'fencing', 'macefighting', 'archery'].sort((a, b) => P.skills[b].v - P.skills[a].v)[0];
   const w = { swordsmanship: P.skills.parrying.v > 0 || P.str < SF.WEAPONS.glaive.str ? 'sword' : 'glaive', fencing: 'dagger', macefighting: 'mace', archery: 'shortbow' }[top];
   if (P.skills[top].v > 0) { P.equip.weapon = SF.newItem(w, 1); if (w === 'shortbow') add('arrow', 80); } else add('dagger', 1);
-  if (P.skills.parrying.v > 0 && !(P.equip.weapon && SF.weaponOf(P.equip.weapon).two)) P.equip.shield = SF.newItem('buckler', 1);
+  if (P.skills.parrying.v > 0 && !(P.equip.weapon && SF.weaponOf(P.equip.weapon).two)) P.equip.shield = SF.EQ.make('buckler', { origin: 'npc' });
   for (const [k, tool] of [['woodcutting', 'hatchet'], ['mining', 'pickaxe'], ['skinning', 'knife'], ['fishing', 'rod'], ['smithing', 'tongs'], ['tailoring', 'sewkit'], ['carpentry', 'knife'], ['fletching', 'knife']]) if (P.skills[k].v > 0 && !SF.count(P.pack, tool)) add(tool, 1);
   if (P.skills.spellcraft.v > 0) mageryStarter(add);
   if (P.skills.alchemy.v > 0) add('vial', 6);
   P.hotbar = [{ k: 'item', id: 'bandage' }, P.skills.spellcraft.v > 0 ? { k: 'spell', id: 'magery.04' } : { k: 'item', id: 'draught' }, P.skills.spellcraft.v > 0 ? { k: 'spell', id: 'magery.05' } : P.skills.concealment.v > 0 ? { k: 'act', id: 'hide' } : { k: 'act', id: 'track' }, { k: 'act', id: 'meditate' }, { k: 'act', id: 'bandother' }];
 }
-const cap = () => ({ slots: SF.SLOTS, kg: SF.carryKg(P) });
-const packKg = () => SF.containerKg(P.pack) + Object.values(P.equip).filter(Boolean).reduce((a, it) => a + SF.itemKg(it), 0);
-const overweight = () => packKg() > SF.carryKg(P) + 1e-9;
+/* equipment and weight (src/equipment.js, SF.EQ). Weight is shown in weight units (SF.WU per authored kg); worn gear counts. */
+const emptyEquip = () => { const e = {}; for (const s of SF.EQ.SLOT_IDS) e[s] = null; return e; };
+const cap = () => SF.EQ.capFor(P);
+const packKg = () => SF.EQ.totalWt(P) / SF.WU;
+const carryWt = () => SF.EQ.totalWt(P);
+const encumb = () => SF.EQ.encumbrance(P);
+const overweight = () => encumb().ratio > 1 + 1e-9;
+const metalTorso = a => { const it = a.equip && (a.equip.chest || a.equip.robe); const d = it && SF.ITEMS[it.id]; return !!(d && d.fam && ['ringmail', 'chain', 'plate', 'dragon'].includes(d.fam)); };
+const fmtWt = v => (Math.round(v * 10) / 10).toFixed(1);
 function wear(it, amt) { if (!it || !SF.WEARABLE(it.id)) return; if (it.cond === undefined) { it.cond = 100; it.maxc = 100; } const before = it.cond; it.cond = Math.max(0, it.cond - amt); const lim = .2 * (it.maxc || 100); if (before >= lim && it.cond < lim) log(SF.itemName(it) + ' is badly worn (−15%). Repair it soon.', '#ffb070'); if (before > 0 && it.cond <= 0) log(SF.itemName(it) + ' has broken and gives no benefit.', '#ff6a5a'); }
 const inCombat = () => GT - (P.lastCombat || -99) < 6;
 function give(id, q, extra) { const r = SF.addItem(P.pack, SF.newItem(id, q, extra), cap()); if (!r.ok) { log('Your pack is full: ' + r.reason + '. ' + SF.ITEMS[id].n + ' left on the ground.', '#ffb070'); dropPile(SF.newItem(id, q, extra)); } return r.ok; }
@@ -228,17 +234,18 @@ function playerMove(dt) {
   if (JOY.on && !P.dead) { const jx = JOY.x - JOY.x0, jy = JOY.y - JOY.y0, m = Math.hypot(jx, jy); if (m > 10) { const tx = jx / HW + jy / HH, ty = jy / HH - jx / HW, tm = Math.hypot(tx, ty); vx = tx / tm; vy = ty / tm; want = Math.min(1, m / 56); JOY.sprint = !!P.sprintOn || (SETTINGS.stickSprint && m > 70); } }
   else if (KEYS.any) { const sx = (KEYS.r ? 1 : 0) - (KEYS.l ? 1 : 0), sy = (KEYS.d ? 1 : 0) - (KEYS.u ? 1 : 0); if (sx || sy) { const tx = sx / HW + sy / HH, ty = sy / HH - sx / HW, tm = Math.hypot(tx, ty); vx = tx / tm; vy = ty / tm; want = 1; JOY.sprint = !!KEYS.shift || !!P.sprintOn; } }
   let sprint = JOY.sprint && want > 0 && !P.ghost;
-  if (sprint && (P.stam <= 0 || overweight() || P.prep)) sprint = false;
+  const enc = encumb(); if (sprint && (P.stam <= 0 || !enc.run || P.prep)) sprint = false;
+  if (enc.speed <= 0 && want > 0 && GT - (P.immobileMsg || -99) > 4) { P.immobileMsg = GT; log('You carry too much to move. Drop something.', '#ffb070'); }
   if (P.hidden && sprint) reveal('You sprint and are revealed.');
   let sp = (sprint ? SF.SPRINT : SF.WALK) * (want > .25 ? 1 : .6) * MOVE_SCALE;
-  sp *= 1 - (SF.ARMOR_SPEED[armorType()] || 0);
+  sp *= (1 - SF.EQ.effective(P).spd) * enc.speed;
   if (tAt(Math.floor(P.x), Math.floor(P.y)) === T.SH) sp *= .8;
   if (P.prep && P.prep.sp.walk) sp = Math.min(sp, SF.WALK * MOVE_SCALE * P.prep.sp.walk);
   if (P.rooted > GT) sp = 0; if (P.slowUntil > GT) sp *= 1 - SF.TRAP.slow;
   if (P.opening) sp = 0;
   const dx = vx * sp * dt, dy = vy * sp * dt; const moved = (dx || dy) ? moveBy(P, dx, dy) : 0;
   P.speed = moved / Math.max(dt, 1e-6); updateFacing(P, vx * want, vy * want);
-  if (sprint && moved > 0) { P.stam = Math.max(0, P.stam - SF.SPRINT_DRAIN * dt); P.lastDrain = GT; if (P.stam <= 0 && P.sprintOn) { P.sprintOn = false; log('Out of stamina. Sprint off.', '#ffb070'); } }
+  if (sprint && moved > 0) { P.stam = Math.max(0, P.stam - SF.SPRINT_DRAIN * enc.stam * dt); P.lastDrain = GT; if (P.stam <= 0 && P.sprintOn) { P.sprintOn = false; log('Out of stamina. Sprint off.', '#ffb070'); } }
   if (moved > 0) onPlayerMoved(moved);
 }
 function onPlayerMoved(m) {
@@ -306,11 +313,11 @@ const weaponLabel = a => { const w = weaponOfActor(a), it = a.equip && a.equip.w
 /* everything a blow needs from one side, read fresh for every swing */
 function fighter(a) {
   if (isPlayerLike(a)) {
-    const w = weaponOfActor(a), it = w === SF.WEAPONS.unarmed ? null : a.equip.weapon, arm = a.equip.armor, sh = a.equip.shield;
-    const at = arm ? (SF.ITEMS[arm.id].armor || 'none') : 'none';
+    const w = weaponOfActor(a), it = w === SF.WEAPONS.unarmed ? null : a.equip.weapon, sh = a.equip.shield;
+    // armor is resolved per blow on the struck body region (applyBlow → regionHit); armorAR here is the expected summary for display
     return { a, player: true, w, it, atk: skOf(a, w.skill), def: skOf(a, w.skill), tactics: skOf(a, 'tactics'), anatomy: skOf(a, 'anatomy'), str: a.str,
-      armorAR: Math.round((SF.ARMOR_AR[at] || 0) * SF.wearFactor(arm && arm.cond, arm && arm.maxc)) + magicArmor(a), armorItem: arm,
-      shieldAR: sh ? Math.round((SF.SHIELD_AR[sh.id] || 7) * SF.wearFactor(sh.cond, sh.maxc)) : 0, shieldItem: sh, parry: skOf(a, 'parrying'), braced: a.braced > GT,
+      armorAR: Math.round(SF.EQ.effective(a).ar) + magicArmor(a), armorItem: null, regions: true,
+      shieldAR: sh && SF.ITEMS[sh.id].slot === 'shield' ? Math.round(SF.EQ.shieldAR(sh)) : 0, shieldItem: sh, parry: skOf(a, 'parrying'), braced: a.braced > GT,
       diff: Math.max(10, Math.round(skOf(a, w.skill))) };
   }
   if (a.summon) { const s = a.summon; return { a, player: false, w: { id: 'summon', reach: (s.melee && s.melee[3]) || 1.3 }, atk: ACC, def: 30, range: s.melee ? [s.melee[0], s.melee[1]] : [1, 2], scale: 1, armorAR: 0, shieldAR: 0, diff: 40 }; }
@@ -319,7 +326,6 @@ function fighter(a) {
     armorAR: Math.round(x.ar * (a.discordUntil > GT ? 1 - SF.BARD.discord : 1)) + magicArmor(a), shieldAR: 0, diff: d.diff || 30 };
 }
 const armorVal = () => fighter(P).armorAR;
-const armorType = () => P.equip.armor ? (SF.ITEMS[P.equip.armor.id].armor || 'none') : 'none';
 const defRating = () => sv(wDef().skill);
 function stamOf(a) { return a === P || isAlly(a) ? a.stam : a.stam !== undefined ? a.stam : monT2A(MON[a.type] || {}).dex; }
 function drainStam(a, n) { if (a === P || isAlly(a)) a.stam = Math.max(0, a.stam - n); else if (a.type) { const x = monT2A(MON[a.type]); a.stam = Math.max(0, (a.stam !== undefined ? a.stam : x.dex) - n); } }
@@ -350,7 +356,8 @@ function applyBlow(A, t, opt) {
   if (!A.player && a.kind === 'mon') { v = monRaw(a, v); if (a.hexUntil > GT) v *= .88; }   // strength hex/boon and Dampening Hex on the striker
   if (t === P && !opt.ranged && a !== P) { v = meleeWard(a, v); if (v <= 0) { wardSound(t); return { raw, final: 0, warded: true }; } }   // Rebounding Armor
   if (t === P && P.veil && P.veil.until > GT && P.veil.left > 0) { const s = Math.min(P.veil.left, v); P.veil.left -= s; v -= s; if (s) floater(P.x, P.y, 'veil ' + Math.round(s), '#c8b890'); if (v <= 0) { wardSound(t); return { raw, final: 0, warded: true }; } }
-  const m = SF.mitigate(v, { parry: D.parry, braced: D.braced, shieldAR: D.shieldAR, armorAR: D.armorAR, player: D.player, mace: !!(A.w && A.w.mace) }, R);
+  if (D.regions) { const rg = SF.EQ.regionArmor(t, SF.EQ.pickRegion(R)); D.armorAR = rg.ar + magicArmor(t); D.armorItem = rg.item; D.region = rg.region; }   // one body region per blow; unprotected regions take it bare
+  const m = SF.mitigate(v, { parry: D.parry, braced: D.braced, shieldAR: D.shieldAR, armorAR: D.armorAR, player: D.player, mace: !!(A.w && A.w.mace) }, R); m.region = D.region;
   // side effects, each once: parry check and shield wear, armor wear (mace: half what it absorbed), weapon wear, stamina drain, gains
   if (D.shieldAR > 0) { if (t === P) gain('parrying', A.diff); if (m.parried) { wear(D.shieldItem, .3); floater(t.x, t.y, 'parry', '#cfe8ff'); } }
   if (D.armorItem) { if (A.w && A.w.mace) { if (m.armorWear > 0) wear(D.armorItem, m.armorWear); } else wear(D.armorItem, .2); }
@@ -443,8 +450,8 @@ function killMon(m, src) {
   m.dead = true; rmEnt(m); if (m.sp) m.sp.n--; const d = MON[m.type];
   if (m.kind === 'pet') { log((m.name || d.n) + ' has died.', '#ff6a5a'); return; }
   if (m.quest) questCrabKilled();
-  const cont = SF.newContainer('corpse'); for (const k in d.loot) { const q = rnd(d.loot[k][0], d.loot[k][1]); if (q > 0) cont.items.push(SF.newItem(k, q, SF.WEARABLE(k) ? { cond: 100, maxc: 100 } : null)); }
-  for (const [id, ch] of d.rare || []) if (R() < ch) cont.items.push(SF.newItem(id, 1, { cond: rnd(60, 100), maxc: 100 }));
+  const cont = SF.newContainer('corpse'); for (const k in d.loot) { const q = rnd(d.loot[k][0], d.loot[k][1]); if (q > 0) cont.items.push(lootItem(k, q, 100)); }
+  for (const [id, ch] of d.rare || []) if (R() < ch) cont.items.push(lootItem(id, 1, rnd(60, 100)));
   if (m.purse) cont.items.push(SF.newItem('gold', m.purse));
   const corpse = addEnt({ kind: 'corpse', mon: m.type, sect: m.sect || 0, t0: GT, name: d.n + ' remains', x: m.x, y: m.y, cont, expires: GT + (d.boss ? 600 : 240), skinned: !d.skin });
   if (corpse && (P.sel === m || src === P)) { P.sel = corpse; if (!P.lootHinted) { P.lootHinted = true; log('Tap the bones (or press Interact) beside them to loot.', '#ffe08a'); } }
@@ -501,9 +508,9 @@ const ALLY_POST = { x: 97.5, y: 308.5 };
 function makeAlly(sv0) {
   const a = addEnt({ kind: 'ally', aid: 'wren', name: 'Wren', x: ALLY_POST.x, y: ALLY_POST.y, sect: 2, str: 60, dex: 55, int: 30, skills: SF.newSkills(), pack: SF.newContainer('pack', 'wren'), order: 'wait', sw: SF.newSwing() });
   for (const [k, v] of [['swordsmanship', 55], ['tactics', 55], ['anatomy', 40], ['parrying', 40], ['wrestling', 30]]) a.skills[k].v = v * 10;
-  a.equip = { weapon: SF.newItem('sword', 1, { cond: 100, maxc: 100, omax: 100 }), shield: SF.newItem('buckler', 1, { cond: 100, maxc: 100, omax: 100 }), armor: SF.newItem('leather', 1, { cond: 100, maxc: 100, omax: 100 }) };
+  a.equip = { weapon: SF.newItem('sword', 1, { cond: 100, maxc: 100, omax: 100 }), shield: SF.newItem('buckler', 1, { cond: 100, maxc: 100, omax: 100 }), }; Object.assign(a.equip, emptyEquip(), { weapon: a.equip.weapon, shield: a.equip.shield }); for (const id of ['leather_cap', 'leather_gorget', 'leather_tunic', 'leather_sleeves', 'leather_gloves', 'leather_leggings', 'shirt', 'trousers', 'boots']) { const it = SF.EQ.make(id, { origin: 'npc' }); a.equip[SF.ITEMS[id].slot] = it; } a.eqMig = SF.EQ.MIGRATION;
   a.max = SF.maxHp(a); a.hp = Math.round(a.max * .55); a.stam = a.dex;          // she starts nursing a wound
-  if (sv0) { for (const k of ['x', 'y', 'hp', 'stam', 'ghost', 'ghostAt', 'order', 'poison', 'skills']) if (sv0[k] !== undefined) a[k] = sv0[k]; if (sv0.equip) a.equip = sv0.equip; if (sv0.pack) a.pack.items = sv0.pack; if (a.ghost && Number.isFinite(sv0.ghostLeft)) a.ghostAt = GT - (SF.ALLY_GHOST_WAIT - sv0.ghostLeft); }
+  if (sv0) { for (const k of ['x', 'y', 'hp', 'stam', 'ghost', 'ghostAt', 'order', 'poison', 'skills']) if (sv0[k] !== undefined) a[k] = sv0[k]; if (sv0.equip) a.equip = Object.assign(emptyEquip(), sv0.equip); if (sv0.pack) a.pack.items = sv0.pack; if (a.ghost && Number.isFinite(sv0.ghostLeft)) a.ghostAt = GT - (SF.ALLY_GHOST_WAIT - sv0.ghostLeft); }
   if (!canStand(a, a.x, a.y)) { a.x = ALLY_POST.x; a.y = ALLY_POST.y; }
   return a;
 }
@@ -796,7 +803,7 @@ function populate() {
   annPopulate(npc);
   for (let i = 0; i < 12; i++) { for (const s of SPAWNS) s.next = 0; spawnTick(); }
 }
-const SHOPS = { provisioner: ['hatchet', 'pickaxe', 'knife', 'rod', 'tongs', 'sewkit', 'cloth', 'vial', 'bandage', 'lanternoil', 'cookedmeat', 'clothvest', 'lute', 'lockpick', 'repairkit'], smith: ['dagger', 'kryss', 'spear', 'sword', 'battleaxe', 'glaive', 'mace', 'waraxe', 'hammer', 'ironbar', 'leather', 'chain', 'plate', 'buckler'], workshop: ['shortbow', 'crossbow', 'heavycrossbow', 'arrow', 'bolt', 'pine', 'buckler', 'strap', 'trapkit', 'repairkit'], apothecary: ['reedash', 'shelldust', 'marshroot', 'lanternoil', 'blacksalt', 'vial', 'draught', 'antidote', 'manatonic', 'stamtonic', 'cinder'], outlaw: ['bandage', 'draught', 'arrow', 'cookedmeat', 'cloth', 'vial', 'reedash', 'marshroot', 'knife', 'dagger', 'lockpick', 'venom', 'trapkit'] };
+const SHOPS = { provisioner: ['hatchet', 'pickaxe', 'knife', 'rod', 'tongs', 'sewkit', 'cloth', 'vial', 'bandage', 'lanternoil', 'cookedmeat', 'shirt', 'trousers', 'shoes', 'cloak', 'lute', 'lockpick', 'repairkit'], smith: ['dagger', 'kryss', 'spear', 'sword', 'battleaxe', 'glaive', 'mace', 'waraxe', 'hammer', 'ironbar', 'ringmail_tunic', 'ringmail_sleeves', 'ringmail_gloves', 'ringmail_leggings', 'chain_coif', 'chain_tunic', 'chain_leggings', 'plate_gorget', 'plate_chest', 'plate_arms', 'plate_gauntlets', 'plate_leggings', 'bascinet', 'open_helm', 'closed_helm', 'plate_helm', 'buckler', 'metal_shield', 'kite_shield'], workshop: ['shortbow', 'crossbow', 'heavycrossbow', 'arrow', 'bolt', 'pine', 'buckler', 'wooden_shield', 'strap', 'trapkit', 'repairkit'], apothecary: ['reedash', 'shelldust', 'marshroot', 'lanternoil', 'blacksalt', 'vial', 'draught', 'antidote', 'manatonic', 'stamtonic', 'cinder'], outlaw: ['bandage', 'draught', 'arrow', 'cookedmeat', 'cloth', 'vial', 'reedash', 'marshroot', 'knife', 'dagger', 'lockpick', 'venom', 'trapkit'] };
 Object.assign(SHOPS, ANN_SHOPS);
 
 /* ---------- main tick ---------- */
@@ -816,7 +823,7 @@ function update(dt) {
     // stamina
     const sMax = SF.maxStam(P); if (GT - (P.lastDrain || -9) > SF.STAM_DELAY) P.stam = Math.min(sMax, P.stam + (inCombat() ? SF.STAM_REGEN_COMBAT : SF.STAM_REGEN) * dt);
     // mana
-    let mr = SF.manaRegen(sv('meditation'), armorType()); if (P.meditating && GT - P.meditating.t0 > SF.MEDITATE_SETTLE) mr += SF.MEDITATE_BONUS * (1 - (SF.ARMOR_MANA[armorType()] || 0));
+    const medI = SF.EQ.effective(P).med; let mr = SF.manaRegen(sv('meditation'), medI); if (P.meditating && GT - P.meditating.t0 > SF.MEDITATE_SETTLE) mr += SF.MEDITATE_BONUS * (1 - medI);
     const mb = P.mana; P.mana = Math.min(SF.maxMana(P), P.mana + mr * dt); if (P.meditating) { P.meditating.gained += P.mana - mb; if (P.mana >= SF.maxMana(P)) { if (P.meditating.gained >= 8) gain('meditation', 40); P.meditating = null; log('Your mana is full.'); } }
     // health: slow out-of-combat recovery, faster when fed
     if (!inCombat() && !P.poison) P.hp = Math.min(SF.maxHp(P), P.hp + (P.fed > GT ? 1 : .1) * dt);
@@ -1198,11 +1205,13 @@ const TASKS = {
     const lo = Math.max(1, Math.round(p * .4 * (1 - err))), hi = Math.round(p * 1.2 * (1 + err));
     log(`${SF.itemName(it)}${it.quality === 'exceptional' ? ' (exceptional)' : ''}: ${it.maker ? 'made by ' + it.maker + ', ' : ''}${it.cond !== undefined ? 'condition ' + Math.round(it.cond) + '/' + (it.maxc || 100) + ', ' : ''}worth about ${lo}–${hi} gold${d.trade ? '' : ', cannot be traded'}.`, '#e8d8b0'); },
   repair: t => { const it = t.item, k = SF.repairSkill(it.id); const rp = SF.repairPlan(it); if (!rp.ok) return log(cap1(rp.reason), '#ffb070'); if (!SF.removeQty(P.pack, 'repairkit', 1)) return log('You need a repair kit.'); gain(k, 30);
-    if (R() < SF.opposed(sv(k), 30)) { const r = SF.repair(it); log(r.ok ? `Repaired to ${r.maxc}/${r.maxc}. Each repair lowers the maximum by ${Math.ceil(.03 * SF.origMax(it))}.` : r.reason, r.ok ? '#7ee08a' : '#ffb070'); } else log('The repair fails and the kit is used up.', '#ffb070'); renderPanel(); } };
-function chestLoot(tier) { const c = SF.newContainer('chest'); const add = (id, a, b) => { const q = rnd(a, b); if (q > 0) c.items.push(SF.newItem(id, q, SF.WEARABLE(id) ? { cond: rnd(70, 100), maxc: 100 } : null)); };
+    if (R() < SF.opposed(sv(k), 30)) { const r = SF.EQ.repairItem(P, { uid: it.uid, skill: sv(k), rng: R }); log(r.ok ? `Repaired to ${r.maxc}/${r.maxc}.` + (r.lost ? ` The maximum drops by ${r.lost}.` : ' The maximum holds.') : r.reason, r.ok ? '#7ee08a' : '#ffb070'); } else log('The repair fails and the kit is used up.', '#ffb070'); renderPanel(); } };
+/* a found item: gear arrives as a proper instance (material, durability), worn to pct % of its maximum */
+function lootItem(id, q, pct) { if (SF.EQ.isGear(id)) { const it = SF.EQ.make(id, { origin: 'loot' }); if (it.omax) it.cond = Math.max(1, Math.round(it.omax * pct / 100)); return it; } return SF.newItem(id, q, SF.WEARABLE(id) ? { cond: pct, maxc: 100 } : null); }
+function chestLoot(tier) { const c = SF.newContainer('chest'); const add = (id, a, b) => { const q = rnd(a, b); if (q > 0) c.items.push(lootItem(id, q, rnd(70, 100))); };
   if (tier === 0) { add('gold', 15, 40); add('bandage', 2, 5); add(pick(Object.values(SF.REAGENT)), 2, 5); }
   if (tier === 1) { add('gold', 40, 90); add('draught', 0, 1); add('ironbar', 1, 2); add('lockpick', 1, 3); add(pick(Object.values(SF.REAGENT)), 3, 6); }
-  if (tier === 2) { add('gold', 100, 200); add('bellshard', 1, 2); add('draught', 1, 2); if (R() < .35) add(pick(['chain', 'glaive', 'crossbow', 'leather', 'kryss', 'battleaxe', 'spear']), 1, 1); }
+  if (tier === 2) { add('gold', 100, 200); add('bellshard', 1, 2); add('draught', 1, 2); if (R() < .35) add(pick(['chain_tunic', 'glaive', 'crossbow', 'studded_tunic', 'kryss', 'battleaxe', 'spear', 'norse_helm', 'kite_shield', 'ringmail_leggings']), 1, 1); }
   return c; }
 /* fresh: the lid actually opens; otherwise this only reopens the loot panel of an open chest (UI only) */
 function openChest(c, fresh) { springRuneTrap(c, false); P.lootOpen = { kind: 'chest', x: c.x + .5, y: c.y + .5, cont: c.cont, name: 'chest', expires: c.refill }; openPanel('loot'); if (fresh) sndAt('chest.open', P.lootOpen, { delay: .3 }); else snd('ui.open'); }
@@ -1294,7 +1303,7 @@ function genBrine(r, carve, disc) {
 /* ---------- starter quest: A Light for the Quay ---------- */
 SF.ITEMS.wick = { n: 'Dry wick', kg: .05, stack: 1, cat: 'quest' };
 MON.wreckcrab = { n: 'wreck crab', col: '#c0502a', size: .9, h: 28, hp: 34, atk: 35, def: 30, dmg: [3, 6], reach: 1.2, tele: .6, rec: 1.4, speed: 2.4, aggro: 6, leash: 9, armor: 15, diff: 30, loot: { shelldust: [1, 2], gold: [2, 6] }, skin: { meat: [1, 1] } };
-MON.skeleton = { n: 'drowned skeleton', col: '#c8b890', size: 1, h: 60, hp: 55, atk: 58, def: 50, dmg: [7, 11], reach: 1.3, tele: .5, rec: 1.1, speed: 3.6, aggro: 7, leash: 18, armor: 12, diff: 55, loot: { gold: [4, 16], bellshard: [0, 1] } };
+MON.skeleton = { n: 'drowned skeleton', col: '#c8b890', size: 1, h: 60, hp: 55, atk: 58, def: 50, dmg: [7, 11], reach: 1.3, tele: .5, rec: 1.1, speed: 3.6, aggro: 7, leash: 18, armor: 12, diff: 55, loot: { gold: [4, 16], bellshard: [0, 1], bone: [2, 5] } };
 SPAWNS.push({ type: 'skeleton', x: 540, y: 330, r: 11, max: 3, n: 0, next: 0 });
 // T2A halves damage to players at the end of a blow; creature damage ranges double so PvE threat stays near v0.16 (tuning)
 for (const k in MON) { const d = MON[k]; if (d._x2) continue; d._x2 = 1; d.dmg = d.dmg.map(v => v * 2); if (d.ranged2) d.ranged2.dmg = d.ranged2.dmg.map(v => v * 2); }
@@ -1756,9 +1765,9 @@ SFXA.musicOn = SETTINGS.music !== false;           // music on unless turned off
 /* ---------- HUD ---------- */
 function bar(id, v, m, lbl) { const el = $(id); el.querySelector('i').style.width = cl(v / m * 100, 0, 100) + '%'; el.querySelector('span').textContent = lbl + ' ' + Math.floor(v) + '/' + m; }
 function refreshHud() {
-  if (!P) return; bar('#hp', P.hp, SF.maxHp(P), 'HP'); bar('#sp', P.stam, SF.maxStam(P), 'ST'); bar('#mp', P.mana, SF.maxMana(P), 'MP');
+  if (!P) return; eqTick(); bar('#hp', P.hp, SF.maxHp(P), 'HP'); bar('#sp', P.stam, SF.maxStam(P), 'ST'); bar('#mp', P.mana, SF.maxMana(P), 'MP');
   $('#pname').textContent = P.name + (P.ghost ? ' · ghost' : '');
-  const chips = []; if (P.hidden) chips.push(`hidden ${Math.max(0, P.stepBudget)} steps`); if (P.poison) chips.push('poisoned'); if (P.skillPool > 0) chips.push(f1(P.skillPool) + ' skill points to place'); if (P.meditating) chips.push('meditating'); if (P.veil && P.veil.until > GT && P.veil.left > 0) chips.push('stoneveil ' + Math.round(P.veil.left)); if (P.fed > GT) chips.push('fed'); if (overweight()) chips.push('overweight'); if (inCombat() && !P.ghost) chips.push('in combat'); if (!P.ghost) chips.push(...magicChips());
+  const chips = []; if (P.hidden) chips.push(`hidden ${Math.max(0, P.stepBudget)} steps`); if (P.poison) chips.push('poisoned'); if (P.skillPool > 0) chips.push(f1(P.skillPool) + ' skill points to place'); if (P.meditating) chips.push('meditating'); if (P.veil && P.veil.until > GT && P.veil.left > 0) chips.push('stoneveil ' + Math.round(P.veil.left)); if (P.fed > GT) chips.push('fed'); { const en = encumb(); if (en.stage) chips.push(en.n.toLowerCase()); } if (inCombat() && !P.ghost) chips.push('in combat'); if (!P.ghost) chips.push(...magicChips());
   $('#chips').textContent = chips.join(' · ');
   $('#zone').textContent = ZONE_NAME[zoneAt(Math.floor(P.x), Math.floor(P.y))] || '';
   { const ck = $('#clock'); ck.textContent = clockText(); ck.title = PERIOD_NAME[SIM.periodOf(hourOfDay())] + ' · day ' + (WS ? WS.clock.dayAt(GT) : 1); }
@@ -1874,8 +1883,8 @@ function bagActions(it) {
 }
 const PANELS = {
   bag: bagPanel,
-  gear: () => { const t = (k, n) => `<span>${n}</span><span>${P[k]}</span>`; let h = `<div class="kv">${t('str', 'Strength')}${t('dex', 'Dexterity')}${t('int', 'Intellect')}<span>Stat total</span><span>${P.str + P.dex + P.int} / 225</span><span>Health</span><span>${Math.floor(P.hp)} / ${SF.maxHp(P)}</span><span>Stamina</span><span>${Math.floor(P.stam)} / ${SF.maxStam(P)}</span><span>Mana</span><span>${Math.floor(P.mana)} / ${SF.maxMana(P)}</span><span>Armor</span><span>${armorVal()} (${armorType()})</span><span>Weapon</span><span>${wDef().fam} · ${wDef().dmg.join('–')} · reach ${wDef().reach} m · swing every ${SF.swingDelay(P.stam, wDef().speed).toFixed(2)} s</span><span>Bound shrine</span><span>${SHRINES.find(s => s.id === P.bound).n}</span><span>Skills</span><span>${f1(SF.totalSkill(P))} / 700.0</span></div><div class="sec">Equipped</div>`;
-    for (const s of ['weapon', 'shield', 'armor']) { const it = P.equip[s]; h += `<div class="row"><span class="v" style="width:4.5em">${s}</span>${it ? rowIcon(it) : ''}<span class="nm">${it ? esc(iname(it)) : '<span class="note">empty</span>'}</span>${it && SF.WEARABLE(it.id) && it.cond !== undefined && it.cond < (it.maxc || 100) ? btn('repair', 'Repair', { u: it.uid }) : ''}${it && SF.ITEMS[it.id].trade ? btn('uneq', 'Remove', { s }) : ''}</div>`; }
+  gear: () => { const t = (k, n) => `<span>${n}</span><span>${P[k]}</span>`; let h = `<div class="kv">${t('str', 'Strength')}${t('dex', 'Dexterity')}${t('int', 'Intellect')}<span>Stat total</span><span>${P.str + P.dex + P.int} / 225</span><span>Health</span><span>${Math.floor(P.hp)} / ${SF.maxHp(P)}</span><span>Stamina</span><span>${Math.floor(P.stam)} / ${SF.maxStam(P)}</span><span>Mana</span><span>${Math.floor(P.mana)} / ${SF.maxMana(P)}</span><span>Armor rating</span><span>${armorVal()}</span><span>Carried</span><span>${fmtWt(carryWt())} / ${fmtWt(SF.carryCap(P))} · ${encumb().n}</span><span>Weapon</span><span>${wDef().fam} · ${wDef().dmg.join('–')} · reach ${wDef().reach} m · swing every ${SF.swingDelay(P.stam, wDef().speed).toFixed(2)} s</span><span>Bound shrine</span><span>${SHRINES.find(s => s.id === P.bound).n}</span><span>Skills</span><span>${f1(SF.totalSkill(P))} / 700.0</span></div><div class="sec">Equipped ${btn('eqwin', 'Paper doll (C)', {}, 'ac')}</div>`;
+    for (const s of SF.EQ.SLOT_IDS) { const it = P.equip[s]; if (!it && !['weapon', 'shield', 'chest'].includes(s)) continue; h += `<div class="row"><span class="v" style="width:5.5em">${SF.EQ.SLOT[s].n}</span>${it ? rowIcon(it) : ''}<span class="nm">${it ? esc(iname(it)) : '<span class="note">empty</span>'}</span>${it && SF.WEARABLE(it.id) && it.cond !== undefined && it.cond < (it.maxc || 100) ? btn('repair', 'Repair', { u: it.uid }) : ''}${it && SF.ITEMS[it.id].trade ? btn('uneq', 'Remove', { s }) : ''}</div>`; }
     return ['Character', h + '<p class="note">Stats do not grow by use. Buy points from Master Vey (up to 225 total).</p>']; },
   skills: () => { let h = `<div class="note">Total ${f1(SF.totalSkill(P))} / 700.0 · ▲ raise · ■ hold · ▼ lower (gives points when you hit the cap)</div>`;
     if (P.skillPool > 0) h += `<div class="sec">Combat reform</div><p class="note">${f1(P.skillPool)} trained points from skills that merged in the combat reform are waiting. Tap +1.0 on a skill to place them (never past 100.0 or the 700.0 total).</p>`;
@@ -1893,7 +1902,7 @@ const PANELS = {
   bank: () => { let h = `<div class="note">Bank storage is safe when you die. One account at every bank: the Quay, Mynoc, Vespar, Skara Bryn, Moonglen and the camp strongbox.</div>${btn('depgold', 'Deposit all gold', {}, 'ac')}<div class="sec">Bank (${SF.count(P.bank, 'gold')} gold)</div>`;
     if (!P.bank.items.length) h += '<p class="note">Empty.</p>'; for (const it of P.bank.items) h += `<div class="row">${rowIcon(it)}<span class="nm">${esc(iname(it))}</span>${btn('wd', 'Withdraw', { u: it.uid })}</div>`;
     h += '<div class="sec">Pack</div>'; for (const it of P.pack.items) if (SF.ITEMS[it.id].trade) h += `<div class="row">${rowIcon(it)}<span class="nm">${esc(iname(it))}</span>${btn('dep', 'Deposit', { u: it.uid })}</div>`;
-    for (const s of ['weapon', 'shield', 'armor']) { const it = P.equip[s]; if (it && SF.ITEMS[it.id].trade) h += `<div class="row">${rowIcon(it)}<span class="nm">${esc(iname(it))} <span class="note">worn</span></span>${btn('depeq', 'Deposit', { s })}</div>`; }
+    for (const s of SF.EQ.SLOT_IDS) { const it = P.equip[s]; if (it && SF.ITEMS[it.id].trade) h += `<div class="row">${rowIcon(it)}<span class="nm">${esc(iname(it))} <span class="note">worn</span></span>${btn('depeq', 'Deposit', { s })}</div>`; }
     return [P.talkTo ? P.talkTo.name : 'Bank', h]; },
   shop: () => { const n = P.talkTo; if (!n || dist(n, P) > 4) return null; const stock = SHOPS[n.role] || []; const tab = PTAB || 'buy'; let h = `<div class="tabs">${btn('tab', 'Buy', { t: 'buy' }, tab === 'buy' ? 'ac' : '')}${btn('tab', 'Sell', { t: 'sell' }, tab === 'sell' ? 'ac' : '')}<span class="note" style="margin-left:auto">${SF.count(P.pack, 'gold')} gold</span></div>`;
     if (tab === 'buy') for (const id of stock) { const p = SF.PRICES[id]; const st = SF.ITEMS[id].stack; h += `<div class="row">${rowIcon({ id })}<span class="nm">${esc(SF.itemName({ id, qty: 1 }))}</span><span class="v">${p} gp</span>${btn('buy', 'Buy', { id, n: 1 })}${st ? btn('buy', '×10', { id, n: 10 }) : ''}</div>`; }
@@ -1929,21 +1938,21 @@ const ACT = {
   abil: d => { ABIL[d.id].fn(); }, petcmd: d => petCommand(d.c), appraise: d => { const it = findU(P.pack, d.u); if (!it) return; closePanel(); P.task = { kind: 'appraise', item: it, label: 'Appraising', t0: GT, t1: GT + SF.APPRAISE_TIME, still: true, x0: P.x, y0: P.y }; },
   repair: d => { const it = findU(P.pack, d.u) || Object.values(P.equip).find(e => e && e.uid === +d.u); if (!it) return; const k = SF.repairSkill(it.id); const st = nearestStation(k === 'smithing' ? ['anvil', 'forge'] : ['bench']); if (!st) return log(k === 'smithing' ? 'Repair metal at the smithy anvil.' : 'Repair this at a workbench.', '#ffb070'); if (!SF.count(P.pack, 'repairkit')) return log('You need a repair kit.', '#ffb070'); const rp = SF.repairPlan(it); if (!rp.ok) return log(cap1(rp.reason), '#ffb070'); P.task = { kind: 'repair', item: it, label: 'Repairing', t0: GT, t1: GT + SF.CRAFT_TIME, still: true, x0: P.x, y0: P.y }; }, self: () => { P.sel = P; if (P.held && SF.SPELL[P.held.sp.id].t === 'ally') releaseHeld(P); },
   desel: () => { P.sel = null; P.armed = false; }, ghostret: () => { if (GT - P.ghostAt >= 12) { const s = SHRINES.find(z => z.id === P.bound); resurrect({ x: s.x + .5, y: s.y + .5 }); } },
-  equip: d => { const it = findU(P.pack, d.u); if (!it) return; const def = SF.ITEMS[it.id]; const slot = def.slot; const nw = slot === 'weapon' ? SF.WEAPONS[def.wpn] : null; if (nw && P.str < nw.str) return log(`You are not strong enough to wield that (${nw.n} needs ${nw.str} Strength).`, '#ffb070'); if (slot === 'shield' && P.equip.weapon && (SF.weaponOf(P.equip.weapon) || {}).two) unequipTo('weapon'); if (nw && nw.two && P.equip.shield) unequipTo('shield'); if (P.equip[slot]) unequipTo(slot); P.pack.items.splice(P.pack.items.indexOf(it), 1); P.pack.ver++; P.equip[slot] = it; snd('item.equip'); if (slot === 'weapon') weaponChanged(); renderPanel(); },
+  equip: d => { equipUid(d.u, d.slot); renderPanel(); },
   uneq: d => { unequipTo(d.s); renderPanel(); }, useitem: d => { const def = SF.ITEMS[d.id]; if (d.id === 'bandage') firstAid(P); else if (def.use === 'eat') eat(d.id); else useConsumable(d.id); renderPanel(); },
-  drop: d => { const it = findU(P.pack, d.u); if (!it) return; P.pack.items.splice(P.pack.items.indexOf(it), 1); dropPile(it); renderPanel(); },
+  drop: d => { const r = SF.EQ.dropItem(P, { uid: d.u, qty: d.q ? +d.q : undefined }, it => { dropPile(it); return true; }); if (!r.ok) log(cap1(r.reason) + '.', '#ffb070'); else { if (r.from !== 'pack' && r.from === 'weapon') weaponChanged(); snd('loot.rummage'); bagUid = null; eqChanged(); } renderPanel(); },
   assign: d => { ASSIGN = { k: d.k, id: d.id }; openPanel('assign'); }, setslot: d => { P.hotbar[+d.i] = ASSIGN; closePanel(); },
   lock: d => { const s = P.skills[d.k]; s.lock = s.lock === 'raise' ? 'hold' : s.lock === 'hold' ? 'lower' : 'raise'; renderPanel(); },
   cast: d => { closePanel(); castSlot(d.s); },
-  take: d => { const c = P.lootOpen; if (!c || dist(c, P) > 2) return log('Move within 2 m.'); const it = findU(c.cont, d.u); if (!it) return; const r = SF.transfer(c.cont, P.pack, it.uid, d.half ? Math.ceil(it.qty / 2) : it.qty, { cap: cap() }); if (!r.ok) log(r.reason, '#ffb070'); else if (it.id === 'gold') snd('loot.coin'); renderPanel(); if (c.mine) save(); },
-  takeall: () => { const c = P.lootOpen; if (!c || dist(c, P) > 2) return; let n = 0, gold = 0; for (const it of c.cont.items.slice()) { const r = SF.transfer(c.cont, P.pack, it.uid, it.qty, { cap: cap() }); if (r.ok) { n++; if (it.id === 'gold') gold++; } else { log('Stopped: ' + r.reason, '#ffb070'); break; } } if (n) snd(gold ? 'loot.coin' : 'loot.rummage'); /* one cue for the whole transfer */ renderPanel(); if (c.mine) save(); },
+  take: d => { const c = P.lootOpen; if (!c || dist(c, P) > 2) return log('Move within 2 m.'); const it = findU(c.cont, d.u); if (!it) return; const r = SF.EQ.pickupItem(P, c.cont, { uid: it.uid, qty: d.half ? Math.ceil(it.qty / 2) : it.qty }); if (!r.ok) log(r.reason, '#ffb070'); else if (it.id === 'gold') snd('loot.coin'); renderPanel(); if (c.mine) save(); },
+  takeall: () => { const c = P.lootOpen; if (!c || dist(c, P) > 2) return; let n = 0, gold = 0; for (const it of c.cont.items.slice()) { const r = SF.EQ.pickupItem(P, c.cont, { uid: it.uid, qty: it.qty }); if (r.ok) { n++; if (it.id === 'gold') gold++; } else { log('Stopped: ' + r.reason, '#ffb070'); break; } } if (n) snd(gold ? 'loot.coin' : 'loot.rummage'); /* one cue for the whole transfer */ renderPanel(); if (c.mine) save(); },
   skin: () => { const c = P.lootOpen || P.sel; if (c && c.mon && dist(c, P) <= 2) skin(c); else log('Stand by the remains.'); },
   depgold: () => { let g = 0; for (const it of P.pack.items.filter(i => i.id === 'gold')) if (SF.transfer(P.pack, P.bank, it.uid, it.qty).ok) g++; if (g) snd('loot.coin'); save(); renderPanel(); },
   dep: d => { const it = findU(P.pack, d.u); if (it) SF.transfer(P.pack, P.bank, it.uid, it.qty); save(); renderPanel(); },
-  depeq: d => { const it = P.equip[d.s]; if (!it) return; P.equip[d.s] = null; SF.addItem(P.bank, it); if (d.s === 'weapon') weaponChanged(); save(); renderPanel(); },
+  depeq: d => { const r = SF.EQ.unequipItem(P, { slot: d.s }); if (!r.ok) return; SF.transfer(P.pack, P.bank, r.uid); if (d.s === 'weapon') weaponChanged(); save(); renderPanel(); },
   wd: d => { const it = findU(P.bank, d.u); if (!it) return; const r = SF.transfer(P.bank, P.pack, it.uid, it.qty, { cap: cap() }); if (!r.ok) log(r.reason, '#ffb070'); save(); renderPanel(); },
   tab: d => { PTAB = d.t; renderPanel(true); snd('ui.page'); },
-  buy: d => { const p = SF.PRICES[d.id] * +d.n; if (SF.count(P.pack, 'gold') < p) return log('Not enough gold.', '#ffb070'); const it = SF.newItem(d.id, +d.n, SF.ITEMS[d.id].stack ? null : SF.WEARABLE(d.id) ? { cond: 100, maxc: 100, omax: 100, origin: 'npc' } : { cond: 100 }); const r = SF.addItem(P.pack, it, cap()); if (!r.ok) return log(r.reason, '#ffb070'); SF.removeQty(P.pack, 'gold', p); snd('loot.coin'); renderPanel(); },
+  buy: d => { const p = SF.PRICES[d.id] * +d.n; if (SF.count(P.pack, 'gold') < p) return log('Not enough gold.', '#ffb070'); const it = SF.EQ.isGear(d.id) || (SF.WEARABLE(d.id) && !SF.ITEMS[d.id].stack) ? SF.EQ.make(d.id, { origin: 'npc' }) : SF.newItem(d.id, +d.n, SF.ITEMS[d.id].stack ? null : { cond: 100 }); const r = SF.addItem(P.pack, it, cap()); if (!r.ok) return log(r.reason, '#ffb070'); SF.removeQty(P.pack, 'gold', p); snd('loot.coin'); renderPanel(); },
   sell: d => { const it = findU(P.pack, d.u); if (!it) return; const n = d.all ? it.qty : 1, g = Math.max(1, Math.floor((SF.PRICES[it.id] || 1) * .4 * (SF.WORK_TOOLS[it.id] && !SF.ITEMS[it.id].stack ? SF.toolUses(it) / SF.TOOL_USES : 1))) * n; it.qty -= n; if (it.qty <= 0) P.pack.items.splice(P.pack.items.indexOf(it), 1); P.pack.ver++; SF.addItem(P.pack, SF.newItem('gold', g)); snd('loot.coin'); renderPanel(); },
   train: d => { const s = P.skills[d.k]; if (s.lock !== 'raise') return log('Set that skill to Raise first.', '#ffb070'); const v = s.v / 10; const cost = P.freeLessons > 0 ? 0 : SF.trainCost(v, 30); const add = 300 - s.v; if (SF.totalSkill(P) + add > SF.SKILL_CAP) return log('That would pass the 700 cap.', '#ffb070'); if (cost && SF.count(P.pack, 'gold') < cost) return log('Not enough gold.', '#ffb070'); if (cost) SF.removeQty(P.pack, 'gold', cost); else P.freeLessons--; s.v = 300; log(`You train ${SF.SKILL[d.k].n} to 30.`, '#7fd4ff'); save(); renderPanel(); },
   stat: d => { const n = +d.n, k = d.k; if (P.str + P.dex + P.int + n > SF.STAT_CAP) return log('Attribute total is capped at 225.', '#ffb070'); if (P[k] + n > SF.STAT_MAX) return log('Each attribute is capped at 100.', '#ffb070'); const c = SF.statTrainCost(n); if (SF.count(P.pack, 'gold') < c) return log('Not enough gold.', '#ffb070'); SF.removeQty(P.pack, 'gold', c); P[k] += n; save(); renderPanel(); },
@@ -2212,27 +2221,27 @@ function craftDetail(r) {
   return ['Crafting', h];
 }
 /* batch: one cancel token per batch, re-checked at the start and end of every attempt */
-function startCraft(id, n, mat) {
-  const r = SF.RECIPE[id]; if (!r || P.ghost) return; mat = r.prim ? (mat || r.defMat) : null;
+function startCraft(id, n, mat, sec) {
+  const r = SF.RECIPE[id]; if (!r || P.ghost) return; mat = r.prim ? (mat || r.defMat) : null; sec = r.sec ? (sec || r.defSec) : null;
   if (inCombat()) return log('Not while you are in combat.', '#ffb070');
   if (P.task && P.task.kind !== 'craft') return log('Finish ' + P.task.label.toLowerCase() + ' first.', '#ffb070');
   if (P.task) P.task = null;   // a new batch replaces the old one; the unresolved attempt costs nothing
   const stn = craftStation(r); if (!stn.st) return log(stn.why, '#ffb070');
   const tool = toolState(r, stn.st); if (!tool.ok) return log(tool.t + '.', '#ffb070');
-  const p = SF.craftPlan(P, P.pack, r, mat); if (!p.ok) return log(cap1(p.reason) + '.', '#ffb070');
-  P.batch = { token: (P.batch && P.batch.token || 0) + 1, rid: id, mat, left: Math.max(1, Math.min(20, n || 1)), made: 0, x0: P.x, y0: P.y };
+  const p = SF.craftPlan(P, P.pack, r, mat, sec); if (!p.ok) return log(cap1(p.reason) + '.', '#ffb070');
+  P.batch = { token: (P.batch && P.batch.token || 0) + 1, rid: id, mat, sec, left: Math.max(1, Math.min(20, n || 1)), made: 0, x0: P.x, y0: P.y };
   nextAttempt();
 }
 function nextAttempt() {
   const b = P.batch; if (!b || P.task) return; const r = SF.RECIPE[b.rid];
-  P.task = { kind: 'craft', r: b.rid, mat: b.mat, token: b.token, label: `${recipeName(r)}${b.left > 1 ? ' · ' + b.left + ' left' : ''}`, t0: GT, t1: GT + SF.craftTime(r), still: true, x0: P.x, y0: P.y };
+  P.task = { kind: 'craft', r: b.rid, mat: b.mat, sec: b.sec, token: b.token, label: `${recipeName(r)}${b.left > 1 ? ' · ' + b.left + ' left' : ''}`, t0: GT, t1: GT + SF.craftTime(r), still: true, x0: P.x, y0: P.y };
 }
 function finishCraft(t) {
   const b = P.batch; if (!b || b.token !== t.token) return;
   const r = SF.RECIPE[t.r], stn = craftStation(r), tool = toolState(r, stn.st);
   if (!stn.st) { P.batch = null; return log(stn.why, '#ffb070'); }
   if (!tool.ok) { P.batch = null; return log(tool.t + '.', '#ffb070'); }
-  const p = SF.craftPlan(P, P.pack, r, t.mat), res = SF.craftAttempt(P, P.pack, p, R, cap(), { mark: !!P.cx.mark });
+  const p = SF.craftPlan(P, P.pack, r, t.mat, t.sec), res = SF.craftAttempt(P, P.pack, p, R, cap(), { mark: !!P.cx.mark });
   if (!res.ok) { P.batch = null; log('Stopped: ' + res.reason + '.', '#ffb070'); renderPanel(); return; }
   craftSound(r, res.success);
   gain(r.skill, p.diff, { recipe: r.id });
@@ -2243,14 +2252,14 @@ function finishCraft(t) {
     simEmit('ItemCrafted', { actor: aidOf(P), recipe: r.id, item: it.id, qty: it.qty, uid: it.uid, exceptional: !!res.exceptional }); }
   else log('You fail and lose ' + res.lost.map(l => l.n + ' ' + SF.ITEMS[l.id].n.toLowerCase()).join(', ') + '.', '#ffb070');
   b.left--; renderPanel();
-  if (b.left > 0) at(.25, () => { if (P.batch && P.batch.token === b.token && !P.ghost) { const p2 = SF.craftPlan(P, P.pack, r, t.mat); if (!p2.ok) { log('Batch stopped: ' + p2.reason + '.', '#ffb070'); P.batch = null; return; } nextAttempt(); } });
+  if (b.left > 0) at(.25, () => { if (P.batch && P.batch.token === b.token && !P.ghost) { const p2 = SF.craftPlan(P, P.pack, r, t.mat, t.sec); if (!p2.ok) { log('Batch stopped: ' + p2.reason + '.', '#ffb070'); P.batch = null; return; } nextAttempt(); } });
   else P.batch = null;
 }
 function stopBatch(why) { if (P.batch) { P.batch = null; if (why) log(why, '#ffb070'); } if (PANEL === 'craft' && CUI && CUI.rid) closePanel(); }
 Object.assign(ACT, {
   ccat: d => { CUI.cat = d.c; renderPanel(true); snd('ui.page'); }, crec: d => { CUI.rid = d.r; renderPanel(true); snd('ui.page'); }, cback: () => { CUI.rid = null; renderPanel(true); snd('ui.page'); },
   cmat: d => { CUI.mat = d.m; renderPanel(); }, cn: d => { CUI.n = cl(CUI.n + +d.d, 1, 20); renderPanel(); }, cmark: () => { P.cx.mark = !P.cx.mark; renderPanel(); },
-  cmake: d => { startCraft(CUI.rid, +d.n, CUI.mat); renderPanel(); },
+  cmake: d => { startCraft(CUI.rid, +d.n, CUI.mat, CUI.sec); renderPanel(); },
   survey: () => startSurvey(P.sel),
   gqacc: d => gqAccept(d.q), gqclaim: d => gqClaim(d.q), gqpay: d => { payPending(d.q); save(); renderPanel(true); },
   gqtrack: d => { P.cx.track = P.cx.track === d.q ? null : d.q; renderPanel(true); },
@@ -2277,6 +2286,7 @@ function migrateSave(s, raw) {
     s.sim = s.sim || null; s.v = 5;
   }
   if (s.v < 6) migrateV6(s, raw);
+  if (s.v < 7) migrateV7(s, raw);
   return s;
 }
 /* v0.23 world expansion: the grid grew from 2100 × 900 to W × H and Anniabreen was stretched (annStretch). Everything saved at
@@ -2299,6 +2309,20 @@ function migrateV6(s, raw) {
   if (s.ally) (s.ally.pack || []).forEach(rune);
   s.worldMoved = true; s.v = 6;
 }
+/* v0.25 equipment: the single armor slot becomes individual pieces (head … feet, clothing layers, accessories). A worn suit
+   becomes its pieces, worn; suits in the pack, bank, ally and corpses become pieces too. Material, quality, crafter and the worn
+   fraction carry over. Idempotent (eqMig); a snapshot of the old save is kept once. */
+function migrateV7(s, raw) {
+  try { if (raw && !localStorage.getItem(SAVEKEY + '.prev6')) localStorage.setItem(SAVEKEY + '.prev6', raw); } catch (e) { }
+  let mx = s.uid || 1; const scan = it => { if (it && it.uid >= mx) mx = it.uid + 1; if (it && it.items) it.items.forEach(scan); };   // new pieces must not reuse an id already in the save
+  const c = s.char; for (const k of ['pack', 'bank']) if (c[k]) c[k].items.forEach(scan); Object.values(c.equip || {}).forEach(scan); for (const co of s.corpses || []) (co.items || []).forEach(scan);
+  if (s.ally) { Object.values(s.ally.equip || {}).forEach(scan); (s.ally.pack || []).forEach(scan); if (s.ally.body) s.ally.body.items.forEach(scan); }
+  SF.setUidBase(mx);
+  s.equipReform = SF.EQ.migrateActor(s.char);
+  if (s.ally) { SF.EQ.migrateActor(s.ally); if (s.ally.body) SF.EQ.expandList(s.ally.body.items); }
+  for (const co of s.corpses || []) SF.EQ.expandList(co.items);
+  s.uid = 0; s.v = 7;   // boot takes the id counter from SF (setUidBase keeps the larger value)
+}
 function migrateV2(s, raw) {
   const walk = fn => { const c = s.char; for (const k of ['pack', 'bank']) if (c[k]) c[k].items.forEach(fn); for (const k in c.equip || {}) if (c.equip[k]) fn(c.equip[k]); for (const co of s.corpses || []) co.items.forEach(fn); };
   walk(it => {
@@ -2319,7 +2343,14 @@ function petCommand(c) {
     const strong = (p.slots || 1) > 1, ch = p.type ? cl(.6 + sv('beasthandling') / 200 - (strong ? .2 : 0), .3, .98) : 1; if (p.type) gain('beasthandling', strong ? 55 : 30);
     if (R() > ch) { log(p.name + ' ignores you.'); continue; } p.order = c; p.tgt = tgt; }
   say(P, c === 'attack' ? 'Attack!' : c === 'follow' ? 'Heel.' : 'Stay.'); }
-function unequipTo(s) { const it = P.equip[s]; if (!it) return; P.equip[s] = null; if (!SF.addItem(P.pack, it).ok) dropPile(it); if (s === 'weapon') weaponChanged(); }
+function unequipTo(s) { const r = SF.EQ.unequipItem(P, { slot: s }); if (!r.ok) return false; snd('item.equip'); if (s === 'weapon') weaponChanged(); eqChanged(); return true; }
+/* the one equip path for every control (button, double-click, drag, context menu): a validated, atomic command */
+function equipUid(u, slot) {
+  if (P.ghost) return log('Ghosts cannot handle equipment.', '#ffb070');
+  const r = SF.EQ.equipItem(P, { uid: u, slot: slot || undefined });
+  if (!r.ok) { log(cap1(r.reason) + '.', '#ffb070'); return false; }
+  snd('item.equip'); if (r.slot === 'weapon' || r.displaced.some(x => x.slot === 'weapon')) weaponChanged(); eqChanged(); return true;
+}
 document.addEventListener('click', ev => { const b = ev.target.closest('[data-a]'); if (!b) return; const f = ACT[b.dataset.a]; if (f && P) { ev.preventDefault(); try { f(b.dataset, b); } catch (e) { console.error(e); } refreshHud(); } });
 
 /* ---------- touch / mouse input ---------- */
@@ -2351,6 +2382,7 @@ cv.addEventListener('pointerup', pend); cv.addEventListener('pointercancel', () 
 cv.addEventListener('mousemove', e => { if (AIM && !PT) { const w = screenToWorld(e.clientX, e.clientY); AIM.pt = { x: w.x, y: w.y }; } });
 const KM = { ArrowUp: 'u', w: 'u', W: 'u', ArrowDown: 'd', s: 'd', S: 'd', ArrowLeft: 'l', a: 'l', A: 'l', ArrowRight: 'r', d: 'r', D: 'r' };
 addEventListener('keydown', e => { if (!P || e.target.matches('input,select,textarea')) return;
+  if ((e.key === 'c' || e.key === 'C') && !e.ctrlKey && !e.metaKey && !e.altKey && !SCREEN) { e.preventDefault(); toggleEqWin(); refreshHud(); return; }
   if (SCREEN || PANEL) {
     if (e.key === 'Escape') { e.preventDefault(); if (SCREEN) closeScreen(); else closePanel(); snd('ui.close'); refreshHud(); }
     return;
@@ -2363,15 +2395,15 @@ let deletingSave = false;
 const SAVEKEY = 'shardfall.save.v1';
 function save() {
   if (!P || deletingSave) return false; try {
-    const c = {}; for (const k of ['name', 'x', 'y', 'str', 'dex', 'int', 'hp', 'stam', 'mana', 'skills', 'pack', 'bank', 'equip', 'look', 'bound', 'quest', 'freeLessons', 'hotbar', 'ghost', 'ghostAt', 'gainLog', 'recipeN', 'cx', 'skillPool', 'combatMig', 'bandSeq', 'bandDone', 'lowerRank']) c[k] = P[k];
+    const c = {}; for (const k of ['name', 'x', 'y', 'str', 'dex', 'int', 'hp', 'stam', 'mana', 'skills', 'pack', 'bank', 'equip', 'look', 'bound', 'quest', 'freeLessons', 'hotbar', 'ghost', 'ghostAt', 'gainLog', 'recipeN', 'cx', 'skillPool', 'combatMig', 'eqMig', 'bandSeq', 'bandDone', 'lowerRank']) c[k] = P[k];
     c.bandage = bandageSave();
     if (P.base) Object.assign(c, P.base); c.magery = { mig: (P.mg && P.mg.mig) || 0 };
     const corpses = ents.filter(e => e.mine && !e.gone).map(e => ({ x: e.x, y: e.y, items: e.cont.items, left: e.expires - GT, diedAgo: GT - e.cont.diedAt }));
     let maxUid = 0; const scan = it => { if (it && it.uid > maxUid) maxUid = it.uid; }; P.pack.items.forEach(scan); P.bank.items.forEach(scan); Object.values(P.equip).forEach(scan); corpses.forEach(c2 => c2.items.forEach(scan));
     const pets = ents.filter(e => e.kind === 'pet' && e.type && !e.summon && !e.gone && e.hp > 0).map(e => ({ type: e.type, hp: e.hp, order: e.order === 'stay' ? 'stay' : 'follow', slots: e.slots, name: e.name, dx: e.x - P.x, dy: e.y - P.y }));
     const nodes = []; for (const [k, o] of RES) nodes.push([k, o.gen || 1, o.spec || 0, o.n, o.max || 0, Math.round(o.t * 10) / 10]);
-    const ally = allySave(); if (ally) { [ally.equip.weapon, ally.equip.shield, ally.equip.armor].forEach(scan); ally.pack.forEach(scan); if (ally.body) ally.body.items.forEach(scan); }
-    localStorage.setItem(SAVEKEY, JSON.stringify({ v: 6, char: c, corpses, pets, nodes, ally, sim: WS ? WS.save() : null, uid: maxUid + 1, gt: GT, savedAt: Date.now() }));
+    const ally = allySave(); if (ally) { Object.values(ally.equip || {}).forEach(scan); ally.pack.forEach(scan); if (ally.body) ally.body.items.forEach(scan); }
+    localStorage.setItem(SAVEKEY, JSON.stringify({ v: 7, char: c, corpses, pets, nodes, ally, sim: WS ? WS.save() : null, uid: maxUid + 1, gt: GT, savedAt: Date.now() }));
     DEV.lastSave = { ok: true, at: GT }; return true;
   } catch (e) { DEV.lastSave = { ok: false, at: GT }; return false; }
 }
@@ -2412,7 +2444,7 @@ $('#cc').addEventListener('change', ev => { const s = ev.target; if (!s.dataset 
 function boot(saved, fresh) {
   genWorld(); buildTiles(); buildMini(); resize();
   if (saved) { try { saved = migrateSave(saved, localStorage.getItem(SAVEKEY)); } catch (e) { console.error(e); } for (const [k, gen, spec, n, max, t] of saved.nodes || []) RES.set(k, { gen, spec: spec || undefined, n, max, t });
-    const c = saved.char; P = newChar({ name: c.name, str: c.str, dex: c.dex, int: c.int, skills: {}, look: c.look }); Object.assign(P, c); SF.setUidBase(saved.uid || 1); GT = saved.gt || 0;
+    const c = saved.char; P = newChar({ name: c.name, str: c.str, dex: c.dex, int: c.int, skills: {}, look: c.look }); Object.assign(P, c); P.equip = Object.assign(emptyEquip(), P.equip); delete P.equip.armor; SF.setUidBase(saved.uid || 1); GT = saved.gt || 0;
     for (const k of Object.keys(SF.newSkills())) if (!P.skills[k]) P.skills[k] = { v: 0, lock: 'raise' };
     for (const co of saved.corpses || []) { const cont = SF.newContainer('corpse', 'p1'); cont.items = co.items; cont.diedAt = GT - (co.diedAgo ?? 999); cont.expires = GT + co.left; addEnt({ kind: 'corpse', mine: true, name: 'your body', x: co.x, y: co.y, cont, expires: GT + co.left }); }
     if (P.ghost && !Number.isFinite(c.ghostAt)) P.ghostAt = GT - 12; }
@@ -2444,7 +2476,3 @@ function spawnMon(type, dx = 3, dy = 0) { const d = MON[type]; if (!d) return nu
   for (let r = 0; r < 6 && BLK[tAt(Math.floor(x), Math.floor(y))]; r += .5) for (let a = 0; a < 8; a++) { const nx = P.x + dx + Math.cos(a * Math.PI / 4) * r, ny = P.y + dy + Math.sin(a * Math.PI / 4) * r; if (!BLK[tAt(Math.floor(nx), Math.floor(ny))]) { x = nx; y = ny; break; } }
   return addEnt({ kind: 'mon', type, name: d.n, x, y, hp: d.hp, max: d.hp, state: 'idle', home: { x, y }, sect: 0, ward: 0 }); }
 window.__SF = { get WS() { return WS; }, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
-
-}
-</script>
-</body></html>

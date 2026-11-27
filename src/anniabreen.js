@@ -14,7 +14,7 @@ const ANN_ZONE_MUSIC = { mynoc: '01-saltmarsh-home', mine: '04-the-empty-watch',
   mglen: '03-mist-on-the-causeway', woods: '05-beyond-the-tidegate', ridge: '04-the-empty-watch', vale: '05-beyond-the-tidegate', fields: '05-beyond-the-tidegate' };
 const ANN_SHOPS = {
   miner: ['pickaxe', 'tongs', 'hammer', 'repairkit', 'ironbar', 'bandage', 'cookedmeat', 'lanternoil'],
-  tailor: ['cloth', 'sewkit', 'clothvest', 'leather', 'strap'],
+  tailor: ['cloth', 'sewkit', 'strap', 'shirt', 'trousers', 'robe', 'cloak', 'tabard', 'cloth_cap', 'cloth_gloves', 'shoes', 'boots', 'belt', 'leather_cap', 'leather_gorget', 'leather_tunic', 'leather_sleeves', 'leather_gloves', 'leather_leggings', 'studded_tunic', 'studded_leggings'],
   tinker: ['tongs', 'pickaxe', 'hatchet', 'knife', 'rod', 'repairkit', 'lockpick', 'trapkit'],
   fishmonger: ['fish', 'cookedmeat', 'rod'],
   innkeeper: ['cookedmeat', 'fish', 'bandage', 'draught', 'lanternoil'],
