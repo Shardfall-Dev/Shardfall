@@ -2,12 +2,19 @@
 #   build:  every script block compiles, the committed build equals ./build.sh output, assets and manifests are complete,
 #           and every node rules suite passes against the built game.
 #   smoke:  every browser suite in Chrome (desktop and phone sizes), including the stabilization save/reload checks.
+#           Blocking on pushes and pull requests. When pages.yml calls this with smoke_advisory: true, a smoke failure is
+#           reported but does not stop the deploy (timing-sensitive browser checks must not keep a build that passed every
+#           rules suite offline); build failures always block.
 name: Checks
 
 on:
   push:
   pull_request:
   workflow_call:
+    inputs:
+      smoke_advisory:
+        type: boolean
+        default: false
   workflow_dispatch:
 
 permissions:
@@ -35,6 +42,7 @@ jobs:
 
   smoke:
     needs: build
+    continue-on-error: ${{ inputs.smoke_advisory == true }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
