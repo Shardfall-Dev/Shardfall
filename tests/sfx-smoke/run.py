@@ -116,14 +116,14 @@ with sync_playwright() as pw:
     check('standing idle: no footsteps', not [e for e in played(page) if e.startswith('step')], played(page))
 
     # ---------- combat ----------
-    J(page, """(() => { const S = __SF, P = S.P, SF = S.SF; P.equip.weapon = SF.newItem('sword', 1); P.skills.swordsmanship.v = 1000; P.skills.tactics.v = 1000; P.drawn = false; P.hp = 999; })()""")
+    J(page, """(() => { const S = __SF, P = S.P, SF = S.SF; P.equip.weapon = SF.newItem('sword', 1); P.skills.swordsmanship.v = 1000; P.skills.tactics.v = 1000; P.drawn = false; P.hp = 999; P.dex = 100; P.stam = 100; })()""")
     def purge(*keep): J(page, "ks => { for (const e of __SF.ents) if (e.kind === 'mon' && !ks.includes(e.id)) e.gone = true; for (let i = __SF.ents.length - 1; i >= 0; i--) if (__SF.ents[i].gone) __SF.ents.splice(i, 1); }", list(keep))
     def spawn(t, x, y, extra=''):
         return J(page, f"""(() => {{ const S = __SF, d = S.MON['{t}']; const m = S.addEnt({{ kind: 'mon', type: '{t}', name: d.n, x: {x}, y: {y}, hp: d.hp, max: d.hp, state: 'idle', home: {{ x: {x}, y: {y} }}, sect: 0, ward: 0, purse: 0 }}); {extra}; return m.id; }})()""")
     # wilderness west of the gate so creatures aggro
     J(page, "(() => { for (const e of __SF.ents) if (e.kind === 'mon') e.gone = true; for (let i = __SF.ents.length - 1; i >= 0; i--) if (__SF.ents[i].gone) __SF.ents.splice(i, 1); })()")
     tp(page, 300.5, 296.5); page.wait_for_timeout(300)
-    purge(); clear(page); rid = spawn('rat', 301.5, 296.5, "m.rooted = __SF.GT + 999")
+    purge(); clear(page); J(page, "__SF.setRng(() => .999)"); rid = spawn('rat', 301.5, 296.5, "m.rooted = __SF.GT + 999")   # misses from the start: the whiff below must hear no impact
     page.wait_for_timeout(1200)
     J(page, "__SF.setRng(() => .999); __SF.P.skills.swordsmanship.v = 500")   # T2A hit chance caps at 100 %: at 100.0 vs a rat every swing lands, so whiff at 50.0
     R = f"__SF.ents.find(e => e.id === {rid})"

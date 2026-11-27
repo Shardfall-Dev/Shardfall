@@ -250,7 +250,7 @@ SF.assignPool = (c, key, tenths) => {
   s.v += n; c.skillPool -= n; return n;
 };
 
-SF.POISON = { 1: 2, 2: 3, 3: 4 }; SF.POISON_TICKS = 4; SF.POISON_GAP = 2;
+SF.POISON = { 1: 2, 2: 3, 3: 4, 4: 6 };   // per tick: lesser, regular, greater, deadly SF.POISON_TICKS = 4; SF.POISON_GAP = 2;
 SF.CONSUMABLES = {
   draught:  { n: 'Healing draught', heal: 24, cd: 16, fam: 'heal' },
   stamtonic:{ n: 'Stamina tonic', stam: 25, cd: 14, fam: 'stam' },

@@ -100,7 +100,7 @@ SK.learn = (ch, key, chance, success, ctx) => {
     }
     if (amt > 0) { s.v += amt; out.gained = true; out.amount = amt; out.value = s.v; }
   } else out.reason = 'skill is at 100';
-  const st = SK.statGain(ch, key, rng); if (st) out.stat = st;
+  const st = SK.statGain(ctx.stats || ch, key, rng); if (st) out.stat = st;   // ctx.stats: the unbuffed stats when temporary effects are active
   return out;
 };
 /* a check against a window: rolls success, then learns if the use was a challenge. Returns { success, chance, learn } */
@@ -198,6 +198,72 @@ SK.repairDiff = (cond, max) => 125 * clamp(0, 1, (max - cond) / Math.max(1, max)
 SK.HARVEST = { common: [0, 100], rare: g => [g - 40, g + 40] }; // ordinary ore/logs/fish teach to 100; coloured materials from their gate − 40 to + 40
 SK.magCircleWindow = circle => { const avg = (100 / 7) * (circle - 1); return [avg - 20, avg + 20]; };   // circle 1 −20…20 … circle 8 80…120
 SK.resistMaxFor = circle => circle * 10 + (1 + Math.floor((circle - 1) / 6)) * 25;   // resist teaches only below this for a spell of that circle
+
+/* ================= Phase C: rules for the reworked skills (pure; the game wires them in src/game.js) ================= */
+/* Meditation (UOSA "Guide to Meditation"): passive regeneration from 1 mana / 7 s (full plate, or 0 INT and 0 skill) to 1 mana / s
+   (cloth, 100 INT, 100 Meditation); active meditation doubles it, at most 2 mana / s. Metal armor (interference ≥ .10, the studded
+   tunic and anything heavier) or a weapon or shield in hand stops active meditation. Starting it is a skill check whose difficulty
+   follows how empty you are: it teaches between (90 − skill) % and (120 − skill) % mana. */
+SK.EXT = { bracedGuard: false };   // Shardfall additions that are not Second Age skills; off in parity mode
+SK.MED = { min: 1 / 7, max: 1, activeCap: 2, armorFull: .35, armorBlocks: .10, delay: 5 };
+SK.manaRegen = (int, med, interference, active) => {
+  const f = clamp(0, 1, 1 - (interference || 0) / SK.MED.armorFull), r = SK.MED.min + (SK.MED.max - SK.MED.min) * clamp(0, 1, ((int || 0) + (med || 0)) / 200) * f;
+  return active ? Math.min(SK.MED.activeCap, 2 * r) : r;
+};
+SK.medWindow = manaPct => { const d = 100 - manaPct; return [d - 10, d + 20]; };
+/* Hiding and Stealth (UOSA Stealth): hiding is a check across 0–100; walking while hidden reveals you unless you use Stealth, which
+   needs 80 real Hiding and grants one step per 10 points of Stealth. Armor makes Stealth harder (the "optimal AR" table: cloth
+   teaches to about 85, 14–16 AR to 100); above 18 AR you cannot move hidden at all. */
+SK.STEALTH = { maxAR: 18, needHiding: 80, stepLen: .8 };
+SK.stealthWindow = ar => { const top = 85 + Math.max(0, ar || 0); return [top - 50, top]; };
+SK.stealthSteps = s => Math.max(1, Math.floor(s / 10));
+/* Detecting Hidden: range skill/10 tiles (at least 1); each hidden thing in range is an opposed roll, each side ±10 */
+SK.detectRadius = s => 1 + s / 10;
+SK.detectBeats = (det, hide, rng) => det + Math.floor(rng() * 21) - 10 >= hide + Math.floor(rng() * 21) - 10;
+/* Tracking: classic range 10 + skill/10 tiles; Shardfall's terrain is drawn at about 2.5 m per classic tile for this purpose */
+SK.trackRange = s => (10 + s / 10) * 2.5;
+SK.TRACK_KINDS = { animals: 'Animals', monsters: 'Monsters', people: 'People' };
+/* Animal Taming (UOSA table where a Shardfall creature matches a classic one; the rest are placed between them) */
+SK.TAME_MIN = { hare: 0, rat: 0, deer: 23.6, hound: 35.1, boar: 35, wreckcrab: 41.1, bear: 59.1, spider: 59.1, giant_spider: 71.1, snapper: 77.1, dire_wolf: 83.1 };
+SK.tameWindow = min => [min - 25, min + 25];      // you need the minimum to try; it teaches up to 25 points past it
+/* control: creatures needing 45 or less obey anyone; harder ones check 80% Taming + 20% Animal Lore against their minimum
+   (RunUO's pre-AoS weighting: 70% at par, ±0.6 / 1.4 points per tenth above / below, 20–99%), minus 1% per loyalty step lost */
+SK.controlChance = (taming, lore, min, loyalty) => {
+  if (min <= 45) return 1;
+  const w = (4 * taming + lore) / 5, d = w - min; let c = .70 + (d > 0 ? d * .06 : d * .14);
+  c = clamp(.20, .99, c) - (SK.LOYALTY.max - (loyalty === undefined ? SK.LOYALTY.max : loyalty)) * .01; return clamp(0, 1, c);
+};
+/* pets must be fed: loyalty falls a step every 10 minutes and a meal of the right kind restores it; at 0 the pet goes wild */
+SK.LOYALTY = { max: 10, step: 600, labels: ['confused', 'extremely unhappy', 'rather unhappy', 'unhappy', 'somewhat content', 'content', 'happy', 'rather happy', 'very happy', 'extremely happy', 'wonderfully happy'] };
+SK.DIET = { hare: 'veg', deer: 'veg', boar: 'veg', rat: 'any', bear: 'any', hound: 'meat', dire_wolf: 'meat', snapper: 'fish', wreckcrab: 'fish', spider: 'meat', giant_spider: 'meat' };
+SK.FOOD = { meat: ['meat', 'cookedmeat'], fish: ['fish', 'cookedfish'], veg: ['marshroot', 'travelloaf'], any: ['meat', 'cookedmeat', 'fish', 'cookedfish', 'marshroot', 'travelloaf', 'softcheese'] };
+SK.PET_LIMIT = 5;   // Shardfall deviation: the Second Age had no follower cap; a single-player simulation keeps at most five tamed pets
+/* Veterinary: bandages on pets heal like First Aid with Veterinary and Animal Lore; poison is cured from 60 / 60 (real). No pet
+   resurrection by bandage in this era. */
+SK.vetRange = (vet, lore) => SF.healRange(vet, lore);
+SK.vetChance = vet => clamp(0, 1, (vet + 10) / 100);
+SK.vetCureChance = (vet, lore) => vet < 60 || lore < 60 ? 0 : clamp(0, 1, .80 + (Math.min(vet, lore) - 60) / 200);
+/* the bard: every song is a Musicianship check (0–120), then the bardic skill against the creature's difficulty (±25).
+   Range 8 + skill/15 classic tiles (Shardfall: ×1.5 m). Peacemaking is the Second Age area song (targeted peace came later). */
+SK.BARD = { musicWin: [0, 120], range: s => (8 + s / 15) * 1.5, peaceFor: s => 6 + s / 10, enticeFor: 20, provokeFor: 30, delay: 10, failDelay: 5 };
+SK.bardWindow = diff => [diff - 25, diff + 25];
+/* Stealing (RunUO pre-AoS): weight up to 10 stones; check window from weight ×10 − 22.5 to +27.5; independently, a thief with
+   skill s is noticed with chance (150 − s) / 150. A stack yields up to skill/10 ÷ unit weight. Weights: Shardfall weight units. */
+SK.STEAL = { maxStones: 10, range: 1.5, delay: 10 };
+SK.stealWindow = stones => { const w = Math.ceil(stones) * 10; return [w - 22.5, w + 27.5]; };
+SK.caughtChance = s => clamp(0, 1, (150 - s) / 150);
+/* Poisoning: the potion's strength sets the window (lesser 0–60, regular 30–70, greater 50–90, deadly 80–120); a bladed or
+   piercing weapon takes 18 / 16 / 14 / 12 charges; food holds it until eaten. The potion is used either way. */
+SK.POISON_WIN = { 1: [0, 60], 2: [30, 70], 3: [50, 90], 4: [80, 120] };
+SK.poisonCharges = lvl => 20 - 2 * lvl;
+/* Lockpicking (RunUO lock levels): a lock of difficulty d teaches from d − 10 to d + 40. Remove Trap: a trap of power p teaches from p
+   to p + 30 and needs 50 real Lockpicking and 50 real Detecting Hidden. */
+SK.lockWindow = d => [d - 10, d + 40];
+SK.trapWindow = p => [p, p + 30];
+/* Evaluating Intelligence and Animal Lore: what the skill lets you read. Coarse words sharpen into numbers with skill. */
+SK.INT_WORDS = ['slightly less intelligent than a rock', 'fairly stupid', 'not the brightest', 'about average', 'moderately intelligent', 'very intelligent', 'extraordinarily intelligent', 'like a formidable intellect', 'like a definite genius', 'superhumanly intelligent'];
+SK.intWord = v => SK.INT_WORDS[Math.min(SK.INT_WORDS.length - 1, Math.floor(clamp(0, 99.9, v) / 10))];
+SK.readExact = s => s >= 76;   // classic: exact figures show from about 76
 
 /* ================= supporting content: items and recipes that give every skill a road to 100.0 =================
    Recipes keep the existing crafting rules (SF.craftPlan): difficulty, success, failure loss, quality. New items use existing

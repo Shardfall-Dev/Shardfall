@@ -25,6 +25,7 @@ Object.assign(MON, {
   ettin:           { n: 'ettin',           size: 1.5, h: 94,  hp: 190, atk: 72, def: 62, dmg: [15, 22], reach: 1.7, tele: 1.0, rec: 2.0, speed: 3.4, aggro: 7,  leash: 18, armor: 26, diff: 80, loot: { gold: [30, 70] }, skin: { hide_horned: [2, 4], bone: [2, 4] } },
   earth_elemental: { n: 'earth elemental', size: 1.5, h: 100, hp: 220, atk: 70, def: 70, dmg: [14, 21], reach: 1.6, tele: 1.1, rec: 2.1, speed: 2.6, aggro: 6,  leash: 14, armor: 45, diff: 82, loot: { gold: [10, 40], ironbar: [1, 4] } },
   lich_lord:       { n: 'the Lich Lord',   size: 1.6, h: 106, hp: 520, atk: 85, def: 82, dmg: [16, 24], reach: 1.8, tele: 1.0, rec: 1.7, speed: 3.0, aggro: 12, leash: 16, armor: 30, diff: 95, boss: 1, fallLine: 'The cold light leaves its eyes.', ranged2: { dmg: [13, 19], range: 9, tele: 1.0 }, loot: { gold: [300, 500], bellshard: [2, 4], blacksalt: [3, 6], bone: [6, 10] }, rare: [['plate_chest', .4]] } });
+Object.assign(MON.wisp, { magic: 4 }); MON.lich_lord.ranged2.magic = 6;   // the wisp's fire and the Lich Lord's bolt are spells (circles 4 and 6) for Resisting Spells
 const SPAWNS = [
   { type: 'rat', x: 80, y: 246, r: 18, max: 5 }, { type: 'rat', x: 80, y: 356, r: 18, max: 5 }, { type: 'rat', x: 150, y: 300, r: 16, max: 4 },
   { type: 'boar', x: 215, y: 300, r: 42, max: 9 }, { type: 'boar', x: 290, y: 250, r: 40, max: 7 }, { type: 'boar', x: 300, y: 350, r: 36, max: 6 },
@@ -89,10 +90,11 @@ function noteLearn(key, r) {
   if (!r) return r;
   SKLOG.push({ k: key, at: GT, r: r.gained ? `+${f1(r.amount)} → ${f1(P.skills[key].v)}` + (r.lowered ? ` (−${f1(r.amount)} ${SF.SKILL[r.lowered].n})` : '') : r.reason || '' }); if (SKLOG.length > 80) SKLOG.shift();
   if (r.gained) { log(`${SF.SKILL[key].n} +${f1(r.amount)} (${f1(P.skills[key].v)})`, '#7fd4ff', 'skill'); if (GT - SND.gainAt > 1.5) { SND.gainAt = GT; snd('skill.gain'); } }
-  if (r.stat) log(`Your ${STAT_NAME[r.stat.stat]} rises to ${r.stat.value}.` + (r.stat.lowered ? ` Your ${STAT_NAME[r.stat.lowered]} falls to ${P[r.stat.lowered]} (225 is the most anyone can hold).` : ''), '#ffe08a', 'skill');
+  if (r.stat && P.base && typeof recomputeStats === 'function') recomputeStats();
+  if (r.stat) log(`Your ${STAT_NAME[r.stat.stat]} rises to ${r.stat.value}.` + (r.stat.lowered ? ` Your ${STAT_NAME[r.stat.lowered]} falls to ${(P.base || P)[r.stat.lowered]} (225 is the most anyone can hold).` : ''), '#ffe08a', 'skill');
   return r;
 }
-const skCtx = ctx => Object.assign({ rng: R, now: GT }, ctx || {});
+const skCtx = ctx => Object.assign({ rng: R, now: GT, stats: P.base || P }, ctx || {});   // stat gains land on the unbuffed stats (src/magic.js keeps buffs on top)
 /* a use checked against a difficulty window [min, max] in skill points: returns whether it succeeded; teaches when it was a challenge */
 function skillCheck(key, min, max, ctx) { const r = SF.SK.check(P, key, min, max, skCtx(ctx)); noteLearn(key, r.learn); return r.success; }
 /* the action rolled its own success with chance `chance`; teach from it (optionally only inside a window) */
@@ -266,7 +268,7 @@ function onPlayerMoved(m) {
   if (P.meditating) { P.meditating = null; log('You stop meditating.'); }
   if (P.prep && !P.prep.sp.walk && Math.hypot(P.x - P.prep.x0, P.y - P.prep.y0) > SF.PREP_DRIFT) interruptPrep('You moved and lost your spell preparation.');
   if (P.task && P.task.still && Math.hypot(P.x - P.task.x0, P.y - P.task.y0) > .5) { log(P.task.label + ' interrupted by movement.'); P.task = null; }
-  if (P.hidden) { P.stepAcc = (P.stepAcc || 0) + m; while (P.stepAcc >= .8) { P.stepAcc -= .8; P.stepBudget--; if (ents.some(e => e.kind === 'mon' && alive(e) && dist(e, P) < 10)) gain('stealth', 40); if (P.stepBudget < 0) { reveal('You run out of quiet steps and are revealed.'); break; } } }
+  if (P.hidden) { P.stepAcc = (P.stepAcc || 0) + m; while (P.stepAcc >= SF.SK.STEALTH.stepLen) { P.stepAcc -= SF.SK.STEALTH.stepLen; P.stepBudget--; if (P.stepBudget < 0) { reveal(P.stealthUsed ? 'You run out of quiet steps and are revealed.' : 'You move and are revealed. (Stealth lets a hidden thief walk.)'); break; } } }
   if (P.lootOpen && dist(P.lootOpen, P) > 3) { closePanel(); P.lootOpen = null; }
   if (P.batch && Math.hypot(P.x - P.batch.x0, P.y - P.batch.y0) > .5) stopBatch('You moved; the batch stops.');
   if (PANEL === 'craft' && CUI && Math.hypot(P.x - CUI.x0, P.y - CUI.y0) > .5) closePanel();
@@ -446,7 +448,7 @@ function attackTick() {
 
 function damageMon(m, amt, kind, src, hx) {
   if (isAlly(m)) return damageAlly(m, amt, src, kind, hx);
-  if (!alive(m)) return; src = src || P; m.hitT = GT;
+  if (!alive(m)) return; src = src || P; m.hitT = GT; m.lastHurt = GT; if (m.pacified > GT && src === P) m.pacified = 0;   // an attack breaks Peacemaking and Enticement
   if (m.ward > 0 && kind !== 'poison') { const a = Math.min(m.ward, amt); m.ward -= a; amt -= a; floater(m.x, m.y, 'ward ' + a, '#e8d090'); if (m.ward <= 0) floater(m.x, m.y, 'ward broken', '#e8d090'); if (amt <= 0) { if (sndOnce('ward' + m.id, .6)) sndAt('magic.ward', m, { gain: .6 }); return; } }
   m.hp -= amt; simEmit('ActorDamaged', { actor: aidOf(m), source: aidOf(src), amount: amt, kind: kind || 'phys', x: m.x, y: m.y }); floater(m.x, m.y, String(amt), kind === 'spell' ? '#c8a0ff' : kind === 'poison' ? '#7be07b' : '#ffd27a'); hitSound(m, kind, src, hx, m.hp <= 0); if (src === P || (src && (src.kind === 'pet' || src.kind === 'ally'))) P.lastCombat = GT;
   m.pacified = 0; if (m.rooted > GT) m.rooted = 0;
@@ -463,10 +465,10 @@ function killMon(m, src) {
   m.dead = true; rmEnt(m); ecoDied(m, src); if (m.sp) m.sp.n--; const d = MON[m.type]; const mine = src === P || (src && (src.kind === 'pet' || src.kind === 'ally'));
   if (m.kind === 'pet') { log((m.name || d.n) + ' has died.', '#ff6a5a'); return; }
   if (m.quest) questCrabKilled();
-  const cont = SF.newContainer('corpse'); for (const k in d.loot) { const q = rnd(d.loot[k][0], d.loot[k][1]); if (q > 0) cont.items.push(lootItem(k, q, 100)); }
+  const cont = SF.newContainer('corpse'); if (m.pack2) cont.items.push(...m.pack2.items); else for (const k in d.loot) { const q = rnd(d.loot[k][0], d.loot[k][1]); if (q > 0) cont.items.push(lootItem(k, q, 100)); }   // a pack that was snooped or robbed is what the body holds: nothing stolen comes back
   for (const [id, ch] of d.rare || []) if (R() < ch) cont.items.push(lootItem(id, 1, rnd(60, 100)));
   if (m.purse) cont.items.push(SF.newItem('gold', m.purse));
-  const corpse = addEnt({ kind: 'corpse', mon: m.type, sect: m.sect || 0, t0: GT, name: d.n + ' remains', x: m.x, y: m.y, cont, expires: GT + (d.boss ? 600 : 240), skinned: !d.skin });
+  const corpse = addEnt({ kind: 'corpse', mon: m.type, sect: m.sect || 0, t0: GT, killer: src ? (src === P ? P.name : src.name || (MON[src.type] || {}).n || null) : null, killKind: src && src.kind, name: d.n + ' remains', x: m.x, y: m.y, cont, expires: GT + (d.boss ? 600 : 240), skinned: !d.skin });
   if (corpse && (P.sel === m || src === P) && mine) { P.sel = corpse; if (!P.lootHinted) { P.lootHinted = true; log('Tap the bones (or press Interact) beside them to loot.', '#ffe08a'); } }
   for (const e of ents) if (e.target === m) { e.target = null; if (e.kind === 'mon') e.state = 'return'; }
   if (P.sel === m) { P.sel = mine ? null : corpse; P.armed = false; }
@@ -482,6 +484,8 @@ function aiMon(m, dt) {
   let anchor, home, hunting, pursuit; const frame = () => { anchor = m.anchor || m.home; home = Math.hypot(m.x - anchor.x, m.y - anchor.y); hunting = m.chaseKind === 'hunt'; pursuit = (pr.pur || d.leash) * (hunting ? 2 : 1); }; frame();   // a hunt may run further than a territorial chase
   const step = (tx, ty, spd, away) => { if (m.rooted > GT) return; let dx = tx - m.x, dy = ty - m.y; if (away) { dx = -dx; dy = -dy; } const l = Math.hypot(dx, dy); if (l < .05) return; const s = Math.min(l, spd * MOVE_SCALE * (m.slowUntil > GT ? .75 : 1) * dt); const mv = moveBy(m, dx / l * s, dy / l * s); if (mv < s * .3) moveBy(m, -dy / l * s, dx / l * s); m.speed = mv / dt; updateFacing(m, dx, dy); };
   if (d.ward && d.wardEvery && GT > (m.wardAt || 0) && m.state === 'chase') { m.wardAt = GT + d.wardEvery; m.ward = d.ward; say(m, '*the bell hums: ward*'); }
+  if (m.taming > GT && m.target !== P) { m.state = 'idle'; return; }   // a creature being tamed holds still for the attempt (Shardfall: timid wildlife would otherwise bolt)
+  if (m.lured) { if (GT > m.lured.until || m.lastHurt > m.lured.t0) m.lured = null; else { m.target = null; m.state = 'idle'; const dl = Math.hypot(m.lured.x - m.x, m.lured.y - m.y); if (dl > 1.6) step(m.lured.x, m.lured.y, d.speed * .7); else if (!m.lured.arrived) m.lured.arrived = m.lured.until = Math.min(m.lured.until, GT + 5); return; } }   // Enticement: drawn to the bard, then lingers
   if (m.hidden && dist(m, P) < 2.4 && !P.ghost && !P.hidden && ecoEnemy(m, P)) { m.hidden = false; m.target = P; m.state = 'tele'; m.st = GT; if (m.sortie) ecoSortieEnd(m); say(m, 'Ambush!'); }
   if (m.state !== 'tele' && m.state !== 'strike') { ecoThink(m); t = m.target; frame(); }   // the decision may have chosen a new target
   switch (m.state) {
@@ -520,9 +524,17 @@ function aiMon(m, dt) {
 function monStrike(m, t) {
   const d = MON[m.type]; if (!t || t.gone || t.dead) return;
   if (m.mode === 'aoe') { FX.push({ k: 'boom', x: m.x, y: m.y, r: d.aoe, t0: GT, dur: .5 }); sndAt('combat.blast', m); for (const v of [P, ...ents.filter(e => e.kind === 'pet' || (isAlly(e) && !e.ghost))]) { if (v === P && (P.ghost || P.hidden)) continue; if (Math.hypot(v.x - m.x, v.y - m.y) <= d.aoe) strikeOne(m, v, d.dmg, false, true); } return; }
-  if (m.mode === 'shot' || m.mode === 'r2') { const r = m.mode === 'r2' ? d.ranged2 : d; if (m.mode === 'r2') m.r2At = GT + 5; const aim = m.aim, tt = Math.hypot(aim.x - m.x, aim.y - m.y) / 14; EFX.push({ k: 'proj', x: m.x, y: m.y, tx: aim.x, ty: aim.y, t0: GT, t1: GT + tt, col: d.boss ? '#ffd070' : '#ff8a30', big: 1, at: GT + tt, fn: () => { if (alive(m) || true) { const hitT = Math.hypot(t.x - aim.x, t.y - aim.y) < 1.1 && !(t === P && (P.ghost || P.hidden)); if (hitT) strikeOne(m, t, r.dmg, true); else floater(aim.x, aim.y, 'dodged', '#c8c8c8'); } } }); return; }
+  if (m.mode === 'shot' || m.mode === 'r2') { const r = m.mode === 'r2' ? d.ranged2 : d; if (m.mode === 'r2') m.r2At = GT + 5; const aim = m.aim, tt = Math.hypot(aim.x - m.x, aim.y - m.y) / 14; EFX.push({ k: 'proj', x: m.x, y: m.y, tx: aim.x, ty: aim.y, t0: GT, t1: GT + tt, col: d.boss ? '#ffd070' : '#ff8a30', big: 1, at: GT + tt, fn: () => { if (alive(m) || true) { const hitT = Math.hypot(t.x - aim.x, t.y - aim.y) < 1.1 && !(t === P && (P.ghost || P.hidden)); if (hitT) { if (r.magic) magicStrike(m, t, r.dmg, r.magic); else strikeOne(m, t, r.dmg, true); } else floater(aim.x, aim.y, 'dodged', '#c8c8c8'); } } }); return; }
   const dd = dist(m, t); if (dd > d.reach + .35 || !los(m, t)) return;
   strikeOne(m, t, d.dmg);
+}
+/* a creature's spell (the ash wisp's fire, the Lich Lord's bolt): no armor, no parry; Resisting Spells halves it and is taught by it,
+   up to the ceiling the spell's circle allows (src/skills.js SK.resistMaxFor). Players take half creature damage, as with blows. */
+function magicStrike(m, t, dmgR, circle) {
+  if (!fighterAlive(t) || (t === P && P.hidden)) return; let dmg = rnd(dmgR[0], dmgR[1]);
+  if (t === P) { const ch = SF.MAGERY.resistChance(circle, monDiff(m), sv('resistingspells')); if (ch > 0 && svReal('resistingspells') < SF.SK.resistMaxFor(circle)) skillCheck('resistingspells', 0, 120);
+    const res = R() < ch; dmg = Math.max(1, Math.round(dmg / 2 * (res ? .5 : 1))); if (res) floater(P.x, P.y, 'resisted', '#c8a0ff'); log(`The ${MON[m.type].n}'s spell strikes you: ${dmg}${res ? ' (resisted)' : ''}.`, '#ff9a8a', 'combat'); }
+  damageActor(t, dmg, 'spell', m);
 }
 function strikeOne(m, t, dmgR, ranged, area) {
   if (!fighterAlive(t) || (t === P && P.hidden)) return;
@@ -699,38 +711,56 @@ function throwFlask(pt) {
   const f = { k: 'flask', sx: P.x, sy: P.y, x: pt.x, y: pt.y, r: c.radius, t0: GT, until: GT + c.fuse + .5 }; EFX.push(f);
   at(c.fuse, () => { FX.push({ k: 'boom', x: pt.x, y: pt.y, r: c.radius, t0: GT, dur: .5 }); sndAt('combat.blast', pt); const dmg = c.blast + Math.round(5 * sv('alchemy') / 100); for (const m of ents.slice()) if (m.kind === 'mon' && alive(m) && Math.hypot(m.x - pt.x, m.y - pt.y) <= c.radius) damageMon(m, dmg, 'phys', P, { area: 1 }); if (Math.hypot(P.x - pt.x, P.y - pt.y) <= c.radius) damagePlayer(Math.round(dmg / 2), null, 'phys', { area: 1 }); });
 }
-function eat(id) { if (!SF.removeQty(P.pack, id, 1)) return; snd('item.eat', { key: 'P' }); P.fed = GT + 300; log('You eat. Out of combat you recover health faster for 5 minutes.', '#7ee08a'); }
+function eat(id, uid) { const pz = uid ? findU(P.pack, uid) : P.pack.items.find(i => i.id === id && !i.poison) || P.pack.items.find(i => i.id === id); if (!pz) return; const lvl = pz.poison || 0; if (pz.qty > 1) { pz.qty--; P.pack.ver++; } else { P.pack.items.splice(P.pack.items.indexOf(pz), 1); P.pack.ver++; }
+  if (lvl) { applyPoison(P, Math.min(4, lvl)); log('The food tastes strange…', '#7be07b'); } snd('item.eat', { key: 'P' }); P.fed = GT + 300; log('You eat. Out of combat you recover health faster for 5 minutes.', '#7ee08a'); }
 function hide() {
-  if (P.ghost || P.hidden) return; if (ents.some(e => e.kind === 'mon' && alive(e) && e.target === P && dist(e, P) < 3)) return log('Too close to a hostile to hide.', '#ffb070');
-  if (GT - (P.lastHit || -99) < 4) return log('You must be clear of damage for 4 seconds to hide.', '#ffb070');
+  if (P.ghost || P.hidden) return; if (cdLeft('hide') > 0) return log('You must wait to perform another action (' + Math.ceil(cdLeft('hide')) + ' s).');
+  if (ents.some(e => e.kind === 'mon' && alive(e) && e.target === P && dist(e, P) <= 2 && los(e, P))) return log('You can\'t seem to hide right now.', '#ffb070');
+  if (P.meditating) { P.meditating = null; log('You lose your focus.'); }
   P.task = { kind: 'hide', label: 'Hiding', t0: GT, t1: GT + .7, still: true, x0: P.x, y0: P.y };
 }
 function finishHide() {
-  const threats = ents.filter(e => e.kind === 'mon' && alive(e) && dist(e, P) < 12);
-  const ok = R() < SF.opposed(sv('hiding'), threats.length ? 40 : 10);
-  if (threats.length) gain('hiding', 40);
-  if (!ok) return log('You fail to find cover.', '#a8a8a8');
-  P.hidden = true; P.stepBudget = 2 + Math.floor(sv('stealth') / 20); P.stepAcc = 0; log('You are hidden. Walking spends quiet steps; sprinting, attacking or casting reveals you.', '#9fd0ff');
+  skillDelay('hide', 10); const ok = skillCheck('hiding', 0, 100);       // Hiding: a check across 0–100 (classic), 10 s between attempts
+  if (!ok) return log('You can\'t seem to hide here.', '#a8a8a8');
+  P.hidden = true; P.stepBudget = 0; P.stepAcc = 0; P.stealthUsed = false; log('You have hidden yourself well. Moving reveals you unless you use Stealth; attacking, casting and most skills reveal you.', '#9fd0ff');
   for (const m of ents) if (m.target === P) { m.target = null; m.state = 'return'; }
 }
-function reveal(msg) { if (!P.hidden) return; P.hidden = false; log(msg || 'You are revealed.', '#ffb070'); }
-function track() {
-  const range = 25 + .4 * sv('tracking'); const list = ents.filter(e => e.kind === 'mon' && alive(e) && dist(e, P) <= range).sort((a, b) => dist(a, P) - dist(b, P)).slice(0, 6);
-  if (!list.length) return log('You find no fresh tracks within ' + Math.round(range) + ' m.');
-  gain('tracking', 30); const names = ['E', 'SE', 'S', 'SW', 'W', 'NW', 'N', 'NE'];
-  TRACKS = { until: GT + 10, list: list.map(e => { const sx = (e.x - P.x) - (e.y - P.y), sy = ((e.x - P.x) + (e.y - P.y)) * .5; let a = Math.atan2(sy, sx) * 180 / Math.PI; const q = Math.round(a / 45) * 45; return { bearing: q + 90, label: `${MON[e.type].n} · ${Math.round(dist(e, P))} m` }; }) };
-  log('Tracks: ' + list.map(e => MON[e.type].n).join(', ') + '.', '#9fd0ff');
+function reveal(msg) { if (!P.hidden) return; P.hidden = false; P.stepBudget = 0; log(msg || 'You are revealed.', '#ffb070'); }
+/* Tracking: choose animals, monsters or people, then one of them; an arrow follows that trail until it goes cold */
+function track() { if (P.ghost) return; if (cdLeft('track') > 0) return log('You must wait to track again (' + Math.ceil(cdLeft('track')) + ' s).'); openPanel('track'); }
+function trackKind(e) { if (e.kind === 'npc' || isAlly(e)) return 'people'; if (e.kind !== 'mon' || !alive(e)) return null; return SPECIES_CLASS[e.type] === 'animal' ? 'animals' : HUMANOID[e.type] ? 'people' : 'monsters'; }
+function trackList(kind) { const range = SF.SK.trackRange(sv('tracking')); return ents.filter(e => e !== P && !e.gone && trackKind(e) === kind && dist(e, P) <= range).sort((a, b) => dist(a, P) - dist(b, P)).slice(0, 8); }
+function trackStart(kind) {
+  skillDelay('track', 10); useAbilityReveal('track');
+  if (!skillCheck('tracking', 0, 100)) { closePanel(); return log('You see no evidence of those in the area.', '#a8a8a8'); }
+  TRACKUI = { kind, list: trackList(kind) }; if (!TRACKUI.list.length) { closePanel(); return log('You see no evidence of those in the area.'); } renderPanel();
 }
+function trackFollow(e) { P.trackT = { e, until: GT + 90, range: SF.SK.trackRange(sv('tracking')) * 1.5 }; closePanel(); log(`You find the trail of ${e.name || (MON[e.type] || {}).n || 'someone'}.`, '#9fd0ff'); trackUpdate(); }
+function trackUpdate() {
+  const t = P.trackT; if (!t) { if (TRACKS && TRACKS.follow) TRACKS = null; return; }
+  const e = t.e, d = !e.gone && !e.dead ? dist(e, P) : 1e9;
+  if (d > t.range || GT > t.until) { P.trackT = null; TRACKS = null; return log('The trail goes cold.', '#a8a8a8'); }
+  const sx = (e.x - P.x) - (e.y - P.y), sy = ((e.x - P.x) + (e.y - P.y)) * .5, a = Math.atan2(sy, sx) * 180 / Math.PI;
+  TRACKS = { follow: true, until: GT + 1, list: [{ bearing: a + 90, label: `${e.name || (MON[e.type] || {}).n} · ${Math.round(d)} m` }] };
+}
+let TRACKUI = null;
+/* Meditation: passive regeneration always; active meditation is a check against how empty you are (see SF.SK.manaRegen) */
 function meditate() {
-  if (P.ghost) return; if (P.mana >= SF.maxMana(P)) return log('Your mana is full.');
-  if (GT - (P.lastHit || -99) < SF.MEDITATE_DELAY) return log('You cannot meditate under fire.', '#ffb070');
-  P.meditating = { t0: GT, gained: 0 }; log('You begin to meditate. Moving or acting stops it.');
+  if (P.ghost) return; if (P.mana >= SF.maxMana(P)) return log('You are at peace.');
+  if (cdLeft('meditate') > 0) return log('You must wait to meditate again (' + Math.ceil(cdLeft('meditate')) + ' s).');
+  if (GT - (P.lastHit || -99) < SF.MEDITATE_DELAY) return log('You cannot focus your concentration under fire.', '#ffb070');
+  if (P.equip.weapon || P.equip.shield) return log('You cannot meditate with anything in your hands.', '#ffb070');
+  skillDelay('meditate', SF.SK.MED.delay); useAbilityReveal('meditate');
+  const pct = P.mana / SF.maxMana(P) * 100, w = SF.SK.medWindow(pct);
+  if (!skillCheck('meditation', w[0], w[1])) return log('You cannot focus your concentration.', '#a8a8a8');
+  if (SF.EQ.effective(P).med >= SF.SK.MED.armorBlocks) return log('Regenerative forces cannot penetrate your armor.', '#ffb070');
+  P.meditating = { t0: GT, gained: 0 }; log('You enter a meditative trance. Moving or acting stops it.', '#9fd0ff');
 }
 function useSlot(i) {
   const s = P.hotbar[i]; if (!s) { openPanel('bag'); return; }
   if (s.k === 'spell') return castSlot(s.id);
   if (s.k === 'act' && ABIL[s.id]) return ABIL[s.id].fn();
-  if (s.k === 'act') return ({ hide, track, meditate, brace: () => { if (!P.equip.shield) return log('You need a shield.'); if (sv('parrying') < 50) return log('Braced Guard needs Parrying 50.'); if (P.stam < 6) return log('Too tired.'); P.stam -= 6; P.braced = GT + .8; } }[s.id] || (() => { }))();
+  if (s.k === 'act') return ({ hide, track, meditate, brace: () => { if (!SF.SK.EXT.bracedGuard) return log('Braced Guard is a Shardfall extension, switched off in Second Age parity mode.', '#ffb070'); if (!P.equip.shield) return log('You need a shield.'); if (sv('parrying') < 50) return log('Braced Guard needs Parrying 50.'); if (P.stam < 6) return log('Too tired.'); P.stam -= 6; P.braced = GT + .8; } }[s.id] || (() => { }))();
   if (s.k === 'item') { if (s.id === 'bandage') return firstAid(P); if (SF.CONSUMABLES[s.id]) return useConsumable(s.id); if (SF.ITEMS[s.id].use === 'eat') return eat(s.id); }
 }
 function slotLabel(s) { if (!s) return ['+', 'empty']; if (s.k === 'spell') return [SF.SPELL[s.id].n, SF.SPELL[s.id].mp + ' mp']; if (s.k === 'act') return [ABIL[s.id] ? ABIL[s.id].n : { hide: 'Hide', track: 'Track', meditate: 'Meditate', brace: 'Brace' }[s.id], ABIL[s.id] && ABIL[s.id].cd && P.cdA && P.cdA[s.id] > GT ? Math.ceil(P.cdA[s.id] - GT) + 's' : '']; return [s.id === 'bandage' ? 'Bandage self' : SF.ITEMS[s.id].n.replace('Healing draught', 'Draught'), '×' + SF.count(P.pack, s.id)]; }
@@ -842,8 +872,9 @@ function update(dt) {
     // stamina
     const sMax = SF.maxStam(P); if (GT - (P.lastDrain || -9) > SF.STAM_DELAY) P.stam = Math.min(sMax, P.stam + (inCombat() ? SF.STAM_REGEN_COMBAT : SF.STAM_REGEN) * dt);
     // mana
-    const medI = SF.EQ.effective(P).med; let mr = SF.manaRegen(sv('meditation'), medI); if (P.meditating && GT - P.meditating.t0 > SF.MEDITATE_SETTLE) mr += SF.MEDITATE_BONUS * (1 - medI);
-    const mb = P.mana; P.mana = Math.min(SF.maxMana(P), P.mana + mr * dt); if (P.meditating) { P.meditating.gained += P.mana - mb; if (P.mana >= SF.maxMana(P)) { if (P.meditating.gained >= 8) gain('meditation', 40); P.meditating = null; log('Your mana is full.'); } }
+    const medI = SF.EQ.effective(P).med, mr = SF.SK.manaRegen(P.int, sv('meditation'), medI, !!(P.meditating && GT - P.meditating.t0 > SF.MEDITATE_SETTLE));   // Second Age regeneration (src/skills.js)
+    const mb = P.mana; P.mana = Math.min(SF.maxMana(P), P.mana + mr * dt); if (P.meditating) { P.meditating.gained += P.mana - mb; if (P.mana >= SF.maxMana(P)) { P.meditating = null; log('You are at peace.'); } }
+    trackUpdate(); petLoyaltyTick();
     // health: slow out-of-combat recovery, faster when fed
     if (!inCombat() && !P.poison) P.hp = Math.min(SF.maxHp(P), P.hp + (P.fed > GT ? 1 : .1) * dt);
     if (P.poison && GT >= P.poison.next) { P.poison.next = GT + SF.POISON_GAP; damagePlayer(SF.POISON[P.poison.tier], null, 'poison'); if (P.poison && --P.poison.ticks <= 0) P.poison = null; }
@@ -1010,7 +1041,9 @@ const RES = new Map();
 
 /* ---- Sunken Bell: three levels with two surface exits ---- */
 const STAIRS = [], CHESTS = new Map(), VOID = new Uint8Array(W * H);
-function placeChest(x, y, tier) { for (let k = 0; k < 8; k++) { const xx = x + (k % 3) - 1, yy = y + Math.floor(k / 3) - 1; const t = tAt(xx, yy); if (!BLK[t] && t !== T.WA && t !== T.SD && t !== T.SU) { tSet(xx, yy, T.CH); CHESTS.set(yy * W + xx, { x: xx, y: yy, tier, open: false, refill: 0 }); return; } } }
+/* dungeon chests of the second and third tier are trapped half the time (power 40 / 70): Detecting Hidden finds it, Remove Trap clears it */
+function chestTrapRoll(c) { c.trap = c.tier >= 1 && R() < .5 ? [0, 40, 70][c.tier] : 0; c.trapSeen = false; return c; }
+function placeChest(x, y, tier) { for (let k = 0; k < 8; k++) { const xx = x + (k % 3) - 1, yy = y + Math.floor(k / 3) - 1; const t = tAt(xx, yy); if (!BLK[t] && t !== T.WA && t !== T.SD && t !== T.SU) { tSet(xx, yy, T.CH); CHESTS.set(yy * W + xx, chestTrapRoll({ x: xx, y: yy, tier, open: false, refill: 0 })); return; } } }
 function genDungeon(r, carve) {
   const rooms = {};
   for (const L of LEVELS) {
@@ -1167,67 +1200,270 @@ function dressQuay() {
 
 /* ================= CONTENT (M3 offline): dungeon travel, chests, traps, pets, bard, stealth, theft, venom, appraisal, repair ================= */
 const TRAPS = [];
+/* ================= skills in the world: every active skill's real action (rules: src/skills.js SF.SK; status: docs/skills/STATUS.md) =================
+   One usage delay per skill (P.cdA), checks through skillCheck/skillUse, targets by selection or by a tap after a prompt (pickTarget). */
+const SKD = SF.SK;
+const cdLeft = id => Math.max(0, ((P.cdA || {})[id] || 0) - GT);
+function skillDelay(id, s) { P.cdA = P.cdA || {}; P.cdA[id] = GT + s; }
+const hasInstrument = () => SF.count(P.pack, 'lute') > 0;
+const monDiff = m => (MON[m.type] && MON[m.type].diff) || 30;
+const HUMANOID = { smuggler: 1, bandit: 1, captain: 1, orc: 1, lizardman: 1 };          // creatures that carry a pack worth snooping
+const isAnimal = m => m && m.kind === 'mon' && SPECIES_CLASS[m.type] === 'animal';
+const packOwner = e => e && !e.gone && ((e.kind === 'mon' && alive(e) && HUMANOID[e.type]) || (e.kind === 'npc' && e.role !== 'guard' && !e.dev));
+/* a prompt for a creature or person: uses the current selection when it fits, otherwise waits for the next tap (15 s, Escape cancels) */
+function pickTarget(prompt, ok, fn, useSel) {
+  if (useSel !== false && P.sel && ok(P.sel)) return fn(P.sel);
+  PICKT = { prompt, ok, fn, until: GT + 15 }; log(prompt, '#9fd0ff');
+}
+function pickTap(hits) {
+  if (!PICKT) return false; if (GT > PICKT.until) { PICKT = null; return false; }
+  const e = hits.find(PICKT.ok); if (!e) { log('That is not a valid target. ' + PICKT.prompt, '#ffb070'); return true; }
+  const f = PICKT.fn; PICKT = null; P.sel = e; f(e); return true;
+}
+const inReach = (e, r) => { if (dist(e, P) > r) { log(`Move within ${Math.round(r * 10) / 10} m.`, '#ffb070'); return false; } if (!los(P, e)) { log('No line of sight.', '#ffb070'); return false; } return true; };
+// ---- pets: tamed creatures and summons. Summons keep their Magery control slots; tamed pets have no classic cap (a safety limit here)
 const petSlotsUsed = () => ents.filter(e => e.kind === 'pet' && !e.gone).reduce((a, p) => a + (p.slots || 1), 0);
-function cdReady(id, cd) { P.cdA = P.cdA || {}; if (GT < (P.cdA[id] || 0)) { log(ABIL[id].n + ' is not ready (' + Math.ceil(P.cdA[id] - GT) + ' s).'); return false; } if (cd) P.cdA[id] = GT + cd; return true; }
+const tamedPets = () => ents.filter(e => e.kind === 'pet' && !e.gone && e.type && !e.summon);
+const tameMin = type => SKD.TAME_MIN[type] !== undefined ? SKD.TAME_MIN[type] : null;
+const loyaltyWord = p => SKD.LOYALTY.labels[Math.max(0, Math.min(10, Math.round(p.loyal === undefined ? 10 : p.loyal)))];
+function cdReady(id, cd) { P.cdA = P.cdA || {}; if (GT < (P.cdA[id] || 0)) { log((ABIL[id] ? ABIL[id].n : cap1(id)) + ' is not ready (' + Math.ceil(P.cdA[id] - GT) + ' s).'); return false; } if (cd) P.cdA[id] = GT + cd; return true; }
 function selMon(range, needAware) {
   const t = P.sel; if (!t || t.kind !== 'mon' || !alive(t)) { const a = autoTarget(); if (!a) { log('Select a creature first.', '#ffb070'); return null; } }
   const m = P.sel; if (range && dist(m, P) > range) { log('Move within ' + range + ' m.', '#ffb070'); return null; } if (!los(P, m)) { log('No line of sight.', '#ffb070'); return null; } return m;
 }
+/* actions that reveal a hidden player (the classic rule: using most skills unhides you; Hiding, Stealth, Detect, Snooping-unhides, Stealing do not) */
+const KEEPS_HIDDEN = { stealth: 1, detect: 1, steal: 1, track: 1, hide: 1 };
+function useAbilityReveal(id) { if (P.hidden && !KEEPS_HIDDEN[id]) reveal('You use a skill and are revealed.'); }
 const ABIL = {
   bandother: { n: 'Bandage other', fn: () => firstAidOther() },
   anatomy: { n: 'Anatomy', cd: 1, fn: () => { if (cdReady('anatomy', 1)) anatomyCheck(); } },
-  detect: { n: 'Detect Hidden', cd: SF.SEARCH.cd, fn: () => { if (P.ghost || !cdReady('detect', SF.SEARCH.cd)) return; P.task = { kind: 'search', label: 'Searching', t0: GT, t1: GT + SF.SEARCH.wind, still: true, x0: P.x, y0: P.y }; } },
-  tame: { n: 'Tame', fn: () => { const m = selMon(SF.TAME.range); if (!m) return; const d = MON[m.type]; if (!d.tame || d.boss || d.scout) return log('That creature cannot be tamed.', '#ffb070'); if (sv('animaltaming') < d.tame - 40) return log(`You have no chance with a ${d.n} (difficulty ${d.tame}).`, '#ffb070'); P.task = { kind: 'tame', m, label: 'Taming ' + d.n, t0: GT, t1: GT + SF.TAME.time, still: true, x0: P.x, y0: P.y }; say(P, pick(['Easy now...', 'Steady, steady.', 'Nobody will hurt you.'])); } },
-  vet: { n: 'Treat pet', fn: () => { const p = P.sel && P.sel.kind === 'pet' ? P.sel : ents.find(e => e.kind === 'pet' && !e.gone && dist(e, P) <= SF.VET.range); if (!p || !p.type) return log('Select one of your tamed pets.', '#ffb070'); if (dist(p, P) > SF.VET.range) return log('Stand within 1.5 m of your pet.'); if (!SF.count(P.pack, 'bandage')) return log('You need a bandage.', '#ffb070'); if (p.hp >= p.max) return log('Your pet is not hurt.'); SF.removeQty(P.pack, 'bandage', 1); P.task = { kind: 'vet', p, label: 'Treating ' + p.name, t0: GT, t1: GT + SF.VET.time }; } },
-  peace: { n: 'Peacemaking', cd: SF.BARD.cd, fn: () => bard('lullaby') },
-  entice: { n: 'Enticement', cd: SF.BARD.cd, fn: () => bard('discord') },
-  provoke: { n: 'Provoke', cd: SF.BARD.cd, fn: () => bard('provocation') },
-  steal: { n: 'Steal', fn: () => { const m = P.sel; if (!m || m.kind !== 'mon' || !MON[m.type].purse) return log('Select an unaware smuggler to pick their pocket.', '#ffb070'); if (dist(m, P) > SF.PICK_RANGE) return log('Get within 1.5 m.', '#ffb070'); if (m.target === P) return log('They are watching you too closely.', '#ffb070'); m.pickCd = m.pickCd || 0; if (GT < m.pickCd) return log('Wait before trying that pocket again.'); m.pickCd = GT + SF.PICK_COOLDOWN; P.task = { kind: 'pick', m, label: 'Pickpocketing', t0: GT, t1: GT + SF.PICK_TIME, still: true, x0: P.x, y0: P.y }; } },
-  poison: { n: 'Poison weapon', fn: () => { const w = P.equip.weapon; if (!w || wDef().ammo || wDef() === SF.WEAPONS.unarmed) return log('Equip a melee weapon to coat.', '#ffb070'); if (wDef().skill === 'macefighting') return log('Mace Fighting weapons cannot carry poison.', '#ffb070'); if (!SF.count(P.pack, 'venom')) return log('You need a mire venom vial (craft one at an alchemy still).', '#ffb070'); const tier = SF.venomTier(sv('poisoning')); if (!tier) return log('Applying poison needs Poisoning 30.', '#ffb070'); P.task = { kind: 'coat', label: 'Coating', t0: GT, t1: GT + 1, still: true, x0: P.x, y0: P.y }; } },
-  trap: { n: 'Set snare', fn: () => { if (!SF.count(P.pack, 'trapkit')) return log('You need a snare kit.', '#ffb070'); if (TRAPS.filter(t => t.owner === 'P').length >= SF.TRAP.max) return log('You already have two snares set.', '#ffb070'); if (TRAPS.some(t => Math.hypot(t.x - P.x, t.y - P.y) < SF.TRAP.spacing)) return log('Snares must be at least 4 m apart.', '#ffb070'); P.task = { kind: 'trap', label: 'Setting snare', t0: GT, t1: GT + SF.TRAP.place, still: true, x0: P.x, y0: P.y }; } } };
-function bard(skill) {
-  const id = { lullaby: 'peace', discord: 'entice', provocation: 'provoke' }[skill];
-  if (!SF.count(P.pack, 'lute')) return log('You need an instrument (a reed lute from the provisioner).', '#ffb070');
-  if (GT < (P.bardReady || 0)) return log('Your hands are still recovering from the last song.');
-  const m = selMon(SF.BARD.range); if (!m) return; if (MON[m.type].boss) return log(cap1(MON[m.type].n) + ' cannot be swayed by music.', '#ffb070');
-  if (skill === 'provocation' && !ents.some(o => o.kind === 'mon' && o !== m && alive(o) && dist(o, m) < 8 && !MON[o.type].boss)) return log('There is no other creature near it to provoke against.', '#ffb070');
-  if (!cdReady(id, SF.BARD.cd)) return; P.bardReady = GT + SF.BARD.shared;
-  P.task = { kind: 'bard', skill, m, label: { lullaby: 'Peacemaking', discord: 'Enticement', provocation: 'Provocation' }[skill], t0: GT, t1: GT + SF.BARD.prep };
+  stealth: { n: 'Stealth', cd: 10, fn: () => stealthUse() },
+  detect: { n: 'Detect Hidden', cd: 10, fn: () => { if (P.ghost || !cdReady('detect', 10)) return; P.task = { kind: 'search', label: 'Searching', t0: GT, t1: GT + SF.SEARCH.wind, still: true, x0: P.x, y0: P.y }; } },
+  tame: { n: 'Animal Taming', cd: 10, fn: () => pickTarget('Tap the creature you want to tame.', e => e.kind === 'mon' && alive(e), tameStart) },
+  lore: { n: 'Animal Lore', cd: 1, fn: () => pickTarget('Tap a creature to study.', e => (e.kind === 'mon' || e.kind === 'pet') && alive(e) && !!e.type, loreUse) },
+  vet: { n: 'Veterinary', fn: () => pickTarget('Tap the pet to treat.', e => e.kind === 'pet' && !e.gone && !!e.type, vetStart) },
+  feed: { n: 'Feed pet', fn: () => pickTarget('Tap the pet to feed.', e => e.kind === 'pet' && !e.gone && !!e.type, feedPet) },
+  play: { n: 'Musicianship', cd: 5, fn: () => playMusic() },
+  peace: { n: 'Peacemaking', cd: SKD.BARD.delay, fn: () => peaceUse() },
+  entice: { n: 'Enticement', cd: SKD.BARD.delay, fn: () => pickTarget('Tap the creature to lure.', e => e.kind === 'mon' && alive(e), enticeUse) },
+  provoke: { n: 'Provocation', cd: SKD.BARD.delay, fn: () => provokeStart() },
+  steal: { n: 'Stealing', cd: SKD.STEAL.delay, fn: () => pickTarget('Tap the person or creature to steal from (or steal from a pack you have snooped).', packOwner, e => stealStart(e, null)) },
+  poison: { n: 'Poisoning', fn: () => { P.talkTo = null; openPanel('poison'); } },
+  picklock: { n: 'Lockpicking', fn: () => lockUse() },
+  untrap: { n: 'Remove Trap', cd: 10, fn: () => untrapUse() },
+  evalint: { n: 'Evaluating Intelligence', cd: 1, fn: () => pickTarget('Tap a creature or person to judge.', e => (e.kind === 'mon' || e.kind === 'pet' || e.kind === 'npc' || isAlly(e)) && !e.gone, evalUse) },
+  trap: { n: 'Set snare', fn: () => { if (!SF.count(P.pack, 'trapkit')) return log('You need a snare kit (Tinkering makes them).', '#ffb070'); if (TRAPS.filter(t => t.owner === 'P').length >= SF.TRAP.max) return log('You already have two snares set.', '#ffb070'); if (TRAPS.some(t => Math.hypot(t.x - P.x, t.y - P.y) < SF.TRAP.spacing)) return log('Snares must be at least 4 m apart.', '#ffb070'); P.task = { kind: 'trap', label: 'Setting snare', t0: GT, t1: GT + SF.TRAP.place, still: true, x0: P.x, y0: P.y }; } } };
+
+/* ---- Hiding and Stealth ---- */
+function stealthUse() {
+  if (P.ghost) return; if (!P.hidden) return log('You must be hidden to use Stealth.', '#ffb070');
+  if (svReal('hiding') < SKD.STEALTH.needHiding) return log(`Stealth needs ${SKD.STEALTH.needHiding} real Hiding.`, '#ffb070');
+  const ar = SF.EQ.effective(P).ar; if (ar > SKD.STEALTH.maxAR) return log('You could not hope to move quietly wearing this much armor.', '#ffb070');
+  if (!cdReady('stealth', 10)) return;
+  const w = SKD.stealthWindow(ar);
+  if (skillCheck('stealth', w[0], w[1])) { P.stepBudget = SKD.stealthSteps(sv('stealth')); P.stepAcc = 0; P.stealthUsed = true; log(`You begin to move quietly: ${P.stepBudget} step${P.stepBudget > 1 ? 's' : ''}.`, '#9fd0ff'); }
+  else reveal('You fail to move quietly and are revealed.');
 }
+/* ---- Animal Taming ---- */
+function tameStart(m) {
+  const d = MON[m.type], min = tameMin(m.type);
+  if (min === null || d.boss || d.scout) return log('That creature cannot be tamed.', '#ffb070');
+  if (!inReach(m, SF.TAME.range)) return;
+  if (sv('animaltaming') < min) return log(`You have no chance of taming this creature (${d.n}: ${min.toFixed(1)}).`, '#ffb070');
+  if (m.target === P && m.state !== 'idle') return log('The animal is too angry to continue taming.', '#ffb070');
+  if (tamedPets().length >= SKD.PET_LIMIT) return log(`You already keep ${SKD.PET_LIMIT} pets (a limit of this world, not of the old one).`, '#ffb070');
+  if (!cdReady('tame', 10)) return;
+  m.taming = GT + SF.TAME.time + .5; P.task = { kind: 'tame', m, label: 'Taming ' + d.n, t0: GT, t1: GT + SF.TAME.time, still: true, x0: P.x, y0: P.y }; say(P, pick(['I always wanted a ' + d.n + ' like you.', 'Good ' + d.n + '.', 'Here ' + d.n + '.', 'I won\'t hurt you.']));
+}
+/* ---- Animal Lore ---- */
+function loreUse(m) {
+  if (!cdReady('lore', 1) || !inReach(m, 8)) return; const d = MON[m.type], ok = skillCheck('animallore', 0, 110);
+  if (!ok) return log('You can\'t think of anything you know offhand.', '#a8a8a8');
+  const x = monT2A(d), exact = SKD.readExact(sv('animallore')), r = v => exact ? Math.round(v) : Math.round(v / 10) * 10 + '±5';
+  const diet = { meat: 'eats meat', fish: 'eats fish', veg: 'grazes on plants', any: 'eats anything' }[SKD.DIET[m.type]] || 'cannot be fed';
+  const min = tameMin(m.type);
+  log(`${cap1(m.name || d.n)}: health ${Math.round(m.hp)}/${m.max || d.hp}, STR ${r(x.str)}, DEX ${r(x.dex)}, armor ${d.armor}; ${diet}; ${min === null ? 'cannot be tamed' : 'tamable from ' + min.toFixed(1)}${m.kind === 'pet' ? '; seems ' + loyaltyWord(m) : ''}.`, '#e8d8b0');
+}
+/* ---- Veterinary: bandage a pet ---- */
+function vetStart(p) {
+  if (!inReach(p, SF.VET.range + .3)) return; if (!SF.count(P.pack, 'bandage')) return log('You need a bandage.', '#ffb070');
+  const poisoned = !!p.poison; if (!poisoned && p.hp >= p.max) return log('That pet is not hurt.');
+  SF.removeQty(P.pack, 'bandage', 1); P.task = { kind: 'vet', p, cure: poisoned, label: (poisoned ? 'Curing ' : 'Treating ') + p.name, t0: GT, t1: GT + SF.VET.time };
+}
+function feedPet(p) {
+  if (!inReach(p, 2.5)) return; const diet = SKD.DIET[p.type]; if (!diet) return log(cap1(p.name) + ' will not eat.', '#ffb070');
+  const food = SKD.FOOD[diet].find(id => SF.count(P.pack, id)); if (!food) return log(`${cap1(p.name)} ${{ meat: 'wants meat', fish: 'wants fish', veg: 'wants greens or bread', any: 'is hungry' }[diet]}.`, '#ffb070');
+  SF.removeQty(P.pack, food, 1); p.loyal = SKD.LOYALTY.max; p.fedAt = GT; floater(p.x, p.y, 'munch', '#7ee08a'); log(`${cap1(p.name)} eats the ${SF.ITEMS[food].n.toLowerCase()} and looks ${loyaltyWord(p)}.`, '#7ee08a');
+}
+/* ---- the bard ---- */
+function bardReady(id) {
+  if (!hasInstrument()) { log('You need an instrument (a reed lute from the provisioner).', '#ffb070'); return false; }
+  if (GT < (P.bardReady || 0)) { log('You are still playing.', '#ffb070'); return false; }
+  return true;
+}
+const music = () => skillCheck('musicianship', SKD.BARD.musicWin[0], SKD.BARD.musicWin[1]);
+function bardFail(id) { skillDelay(id, SKD.BARD.failDelay); }
+function playMusic() {
+  if (!bardReady('play') || !cdReady('play', 5)) return; useAbilityReveal('play');
+  snd('bard.lullaby', { key: 'P', gain: .6 }); if (music()) log('You play a pleasant tune.', '#c8e0ff'); else log('You play poorly, and there is no effect.', '#a8a8a8');
+}
+function peaceUse() {
+  if (!bardReady('peace') || !cdReady('peace', SKD.BARD.delay)) return; useAbilityReveal('peace'); P.bardReady = GT + 1;
+  const rad = SKD.BARD.range(sv('peacemaking')), near = ents.filter(e => e.kind === 'mon' && alive(e) && dist(e, P) <= rad && !MON[e.type].boss);
+  const diff = near.length ? Math.max(...near.map(monDiff)) : null;
+  snd('bard.lullaby', { key: 'P' });
+  if (!music()) { bardFail('peace'); return log('You play poorly, and there is no effect.', '#a8a8a8'); }
+  const ok = diff === null ? skillCheck('peacemaking', 0, 100) : skillCheck('peacemaking', ...SKD.bardWindow(diff));
+  if (!ok) { bardFail('peace'); return log('You attempt to calm everyone, but fail.', '#ffb070'); }
+  const until = GT + SKD.BARD.peaceFor(sv('peacemaking'));
+  for (const m of near) { m.pacified = until; m.target = null; m.provoked = 0; if (m.state !== 'flee') m.state = 'idle'; floater(m.x, m.y, 'calmed', '#9fd0ff'); }
+  for (const e of ents) if (e.kind === 'pet' && e.order === 'attack') e.order = 'follow';
+  P.armed = false; FX.push({ k: 'ring', x: P.x, y: P.y, c: '#9fd0ff', t0: GT, dur: 1 });
+  log(near.length ? `You play hypnotic music, calming ${near.length} creature${near.length > 1 ? 's' : ''} around you.` : 'You play hypnotic music. All is calm.', '#9fd0ff');
+}
+function enticeUse(m) {
+  if (MON[m.type].boss) return log(cap1(MON[m.type].n) + ' cannot be swayed by music.', '#ffb070');
+  if (!bardReady('entice') || !inReach(m, SKD.BARD.range(sv('enticement'))) || !cdReady('entice', SKD.BARD.delay)) return; useAbilityReveal('entice'); P.bardReady = GT + 1;
+  snd('bard.discord', { key: 'P' });
+  if (!music()) { bardFail('entice'); return log('You play poorly, and there is no effect.', '#a8a8a8'); }
+  if (!skillCheck('enticement', ...SKD.bardWindow(monDiff(m)))) { bardFail('entice'); log('Your music fails to attract the creature, and it notices you.', '#ffb070'); if (!m.target && ecoEnemy(m, P)) { m.target = P; m.state = 'chase'; } return; }
+  m.lured = { x: P.x, y: P.y, t0: GT, until: GT + SKD.BARD.enticeFor }; m.target = null; m.state = 'idle'; floater(m.x, m.y, 'enticed', '#c8e0ff'); log(`The ${MON[m.type].n} is drawn to your music.`, '#c8e0ff');
+}
+function provokeStart() {
+  if (!bardReady('provoke')) return; if (cdLeft('provoke') > 0) return log('Provocation is not ready (' + Math.ceil(cdLeft('provoke')) + ' s).');
+  const ok = e => e.kind === 'mon' && alive(e) && !MON[e.type].boss;
+  pickTarget('Tap the creature to provoke.', ok, a => {
+    if (!inReach(a, SKD.BARD.range(sv('provocation')))) return;
+    pickTarget(`Tap the creature to set the ${MON[a.type].n} against.`, e => ok(e) && e !== a, b => provokeUse(a, b), false);
+  }, false);
+}
+function provokeUse(a, b) {
+  if (!alive(a) || !alive(b)) return; if (dist(a, b) > SKD.BARD.range(sv('provocation'))) return log('Those two are too far apart.', '#ffb070');
+  if (!cdReady('provoke', SKD.BARD.delay)) return; useAbilityReveal('provoke'); P.bardReady = GT + 1; snd('bard.provoke', { key: 'P' });
+  if (!music()) { bardFail('provoke'); return log('You play poorly, and there is no effect.', '#a8a8a8'); }
+  if (!skillCheck('provocation', ...SKD.bardWindow(Math.max(monDiff(a), monDiff(b))))) {
+    bardFail('provoke'); log('Your music fails to incite enough anger. They turn on you!', '#ff8a6a');
+    for (const m of [a, b]) { m.target = P; m.state = 'chase'; m.pacified = 0; } return;
+  }
+  const until = GT + SKD.BARD.provokeFor;
+  a.target = b; a.provoked = until; a.state = 'chase'; a.pacified = 0; b.target = a; b.provoked = until; b.state = 'chase'; b.pacified = 0;
+  floater(a.x, a.y, 'provoked!', '#ff9a6a'); log(`You play your music and the ${MON[a.type].n} turns on the ${MON[b.type].n}.`, '#ff9a6a');
+}
+/* ---- Evaluating Intelligence ---- */
+function evalUse(t) {
+  if (!cdReady('evalint', 1) || !inReach(t, 8)) return; if (!skillCheck('evaluatingintelligence', 0, 100)) return log('You cannot judge their mental abilities.', '#a8a8a8');
+  const iv = t === P ? P.int : t.kind === 'npc' ? 40 : isAlly(t) ? t.int : intOf(t), mx = t.kind === 'mon' || t.kind === 'pet' ? iv : iv, exact = SKD.readExact(sv('evaluatingintelligence'));
+  log(`${cap1(t.name || (MON[t.type] || {}).n || 'They')} ${t.kind === 'npc' || isAlly(t) ? 'look' : 'looks'} ${SKD.intWord(iv)}${exact ? ` (INT ${Math.round(iv)}, mana about ${Math.round(mx)})` : ''}.`, '#e8d8b0');
+}
+/* ---- Lockpicking and Remove Trap: dungeon chests, tinker's lockboxes and trapped practice boxes ---- */
+const nearChest = () => [...CHESTS.values()].find(c => Math.hypot(c.x + .5 - P.x, c.y + .5 - P.y) <= 2);
+function lockUse(item) {
+  if (!SF.count(P.pack, 'lockpick')) return log('You need lockpicks.', '#ffb070');
+  const c = item ? null : nearChest(), box = item || (!c && P.pack.items.find(i => i.id === 'lockbox' && i.locked));
+  if (c && !c.open) { P.task = { kind: 'lock', chest: c, label: 'Picking lock', t0: GT, t1: GT + SF.LOCK_TIME, still: true, x0: P.x, y0: P.y }; sndAt('lock.pick', { x: c.x + .5, y: c.y + .5 }); return; }
+  if (box) { if (!box.locked) return log('That box is not locked. Lock it first.', '#ffb070'); P.task = { kind: 'lock', box, label: 'Picking lock', t0: GT, t1: GT + SF.LOCK_TIME, still: true, x0: P.x, y0: P.y }; snd('lock.pick', { key: 'P' }); return; }
+  log('Stand at a locked chest, or carry a locked tinker\'s lockbox.', '#ffb070');
+}
+function untrapUse(item) {
+  if (svReal('lockpicking') < 50 || svReal('detectinghidden') < 50) return log('Remove Trap needs 50 real Lockpicking and 50 real Detecting Hidden.', '#ffb070');
+  const c = item ? null : nearChest(), sn = !item && TRAPS.find(t => !t.hidden && t.owner !== 'P' && Math.hypot(t.x - P.x, t.y - P.y) <= 2), box = item || (!c && !sn && P.pack.items.find(i => i.id === 'trapbox' && i.armed));
+  if (!cdReady('untrap', 10)) return;
+  if (c && c.trap && !c.open) { if (!c.trapSeen) return log('You see no trap on this chest. (Detecting Hidden may find one.)', '#ffb070'); P.task = { kind: 'disarm', chest: c, label: 'Disarming', t0: GT, t1: GT + 2, still: true, x0: P.x, y0: P.y }; return; }
+  if (sn) { P.task = { kind: 'disarm', trap: sn, label: 'Disarming', t0: GT, t1: GT + SF.TRAP.place, still: true, x0: P.x, y0: P.y }; return; }
+  if (box) { if (!box.armed) return log('That box is not armed. Arm it first.', '#ffb070'); P.task = { kind: 'disarm', box, label: 'Disarming', t0: GT, t1: GT + 2, still: true, x0: P.x, y0: P.y }; return; }
+  P.cdA.untrap = 0; log('There is no known trap here.', '#ffb070');
+}
+/* ---- Stealing (and Snooping's open pack, phase D) ---- */
+function npcPack(e) {
+  if (e.pack2) return e.pack2; const rng = mulberry(hash(e.id * 977 + (e.actorId ? e.actorId.length : 0), 41)), c = SF.newContainer('pack', e.actorId || e.id), add = (id, a, b) => { const q = a + Math.floor(rng() * (b - a + 1)); if (q > 0) c.items.push(SF.newItem(id, q, SF.ITEMS[id].stack ? null : { cond: 100 })); };
+  if (e.kind === 'mon') { const d = MON[e.type]; for (const k in d.loot) add(k, d.loot[k][0], d.loot[k][1]); if (e.purse) { c.items.push(SF.newItem('gold', e.purse)); e.purse = 0; } }
+  else { add('gold', 3, 25); const role = { apothecary: ['vial', 'marshroot'], reagents: ['blacksalt', 'shelldust'], mage: ['blankscroll', 'black_pearl'], smith: ['ironshard', 'rivet'], tinker: ['lockpick', 'ironshard'], provisioner: ['bandage', 'travelloaf'], fishmonger: ['fish', 'fish'], healer: ['bandage', 'bandage'], innkeeper: ['cookedmeat', 'softcheese'], tailor: ['cloth', 'strap'], scholar: ['blankmap', 'blankscroll'] }[e.role] || ['travelloaf', 'softcheese'];
+    add(role[0], 1, 4); add(role[1], 0, 3); if (rng() < .3) add('bandage', 1, 3); }
+  return (e.pack2 = c);
+}
+function stealStart(e, it) {
+  if (!inReach(e, SKD.STEAL.range)) return; if (e.kind === 'mon' && e.target === P) return log('They are watching you too closely.', '#ffb070');
+  if (!cdReady('steal', SKD.STEAL.delay)) return;
+  P.task = { kind: 'steal', e, uid: it ? it.uid : null, label: 'Stealing', t0: GT, t1: GT + 1, still: true, x0: P.x, y0: P.y };
+}
+function crime(victim, what) {   // the law arrives in a later phase; for now: a gray name for two minutes, angry townsfolk, and an event the law can read
+  P.crimUntil = GT + 120; simEmit('CrimeCommitted', { actor: aidOf(P), victim: aidOf(victim), crime: what, x: P.x, y: P.y });
+  if (victim.kind === 'npc') { say(victim, pick(['Thief!', 'Guards! A thief!', 'Stop, thief!'])); const g = ents.find(o => o.kind === 'npc' && o.role === 'guard' && dist(o, P) < 18); if (g) say(g, 'You there! Keep your hands to yourself.'); }
+  log('You are a criminal for two minutes.', '#ff8a6a');
+}
+/* ---- Poisoning (the panel lists potions × targets) ---- */
+const poisonPotions = () => P.pack.items.filter(i => SF.ITEMS[i.id].poisonLvl);
+const poisonableWeapon = () => { const w = P.equip.weapon, d = w && SF.weaponOf(w); return d && !d.ammo && (d.skill === 'swordsmanship' || d.skill === 'fencing') ? w : null; };
+function poisonApply(potUid, target) {
+  const pot = findU(P.pack, potUid); if (!pot) return; const lvl = SF.ITEMS[pot.id].poisonLvl, w = SKD.POISON_WIN[lvl];
+  let tgt = null; if (target === 'weapon') tgt = poisonableWeapon(); else tgt = findU(P.pack, +target);
+  if (!tgt) return log(target === 'weapon' ? 'Only a bladed or piercing weapon in hand can carry poison.' : 'That food is gone.', '#ffb070');
+  closePanel(); useAbilityReveal('poison');
+  P.task = { kind: 'poison', pot: pot.id, lvl, target, tuid: tgt.uid, win: w, label: 'Applying poison', t0: GT, t1: GT + 2, still: true, x0: P.x, y0: P.y };
+}
+
 const TASKS = {
-  search: () => { const r = SF.SEARCH.radius(sv('detectinghidden')); let found = 0, any = 0;
-    for (const m of ents) if (m.kind === 'mon' && m.hidden && dist(m, P) <= r) { any++; if (R() < SF.opposed(sv('detectinghidden'), 50)) { m.hidden = false; found++; floater(m.x, m.y, 'found!', '#ffe08a'); } }
-    for (const t of TRAPS) if (t.hidden && Math.hypot(t.x - P.x, t.y - P.y) <= r) { any++; if (R() < SF.opposed(sv('detectinghidden'), t.diff)) { t.hidden = false; found++; } }
-    if (any) gain('detectinghidden', 45); log(found ? `You uncover ${found} hidden thing${found > 1 ? 's' : ''}.` : 'You find nothing hidden nearby.', found ? '#ffe08a' : undefined); FX.push({ k: 'ring', x: P.x, y: P.y, c: '#ffe08a', t0: GT, dur: .8 }); },
-  tame: t => { const m = t.m, d = MON[m.type]; if (!alive(m) || dist(m, P) > SF.TAME.range + .5) return log('The creature is no longer close enough.');
-    const need = d.strong ? 2 : 1; if (petSlotsUsed() + need > SF.TAME.slots) return log(`No free control slots (${d.n} needs ${need}).`, '#ffb070');
-    gain('animaltaming', d.tame); if (R() < SF.opposed(sv('animaltaming'), d.tame)) { m.kind = 'pet'; if (m.sp) { m.sp.n--; if (m.sp.camp) m.sp.camp.removed(); m.sp = null; } if (m.sortie) ecoSortieEnd(m); m.leader = null; m.order = 'follow'; m.slots = need; m.name = 'your ' + d.n; m.state = ''; m.target = null; m.hidden = false; for (const e of ents) if (e.target === m) { e.target = null; e.state = 'return'; } P.sel = m; log(`The ${d.n} accepts you. It follows on command.`, '#7ee08a'); }
-    else { log('It shies away from you.'); if (R() < d.bite) { m.target = P; m.state = 'chase'; log('It turns on you!', '#ff8a6a'); } } },
-  vet: t => { const p = t.p; if (p.gone || dist(p, P) > SF.VET.range + .3) return log('Your pet moved away.'); gain('veterinary', 40); if (R() < SF.opposed(sv('veterinary'), 30)) { const b = p.hp; p.hp = Math.min(p.max, p.hp + SF.VET.heal(sv('veterinary'))); floater(p.x, p.y, '+' + Math.round(p.hp - b), '#7ee08a'); } else log('The treatment does not take.'); },
-  bard: t => { const m = t.m; if (!alive(m)) return; const diff = cl(MON[m.type].diff, 25, 75);
-    gain('musicianship', diff); if (R() >= SF.opposed(sv('musicianship'), diff)) { log('Your playing falters and draws attention.', '#ffb070'); if (!m.target) { m.target = P; m.state = 'chase'; } return; }
-    snd('bard.' + { lullaby: 'lullaby', discord: 'discord', provocation: 'provoke' }[t.skill], { key: 'P' }); { const bk = { lullaby: 'peacemaking', discord: 'enticement', provocation: 'provocation' }[t.skill]; gain(bk, diff); if (R() >= SF.opposed(sv(bk), diff)) { log('The creature shrugs off your song.', '#ffb070'); if (!m.target) { m.target = P; m.state = 'chase'; } return; } }
-    if (t.skill === 'lullaby') { m.pacified = GT + SF.BARD.lullaby; m.target = null; m.state = 'idle'; if (P.sel === m) P.armed = false; floater(m.x, m.y, 'lulled', '#9fd0ff'); }
-    if (t.skill === 'discord') { m.discordUntil = GT + SF.BARD.discordFor; floater(m.x, m.y, 'discorded', '#c97bff'); }
-    if (t.skill === 'provocation') { const o = ents.filter(e => e.kind === 'mon' && e !== m && alive(e) && !MON[e.type].boss).sort((a, b) => dist(a, m) - dist(b, m))[0]; if (!o || dist(o, m) > 8) return log('Nothing nearby to set it against.'); m.target = o; m.provoked = GT + SF.BARD.provoke; m.state = 'chase'; floater(m.x, m.y, 'provoked!', '#ff9a6a'); log(`The ${MON[m.type].n} turns on the ${MON[o.type].n}.`); } },
-  pick: t => { const m = t.m; if (!alive(m) || dist(m, P) > SF.PICK_RANGE + .2) return log('Your mark slips away.');
-    const units = Math.min(SF.PICK_MAX_UNITS, m.purse || 0); gain('stealing', 55);
-    if (!units) return log('Their purse is empty.');
-    if (units * SF.ITEMS.gold.kg > SF.pickMaxKg(sv('stealing'))) return log('Too heavy to lift unnoticed.');
-    if (R() < SF.pickChance(sv('stealing'), units * SF.ITEMS.gold.kg)) { m.purse -= units; give('gold', units); log(`You lift ${units} gold.`, '#ffe08a'); snd('loot.coin', { gain: .6 }); }
-    else { m.hidden = false; m.target = P; m.state = 'chase'; reveal('You are caught in the act!'); say(m, 'Thief!'); } },
-  coat: () => { const tier = SF.venomTier(sv('poisoning')); SF.removeQty(P.pack, 'venom', 1); gain('poisoning', [0, 30, 55, 80][tier]); P.equip.weapon.venom = { tier, charges: SF.VENOM_CHARGES }; log(`Your weapon carries tier ${tier} venom for ${SF.VENOM_CHARGES} hits.`, '#7be07b'); },
+  search: () => { const det = sv('detectinghidden'), ok = skillCheck('detectinghidden', 0, 100), r = SKD.detectRadius(det); let found = 0;
+    if (ok) {
+      for (const m of ents) if (m.kind === 'mon' && m.hidden && dist(m, P) <= r && SKD.detectBeats(det, MON[m.type].hide || monDiff(m) * .8, R)) { m.hidden = false; found++; floater(m.x, m.y, 'found!', '#ffe08a'); }
+      for (const t of TRAPS) if (t.hidden && Math.hypot(t.x - P.x, t.y - P.y) <= r && SKD.detectBeats(det, t.diff, R)) { t.hidden = false; found++; }
+      for (const c of CHESTS.values()) if (c.trap && !c.trapSeen && !c.open && Math.hypot(c.x + .5 - P.x, c.y + .5 - P.y) <= r && SKD.detectBeats(det, c.trap, R)) { c.trapSeen = true; found++; floater(c.x + .5, c.y + .5, 'trapped!', '#ffe08a'); }
+    }
+    log(found ? `You uncover ${found} hidden thing${found > 1 ? 's' : ''}.` : ok ? 'You can see nothing hidden there.' : 'You fail to see anything hidden.', found ? '#ffe08a' : undefined); FX.push({ k: 'ring', x: P.x, y: P.y, c: '#ffe08a', t0: GT, dur: .8, r }); },
+  tame: t => { const m = t.m, d = MON[m.type], min = tameMin(m.type); if (!alive(m) || dist(m, P) > SF.TAME.range + .5) return log('You are too far away to continue taming.');
+    if (m.target === P && m.state === 'chase') return log('The animal is too angry to continue taming.', '#ffb070');
+    if (skillCheck('animaltaming', ...SKD.tameWindow(min))) { m.kind = 'pet'; if (m.sp) { m.sp.n--; if (m.sp.camp) m.sp.camp.removed(); m.sp = null; } if (m.sortie) ecoSortieEnd(m); m.leader = null; m.order = 'follow'; m.slots = 1; m.loyal = SKD.LOYALTY.max; m.fedAt = GT; m.name = 'your ' + d.n; m.state = ''; m.target = null; m.hidden = false; m.lured = null; for (const e of ents) if (e.target === m) { e.target = null; e.state = 'return'; } P.sel = m; simAdopt(m); log(`It seems to accept you as master.`, '#7ee08a'); }
+    else { log('You fail to tame the creature.'); if (R() < d.bite) { m.target = P; m.state = 'chase'; log('You seem to anger the beast!', '#ff8a6a'); } } },
+  vet: t => { const p = t.p; if (p.gone || dist(p, P) > SF.VET.range + .3) return log('You did not stay close enough to your patient.');
+    const vet = sv('veterinary'), lore = sv('animallore');
+    if (t.cure) { const ch = SKD.vetCureChance(svReal('veterinary'), svReal('animallore')); skillCheck('veterinary', 0, 120); skillCheck('animallore', 0, 120); if (!ch) return log('Curing a pet needs 60 Veterinary and 60 Animal Lore.', '#ffb070'); if (R() < ch) { p.poison = null; floater(p.x, p.y, 'cured', '#7ee08a'); log(`You cure ${p.name}.`, '#7ee08a'); } else log('You fail to cure the poison.'); return; }
+    skillCheck('veterinary', 0, 120); skillCheck('animallore', 0, 120);
+    if (R() >= SKD.vetChance(vet)) return log('You fail to stop the bleeding.');
+    const [lo, hi] = SKD.vetRange(vet, lore), b = p.hp; p.hp = Math.min(p.max, p.hp + lo + Math.floor(R() * (hi - lo + 1))); floater(p.x, p.y, '+' + Math.round(p.hp - b), '#7ee08a'); log(`You treat ${p.name} for ${Math.round(p.hp - b)}.`, '#7ee08a'); },
+  steal: t => { const e = t.e; if (e.gone || (e.kind === 'mon' && !alive(e)) || dist(e, P) > SKD.STEAL.range + .3) return log('Your mark slips away.');
+    const pack = npcPack(e), items = pack.items.filter(i => SF.ITEMS[i.id].trade);
+    const it = t.uid ? items.find(i => i.uid === t.uid) : items[Math.floor(R() * items.length)];
+    if (!it) return log(t.uid ? 'That is no longer there.' : 'Their pack is empty.');
+    const unitW = SF.itemKg({ id: it.id, qty: 1 }) * SF.WU; let qty = 1;
+    if (SF.ITEMS[it.id].stack && it.qty > 1) { const mx = Math.max(1, Math.min(it.qty, Math.floor((sv('stealing') / 10) / Math.max(unitW, 1e-6)))); qty = 1 + Math.floor(R() * mx); }
+    const stones = unitW * qty; if (stones > SKD.STEAL.maxStones) return log('That is too heavy to steal.', '#ffb070');
+    const ok = skillCheck('stealing', ...SKD.stealWindow(stones)), caught = R() < SKD.caughtChance(sv('stealing'));
+    if (ok) { const take = qty === it.qty ? it : Object.assign({}, it, { uid: undefined, qty }); const nw = take === it ? it : SF.newItem(it.id, qty, Object.fromEntries(Object.entries(it).filter(([k]) => !['uid', 'id', 'qty'].includes(k))));
+      const r = SF.addItem(P.pack, nw, cap()); if (!r.ok) return log(r.reason, '#ffb070'); if (take === it) pack.items.splice(pack.items.indexOf(it), 1); else it.qty -= qty; pack.ver++;
+      log(`You steal ${qty > 1 ? qty + ' × ' : ''}${SF.itemName(nw).toLowerCase()}.`, '#ffe08a'); snd('loot.coin', { gain: .5 }); }
+    else log('You fail to steal the item.', '#ffb070');
+    if (caught) { reveal('You are noticed stealing!'); if (e.kind === 'mon') { e.hidden = false; e.target = P; e.state = 'chase'; say(e, 'Thief!'); } else crime(e, 'theft'); }
+    if (PANEL === 'snoop') renderPanel(); },
+  poison: t => { if (!SF.removeQty(P.pack, t.pot, 1)) return; give('vial', 1);
+    const ok = skillCheck('poisoning', t.win[0], t.win[1]);
+    if (!ok) return log('You fail to apply a sufficient dose of poison.', '#ffb070');
+    if (t.target === 'weapon') { const w = poisonableWeapon(); if (!w || w.uid !== t.tuid) return log('Your weapon is no longer in hand; the dose is wasted.'); w.venom = { tier: t.lvl, charges: SKD.poisonCharges(t.lvl) }; log(`You apply the poison. Your weapon carries it for ${w.venom.charges} hits.`, '#7be07b'); }
+    else { const f = findU(P.pack, t.tuid); if (!f) return; if (f.qty > 1) { f.qty--; P.pack.ver++; SF.addItem(P.pack, SF.newItem(f.id, 1, { poison: t.lvl, cond: 100 })); } else f.poison = t.lvl; log('You apply the poison to the food.', '#7be07b'); } },
   trap: () => { SF.removeQty(P.pack, 'trapkit', 1); snd('trap.set', { key: 'P' }); TRAPS.push({ x: P.x, y: P.y, owner: 'P', hidden: false, armedAt: GT + SF.TRAP.arm, until: GT + SF.TRAP.life, diff: 40 }); log('Snare set. It arms in a second and lasts 3 minutes.'); },
-  disarm: t => { const tr = t.trap; gain('removetrap', tr.diff); if (R() < SF.opposed(sv('removetrap'), tr.diff)) { TRAPS.splice(TRAPS.indexOf(tr), 1); give('ironshard', 1); log('You disarm the snare and salvage a shard.'); } else if (R() < .3) { TRAPS.splice(TRAPS.indexOf(tr), 1); springOnPlayer(); } else log('You fail to disarm it.'); },
-  lock: t => { const c = t.chest, diff = SF.CHEST_DIFF[c.tier]; gain('lockpicking', diff, { target: 'chest:' + c.x + ',' + c.y });
-    if (R() < SF.opposed(sv('lockpicking'), diff)) { c.open = true; c.refill = GT + 600; c.cont = chestLoot(c.tier); log('The lock clicks open.', '#ffe08a'); sndAt('door.unlock', { x: c.x + .5, y: c.y + .5 }); openChest(c, true); }
-    else { SF.removeQty(P.pack, 'lockpick', 1); log('Your lockpick snaps.'); } },
-  appraise: t => { const it = t.item, d = SF.ITEMS[it.id], p = SF.PRICES[it.id] || 1, err = (1 - sv('itemidentification') / 100) * .5; skillCheck('itemidentification', 0, 100);
+  disarm: t => {
+    const pw = t.trap ? t.trap.diff : t.chest ? t.chest.trap : t.box ? t.box.power : 0, ok = skillCheck('removetrap', ...SKD.trapWindow(pw));
+    if (ok) { if (t.trap) { TRAPS.splice(TRAPS.indexOf(t.trap), 1); give('ironshard', 1); log('You disarm the snare and salvage a shard.'); } else if (t.chest) { t.chest.trap = 0; t.chest.trapSeen = false; log('You successfully render the trap harmless.', '#7ee08a'); } else { t.box.armed = false; P.pack.ver++; log('You disarm the practice box.', '#7ee08a'); } return; }
+    if (R() < .3) { if (t.trap) { TRAPS.splice(TRAPS.indexOf(t.trap), 1); springOnPlayer(); } else if (t.chest) springChestTrap(t.chest); else { t.box.armed = false; P.pack.ver++; springBox(t.box); } }
+    else log('You fail to safely remove the trap.', '#ffb070'); },
+  lock: t => {
+    if (t.chest) { const c = t.chest, diff = SF.CHEST_DIFF[c.tier];
+      if (skillCheck('lockpicking', ...SKD.lockWindow(diff))) { c.open = true; c.picked = { by: P.name, at: GT }; c.refill = GT + 600; c.cont = chestLoot(c.tier); log('The lock quickly yields to your skill.', '#ffe08a'); sndAt('door.unlock', { x: c.x + .5, y: c.y + .5 }); if (c.trap) springChestTrap(c); openChest(c, true); }
+      else { if (R() < .3) { SF.removeQty(P.pack, 'lockpick', 1); log('You broke the lockpick.'); } else log('You are unable to pick the lock.'); } return; }
+    const b = t.box; if (!b || !findU(P.pack, b.uid)) return;
+    if (skillCheck('lockpicking', ...SKD.lockWindow(b.lockLvl || 20))) { b.locked = false; b.picked = { by: P.name, at: GT }; P.pack.ver++; log('The lock quickly yields to your skill.', '#ffe08a'); snd('door.unlock', { key: 'P' }); }
+    else { if (R() < .3) { SF.removeQty(P.pack, 'lockpick', 1); log('You broke the lockpick.'); } else log('You are unable to pick the lock.'); } },
+  appraise: t => { const it = t.item, d = SF.ITEMS[it.id], p = SF.PRICES[it.id] || 1; const ok = skillCheck('itemidentification', 0, 100);
+    if (!ok) return log('You are not certain…', '#a8a8a8'); const err = (1 - sv('itemidentification') / 100) * .5;
+    if (it.unid) { delete it.unid; P.pack.ver++; }
     const lo = Math.max(1, Math.round(p * .4 * (1 - err))), hi = Math.round(p * 1.2 * (1 + err));
-    log(`${SF.itemName(it)}${it.quality === 'exceptional' ? ' (exceptional)' : ''}: ${it.maker ? 'made by ' + it.maker + ', ' : ''}${it.cond !== undefined ? 'condition ' + Math.round(it.cond) + '/' + (it.maxc || 100) + ', ' : ''}worth about ${lo}–${hi} gold${d.trade ? '' : ', cannot be traded'}.`, '#e8d8b0'); },
+    log(`${SF.itemName(it)}${it.quality === 'exceptional' ? ' (exceptional)' : ''}${it.magic ? ' — ' + magicName(it) : ''}: ${it.maker ? 'made by ' + it.maker + ', ' : ''}${it.poison ? 'tainted with poison, ' : ''}worth about ${lo}–${hi} gold${d.trade ? '' : ', cannot be traded'}.`, '#e8d8b0'); },
   repair: t => { const it = t.item, k = SF.repairSkill(it.id); const rp = SF.repairPlan(it); if (!rp.ok) return log(cap1(rp.reason), '#ffb070'); if (!SF.removeQty(P.pack, 'repairkit', 1)) return log('You need a repair kit.');
     const rd = SF.SK.repairDiff(it.cond === undefined ? 100 : it.cond, it.maxc || 100);   // a badly worn piece is harder to mend (−25 … 100)
     if (skillCheck(k, rd - 25, rd + 25)) { const r = SF.EQ.repairItem(P, { uid: it.uid, skill: sv(k), rng: R }); log(r.ok ? `Repaired to ${r.maxc}/${r.maxc}.` + (r.lost ? ` The maximum drops by ${r.lost}.` : ' The maximum holds.') : r.reason, r.ok ? '#7ee08a' : '#ffb070'); } else log('The repair fails and the kit is used up.', '#ffb070'); renderPanel(); } };
+const magicName = it => it.magic ? ({ dmg: ['', 'ruin', 'might', 'force', 'power', 'vanquishing'], acc: ['', 'accurate', 'surpassingly accurate', 'eminently accurate', 'exceedingly accurate', 'supremely accurate'], def: ['', 'defense', 'guarding', 'hardening', 'fortification', 'invulnerability'] }[it.magic.k] || [])[it.magic.l] || 'magic' : '';
+/* chest traps (dungeon chests of the second and third tier): a poison needle or an explosion when the lid opens untouched */
+function springChestTrap(c) { const p = c.trap; c.trap = 0; c.trapSeen = false; snd('trap.spring', { key: 'P' }); if (R() < .5) { damagePlayer(Math.round(p / 4), null, 'phys', { quiet: 1 }); log('The chest explodes in your face!', '#ff8a6a'); FX.push({ k: 'boom', x: c.x + .5, y: c.y + .5, r: .8, t0: GT, dur: .5 }); } else { applyPoison(P, p >= 70 ? 3 : 2); log('A poison needle pricks your finger!', '#7be07b'); } }
+function springBox(b) { snd('trap.spring', { key: 'P' }); damagePlayer(Math.max(2, Math.round((b.power || 20) / 10)), null, 'phys', { quiet: 1 }); log('The practice box snaps shut on your fingers!', '#ff8a6a'); }
 /* a found item: gear arrives as a proper instance (material, durability), worn to pct % of its maximum */
 function lootItem(id, q, pct) { if (SF.EQ.isGear(id)) { const it = SF.EQ.make(id, { origin: 'loot' }); if (it.omax) it.cond = Math.max(1, Math.round(it.omax * pct / 100)); return it; } return SF.newItem(id, q, SF.WEARABLE(id) ? { cond: pct, maxc: 100 } : null); }
 function chestLoot(tier) { const c = SF.newContainer('chest'); const add = (id, a, b) => { const q = rnd(a, b); if (q > 0) c.items.push(lootItem(id, q, rnd(70, 100))); };
@@ -1241,7 +1477,8 @@ function springOnPlayer() { snd('trap.spring', { key: 'P' }); damagePlayer(SF.TR
 function interactExtra() {
   // chests
   for (const c of CHESTS.values()) { if (Math.hypot(c.x + .5 - P.x, c.y + .5 - P.y) > 2) continue;
-    if (c.open && GT > c.refill) { c.open = false; c.cont = null; }
+    if (c.open && GT > c.refill) { c.open = false; c.cont = null; chestTrapRoll(c); }
+    if (!c.open && c.trap && !SF.count(P.pack, 'lockpick') && c.trapSeen) { log(`A locked and trapped chest (trap ${c.trap}). Remove Trap, then pick the lock.`, '#ffb070'); return true; }
     if (c.open) { openChest(c); return true; }
     if (!SF.count(P.pack, 'lockpick')) { log(`A locked chest (difficulty ${SF.CHEST_DIFF[c.tier]}). You need lockpicks.`, '#ffb070'); return true; }
     P.task = { kind: 'lock', chest: c, label: 'Picking lock', t0: GT, t1: GT + SF.LOCK_TIME, still: true, x0: P.x, y0: P.y }; sndAt('lock.pick', { x: c.x + .5, y: c.y + .5 }); return true; }
@@ -1910,6 +2147,15 @@ function bagPanel() {
   return ['Backpack', h + (items.length ? '' : 'Your backpack is empty.') + '</div>'];
 }
 
+function itemSkill(k, u) {
+  const it = findU(P.pack, u); if (!it) return; closePanel();
+  if (k === 'picklock') return lockUse(it);
+  if (k === 'untrap') return untrapUse(it);
+  if (k === 'lockup') { it.locked = true; it.lockLvl = it.lockLvl || 20; P.pack.ver++; snd('door.unlock', { key: 'P', gain: .5 }); return log(`You lock the box (lock ${it.lockLvl}).`); }
+  if (k === 'arm') { it.armed = true; it.power = it.power || 20; P.pack.ver++; return log(`You arm the box's trap (power ${it.power}).`); }
+  if (ITEM_SKILL[k]) return ITEM_SKILL[k](it);
+}
+const ITEM_SKILL = {};   // phase D item-target skills (Arms Lore, Taste Identification, Camping, Cartography) register here
 function bagActions(it) {
   const d = SF.ITEMS[it.id]; let a = '';
   if (d.slot) a += btn('equip', 'Equip', { u: it.uid });
@@ -1920,7 +2166,10 @@ function bagActions(it) {
   if (d.use === 'bandage') a += btn('assign', 'Slot other', { k: 'act', id: 'bandother' });
   if (SF.WEARABLE(it.id) && (it.cond !== undefined && it.cond < (it.maxc || 100))) a += btn('repair', 'Repair', { u: it.uid });
   a += magicItemActions(it);
-  a += btn('appraise', 'Appraise', { u: it.uid });
+  a += btn('appraise', 'Identify', { u: it.uid });
+  if (it.id === 'lockbox') a += it.locked ? btn('skitem', 'Pick lock', { k: 'picklock', u: it.uid }) : btn('skitem', 'Lock', { k: 'lockup', u: it.uid });
+  if (it.id === 'trapbox') a += it.armed ? btn('skitem', 'Remove trap', { k: 'untrap', u: it.uid }) : btn('skitem', 'Arm', { k: 'arm', u: it.uid });
+  if (d.poisonLvl) a += btn('abil', 'Poison…', { id: 'poison' });
   if (d.trade) a += btn('drop', 'Drop', { u: it.uid });
   return a;
 }
@@ -1932,6 +2181,11 @@ const SKILL_ABIL = { anatomy: 'anatomy', hiding: 'hide', tracking: 'track', medi
   peacemaking: 'peace', enticement: 'entice', provocation: 'provoke', stealing: 'steal', poisoning: 'poison', stealth: 'stealth', animallore: 'lore', evaluatingintelligence: 'evalint',
   itemidentification: 'itemid', armslore: 'armslore', musicianship: 'play', begging: 'beg', camping: 'camp', forensicevaluation: 'forensic', herding: 'herd', snooping: 'snoop',
   spiritspeak: 'spirit', tasteidentification: 'taste', lockpicking: 'picklock', removetrap: 'untrap' };
+const ABIL_LIST = [['bandother', 'Bandage other (Healing: an ally or a player ghost)'], ['anatomy', 'Anatomy'], ['evalint', 'Evaluating Intelligence'], ['hide', 'Hiding'], ['stealth', 'Stealth (while hidden, 80 Hiding)'],
+  ['detect', 'Detecting Hidden'], ['track', 'Tracking'], ['meditate', 'Meditation'], ['tame', 'Animal Taming'], ['lore', 'Animal Lore'], ['vet', 'Veterinary'], ['feed', 'Feed a pet'], ['herd', 'Herding (crook)'],
+  ['play', 'Musicianship'], ['peace', 'Peacemaking'], ['entice', 'Enticement'], ['provoke', 'Provocation'], ['snoop', 'Snooping'], ['steal', 'Stealing'], ['poison', 'Poisoning'], ['picklock', 'Lockpicking'],
+  ['untrap', 'Remove Trap'], ['beg', 'Begging'], ['camp', 'Camping'], ['forensic', 'Forensic Evaluation'], ['spirit', 'Spirit Speak'], ['armslore', 'Arms Lore'], ['itemid', 'Item Identification'], ['taste', 'Taste Identification'],
+  ['trap', 'Set a snare (a tinker\'s snare kit)']];
 function useAbility(id) { if (ABIL[id]) return ABIL[id].fn(); const f = { hide, track, meditate }[id]; if (f) return f(); }
 function skillsPanel() {
   const tot = SF.totalSkill(P), q = SKUI.q.trim().toLowerCase();
@@ -1973,7 +2227,17 @@ const PANELS = {
     return ['Character', h + '<p class="note">Stats grow as you use the skills that lean on them: Strength, Dexterity and Intelligence each up to 100, 225 in all. At 225 a gain in one lowers another.</p>']; },
   skills: () => skillsPanel(),
   spells: () => spellbookPanel(),
-  abilities: () => ['Abilities', `<p class="note">Use now or put an action on a hotbar slot (two bars of four).</p>` + [['bandother', 'Bandage other (Healing: an ally or a player ghost)'], ['anatomy', 'Anatomy (judge a living target)'], ['hide', 'Hide (Hiding)'], ['track', 'Track (Tracking)'], ['meditate', 'Meditate (Meditation)'], ['detect', 'Detect Hidden (finds hidden foes and snares)'], ['tame', 'Tame (Animal Taming)'], ['vet', 'Treat pet (Veterinary)'], ['peace', 'Peacemaking (needs an instrument)'], ['entice', 'Enticement (needs an instrument)'], ['provoke', 'Provocation (needs an instrument)'], ['steal', 'Steal (Stealing)'], ['poison', 'Poison a weapon (Poisoning 30)'], ['trap', 'Set a snare (a tinker\'s snare kit)']].map(([id, n]) => `<div class="row"><span class="nm">${n}</span>${ABIL[id] ? btn('abil', 'Use', { id }) : ''}${btn('assign', 'Slot', { k: 'act', id })}</div>`).join('')],
+  abilities: () => ['Abilities', `<p class="note">Use now or put an action on a hotbar slot. Every skill with a use is here; the Skills page has the same Use buttons.</p>` + ABIL_LIST.filter(([id]) => ABIL[id] || ['hide', 'track', 'meditate'].includes(id)).map(([id, n]) => `<div class="row"><span class="nm">${n}${cdLeft(id) > 0 ? ` <span class="note">${Math.ceil(cdLeft(id))} s</span>` : ''}</span>${btn('abil', 'Use', { id })}${btn('assign', 'Slot', { k: 'act', id })}</div>`).join('')],
+  track: () => { const n = sv('tracking'); let h = `<p class="note">Range about ${Math.round(SF.SK.trackRange(n))} m. Choose what to look for, then whose trail to follow.</p><div class="grid2">${Object.entries(SF.SK.TRACK_KINDS).map(([k, l]) => btn('trackk', l, { k }, TRACKUI && TRACKUI.kind === k ? 'ac' : '')).join('')}</div>`;
+    if (TRACKUI) h += TRACKUI.list.filter(e => !e.gone).map((e, i) => `<div class="row"><span class="nm">${esc(cap1(e.name || (MON[e.type] || {}).n || 'someone'))}</span><span class="v">${Math.round(dist(e, P))} m</span>${btn('trackf', 'Follow', { i })}</div>`).join('');
+    return ['Tracking', h]; },
+  poison: () => { const pots = poisonPotions(), w = poisonableWeapon(), foods = P.pack.items.filter(i => SF.ITEMS[i.id].use === 'eat' && !i.poison);
+    if (!pots.length) return ['Poisoning', '<p class="note">You have no poison potions. Alchemy makes them at a still (lesser, regular, greater, deadly).</p>'];
+    let h = '<p class="note">Choose a poison and what to apply it to: a bladed or piercing weapon in hand, or food. The potion is used whether or not you succeed.</p>';
+    for (const p of pots) { const lvl = SF.ITEMS[p.id].poisonLvl, win = SF.SK.POISON_WIN[lvl]; h += `<div class="sec">${esc(SF.ITEMS[p.id].n)} ×${p.qty} <span class="note">Poisoning ${win[0]}–${win[1]}</span></div><div class="row">`;
+      h += w ? btn('poisonapply', 'On ' + esc(SF.itemName(w)), { u: p.uid, t: 'weapon' }) : '<span class="note">No bladed or piercing weapon in hand.</span>';
+      for (const f of foods.slice(0, 4)) h += btn('poisonapply', 'On ' + esc(SF.ITEMS[f.id].n), { u: p.uid, t: f.uid }); h += '</div>'; }
+    return ['Poisoning', h]; },
   assign: () => ['Choose a slot', `<p class="note">Assign ${esc(ASSIGN.k === 'spell' ? SF.SPELL[ASSIGN.id].n : ASSIGN.k === 'item' ? SF.ITEMS[ASSIGN.id].n : (ABIL[ASSIGN.id] ? ABIL[ASSIGN.id].n : ASSIGN.id))} to:</p><div class="grid2">${P.hotbar.map((_, i) => btn('setslot', 'Bar ' + (1 + Math.floor(i / 3)) + ' · ' + (i % 3 + 1) + ': ' + esc(slotLabel(P.hotbar[i])[0]), { i })).join('')}</div>`],
   loot: () => { const c = P.lootOpen; if (!c || c.gone) return null; const ls = c.cont ? SF.lootStatus(c.cont, P.id, GT) : { label: '' }; let h = `<div class="note">${c.mine ? 'Your body · ' : ''}${esc(ls.label || '')} · crumbles in ${Math.ceil((c.expires - GT) / 60)} min · pack ${P.pack.items.length}/${SF.SLOTS}, ${packKg().toFixed(1)}/${SF.carryKg(P).toFixed(1)} kg</div>`;
     if (!c.cont.items.length) h += '<p class="note">Empty.</p>'; else h += btn('takeall', 'Take all', {}, 'ac');
@@ -2011,10 +2275,13 @@ const ACT = {
   qwick: () => { if (Q().beacon !== 1 || hasWick()) return; SF.addItem(P.pack, SF.newItem('wick', 1)); log('The Quaywarden hands you another wick.', '#ffe08a'); closePanel(); save(); },
   qturn: () => { if (Q().beacon !== 2) return; Q().beacon = 3; snd('quest.complete'); SF.addItem(P.pack, SF.newItem('bandage', 5)); SF.addItem(P.pack, SF.newItem('gold', 40)); log('Quest complete: A Light for the Quay. +5 bandages, +40 gold.', '#7ee08a'); log('Brine Road runs east to the gate. Past the gate pillars, full-loot wilderness rules begin.', '#ffb070'); closePanel(); save(); },
   atk: toggleArm, interact, bandother: () => firstAidOther(), allycmd: d => allyCommand(d.c),
-  pool: d => { const n = SF.assignPool(P, d.k, 10); if (n) { log(`${SF.SKILL[d.k].n} +${f1(n)} from the skill reform (${f1(P.skillPool)} left).`, '#7fd4ff'); save(); } else log('That skill or your total is at its cap.', '#ffb070'); renderPanel(); }, cancel: () => { P.armed = false; if (P.prep || P.held) cancelCast(); AIM = null; P.batch = null; if (P.task) { log(P.task.label + ' cancelled.'); P.task = null; } P.meditating = null; },
+  pool: d => { const n = SF.assignPool(P, d.k, 10); if (n) { log(`${SF.SKILL[d.k].n} +${f1(n)} from the skill reform (${f1(P.skillPool)} left).`, '#7fd4ff'); save(); } else log('That skill or your total is at its cap.', '#ffb070'); renderPanel(); }, cancel: () => { P.armed = false; if (P.prep || P.held) cancelCast(); AIM = null; if (PICKT) { PICKT = null; log("Targeting cancelled."); } P.batch = null; if (P.task) { log(P.task.label + ' cancelled.'); P.task = null; } P.meditating = null; },
   cycle: () => { const L = ents.filter(e => e.kind === 'mon' && alive(e) && dist(e, P) < 16 && los(P, e)).sort((a, b) => dist(a, P) - dist(b, P)); if (!L.length) return log('No creatures in sight.'); const i = L.indexOf(P.sel); P.sel = L[(i + 1) % L.length]; },
   slot: d => useSlot(+d.i + (P.hbPage || 0) * 3), page: () => { P.hbPage = ((P.hbPage || 0) + 1) % 3; },
-  abil: d => { ABIL[d.id].fn(); }, petcmd: d => petCommand(d.c), appraise: d => { const it = findU(P.pack, d.u); if (!it) return; closePanel(); P.task = { kind: 'appraise', item: it, label: 'Appraising', t0: GT, t1: GT + SF.APPRAISE_TIME, still: true, x0: P.x, y0: P.y }; },
+  abil: d => { useAbility(d.id); },
+  trackk: d => trackStart(d.k), trackf: d => { const e = TRACKUI && TRACKUI.list[+d.i]; if (e) trackFollow(e); },
+  poisonapply: d => poisonApply(+d.u, d.t),
+  skitem: d => itemSkill(d.k, +d.u), petcmd: d => petCommand(d.c), appraise: d => { const it = findU(P.pack, d.u); if (!it) return; closePanel(); P.task = { kind: 'appraise', item: it, label: 'Appraising', t0: GT, t1: GT + SF.APPRAISE_TIME, still: true, x0: P.x, y0: P.y }; },
   repair: d => { const it = findU(P.pack, d.u) || Object.values(P.equip).find(e => e && e.uid === +d.u); if (!it) return; const k = SF.repairSkill(it.id); const st = nearestStation(k === 'blacksmithy' ? ['anvil', 'forge'] : ['bench']); if (!st) return log(k === 'blacksmithy' ? 'Repair metal at the smithy anvil.' : 'Repair this at a workbench.', '#ffb070'); if (!SF.count(P.pack, 'repairkit')) return log('You need a repair kit.', '#ffb070'); const rp = SF.repairPlan(it); if (!rp.ok) return log(cap1(rp.reason), '#ffb070'); P.task = { kind: 'repair', item: it, label: 'Repairing', t0: GT, t1: GT + SF.CRAFT_TIME, still: true, x0: P.x, y0: P.y }; }, self: () => { P.sel = P; if (P.held && SF.SPELL[P.held.sp.id].t === 'ally') releaseHeld(P); },
   desel: () => { P.sel = null; P.armed = false; }, ghostret: () => { if (GT - P.ghostAt >= 12) { const s = SHRINES.find(z => z.id === P.bound); resurrect({ x: s.x + .5, y: s.y + .5 }); } },
   equip: d => { equipUid(d.u, d.slot); renderPanel(); },
@@ -2330,7 +2597,7 @@ function finishCraft(t) {
   craftSound(r, res.success);
   skillUse(r.skill, p.chance, res.success, null, SF.SK.CRAFT_WINDOW(p.diff));   // every attempt teaches while the recipe is still a challenge
   if (tool.it && spendTool(tool.it)) log('Your ' + SF.ITEMS[r.tool].n.toLowerCase() + ' wear out and break.', '#ff6a5a');
-  if (res.success) { const it = res.items[0]; b.made++;
+  if (res.success) { const it = res.items[0]; b.made++; if (it.id === 'lockbox') Object.assign(it, { lockLvl: Math.max(10, Math.round(sv('tinkering'))), locked: true }); if (it.id === 'trapbox') Object.assign(it, { power: Math.max(10, Math.round(sv('tinkering'))), armed: true });   // a tinker's box is as hard as its maker was skilled
     log(`You make ${it.qty > 1 ? it.qty + ' × ' : ''}${SF.itemName(it).toLowerCase()}${res.exceptional ? ' — exceptional work!' : ''}.`, res.exceptional ? '#ffe08a' : '#e8e2d2');
     questEvent({ type: recipeCat(r) === 'Smelt' ? 'smelt' : 'make', rid: r.id, out: r.out, mat: SF.matOf(it), qty: it.qty, exceptional: res.exceptional });
     simEmit('ItemCrafted', { actor: aidOf(P), recipe: r.id, item: it.id, qty: it.qty, uid: it.uid, exceptional: !!res.exceptional }); }
@@ -2428,13 +2695,21 @@ function migrateV2(s, raw) {
   try { if (raw && !localStorage.getItem(SAVEKEY + '.backup')) localStorage.setItem(SAVEKEY + '.backup', raw); } catch (e) { }
 }
 
+function petLoyaltyTick() {
+  for (const p of tamedPets()) {
+    if (p.loyal === undefined) { p.loyal = SF.SK.LOYALTY.max; p.fedAt = GT; }
+    const want = SF.SK.LOYALTY.max - Math.floor((GT - (p.fedAt || GT)) / SF.SK.LOYALTY.step);
+    if (want < p.loyal) { p.loyal = Math.max(0, want); if (p.loyal === 3) log(`${cap1(p.name)} looks hungry. (Feed pet)`, '#ffb070'); }
+    if (p.loyal <= 0) { log(`${cap1(p.name)} seems to have decided that it is better off without a master!`, '#ff8a6a'); p.kind = 'mon'; p.name = undefined; p.order = null; p.loyal = undefined; p.home = { x: p.x, y: p.y }; p.state = 'return'; if (P.sel === p) P.sel = null; simAdopt(p); }
+  }
+}
 function petCommand(c) {
   const pets = ents.filter(e => e.kind === 'pet' && !e.gone); if (!pets.length) return;
   if (c === 'dismiss') { const p = P.sel && P.sel.kind === 'pet' ? P.sel : pets[0]; rmEnt(p); P.sel = null; log(p.name + ' is released into the wild.'); return; }
   const tgt = c === 'attack' ? P.sel : null; if (c === 'attack' && (!tgt || tgt.kind !== 'mon')) return log('Select a creature for your pets to attack.');
   for (const p of (P.sel && P.sel.kind === 'pet' ? [P.sel] : pets)) { if (!los(P, p)) { log(p.name + ' cannot see you.'); continue; }
-    const strong = (p.slots || 1) > 1, ch = p.type ? cl(.6 + sv('animallore') / 200 - (strong ? .2 : 0), .3, .98) : 1; if (p.type) gain('animallore', strong ? 55 : 30);
-    if (R() > ch) { log(p.name + ' ignores you.'); continue; } p.order = c; p.tgt = tgt; }
+    const min = p.type ? tameMin(p.type) : null, ch = min === null ? 1 : SF.SK.controlChance(sv('animaltaming'), sv('animallore'), min, p.loyal);   // 80% Taming + 20% Animal Lore against the creature (src/skills.js)
+    if (R() > ch) { log(`${cap1(p.name)} looks at you and winces.`); continue; } p.order = c; p.tgt = tgt; }
   say(P, c === 'attack' ? 'Attack!' : c === 'follow' ? 'Heel.' : 'Stay.'); }
 function unequipTo(s) { const r = SF.EQ.unequipItem(P, { slot: s }); if (!r.ok) return false; snd('item.equip'); if (s === 'weapon') weaponChanged(); eqChanged(); return true; }
 /* the one equip path for every control (button, double-click, drag, context menu): a validated, atomic command */
@@ -2456,6 +2731,7 @@ function tapWorld(sx, sy) {
   if (P.ghost) return;
   const hits = hitEnts(w.wx, w.wy);
   if (P.held && heldTap(hits, w)) return;
+  if (PICKT && hits.length && pickTap(hits)) return;   // a skill waiting for its target
   if (hits.length > 1 && hits[0].kind !== hits[1].kind && Math.abs(dist(hits[0], hits[1])) < .8) { PICK = hits.slice(0, 5); return openPanel('picker'); }
   if (hits.length) { if (hits[0].kind === 'corpse') { P.sel = hits[0]; if (dist(hits[0], P) <= 2.2) return interact(); return log('Walk next to the remains to loot them.'); } P.sel = hits[0]; if (P.sel.kind === 'mon') P.sel.nameUntil = GT + 3; return; }
   const dr = doorAtScreen(w.wx, w.wy); if (dr) { if (doorDist(dr) <= 2.2) return useDoor(dr); return log('Walk up to the door.'); }
@@ -2493,7 +2769,7 @@ function save() {
     if (P.base) Object.assign(c, P.base); c.magery = { mig: (P.mg && P.mg.mig) || 0 };
     const corpses = ents.filter(e => e.mine && !e.gone).map(e => ({ x: e.x, y: e.y, items: e.cont.items, left: e.expires - GT, diedAgo: GT - e.cont.diedAt }));
     let maxUid = 0; const scan = it => { if (it && it.uid > maxUid) maxUid = it.uid; }; P.pack.items.forEach(scan); P.bank.items.forEach(scan); Object.values(P.equip).forEach(scan); corpses.forEach(c2 => c2.items.forEach(scan));
-    const pets = ents.filter(e => e.kind === 'pet' && e.type && !e.summon && !e.gone && e.hp > 0).map(e => ({ type: e.type, hp: e.hp, order: e.order === 'stay' ? 'stay' : 'follow', slots: e.slots, name: e.name, dx: e.x - P.x, dy: e.y - P.y }));
+    const pets = ents.filter(e => e.kind === 'pet' && e.type && !e.summon && !e.gone && e.hp > 0).map(e => ({ type: e.type, hp: e.hp, order: e.order === 'stay' ? 'stay' : 'follow', slots: e.slots, name: e.name, dx: e.x - P.x, dy: e.y - P.y, loyal: e.loyal, fedAgo: GT - (e.fedAt || GT) }));
     const nodes = []; for (const [k, o] of RES) nodes.push([k, o.gen || 1, o.spec || 0, o.n, o.max || 0, Math.round(o.t * 10) / 10]);
     const ally = allySave(); if (ally) { Object.values(ally.equip || {}).forEach(scan); ally.pack.forEach(scan); if (ally.body) ally.body.items.forEach(scan); }
     localStorage.setItem(SAVEKEY, JSON.stringify({ v: 8, char: c, corpses, pets, nodes, ally, sim: WS ? WS.save() : null, eco: ecoSave(), life: lifeSave(), uid: maxUid + 1, gt: GT, savedAt: Date.now() }));
@@ -2553,7 +2829,7 @@ function boot(saved, fresh) {
   ents.unshift(P); P.sect = P.sect || 0; P.drawn = false; P.sw = SF.newSwing(); P.movedAt = -99; while (P.hotbar.length < 9) P.hotbar.push(null); Q(); ecoLoad(saved && saved.eco); populate(); lifeLoad(saved && saved.life); seedTraps();
   { const al = makeAlly(saved && saved.ally); const bd = saved && saved.ally && saved.ally.body; if (bd && bd.left > 0) { const cont = SF.newContainer('corpse', al.aid); cont.items = bd.items; cont.diedAt = GT - (bd.diedAgo ?? 999); cont.expires = GT + bd.left; addEnt({ kind: 'corpse', allyBody: al.aid, name: al.name + "'s body", x: bd.x, y: bd.y, cont, expires: GT + bd.left }); } }
   P.bandage = null; if (saved) bandageLoad(saved.char.bandage);          // an application in flight resumes once, never twice
-  if (saved) for (const pt of saved.pets || []) { const d = MON[pt.type]; if (!d) continue; const near = Math.hypot(pt.dx || 0, pt.dy || 0) < 12; addEnt({ kind: 'pet', type: pt.type, name: pt.name || 'your ' + d.n, x: P.x + (near ? pt.dx : 1), y: P.y + (near ? pt.dy : 0), hp: Math.min(pt.hp, d.hp), max: d.hp, state: '', home: { x: P.x, y: P.y }, sect: 0, ward: 0, order: pt.order, slots: pt.slots || 1, target: null }); }
+  if (saved) for (const pt of saved.pets || []) { const d = MON[pt.type]; if (!d) continue; const near = Math.hypot(pt.dx || 0, pt.dy || 0) < 12; addEnt({ kind: 'pet', type: pt.type, name: pt.name || 'your ' + d.n, x: P.x + (near ? pt.dx : 1), y: P.y + (near ? pt.dy : 0), hp: Math.min(pt.hp, d.hp), max: d.hp, state: '', home: { x: P.x, y: P.y }, sect: 0, ward: 0, order: pt.order, slots: pt.slots || 1, target: null, loyal: pt.loyal === undefined ? SF.SK.LOYALTY.max : pt.loyal, fedAt: GT - (pt.fedAgo || 0) }); }
   mageryBoot(saved);
   $('#cc').hidden = true; document.body.classList.toggle('mirror', SETTINGS.mirror);
   log('Welcome to Saltmarsh Quay, ' + P.name + '. Bank what you cannot afford to lose.', '#ffe08a');
@@ -2573,4 +2849,5 @@ function spawnMon(type, dx = 3, dy = 0) { const d = MON[type]; if (!d) return nu
   for (let r = 0; r < 6 && BLK[tAt(Math.floor(x), Math.floor(y))]; r += .5) for (let a = 0; a < 8; a++) { const nx = P.x + dx + Math.cos(a * Math.PI / 4) * r, ny = P.y + dy + Math.sin(a * Math.PI / 4) * r; if (!BLK[tAt(Math.floor(nx), Math.floor(ny))]) { x = nx; y = ny; break; } }
   return addEnt({ kind: 'mon', type, name: d.n, x, y, hp: d.hp, max: d.hp, state: 'idle', home: { x, y }, sect: 0, ward: 0 }); }
 window.__SF = { get WS() { return WS; }, dist, closePanel, lifeSave, LIFE, LIFE_SCHED, lifeTick, lifeResume, lifeInspect, lifeTownGeo, lifeTalk, talk, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
-Object.assign(window.__SF, { skillCheck, skillUse, noteLearn, SKUI, SKLOG, useAbility, ABIL, TASKS, get PICKT() { return PICKT; } });
+Object.defineProperties(window.__SF, { PICKT: { get: () => PICKT }, TRACKS: { get: () => TRACKS }, TRACKUI: { get: () => TRACKUI } });   // live views (Object.assign would copy a getter's value)
+Object.assign(window.__SF, { skillCheck, skillUse, noteLearn, SKUI, SKLOG, useAbility, ABIL, TASKS, pickTap, tameStart, loreUse, vetStart, feedPet, peaceUse, enticeUse, provokeStart, provokeUse, stealStart, npcPack, poisonApply, lockUse, untrapUse, stealthUse, hide, finishHide, reveal, trackStart, trackFollow, magicStrike, petLoyaltyTick, petCommand, evalUse, meditate, playMusic, tamedPets, chestTrapRoll, itemSkill, eat, CHESTS, cdLeft, onPlayerMoved });
