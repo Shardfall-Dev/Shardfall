@@ -376,7 +376,7 @@ SF.addItem = (c, it, cap) => {
   const ex = c.items.find(o => SF.canStack(o, it));
   if (cap) {
     if (!ex && c.items.length >= cap.slots) return { ok: false, reason: 'no free slot (' + cap.slots + ' stacks)' };
-    if (SF.containerKg(c) + SF.itemKg(it) > cap.kg + 1e-9) return { ok: false, reason: 'too heavy to carry' };
+    if (SF.containerKg(c) + SF.itemKg(it) + (it.items ? SF.containerKg(it) : 0) > cap.kg + 1e-9) return { ok: false, reason: 'too heavy to carry' };
   }
   if (ex) ex.qty += it.qty; else c.items.push(it);
   c.ver++; return { ok: true };

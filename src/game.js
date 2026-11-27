@@ -845,10 +845,10 @@ function update(dt) {
   if (DEV.on) DEV.aiMs = DEV.aiMs * .95 + (performance.now() - aiT0) * .05;
   sndTick();
   if (GT - spawnT > 1) { spawnT = GT; spawnTick(); }
-  if (GT - saveT > 15) { saveT = GT; if (!save() && !P._saveWarn) { P._saveWarn = true; log('Saving failed (browser storage full?). Your last saved game is still safe.', '#ff9a6a'); } }
+  if (GT - saveT > 15) { saveT = GT; save(); }   // save() reports a failure itself, once until a save succeeds again
 }
-/* controllers (master spec §3). The player's controller is the input code above (playerMove, attackTick, prepTick); townsfolk,
-   merchants and guards have no controller tick yet and stand at their posts (Living World Phase D gives them routines). */
+/* controllers (master spec §3). The player's controller is the input code above (playerMove, attackTick, prepTick); creatures run
+   monsterTick and the ecosystem (ecology.js); townsfolk, merchants and guards follow their routines in townlife.js (lifeTick). */
 function monsterTick(e, dt) {
   dt = ecoSkip(e, dt); if (!dt) return;   // distant idle creatures run at a quarter rate (src/ecology.js)
   if (e.stam !== undefined && GT - (e.hitT || -9) > .75) e.stam = Math.min(monT2A(MON[e.type]).dex, e.stam + 3 * dt); const s0 = e.state; aiMon(e, dt); if (e.state !== s0) monSound(e, s0); ecoSoundTick(e);
@@ -1245,7 +1245,6 @@ function worldTick(dt) {
   for (let i = TRAPS.length - 1; i >= 0; i--) { const tr = TRAPS[i]; if (tr.until && GT > tr.until) { TRAPS.splice(i, 1); continue; } if (GT < (tr.armedAt || 0)) continue;
     if (tr.owner !== 'P' && !P.ghost && Math.hypot(tr.x - P.x, tr.y - P.y) < .6) { TRAPS.splice(i, 1); springOnPlayer(); continue; }
     if (tr.owner === 'P') for (const m of ents) if (m.kind === 'mon' && alive(m) && Math.hypot(tr.x - m.x, tr.y - m.y) < .7) { TRAPS.splice(i, 1); m.slowUntil = GT + SF.TRAP.slowFor; floater(m.x, m.y, 'snared', '#e8d090'); sndAt('trap.spring', tr); damageMon(m, SF.TRAP.dmg, 'phys', P, { quiet: 1 }); break; } }
-  if (P.prep === null && 0) return;
 }
 function seedTraps() { for (const [cx, cy] of [[232, 288], [318, 304], [395, 284], [300, 288], [360, 178]]) for (let k = 0; k < 2; k++) { const x = cx + (R() - .5) * 8, y = cy + (R() - .5) * 6; if (!BLK[tAt(Math.floor(x), Math.floor(y))]) TRAPS.push({ x, y, owner: 'world', hidden: true, armedAt: 0, until: 0, diff: 40 }); } }
 
@@ -1964,6 +1963,15 @@ const ACT = {
   wipe: () => { const el = $('#panel .pb'); if (!el.querySelector('[data-a=wipe2]')) el.insertAdjacentHTML('beforeend', '<p>Delete this character for good? ' + btn('wipe2', 'Yes, delete', {}, 'on') + '</p>'); }, wipe2: () => { try { localStorage.removeItem(SAVEKEY); deletingSave = true; } catch (e) { return log('Could not delete the saved character.'); } location.reload(); },
   rotok: () => { $('#rot').hidden = true; ROTOK = true; } };
 let ROTOK = false;
+/* counter actions re-check the live situation, not just that a button was drawn: alive, the right panel still open, the same
+   keeper still there and within reach, and for a purchase a whole quantity of something this keeper sells. */
+const COUNTER_ACT = { depgold: 'bank', dep: 'bank', depeq: 'bank', wd: 'bank', buy: 'shop', sell: 'shop', train: 'trainer', stat: 'trainer' };
+function atCounter(kind) { const n = P && P.talkTo; if (!n || !P || P.ghost || PANEL !== kind || n.gone || dist(n, P) > 4) return false;
+  return kind === 'bank' ? !!MERCHANT_ROLES[n.role] : kind === 'trainer' ? n.role === 'trainer' : !!SHOPS[n.role]; }
+for (const k in COUNTER_ACT) { const fn = ACT[k]; ACT[k] = d => { d = d || {};
+  if (!atCounter(COUNTER_ACT[k])) { log('You are no longer at the counter.', '#ffb070'); closePanel(); return; }
+  if (k === 'buy' && (!SF.validQty(+d.n) || !(SHOPS[P.talkTo.role] || []).includes(d.id))) return log('That is not for sale here.', '#ffb070');
+  return fn(d); }; }
 
 /* ================= THE QUAY TRADES (crafting guide build step 1): nodes, survey, crafting preview, Dena and Mara ================= */
 /* ---------- Quay training nodes: permanent common locations in the protected Quay ---------- */
@@ -2540,11 +2548,28 @@ function boot(saved, fresh) {
   if (VH > VW) $('#rot').hidden = false; save(); refreshHud();
 }
 let last = performance.now(), hudT = 0;
-function loop(t) { const dt = Math.min(.5, (t - last) / 1000); last = t; try { if (!SIMPAUSE) { const r = STEPPER.advance(dt, s => { simStep(s); DEV.steps++; }); ALPHA = r.alpha; } if (DEV.on) devFrame(dt); renderInterp(); if (DEV.open && t - (DEV.panelT || 0) > 300) { DEV.panelT = t; devRender(); } if (P && t - hudT > 120) { hudT = t; refreshHud(); drawMini(); if (PANEL === 'loot' || PANEL === 'shop') renderPanel(); renderLog(); } } catch (e) { console.error(e); } requestAnimationFrame(loop); }
-addEventListener('visibilitychange', () => { if (document.hidden) save(); else { last = performance.now(); STEPPER.reset(); } });   // the world pauses while the game is hidden
+/* frame errors: each stage (simulation, drawing, HUD) is isolated so one failing stage does not stop the others; each distinct
+   error is logged a bounded number of times, and a stage that keeps failing tells the player once. Counts: __SF.FRAME_ERR */
+const FRAME_ERR = { n: 0, by: {}, msgs: new Map(), shown: false };
+function frameErr(stage, e) {
+  const m = stage + ': ' + String(e && e.message || e); FRAME_ERR.n++; const b = FRAME_ERR.by[stage] = FRAME_ERR.by[stage] || { n: 0, streak: 0 }; b.n++; b.streak++;
+  const seen = FRAME_ERR.msgs.get(m) || 0; FRAME_ERR.msgs.set(m, seen + 1); if (FRAME_ERR.msgs.size > 50) FRAME_ERR.msgs.delete(FRAME_ERR.msgs.keys().next().value);
+  if (seen < 3) console.error('[' + stage + ']', e); else if (seen === 3) console.error('[' + stage + '] repeating, further copies not logged:', m);
+  if (b.streak === 120 && !FRAME_ERR.shown && P) { FRAME_ERR.shown = true; try { log('The game keeps hitting an error (' + m + '). Your last save is safe; reloading the page usually clears it.', '#ff6a5a'); } catch (x) { } }
+}
+const frameOk = stage => { const b = FRAME_ERR.by[stage]; if (b) b.streak = 0; };
+function loop(t) { const dt = Math.min(.5, (t - last) / 1000); last = t;
+  try { if (!SIMPAUSE) { const r = STEPPER.advance(dt, s => { simStep(s); DEV.steps++; }); ALPHA = r.alpha; } frameOk('sim'); } catch (e) { frameErr('sim', e); }
+  try { if (DEV.on) devFrame(dt); renderInterp(); if (DEV.open && t - (DEV.panelT || 0) > 300) { DEV.panelT = t; devRender(); } frameOk('draw'); } catch (e) { frameErr('draw', e); }
+  try { if (P && t - hudT > 120) { hudT = t; refreshHud(); drawMini(); if (PANEL === 'loot' || PANEL === 'shop') renderPanel(); renderLog(); } frameOk('hud'); } catch (e) { frameErr('hud', e); }
+  requestAnimationFrame(loop); }
+addEventListener('visibilitychange', () => { if (document.hidden) { resetInput(); save(); } else { last = performance.now(); STEPPER.reset(); resetInput(); } });   // the world pauses while the game is hidden; held keys and the stick are released (their key-up never arrives)
+addEventListener('blur', () => resetInput());
 loadScout(SCOUT_SRC); renderCC(); resize(); requestAnimationFrame(loop);
 /* dev/test hook: put a creature beside the player, e.g. __SF.spawnMon('lich_lord'). Not used by normal play. */
 function spawnMon(type, dx = 3, dy = 0) { const d = MON[type]; if (!d) return null; let x = P.x + dx, y = P.y + dy;
   for (let r = 0; r < 6 && BLK[tAt(Math.floor(x), Math.floor(y))]; r += .5) for (let a = 0; a < 8; a++) { const nx = P.x + dx + Math.cos(a * Math.PI / 4) * r, ny = P.y + dy + Math.sin(a * Math.PI / 4) * r; if (!BLK[tAt(Math.floor(nx), Math.floor(ny))]) { x = nx; y = ny; break; } }
   return addEnt({ kind: 'mon', type, name: d.n, x, y, hp: d.hp, max: d.hp, state: 'idle', home: { x, y }, sect: 0, ward: 0 }); }
-window.__SF = { get WS() { return WS; }, dist, closePanel, lifeSave, LIFE, LIFE_SCHED, lifeTick, lifeResume, lifeInspect, lifeTownGeo, lifeTalk, talk, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
+/* __SF is a development and test hook (the browser suites drive the game through it). It is not a security boundary: anything
+   here is reachable from the console in an offline single-player game, and a multiplayer server must not trust the client. */
+window.__SF = { FRAME_ERR, readSave, validateSave, get WS() { return WS; }, dist, closePanel, lifeSave, LIFE, LIFE_SCHED, lifeTick, lifeResume, lifeInspect, lifeTownGeo, lifeTalk, talk, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };

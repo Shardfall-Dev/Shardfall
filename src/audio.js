@@ -28,7 +28,8 @@ let ctx = null, master = null, sfxBus = null, ambBus = null, musicBus = null, mu
 const bufs = new Map();          // path -> AudioBuffer once decoded, Promise while decoding
 const voices = new Set();        // live voices: { src, prio, amb, end }
 const pending = new Set();       // requests not yet audible: { valid, cancel }
-const lastTake = new Map();      // emitter|event -> path of the previous take
+const lastTake = new Map();      // emitter|event -> path of the previous take; least recently used entries beyond LAST_TAKE_MAX are dropped
+const LAST_TAKE_MAX = 512;
 const unlockFns = [];
 
 /* audio-only randomness: never touches combat, loot or world RNG */
@@ -94,7 +95,7 @@ function takeFor(ev, key) {
   const files = MAN.events[ev].files, k = (key || '') + '|' + ev, prev = lastTake.get(k);
   let f = files[Math.floor(rand() * files.length)];
   if (files.length > 1 && f === prev) f = files[(files.indexOf(f) + 1 + Math.floor(rand() * (files.length - 1))) % files.length];
-  lastTake.set(k, f); return f;
+  lastTake.delete(k); lastTake.set(k, f); if (lastTake.size > LAST_TAKE_MAX) lastTake.delete(lastTake.keys().next().value); return f;
 }
 function voiceCount() { const now = ctx.currentTime; for (const v of voices) if (v.end < now) voices.delete(v); let n = voices.size; for (const r of pending) if (!r.src) n++; return n; }
 function makeRoom(prio) {
@@ -193,7 +194,7 @@ const API = {
     if (muted) { master.gain.setTargetAtTime(0, t, .015); cancelPending(); setTimeout(() => { if (muted) stopCat('all'); }, 120); }
     else master.gain.setTargetAtTime(MASTER, t, .02);
   },
-  get stats() { return { voices: voices.size, pending: pending.size, decoded: [...bufs.values()].filter(b => !b.then).length, state: ctx ? ctx.state : 'none' }; }
+  get stats() { return { voices: voices.size, pending: pending.size, lastTake: lastTake.size, bufs: bufs.size, decoded: [...bufs.values()].filter(b => !b.then).length, state: ctx ? ctx.state : 'none' }; }
 };
 function cancelPending() { for (const r of [...pending]) { r.cancel(); if (r.voice) voices.delete(r.voice); } pending.clear(); }
 function stopCat(cat) { for (const v of [...voices]) if (cat === 'all' || (cat === 'amb') === v.amb) { try { v.src.stop(); } catch (e) { } voices.delete(v); } }
