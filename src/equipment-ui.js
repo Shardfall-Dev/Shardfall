@@ -101,8 +101,7 @@ function showTip(key, x, y, pin) {
   el.style.left = L + 'px'; el.style.top = T + 'px';
 }
 function hideTip() { ITIP.key = null; ITIP.pin = false; const el = $('#itip'); if (el) el.hidden = true; }
-document.addEventListener('pointerover', e => { if (e.pointerType !== 'mouse' || DRAG.on) return; const t = e.target.closest('[data-tip]'); if (!t || t.closest('.bagcell')) return; showTip(t.dataset.tip, e.clientX, e.clientY); });
-document.addEventListener('pointerout', e => { if (e.pointerType !== 'mouse' || ITIP.pin) return; const t = e.target.closest('[data-tip]'); if (t && !t.contains(e.relatedTarget)) hideTip(); });
+// hover: see src/hud-ui.js (v0.29) — one delayed tooltip for every [data-tip], backpack tiles included
 document.addEventListener('pointermove', e => { if (e.pointerType === 'mouse' && ITIP.key && !ITIP.pin) { const el = $('#itip'); const w = el.offsetWidth, h = el.offsetHeight; let L = e.clientX + 16, T = e.clientY + 12; if (L + w > VW - 6) L = Math.max(6, e.clientX - w - 12); if (T + h > VH - 6) T = Math.max(6, VH - h - 6); el.style.left = L + 'px'; el.style.top = T + 'px'; } });
 // touch: tapping an item name (data-tip without an action) pins its tooltip; the next tap anywhere closes it
 document.addEventListener('click', e => { const t = e.target.closest('[data-tip]'); if (t && !t.closest('[data-a]') && !t.closest('.bagcell')) { const r = t.getBoundingClientRect(); if (ITIP.key === t.dataset.tip && ITIP.pin) hideTip(); else showTip(t.dataset.tip, r.left, r.bottom, true); return; } if (ITIP.pin && !e.target.closest('#itip')) hideTip(); }, true);
@@ -257,8 +256,8 @@ function bagRows(items) {
     cur.items.push(it); }
   return { rows, h: y };
 }
-function bagCell(it, selected) {
-  return `<button class="bagcell" data-a="baginspect" data-u="${it.uid}" data-drag="pack:${it.uid}" data-drop="pack:${it.uid}" aria-pressed="${selected === it}">${bagIcon(it, 40)}<small>${esc(SF.itemName(it))}</small>${it.qty > 1 ? '<strong>' + it.qty + '</strong>' : ''}${it.cond !== undefined && SF.WEARABLE(it.id) && it.cond < .2 * (it.maxc || 100) ? `<em class="wornmark">${it.cond <= 0 ? 'broken' : 'worn'}</em>` : ''}<span class="bagtip" role="tooltip">${bagStats(it)}</span></button>`;
+function bagCell(it, selected) {   // v0.29: the tile carries its tooltip key; the information popup (src/hud-ui.js) replaces the inline card and per-tile copies
+  return `<button class="bagcell" data-a="baginspect" data-u="${it.uid}" data-tip="pack:${it.uid}" data-drag="pack:${it.uid}" data-drop="pack:${it.uid}" aria-pressed="${selected === it}" aria-haspopup="dialog">${bagIcon(it, 40)}<small>${esc(SF.itemName(it))}</small>${it.qty > 1 ? '<strong>' + it.qty + '</strong>' : ''}${it.cond !== undefined && SF.WEARABLE(it.id) && it.cond < .2 * (it.maxc || 100) ? `<em class="wornmark">${it.cond <= 0 ? 'broken' : 'worn'}</em>` : ''}</button>`;
 }
 function bagPanel2() {
   const all = P.pack.items, items = bagItems(), en = encumb(), gold = SF.count(P.pack, 'gold');
@@ -267,8 +266,7 @@ function bagPanel2() {
   h += `<div class="bagtools"><input id="bagq" type="search" placeholder="Search the backpack" value="${esc(BAG.q)}" autocomplete="off" aria-label="Search the backpack">${btn('bagmerge', 'Merge stacks')}${btn('eqwin', 'Paper doll')}</div>`;
   h += '<div class="bagsorts">Sort ' + Object.keys(BAG_SORTS).map(s => btn('bagsort', s, { s }, s === bagSort ? 'on' : '')).join('') + '</div>';
   h += '<div class="bagsorts bagfilters">' + Object.keys(BAG_FILTERS).map(f => btn('bagfilter', f, { f }, f === BAG.filter ? 'ac' : '')).join('') + '</div>';
-  const selected = findU(P.pack, bagUid);
-  if (selected) h += '<div class="bagcard">' + bagStats(selected) + '<div>' + bagActions2(selected) + '</div></div>';
+  const selected = findU(P.pack, bagUid);   // v0.29: selection only highlights its tile; nothing is inserted above the grid, so it never moves
   const { rows, h: total } = bagRows(items), [a, b] = items.length > BAG_VIRT_MIN ? BAG.rows : [0, 1e9];   // small packs draw every row
   let out = '', top = null, bottom = 0;
   for (const r of rows) { if (r.y + r.h < a * CELL_H || r.y > b * CELL_H) continue; if (top === null) top = r.y; bottom = r.y + r.h;

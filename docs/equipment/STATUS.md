@@ -86,8 +86,13 @@ refresh and never saved, so loading cannot stack it.
   repair, drop). Invalid slots and Strength requirements are refused with a message.
 - **Backpack:** search, sort (category, name, quantity, weight, material, quality, value), filters, split and merge, encumbrance
   bar. Above 240 stacks only the rows near the scroll position are in the page (tested with 600+).
-- **Tooltips:** one builder for backpack, doll, crafting result, vendor, loot and bank rows (hover on desktop, tap on touch), with
-  a comparison against the worn piece (green better, red worse; less weight counts as better).
+- **Tooltips:** one builder for backpack, doll, crafting result, vendor, loot and bank rows (hover on desktop after about 300 ms,
+  tap on touch), with a comparison against the worn piece (green better, red worse; less weight counts as better).
+- **Item popup (v0.29, `src/hud-ui.js`):** clicking or tapping a backpack tile opens a floating popup beside it instead of the old
+  card above the grid, so selecting never moves or scrolls the backpack. It shows only the lines that apply to the item, a short
+  description where the data has one, and its actions (equip, use, split half / split 1, slot, repair, appraise, drop, Inspect
+  for the comparison). Escape, the × or a tap outside closes it; a tap on the game world only closes it. Dropping anything worth
+  25 gold or more (or exceptional, rare, magical, marked or crafted-by) asks first, from every drop button.
 - **Crafting:** an **Armor** category with sub-families at the bench (cloth, leather, studded, bone, wooden shield) and the anvil
   (ringmail, chainmail, platemail, helmets, shields, dragon scale, accessories). Material picker (and stud metal), skill gates,
   success and exceptional odds, resulting weight, expected protection, durability, requirements.

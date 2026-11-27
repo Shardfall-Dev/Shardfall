@@ -2415,7 +2415,7 @@ addEventListener('keydown', e => { if (!P || e.target.matches('input,select,text
   if (SCREEN || PANEL) {
     if (e.key === 'Escape') { e.preventDefault(); if (SCREEN) closeScreen(); else closePanel(); snd('ui.close'); refreshHud(); }
     return;
-  } if (KM[e.key]) { KEYS[KM[e.key]] = 1; KEYS.any = 1; e.preventDefault(); } if (e.key === 'Shift') KEYS.shift = 1; if (e.key === ' ') { toggleArm(); e.preventDefault(); } if (e.key === 'e' || e.key === 'E') interact(); if (e.key === 'b' || e.key === 'B') firstAid(P); if (/^[1-3]$/.test(e.key)) ACT.slot({ i: +e.key - 1 }); if (e.key === 'Tab') { ACT.cycle(); e.preventDefault(); } if (e.key === 'Escape') { ACT.cancel(); closePanel(); } refreshHud(); });
+  } if (KM[e.key]) { KEYS[KM[e.key]] = 1; KEYS.any = 1; e.preventDefault(); } if (e.key === 'Shift') KEYS.shift = 1; if (e.key === ' ') { toggleArm(); e.preventDefault(); } if (e.key === 'e' || e.key === 'E') interact(); if (e.key === 'b' || e.key === 'B') firstAid(P); if (/^[1-3]$/.test(e.key)) ACT.slot({ i: +e.key - 1 }); if (e.key === 'Tab') { ACT.cycle(); e.preventDefault(); } if (e.key === 'Escape') { escapeWorld(); closePanel(); } refreshHud(); });   // v0.29: cancel first, then clear the target (src/hud-ui.js)
 addEventListener('keyup', e => { if (KM[e.key]) KEYS[KM[e.key]] = 0; if (e.key === 'Shift') KEYS.shift = 0; KEYS.any = KEYS.u || KEYS.d || KEYS.l || KEYS.r; });
 addEventListener('resize', () => { resize(); if (SCREEN === 'map') { sizeMap(); mapFit(); drawMap(); } if (P && VH > VW && !ROTOK) $('#rot').hidden = false; else $('#rot').hidden = true; });
 
