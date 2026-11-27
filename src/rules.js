@@ -9,8 +9,14 @@ const roundHalfUp = v => Math.floor(v + 0.5);
 SF.clamp = clamp; SF.roundHalfUp = roundHalfUp;
 
 /* ---------------- attributes ---------------- */
-SF.STAT_MIN = 10; SF.STAT_MAX = 100; SF.STAT_CAP = 225; SF.CREATE_STATS = 150; SF.CREATE_STAT_MIN = 25;
-SF.SKILL_MAX = 1000; SF.SKILL_CAP = 7000; SF.CREATE_SKILLS = 100; SF.CREATE_SKILL_MAX = 50;   // tenths
+SF.STAT_MIN = 10; SF.STAT_MAX = 100; SF.STAT_CAP = 225;
+SF.SKILL_MAX = 1000; SF.SKILL_CAP = 7000;   // tenths: 100.0 per skill, 700.0 in total
+/* character creation (Character Creation v2.0, docs/design/character-creation-v2.md): the early Second Age start.
+   65 attribute points, each 10–45; 100 skill points (whole numbers) over two or three different skills, each at most 50.
+   The 225 / 100 attribute caps and the 700.0 / 100.0 skill caps above are the progression caps; creation limits never apply
+   to an existing character. Validation lives in src/creation.js (SF.CREATION.validate). */
+SF.CREATE_STATS = 65; SF.CREATE_STAT_MIN = 10; SF.CREATE_STAT_MAX = 45;
+SF.CREATE_SKILLS = 100; SF.CREATE_SKILL_MAX = 50; SF.CREATE_SKILL_SLOTS = 3;   // whole skill points (not tenths)
 SF.maxHp = c => Math.floor(50 + 0.5 * c.str);
 SF.maxStam = c => Math.max(1, c.dex + (c.eqDex || 0));   // eqDex: transient equipment Dexterity modifier (SF.EQ.refresh), never saved
 SF.maxMana = c => c.int;
@@ -24,19 +30,33 @@ SF.SLOTS = Infinity;                                                      // no 
 SF.WALK = 4.1; SF.SPRINT = 5.3; SF.SPRINT_DRAIN = 7; SF.STAM_REGEN = 5; SF.STAM_REGEN_COMBAT = 3; SF.STAM_DELAY = 0.75;
 
 /* ---------------- skills (41) ---------------- */
-// [key, name, group, implemented in this build]. Combat keys follow UO Second Age (issue #3); old saves migrate once (SF.migrateCombatSkills).
+// [runtime key, display name, group, implemented in this build]. Display names are the canonical Ultima Online names
+// (design/t2a-skill-parity-v1). The runtime keys (and so saves, recipes, spells and quests) are unchanged in this build: the
+// key migration is phase A of the skill parity work. SF.SKILL_CANON maps each canonical id to its runtime key and
+// SF.skillKey resolves either spelling, so nothing outside this table may hard-code a second name for a skill.
 SF.SKILLS = [
  ['swordsmanship','Swordsmanship','combat',1],['macefighting','Mace Fighting','combat',1],['fencing','Fencing','combat',1],['archery','Archery','combat',1],
  ['wrestling','Wrestling','combat',1],['tactics','Tactics','combat',1],['anatomy','Anatomy','combat',1],['parrying','Parrying','combat',1],
- ['healing','Healing','support',1],['spellcraft','Spellcraft','magic',1],['focus','Spell Focus','magic',1],
- ['wardcraft','Wardcraft','magic',1],['meditation','Meditation','magic',1],['alchemy','Alchemy','craft',1],['venomcraft','Venomcraft','stealth',1],
- ['concealment','Concealment','stealth',1],['shadowstep','Shadowstep','stealth',1],['search','Search','stealth',1],['tracking','Tracking','wild',1],
- ['pickpocketing','Pickpocketing','stealth',1],['lockwork','Lockwork','stealth',1],['trapcraft','Trapcraft','stealth',1],['taming','Taming','wild',1],
- ['beasthandling','Beast Handling','wild',1],['veterinary','Veterinary','wild',1],['musicianship','Musicianship','bard',1],['lullaby','Lullaby','bard',1],
- ['discord','Discord','bard',1],['provocation','Provocation','bard',1],['woodcutting','Woodcutting','gather',1],['mining','Mining','gather',1],
- ['foraging','Foraging','gather',1],['skinning','Skinning','gather',1],['fishing','Fishing','gather',1],['smithing','Smithing','craft',1],
- ['carpentry','Carpentry','craft',1],['tailoring','Tailoring','craft',1],['fletching','Fletching','craft',1],['engineering','Engineering','craft',1],
- ['cooking','Cooking','craft',1],['appraisal','Appraisal','craft',1]];
+ ['healing','Healing','support',1],['spellcraft','Magery','magic',1],['focus','Evaluating Intelligence','magic',1],
+ ['wardcraft','Resisting Spells','magic',1],['meditation','Meditation','magic',1],['alchemy','Alchemy','craft',1],['venomcraft','Poisoning','stealth',1],
+ ['concealment','Hiding','stealth',1],['shadowstep','Stealth','stealth',1],['search','Detecting Hidden','stealth',1],['tracking','Tracking','wild',1],
+ ['pickpocketing','Stealing','stealth',1],['lockwork','Lockpicking','stealth',1],['trapcraft','Remove Trap','stealth',1],['taming','Animal Taming','wild',1],
+ ['beasthandling','Animal Lore','wild',1],['veterinary','Veterinary','wild',1],['musicianship','Musicianship','bard',1],['lullaby','Peacemaking','bard',1],
+ ['discord','Discordance','bard',1],['provocation','Provocation','bard',1],['woodcutting','Lumberjacking','gather',1],['mining','Mining','gather',1],
+ ['foraging','Foraging','gather',1],['skinning','Skinning','gather',1],['fishing','Fishing','gather',1],['smithing','Blacksmithy','craft',1],
+ ['carpentry','Carpentry','craft',1],['tailoring','Tailoring','craft',1],['fletching','Bowcraft & Fletching','craft',1],['engineering','Tinkering','craft',1],
+ ['cooking','Cooking','craft',1],['appraisal','Item Identification','craft',1]];
+// canonical id (design/t2a-skill-parity-v1) → runtime key. Unchanged skills use their own key.
+SF.SKILL_CANON = { magery: 'spellcraft', evaluatingintelligence: 'focus', resistingspells: 'wardcraft', poisoning: 'venomcraft', hiding: 'concealment',
+  stealth: 'shadowstep', detectinghidden: 'search', stealing: 'pickpocketing', lockpicking: 'lockwork', removetrap: 'trapcraft', animaltaming: 'taming',
+  animallore: 'beasthandling', peacemaking: 'lullaby', discordance: 'discord', lumberjacking: 'woodcutting', blacksmithy: 'smithing', bowcraft: 'fletching',
+  tinkering: 'engineering', itemidentification: 'appraisal' };
+/* what may be chosen at character creation, and why not. Classic T2A creation excluded Stealth and Remove Trap; Discordance
+   is the later skill this build's discord mechanic resembles (T2A had Enticement, not yet built); Foraging and Skinning are
+   Shardfall gathering skills the parity plan folds into activities. None of these change at runtime. */
+SF.SKILL_NOCREATE = { shadowstep: 'Stealth cannot be a starting skill (Second Age rule).', trapcraft: 'Remove Trap cannot be a starting skill (Second Age rule).',
+  discord: 'Discordance is not a Second Age skill; Enticement is not built yet.', foraging: 'Foraging is a Shardfall gathering skill, not a classic one.',
+  skinning: 'Skinning is a Shardfall gathering skill, not a classic one.' };
 SF.SKILL_TIP = {
   swordsmanship: 'Hit chance with swords, axes, the glaive and the skinning knife. Also your defence while one is in hand.',
   macefighting: 'Hit chance with maces, war hammers, staves and the war axe. Mace and war hammer hits drain 3–5 stamina and wear the armor they strike.',
@@ -47,24 +67,21 @@ SF.SKILL_TIP = {
   anatomy: 'Adds up to 20% weapon damage and raises bandage healing. Use it on a living target to judge strength and dexterity (and stamina above 80).',
   parrying: 'With a shield: half your Parrying as a percent chance to block part of a physical hit.',
   healing: 'First Aid with bandages: heal wounds; cure poison at 60 Healing and 60 Anatomy; resurrect another player at 80 and 80.' };
-SF.SKILL = {}; for (const [k, n, g, live] of SF.SKILLS) SF.SKILL[k] = { k, n, g, live: !!live };
+SF.SKILL = {}; for (const [k, n, g, live] of SF.SKILLS) SF.SKILL[k] = { k, n, g, live: !!live, canon: k };
+for (const c in SF.SKILL_CANON) SF.SKILL[SF.SKILL_CANON[c]].canon = c;
+/* one resolver for every spelling of a skill: runtime key, canonical id, or display name (case and spacing ignored) */
+SF.skillKey = id => { if (typeof id !== 'string') return null; if (Object.prototype.hasOwnProperty.call(SF.SKILL, id)) return id;
+  const s = id.toLowerCase().replace(/[^a-z]/g, ''); if (Object.prototype.hasOwnProperty.call(SF.SKILL, s)) return s;
+  if (Object.prototype.hasOwnProperty.call(SF.SKILL_CANON, s)) return SF.SKILL_CANON[s];
+  for (const k in SF.SKILL) if (SF.SKILL[k].n.toLowerCase().replace(/[^a-z]/g, '') === s) return k; return null; };
 
 SF.newSkills = () => { const s = {}; for (const [k] of SF.SKILLS) s[k] = { v: 0, lock: 'raise' }; return s; };
 SF.totalSkill = ch => Object.values(ch.skills).reduce((a, s) => a + s.v, 0);
 SF.sv = (ch, k) => (ch.skills && ch.skills[k] ? ch.skills[k].v / 10 : (ch.sk && ch.sk[k]) || 0);
 
-SF.validateCreation = o => {
-  const e = [];
-  const st = [o.str, o.dex, o.int];
-  if (st.some(v => !Number.isInteger(v))) e.push('Stats must be whole numbers.');
-  if (st.reduce((a, b) => a + b, 0) !== SF.CREATE_STATS) e.push('Spend exactly 150 stat points.');
-  if (st.some(v => v < SF.CREATE_STAT_MIN || v > SF.STAT_MAX)) e.push('Each stat must be between 25 and 100.');
-  const sk = Object.entries(o.skills || {}).filter(([, v]) => v > 0);
-  const tot = sk.reduce((a, [, v]) => a + v, 0);
-  if (tot > 100) e.push('Starting skills may total at most 100.');
-  if (sk.some(([k, v]) => !SF.SKILL[k] || v > 50)) e.push('Each starting skill is at most 50.');
-  return e;
-};
+// SF.validateCreation(payload) → array of error strings (empty when valid). The full validator, shared by the creator, boot and
+// a future server, is SF.CREATION.validate in src/creation.js; this wrapper keeps the old name working.
+SF.validateCreation = o => SF.CREATION ? SF.CREATION.validate(o).errors : ['creation module missing'];
 
 // spec §5: initial chance = clamp(.04,.30,.24-.0018*skill) * max(0, 1-|skill-difficulty|/40)
 SF.gainChance = (skill, diff) => clamp(0.04, 0.30, 0.24 - 0.0018 * skill) * Math.max(0, 1 - Math.abs(skill - diff) / 40);
@@ -638,7 +655,6 @@ SF.VENOM_CHARGES = 5;
 SF.WEARABLE = id => ['weapon', 'shield', 'armor'].includes(SF.ITEMS[id].cat) && SF.ITEMS[id].trade;
 SF.repairSkill = id => { const d = SF.ITEMS[id]; if (d.wpn === 'shortbow' || d.wpn === 'crossbow' || d.wpn === 'heavycrossbow' || id === 'buckler') return 'carpentry'; if (d.armor === 'cloth' || d.armor === 'leather') return 'tailoring'; return 'smithing'; };
 SF.trainCost = (skill, to) => Math.max(0, Math.round((to * to - skill * skill) * 0.6));
-SF.statTrainCost = n => n * 25;
 
 if (typeof module !== 'undefined' && module.exports) module.exports = SF; else root.SF = SF;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

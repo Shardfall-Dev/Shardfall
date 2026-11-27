@@ -5,9 +5,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="screen-orientation" content="landscape">
-<title>Shardfall v0.28</title>
+<title>Shardfall v0.30</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=Alegreya+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=Alegreya+Sans:wght@400;500;700&family=Cinzel:wght@600;700&display=swap" rel="stylesheet">
 <style>
 /* VOICE: a dangerous sandbox; calm, legible, never cute
    IDEA: a sailor's field kit — navy oilcloth panels stitched with brass
@@ -70,17 +70,99 @@ button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
 #rot{position:fixed;inset:0;z-index:30;background:rgba(5,9,18,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px}
 #rot b{font:700 22px var(--px);color:#f2dfa8}
-#cc{position:fixed;inset:0;z-index:20;overflow:auto;background:radial-gradient(ellipse at 30% 0%,#183050,#07101c 70%);padding:calc(env(safe-area-inset-top) + 14px) calc(env(safe-area-inset-right) + 16px) calc(env(safe-area-inset-bottom) + 20px) calc(env(safe-area-inset-left) + 16px)}
-#ccin{max-width:820px;margin:0 auto}
-.cchead{display:flex;align-items:center;gap:14px;justify-content:center}
-.ccimg{width:96px;height:192px;object-fit:none;object-position:0 0;image-rendering:pixelated;width:96px;height:96px;transform:scale(1.4);transform-origin:center bottom}
-#cc h1{font:700 clamp(32px,6vw,48px)/1.05 var(--px);margin:0;color:#f2dfa8;text-shadow:0 2px 0 #3a2a10}
-.sub{color:var(--dim)}
-.ccgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:6px}
-#cc label{display:block;font:600 14px var(--px);margin:12px 0 4px}
-#cc input,#cc select{width:100%;font-size:16px;padding:8px 10px;border-radius:7px;border:1px solid var(--edge);background:#0c1424;color:var(--ink)}
-.stat{display:grid;grid-template-columns:6em 40px 1fr 40px;gap:6px;align-items:center;margin:4px 0}.stat b{text-align:center;font:700 18px var(--px)}
-.skl{display:grid;grid-template-columns:1fr 5.5em;gap:6px;margin:5px 0}
+/* ---- character creation v2 (src/creation-ui.js): dark wood and stone frame, aged brass, parchment pages ---- */
+#cc{position:fixed;inset:0;z-index:20;overflow:hidden;--wood:#2a1a10;--wood2:#170d07;--brass:#b08d4a;--brass2:#e0c27a;--parch:#eadcbc;--parch2:#d6c296;--inkp:#2b1f14;--dimp:#6a5638;--gothic:"Cinzel","Trajan Pro",Georgia,serif;
+  background:radial-gradient(ellipse at 50% -10%,#3a2a1c,transparent 60%),repeating-linear-gradient(90deg,rgba(0,0,0,.18) 0 2px,transparent 2px 46px),linear-gradient(#1d130c,#0d0805);
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+#ccin{height:100%;max-width:1040px;margin:0 auto;display:flex;flex-direction:column}
+#cc .ccnote{color:var(--dimp);font-size:13px;line-height:1.35}
+#cc h1,#cc h2{font-family:var(--gothic);letter-spacing:.04em}
+.cchome{margin:auto;text-align:center;padding:24px;max-width:520px}
+.ccbrand h1{font-size:clamp(40px,8vw,68px);margin:0;color:var(--brass2);text-shadow:0 2px 0 #3a2410,0 0 18px rgba(224,194,122,.25)}
+.ccsub{font:600 14px var(--px);color:#c9b38a;letter-spacing:.08em;margin-bottom:22px}
+.ccmenu{display:flex;flex-direction:column;gap:12px;align-items:stretch}
+.cchome .ccnote{color:#b9a47e;margin-top:14px}
+.ccb{min-height:44px;min-width:44px;padding:6px 14px;border-radius:6px;border:1px solid var(--brass);background:linear-gradient(#4a3220,#2a1a10);color:#f3e6c8;font:600 14px var(--px);cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,230,170,.18),0 2px 4px rgba(0,0,0,.4)}
+.ccb.pri{background:linear-gradient(#7a5a24,#4a3412);border-color:var(--brass2);color:#fff6dc}
+.ccb.big{font-size:17px;min-height:54px}
+.ccb.sm{min-height:34px;padding:2px 10px;font-size:12px}
+.ccb:disabled{opacity:.45;cursor:not-allowed}
+#cc button:focus-visible,#cc input:focus-visible,#cc select:focus-visible,#cc summary:focus-visible{outline:3px solid #ffd27a;outline-offset:2px}
+.ccwiz{display:flex;flex-direction:column;height:100%;min-height:0}
+.cctop{display:flex;align-items:center;gap:12px;padding:8px 12px;border-bottom:2px solid var(--brass);background:linear-gradient(var(--wood),var(--wood2))}
+.ccmark{font:700 20px var(--gothic);color:var(--brass2);white-space:nowrap}
+.ccsteps{display:flex;gap:6px;flex:1;min-width:0;justify-content:flex-end}
+.ccsteps button{display:flex;align-items:center;gap:6px;min-height:40px;padding:4px 10px;border-radius:20px;border:1px solid rgba(176,141,74,.5);background:rgba(0,0,0,.25);color:#cdb88f;font:600 12px var(--px);min-width:0}
+.ccsteps button i{font-style:normal;display:inline-flex;width:22px;height:22px;border-radius:50%;align-items:center;justify-content:center;background:#3a2818;border:1px solid var(--brass)}
+.ccsteps button.on{color:#fff3d0;border-color:var(--brass2);background:rgba(176,141,74,.25)}.ccsteps button.on i{background:var(--brass);color:#1d130c}
+.ccsteps button.done i{background:#4a6a3a}
+.ccsteps span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ccbody{flex:1;min-height:0;display:grid;grid-template-columns:minmax(220px,300px) 1fr;gap:12px;padding:12px}
+.ccprev{display:flex;flex-direction:column;gap:8px;min-height:0;padding:10px;border-radius:8px;border:2px solid #5a4024;background:linear-gradient(#2e2118,#1a120c);box-shadow:inset 0 0 0 1px rgba(224,194,122,.15);overflow:auto}
+.ccfig{display:flex;align-items:flex-end;justify-content:center;gap:6px;background:radial-gradient(ellipse at 50% 85%,rgba(224,194,122,.18),transparent 65%);border-radius:6px;padding:6px 0}
+#ccdoll{width:150px;height:300px;image-rendering:pixelated;flex:none}
+.ccws{display:flex;flex-direction:column;align-items:center;gap:4px}
+#ccsprite{width:104px;height:135px;image-rendering:pixelated;border:1px solid rgba(176,141,74,.35);border-radius:6px;background:rgba(0,0,0,.25)}
+.ccrot{display:flex;gap:4px}
+.ccb.pm{padding:0;width:44px;font-size:18px}
+.ccpinfo{display:flex;flex-direction:column;gap:3px;color:#efe2c2}
+#ccpname{font:700 18px var(--gothic);color:var(--brass2);overflow-wrap:anywhere}
+.ccpinfo .ccnote{color:#c2ad85}
+.ccderived{display:grid;grid-template-columns:auto 1fr auto 1fr;gap:2px 8px;font:12px var(--px);color:#c2ad85;margin-top:4px}.ccderived b{color:#f3e6c8}
+.ccmain{min-height:0;overflow:auto;overscroll-behavior:contain;padding:14px 18px 20px;border-radius:6px;color:var(--inkp);border:2px solid #6a4a26;
+  background:radial-gradient(ellipse at 20% 0%,rgba(255,255,255,.35),transparent 55%),linear-gradient(var(--parch),var(--parch2));box-shadow:inset 0 0 30px rgba(90,60,20,.35)}
+.ccmain h2{margin:0 0 10px;font-size:22px;color:#4a2e12;border-bottom:1px solid rgba(106,74,38,.4);padding-bottom:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ccmain:focus,.ccmain h2:focus{outline:none}
+.ccfield{margin:10px 0}
+.cclab{display:block;font:700 13px var(--px);color:#4a2e12;margin-bottom:5px;letter-spacing:.03em}
+#cc input:not([type=range]):not([type=checkbox]),#cc select{font:16px "Alegreya Sans",system-ui,sans-serif;padding:8px 10px;border-radius:5px;border:1px solid #8a6a3a;background:#f7efdc;color:var(--inkp);min-height:44px;box-sizing:border-box}
+#ccn{width:100%;max-width:340px}
+.ccerr{color:#9a2a14;font-size:13px;min-height:1.2em;margin-top:3px}
+.ccsw{display:flex;flex-wrap:wrap;gap:6px}
+.ccsw button{min-width:44px;min-height:44px;border-radius:6px;border:2px solid #8a6a3a;background:#f4ead2;padding:3px;display:flex;align-items:center;justify-content:center;color:var(--inkp);font:600 12px var(--px)}
+.ccsw button.txt{padding:3px 10px}
+.ccsw button i{display:block;width:30px;height:30px;border-radius:4px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.35)}
+.ccsw button i.none{background:repeating-linear-gradient(45deg,#e8dcc0 0 4px,#c9b48a 4px 8px)!important}
+.ccsw button.on{border-color:#2b1f14;box-shadow:0 0 0 2px var(--brass2),0 0 0 4px #4a2e12;background:#fff8e4}
+.ccseg{display:flex;gap:6px}.ccseg button{min-height:44px;min-width:96px;border-radius:6px;border:2px solid #8a6a3a;background:#f4ead2;font:700 14px var(--px);color:var(--inkp)}
+.ccseg button.on{background:#4a2e12;color:#fff3d0;border-color:#2b1f14}
+.cctpls,.cctowns{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}
+.cctpl,.cctown{text-align:left;display:flex;flex-direction:column;gap:3px;padding:9px 11px;border-radius:7px;border:2px solid #a08458;background:#f6ecd4;color:var(--inkp);min-height:44px}
+.cctpl b,.cctown b{font:700 15px var(--gothic);color:#4a2e12}
+.cctpl.on,.cctown.on{border-color:#2b1f14;background:#fff8e4;box-shadow:0 0 0 2px var(--brass2)}
+.cctpl:disabled{opacity:.5}
+.ccts{font:700 12px var(--px);color:#7a4a1a}.cctk{font:12px var(--px);color:#3a2a18}
+.ccbadge{display:inline-block;font:700 11px var(--px);padding:1px 8px;border-radius:10px;background:#4a2e12;color:#f3e6c8;align-self:flex-start;letter-spacing:.02em}
+.ccsec{margin:10px 0 14px;padding:10px 12px;border:1px solid rgba(106,74,38,.45);border-radius:6px;background:rgba(255,250,235,.45)}
+.cchd{display:flex;justify-content:space-between;align-items:center;font:700 14px var(--px);color:#4a2e12;margin-bottom:6px}
+.cchd .bad{color:#9a2a14}.cchd .good{color:#2f5a1e}
+.ccstat{display:grid;grid-template-columns:7.5em 44px minmax(60px,1fr) 4.2em 44px;gap:6px;align-items:center;margin:5px 0}
+.ccstat label{font:700 13px var(--px)}
+.ccstat.sm{grid-template-columns:44px minmax(60px,1fr) 4.2em 44px;margin:4px 0}
+.ccnum{width:100%;text-align:center;font:700 15px var(--px)!important;padding:6px 2px!important}
+#cc input[type=range]{width:100%;min-height:44px;accent-color:#7a4a1a;margin:0}
+.ccsk{padding:6px 0 8px;border-bottom:1px dashed rgba(106,74,38,.35)}.ccsk select{width:100%}
+.ccguide{margin-top:10px}.ccguide summary{cursor:pointer;font:700 13px var(--px);color:#4a2e12;min-height:32px;display:flex;align-items:center}
+.ccguide input{width:100%;margin:6px 0}
+#ccglist{max-height:260px;overflow:auto;border-top:1px solid rgba(106,74,38,.3)}
+.ccgi{padding:5px 2px;border-bottom:1px solid rgba(106,74,38,.2);font-size:14px}.ccgi.na{opacity:.6}
+.ccrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.ccwarn{margin:8px 0 10px;padding:10px 12px;border:2px solid #9a5a1a;border-radius:6px;background:#fbe7c0}
+.ccwarnline{color:#7a3a10;font-size:13px}
+.ccerrs{margin:8px 0;padding:10px 12px;border:2px solid #9a2a14;border-radius:6px;background:#f8dccc;color:#5a1408}.ccerrs ul{margin:6px 0 0;padding-left:18px}.ccerrs li{margin:4px 0}
+.ccerrs:focus{outline:3px solid #ffd27a}
+.cckv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:14px}.cckv span{color:var(--dimp);font:12px var(--px);padding-top:2px}.cckv b{font-weight:600}
+.ccchk{display:flex;gap:10px;align-items:flex-start;font-size:14px;cursor:pointer}.ccchk input{width:22px;height:22px;flex:none;margin-top:1px;accent-color:#7a4a1a}
+.ccnav{display:flex;align-items:center;gap:10px;padding:8px 12px calc(8px + env(safe-area-inset-bottom));border-top:2px solid var(--brass);background:linear-gradient(var(--wood),var(--wood2))}
+.ccnav .ccwhy{flex:1;color:#e0c8a0;text-align:center;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ccnav .ccb{min-width:120px}
+@media (max-width:760px){.ccsteps span{display:none}.ccsteps button.on span{display:inline}.ccbody{grid-template-columns:170px 1fr;gap:8px;padding:8px}#ccdoll{width:96px;height:192px}#ccsprite{width:64px;height:83px}.ccfig{flex-direction:column;align-items:center}.ccderived{grid-template-columns:auto 1fr}.ccstat{grid-template-columns:5.5em 44px minmax(40px,1fr) 3.6em 44px;gap:4px}.ccstat.sm{grid-template-columns:44px minmax(40px,1fr) 3.6em 44px}}
+@media (max-width:560px){.ccbody{grid-template-columns:1fr;grid-template-rows:auto 1fr}.ccprev{flex-direction:row;align-items:center;max-height:150px;padding:6px}.ccfig{flex-direction:row;padding:0}#ccdoll{width:60px;height:120px}#ccsprite{width:56px;height:73px}.ccrot .ccb.pm{width:36px;min-width:36px;min-height:36px}.ccpinfo #ccwnote{display:none}.ccmark{display:none}.ccstat{grid-template-columns:1fr 44px 3.6em 44px}.ccstat label{grid-column:1/-1}.ccstat input[type=range]{display:none}.ccstat.sm{grid-template-columns:44px 1fr 3.6em 44px}.ccstat.sm input[type=range]{display:block}.ccnav .ccb{min-width:90px}}
+@media (max-height:500px){.cctop{padding:4px 10px}.ccsteps button{min-height:34px}.ccbody{padding:6px 8px;gap:8px}#ccdoll{width:64px;height:128px}#ccsprite{width:64px;height:83px}.ccfig{flex-direction:row}.ccmain{padding:8px 12px 14px}.ccmain h2{font-size:18px;margin-bottom:6px}.ccfield{margin:6px 0}.ccnav{padding:4px 10px calc(4px + env(safe-area-inset-bottom))}.ccderived{grid-template-columns:auto 1fr auto 1fr}}
+/* attribute lock buttons (Character page and paper doll) */
+.lk{min-width:30px;min-height:30px;padding:0 4px;border-radius:5px;border:1px solid var(--edge);background:#14203a;color:var(--ink);font:12px var(--px);vertical-align:middle;cursor:pointer}
+.lk-hold{color:#f0c040}.lk-lower{color:#ff8a6a}
+@media (pointer:coarse){.lk{min-width:44px;min-height:44px}}
 .chips{display:flex;gap:5px;flex-wrap:wrap}
 .sw{display:flex;gap:7px}.sw button{width:36px;height:36px;border-radius:50%;border:2px solid transparent}.sw button.on{border-color:#fff}
 .big{width:100%;min-height:50px;font-size:18px;margin-top:14px}
@@ -244,8 +326,14 @@ const roundHalfUp = v => Math.floor(v + 0.5);
 SF.clamp = clamp; SF.roundHalfUp = roundHalfUp;
 
 /* ---------------- attributes ---------------- */
-SF.STAT_MIN = 10; SF.STAT_MAX = 100; SF.STAT_CAP = 225; SF.CREATE_STATS = 150; SF.CREATE_STAT_MIN = 25;
-SF.SKILL_MAX = 1000; SF.SKILL_CAP = 7000; SF.CREATE_SKILLS = 100; SF.CREATE_SKILL_MAX = 50;   // tenths
+SF.STAT_MIN = 10; SF.STAT_MAX = 100; SF.STAT_CAP = 225;
+SF.SKILL_MAX = 1000; SF.SKILL_CAP = 7000;   // tenths: 100.0 per skill, 700.0 in total
+/* character creation (Character Creation v2.0, docs/design/character-creation-v2.md): the early Second Age start.
+   65 attribute points, each 10–45; 100 skill points (whole numbers) over two or three different skills, each at most 50.
+   The 225 / 100 attribute caps and the 700.0 / 100.0 skill caps above are the progression caps; creation limits never apply
+   to an existing character. Validation lives in src/creation.js (SF.CREATION.validate). */
+SF.CREATE_STATS = 65; SF.CREATE_STAT_MIN = 10; SF.CREATE_STAT_MAX = 45;
+SF.CREATE_SKILLS = 100; SF.CREATE_SKILL_MAX = 50; SF.CREATE_SKILL_SLOTS = 3;   // whole skill points (not tenths)
 SF.maxHp = c => Math.floor(50 + 0.5 * c.str);
 SF.maxStam = c => Math.max(1, c.dex + (c.eqDex || 0));   // eqDex: transient equipment Dexterity modifier (SF.EQ.refresh), never saved
 SF.maxMana = c => c.int;
@@ -259,19 +347,33 @@ SF.SLOTS = Infinity;                                                      // no 
 SF.WALK = 4.1; SF.SPRINT = 5.3; SF.SPRINT_DRAIN = 7; SF.STAM_REGEN = 5; SF.STAM_REGEN_COMBAT = 3; SF.STAM_DELAY = 0.75;
 
 /* ---------------- skills (41) ---------------- */
-// [key, name, group, implemented in this build]. Combat keys follow UO Second Age (issue #3); old saves migrate once (SF.migrateCombatSkills).
+// [runtime key, display name, group, implemented in this build]. Display names are the canonical Ultima Online names
+// (design/t2a-skill-parity-v1). The runtime keys (and so saves, recipes, spells and quests) are unchanged in this build: the
+// key migration is phase A of the skill parity work. SF.SKILL_CANON maps each canonical id to its runtime key and
+// SF.skillKey resolves either spelling, so nothing outside this table may hard-code a second name for a skill.
 SF.SKILLS = [
  ['swordsmanship','Swordsmanship','combat',1],['macefighting','Mace Fighting','combat',1],['fencing','Fencing','combat',1],['archery','Archery','combat',1],
  ['wrestling','Wrestling','combat',1],['tactics','Tactics','combat',1],['anatomy','Anatomy','combat',1],['parrying','Parrying','combat',1],
- ['healing','Healing','support',1],['spellcraft','Spellcraft','magic',1],['focus','Spell Focus','magic',1],
- ['wardcraft','Wardcraft','magic',1],['meditation','Meditation','magic',1],['alchemy','Alchemy','craft',1],['venomcraft','Venomcraft','stealth',1],
- ['concealment','Concealment','stealth',1],['shadowstep','Shadowstep','stealth',1],['search','Search','stealth',1],['tracking','Tracking','wild',1],
- ['pickpocketing','Pickpocketing','stealth',1],['lockwork','Lockwork','stealth',1],['trapcraft','Trapcraft','stealth',1],['taming','Taming','wild',1],
- ['beasthandling','Beast Handling','wild',1],['veterinary','Veterinary','wild',1],['musicianship','Musicianship','bard',1],['lullaby','Lullaby','bard',1],
- ['discord','Discord','bard',1],['provocation','Provocation','bard',1],['woodcutting','Woodcutting','gather',1],['mining','Mining','gather',1],
- ['foraging','Foraging','gather',1],['skinning','Skinning','gather',1],['fishing','Fishing','gather',1],['smithing','Smithing','craft',1],
- ['carpentry','Carpentry','craft',1],['tailoring','Tailoring','craft',1],['fletching','Fletching','craft',1],['engineering','Engineering','craft',1],
- ['cooking','Cooking','craft',1],['appraisal','Appraisal','craft',1]];
+ ['healing','Healing','support',1],['spellcraft','Magery','magic',1],['focus','Evaluating Intelligence','magic',1],
+ ['wardcraft','Resisting Spells','magic',1],['meditation','Meditation','magic',1],['alchemy','Alchemy','craft',1],['venomcraft','Poisoning','stealth',1],
+ ['concealment','Hiding','stealth',1],['shadowstep','Stealth','stealth',1],['search','Detecting Hidden','stealth',1],['tracking','Tracking','wild',1],
+ ['pickpocketing','Stealing','stealth',1],['lockwork','Lockpicking','stealth',1],['trapcraft','Remove Trap','stealth',1],['taming','Animal Taming','wild',1],
+ ['beasthandling','Animal Lore','wild',1],['veterinary','Veterinary','wild',1],['musicianship','Musicianship','bard',1],['lullaby','Peacemaking','bard',1],
+ ['discord','Discordance','bard',1],['provocation','Provocation','bard',1],['woodcutting','Lumberjacking','gather',1],['mining','Mining','gather',1],
+ ['foraging','Foraging','gather',1],['skinning','Skinning','gather',1],['fishing','Fishing','gather',1],['smithing','Blacksmithy','craft',1],
+ ['carpentry','Carpentry','craft',1],['tailoring','Tailoring','craft',1],['fletching','Bowcraft & Fletching','craft',1],['engineering','Tinkering','craft',1],
+ ['cooking','Cooking','craft',1],['appraisal','Item Identification','craft',1]];
+// canonical id (design/t2a-skill-parity-v1) → runtime key. Unchanged skills use their own key.
+SF.SKILL_CANON = { magery: 'spellcraft', evaluatingintelligence: 'focus', resistingspells: 'wardcraft', poisoning: 'venomcraft', hiding: 'concealment',
+  stealth: 'shadowstep', detectinghidden: 'search', stealing: 'pickpocketing', lockpicking: 'lockwork', removetrap: 'trapcraft', animaltaming: 'taming',
+  animallore: 'beasthandling', peacemaking: 'lullaby', discordance: 'discord', lumberjacking: 'woodcutting', blacksmithy: 'smithing', bowcraft: 'fletching',
+  tinkering: 'engineering', itemidentification: 'appraisal' };
+/* what may be chosen at character creation, and why not. Classic T2A creation excluded Stealth and Remove Trap; Discordance
+   is the later skill this build's discord mechanic resembles (T2A had Enticement, not yet built); Foraging and Skinning are
+   Shardfall gathering skills the parity plan folds into activities. None of these change at runtime. */
+SF.SKILL_NOCREATE = { shadowstep: 'Stealth cannot be a starting skill (Second Age rule).', trapcraft: 'Remove Trap cannot be a starting skill (Second Age rule).',
+  discord: 'Discordance is not a Second Age skill; Enticement is not built yet.', foraging: 'Foraging is a Shardfall gathering skill, not a classic one.',
+  skinning: 'Skinning is a Shardfall gathering skill, not a classic one.' };
 SF.SKILL_TIP = {
   swordsmanship: 'Hit chance with swords, axes, the glaive and the skinning knife. Also your defence while one is in hand.',
   macefighting: 'Hit chance with maces, war hammers, staves and the war axe. Mace and war hammer hits drain 3–5 stamina and wear the armor they strike.',
@@ -282,24 +384,21 @@ SF.SKILL_TIP = {
   anatomy: 'Adds up to 20% weapon damage and raises bandage healing. Use it on a living target to judge strength and dexterity (and stamina above 80).',
   parrying: 'With a shield: half your Parrying as a percent chance to block part of a physical hit.',
   healing: 'First Aid with bandages: heal wounds; cure poison at 60 Healing and 60 Anatomy; resurrect another player at 80 and 80.' };
-SF.SKILL = {}; for (const [k, n, g, live] of SF.SKILLS) SF.SKILL[k] = { k, n, g, live: !!live };
+SF.SKILL = {}; for (const [k, n, g, live] of SF.SKILLS) SF.SKILL[k] = { k, n, g, live: !!live, canon: k };
+for (const c in SF.SKILL_CANON) SF.SKILL[SF.SKILL_CANON[c]].canon = c;
+/* one resolver for every spelling of a skill: runtime key, canonical id, or display name (case and spacing ignored) */
+SF.skillKey = id => { if (typeof id !== 'string') return null; if (Object.prototype.hasOwnProperty.call(SF.SKILL, id)) return id;
+  const s = id.toLowerCase().replace(/[^a-z]/g, ''); if (Object.prototype.hasOwnProperty.call(SF.SKILL, s)) return s;
+  if (Object.prototype.hasOwnProperty.call(SF.SKILL_CANON, s)) return SF.SKILL_CANON[s];
+  for (const k in SF.SKILL) if (SF.SKILL[k].n.toLowerCase().replace(/[^a-z]/g, '') === s) return k; return null; };
 
 SF.newSkills = () => { const s = {}; for (const [k] of SF.SKILLS) s[k] = { v: 0, lock: 'raise' }; return s; };
 SF.totalSkill = ch => Object.values(ch.skills).reduce((a, s) => a + s.v, 0);
 SF.sv = (ch, k) => (ch.skills && ch.skills[k] ? ch.skills[k].v / 10 : (ch.sk && ch.sk[k]) || 0);
 
-SF.validateCreation = o => {
-  const e = [];
-  const st = [o.str, o.dex, o.int];
-  if (st.some(v => !Number.isInteger(v))) e.push('Stats must be whole numbers.');
-  if (st.reduce((a, b) => a + b, 0) !== SF.CREATE_STATS) e.push('Spend exactly 150 stat points.');
-  if (st.some(v => v < SF.CREATE_STAT_MIN || v > SF.STAT_MAX)) e.push('Each stat must be between 25 and 100.');
-  const sk = Object.entries(o.skills || {}).filter(([, v]) => v > 0);
-  const tot = sk.reduce((a, [, v]) => a + v, 0);
-  if (tot > 100) e.push('Starting skills may total at most 100.');
-  if (sk.some(([k, v]) => !SF.SKILL[k] || v > 50)) e.push('Each starting skill is at most 50.');
-  return e;
-};
+// SF.validateCreation(payload) → array of error strings (empty when valid). The full validator, shared by the creator, boot and
+// a future server, is SF.CREATION.validate in src/creation.js; this wrapper keeps the old name working.
+SF.validateCreation = o => SF.CREATION ? SF.CREATION.validate(o).errors : ['creation module missing'];
 
 // spec §5: initial chance = clamp(.04,.30,.24-.0018*skill) * max(0, 1-|skill-difficulty|/40)
 SF.gainChance = (skill, diff) => clamp(0.04, 0.30, 0.24 - 0.0018 * skill) * Math.max(0, 1 - Math.abs(skill - diff) / 40);
@@ -873,7 +972,6 @@ SF.VENOM_CHARGES = 5;
 SF.WEARABLE = id => ['weapon', 'shield', 'armor'].includes(SF.ITEMS[id].cat) && SF.ITEMS[id].trade;
 SF.repairSkill = id => { const d = SF.ITEMS[id]; if (d.wpn === 'shortbow' || d.wpn === 'crossbow' || d.wpn === 'heavycrossbow' || id === 'buckler') return 'carpentry'; if (d.armor === 'cloth' || d.armor === 'leather') return 'tailoring'; return 'smithing'; };
 SF.trainCost = (skill, to) => Math.max(0, Math.round((to * to - skill * skill) * 0.6));
-SF.statTrainCost = n => n * 25;
 
 if (typeof module !== 'undefined' && module.exports) module.exports = SF; else root.SF = SF;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
@@ -1510,6 +1608,386 @@ if (typeof module !== 'undefined' && module.exports) module.exports = EQ;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
 </script>
 <script>
+/* Shardfall attribute progression (SF.STATS) — natural Strength, Dexterity and Intelligence grow by using skills.
+   Pure, renderer-free, network-free: runs in the browser after the rules module and in node for tests (tests/stats.test.js).
+   Design: docs/stats/STAT_SYSTEM_REWORK_v1.0.md, reconciled with docs/design/character-creation-v2.md (65-point start).
+   Rules (Second Age): no stat points, purchases, trainers or levels. Natural stats are integers 10–100, at most 225 together.
+   Each stat has a lock (raise / hold / lower, like skills). Below 225 nothing decays; at 225 a gain moves exactly one point
+   from a stat set to Lower. Natural values live in ch.base when it exists (the magic module's natural block), else on ch.
+   Everything marked TUNING is a Shardfall choice, not a claimed OSI formula; see docs/stats/STATUS.md. */
+(function (root) {
+'use strict';
+const SF = root.SF; if (!SF) throw new Error('stats.js needs the rules module (SF) first');
+const ST = {};
+const clamp = SF.clamp;
+ST.KEYS = ['str', 'dex', 'int'];
+ST.NAME = { str: 'Strength', dex: 'Dexterity', int: 'Intelligence' };
+ST.ABBR = { str: 'STR', dex: 'DEX', int: 'INT' };
+ST.LOCKS = ['raise', 'hold', 'lower'];
+// TUNING: one success per 45 s of active play at most; chance per fitting action falls with the stat (4% at 10 → 1% at 100);
+// trivial use counts a quarter. About 12–30 points per hour of steady work (tests/stats.test.js prints the measured rates).
+ST.CFG = { cooldown: 45, chanceHi: .04, chanceLo: .01, fall: .75, trivial: .25 };
+/* skill → stat weights (primary 75 / secondary 25, single-stat skills 100). Design table in STAT_SYSTEM_REWORK_v1.0.md;
+   keys are the runtime skill keys (display names are the canonical UO names in SF.SKILL). */
+const W = (a, b) => { const o = {}; if (b) { o[a] = 75; o[b] = 25; } else o[a] = 100; return o; };
+ST.WEIGHTS = {
+  swordsmanship: W('str', 'dex'), macefighting: W('str', 'dex'), fencing: W('dex', 'str'), archery: W('dex', 'str'), wrestling: W('str', 'dex'),
+  tactics: W('str', 'dex'), anatomy: W('int', 'str'), parrying: W('dex', 'str'), healing: W('dex', 'int'),
+  spellcraft: W('int'), focus: W('int'), wardcraft: W('int', 'str'), meditation: W('int'), alchemy: W('int', 'dex'), venomcraft: W('int', 'dex'),
+  concealment: W('dex'), shadowstep: W('dex'), search: W('int', 'dex'), tracking: W('int', 'dex'), pickpocketing: W('dex'), lockwork: W('dex', 'int'),
+  trapcraft: W('dex', 'int'), taming: W('int', 'str'), beasthandling: W('int'), veterinary: W('int', 'dex'), musicianship: W('dex', 'int'),
+  lullaby: W('int', 'dex'), discord: W('int', 'dex'), provocation: W('int', 'dex'), woodcutting: W('str', 'dex'), mining: W('str'),
+  foraging: W('dex', 'int'), skinning: W('dex', 'str'), fishing: W('dex', 'str'), smithing: W('str'), carpentry: W('str', 'dex'),
+  tailoring: W('dex', 'int'), fletching: W('dex', 'str'), engineering: W('dex', 'int'), cooking: W('int', 'dex'), appraisal: W('int') };
+// which stats each skill trains, for tooltips: { str: ['Swordsmanship', ...], ... }
+ST.trainedBy = s => SF.SKILLS.filter(([k]) => ST.WEIGHTS[k] && ST.WEIGHTS[k][s]).map(([, n]) => n);
+
+ST.natural = ch => ch.base || ch;                                 // the object holding natural str/dex/int
+ST.values = ch => { const b = ST.natural(ch); return { str: b.str, dex: b.dex, int: b.int }; };
+ST.total = ch => { const b = ST.natural(ch); return b.str + b.dex + b.int; };
+ST.chance = v => clamp(ST.CFG.chanceLo, ST.CFG.chanceHi, ST.CFG.chanceHi * (1 - ST.CFG.fall * (v - SF.STAT_MIN) / (SF.STAT_MAX - SF.STAT_MIN)));
+ST.newLocks = () => ({ str: 'raise', dex: 'raise', int: 'raise' });
+ST.newState = seed => ({ cd: 0, seed: (seed >>> 0) || 0x2f6b1d3, last: null, n: 0 });
+ST.cycleLock = l => ST.LOCKS[(ST.LOCKS.indexOf(l) + 1) % 3] || 'raise';
+// a separate, persisted random stream (mulberry32) so stat rolls never consume or disturb the skill-gain RNG
+ST.rand = st => { let t = (st.seed = (st.seed + 0x6D2B79F5) >>> 0); t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+
+/* setLock: the only stat command the UI has after creation. Never changes a value. */
+ST.setLock = (ch, s, lock) => {
+  if (!ST.KEYS.includes(s) || !ST.LOCKS.includes(lock)) return { ok: false, reason: 'invalid lock' };
+  ch.statLocks = ch.statLocks || ST.newLocks(); ch.statLocks[s] = lock; return { ok: true };
+};
+
+/* migrateChar: add locks and gain state to an older character, repair malformed values. Idempotent. Legitimate stats are kept
+   as they are, even above the creation limits (old 150-point characters keep their points). Returns the list of repairs. */
+ST.migrateChar = ch => {
+  const fixes = [];
+  if (!ch.statLocks || typeof ch.statLocks !== 'object') { ch.statLocks = ST.newLocks(); fixes.push('locks'); }
+  for (const s of ST.KEYS) if (!ST.LOCKS.includes(ch.statLocks[s])) { ch.statLocks[s] = 'raise'; fixes.push('lock ' + s); }
+  const g = ch.statGain;
+  if (!g || typeof g !== 'object' || !Number.isFinite(g.cd) || !Number.isFinite(g.seed)) { ch.statGain = ST.newState(g && g.seed); fixes.push('gain state'); }
+  const b = ST.natural(ch);
+  for (const s of ST.KEYS) { const v = b[s]; if (!Number.isFinite(v)) { b[s] = SF.STAT_MIN; fixes.push(s + ' was ' + v); } else if (!Number.isInteger(v) || v < SF.STAT_MIN || v > SF.STAT_MAX) { b[s] = clamp(SF.STAT_MIN, SF.STAT_MAX, Math.round(v)); fixes.push(s + ' ' + v + ' → ' + b[s]); } }
+  while (b.str + b.dex + b.int > SF.STAT_CAP) { const k = ST.KEYS.slice().sort((x, y) => b[y] - b[x])[0]; b[k]--; if (fixes.indexOf('over cap') < 0) fixes.push('over cap'); }
+  return fixes;
+};
+
+/* eligible(ch, key): may this skill's use train stats right now? (late Second Age profile)
+   The skill must be set to Raise. A Grandmaster (100.0) still trains stats. Below 100 at the 700.0 skill cap another skill
+   must be set to Lower with points to give, as a skill gain would need. Held or lowered skills never train stats. */
+ST.eligible = (ch, key) => {
+  const s = ch.skills && ch.skills[key]; if (!s || !ST.WEIGHTS[key]) return { ok: false, reason: 'no attribute for this skill' };
+  if (s.lock !== 'raise') return { ok: false, reason: 'skill is not set to Raise' };
+  if (s.v < SF.SKILL_MAX && SF.totalSkill(ch) >= SF.SKILL_CAP && !Object.keys(ch.skills).some(k => k !== key && ch.skills[k].lock === 'lower' && ch.skills[k].v > 0))
+    return { ok: false, reason: 'skill cap reached and no skill set to Lower' };
+  return { ok: true };
+};
+// the stat that gives a point at the cap: the highest natural stat set to Lower above 10; ties go Strength, Dexterity, Intelligence (TUNING)
+ST.donor = (ch, not) => { const b = ST.natural(ch), L = ch.statLocks || {}; let best = null; for (const s of ST.KEYS) if (s !== not && L[s] === 'lower' && b[s] > SF.STAT_MIN && (!best || b[s] > b[best])) best = s; return best; };
+
+/* tryStatGain(ch, key, ctx) → { gained, stat, value, lowered, lowValue, chance, reason }
+   One call per resolved gameplay action of skill `key`. ctx: { now: active play seconds, action: id of the resolved action
+   (one roll per action; auxiliary skill checks on the same action pass aux: true), challenge: 1 (a real, fitting use or a
+   Grandmaster's use), TUNING .25 (trivial use or the same target over and over), 0 (invalid: never rolls) }.
+   Mutates only the natural stats (ch.base or ch), ch.statGain (cooldown, last action, random stream). */
+ST.tryStatGain = (ch, key, ctx) => {
+  ctx = ctx || {}; const now = Number.isFinite(ctx.now) ? ctx.now : 0;
+  if (ctx.aux) return { gained: false, reason: 'auxiliary check' };
+  if (!ch.statGain || !ch.statLocks) ST.migrateChar(ch);
+  const st = ch.statGain;
+  if (ctx.action !== undefined && ctx.action !== null) { if (st.last === ctx.action) return { gained: false, reason: 'one attribute roll per action' }; st.last = ctx.action; }
+  const el = ST.eligible(ch, key); if (!el.ok) return { gained: false, reason: el.reason };
+  const challenge = Number.isFinite(ctx.challenge) ? clamp(0, 1, ctx.challenge) : 1;
+  if (challenge <= 0) return { gained: false, reason: 'no challenge' };
+  if (now < st.cd) return { gained: false, reason: 'attribute gain cooling down' };
+  const b = ST.natural(ch), L = ch.statLocks, w = ST.WEIGHTS[key], atCap = b.str + b.dex + b.int >= SF.STAT_CAP;
+  const cand = ST.KEYS.filter(s => w[s] > 0 && L[s] === 'raise' && b[s] < SF.STAT_MAX && (!atCap || ST.donor(ch, s)));
+  if (!cand.length) return { gained: false, reason: atCap ? 'attribute cap 225: set an attribute to Lower' : 'no attribute can rise' };
+  let tot = 0; for (const s of cand) tot += w[s]; let pick = ST.rand(st) * tot, stat = cand[cand.length - 1];
+  for (const s of cand) { pick -= w[s]; if (pick < 0) { stat = s; break; } }
+  const chance = ST.chance(b[stat]) * challenge;
+  if (ST.rand(st) >= chance) return { gained: false, stat, chance, reason: 'no gain this time' };
+  let lowered = null;
+  if (atCap) { lowered = ST.donor(ch, stat); if (!lowered) return { gained: false, stat, chance, reason: 'attribute cap 225: set an attribute to Lower' }; b[lowered] -= 1; }
+  b[stat] += 1; st.cd = now + ST.CFG.cooldown; st.n = (st.n || 0) + 1;
+  return { gained: true, stat, value: b[stat], lowered, lowValue: lowered ? b[lowered] : undefined, chance };
+};
+/* message(r): the journal line for a gain, or null */
+ST.message = r => r && r.gained ? `Your ${ST.NAME[r.stat]} has increased to ${r.value}.` + (r.lowered ? ` Your ${ST.NAME[r.lowered]} has decreased to ${r.lowValue}.` : '') : null;
+
+SF.STATS = ST;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+</script>
+<script>
+/* Shardfall character creation rules (SF.CREATION) — Character Creation v2.0 (docs/design/character-creation-v2.md).
+   Pure, renderer-free, network-free: runs in the browser after the rules, Magery, equipment and stats modules, and in node
+   for tests (tests/creation.test.js). One validator for the creator UI, the boot path and a future server: the payload is
+   treated as untrusted input. No classes, levels, XP, talents or body bonuses: a template only fills in the numbers.
+   Early Second Age start: 65 attribute points (each 10–45); 100 skill points, whole numbers, over two or three different
+   skills, each 0–50. Progression caps stay 225 / 100 (attributes) and 700.0 / 100.0 (skills). */
+(function (root) {
+'use strict';
+const SF = root.SF; if (!SF || !SF.EQ || !SF.MAGERY || !SF.STATS) throw new Error('creation.js needs SF, SF.MAGERY, SF.EQ and SF.STATS first');
+const CR = {}; const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+CR.VERSION = 2;
+CR.NAME_MIN = 2; CR.NAME_MAX = 16;
+
+/* ---------------- appearance (cosmetic only: never touches stats, gear, weight, movement or combat) ---------------- */
+CR.BODIES = [{ id: 'male', n: 'Male' }, { id: 'female', n: 'Female' }];
+// skin: 'light' is the colour the traveller sprite was drawn with, so it needs no recolouring
+CR.SKIN = [{ id: 'porcelain', n: 'Porcelain', hex: '#efcfb6' }, { id: 'light', n: 'Light', hex: '#d0a080' }, { id: 'tan', n: 'Tan', hex: '#b9875c' },
+  { id: 'olive', n: 'Olive', hex: '#a07a50' }, { id: 'bronze', n: 'Bronze', hex: '#8c5a36' }, { id: 'brown', n: 'Brown', hex: '#6a4128' }, { id: 'deep', n: 'Deep', hex: '#46291a' }];
+CR.HAIR_STYLES = [{ id: 'short', n: 'Short' }, { id: 'long', n: 'Long' }, { id: 'ponytail', n: 'Ponytail' }, { id: 'pageboy', n: 'Pageboy' },
+  { id: 'receding', n: 'Receding', body: 'male' }, { id: 'mohawk', n: 'Mohawk', body: 'male' }, { id: 'buns', n: 'Buns', body: 'female' },
+  { id: 'pigtails', n: 'Pigtails', body: 'female' }, { id: 'bald', n: 'Bald' }];
+CR.HAIR_COLORS = [{ id: 'black', n: 'Black', hex: '#1d1712' }, { id: 'darkbrown', n: 'Dark brown', hex: '#3b2618' }, { id: 'brown', n: 'Brown', hex: '#5f3b20' },
+  { id: 'chestnut', n: 'Chestnut', hex: '#7c401e' }, { id: 'auburn', n: 'Auburn', hex: '#8f2f1a' }, { id: 'red', n: 'Red', hex: '#b5461d' },
+  { id: 'blond', n: 'Blond', hex: '#c9a253' }, { id: 'flaxen', n: 'Flaxen', hex: '#e2cf96' }, { id: 'grey', n: 'Grey', hex: '#8c8b88' }, { id: 'white', n: 'White', hex: '#e9e7e1' }];
+CR.FACIAL = [{ id: 'none', n: 'None' }, { id: 'mustache', n: 'Mustache' }, { id: 'goatee', n: 'Goatee' }, { id: 'short', n: 'Short beard' },
+  { id: 'long', n: 'Long beard' }, { id: 'vandyke', n: 'Vandyke' }];
+CR.CLOTHING = [{ id: 'oatmeal', n: 'Undyed', hex: '#a89878' }, { id: 'slate', n: 'Slate', hex: '#4b5765' }, { id: 'forest', n: 'Forest', hex: '#3d5b35' },
+  { id: 'wine', n: 'Wine', hex: '#6b2531' }, { id: 'navy', n: 'Navy', hex: '#2b3b6b' }, { id: 'ochre', n: 'Ochre', hex: '#9b7529' },
+  { id: 'plum', n: 'Plum', hex: '#5b2f5f' }, { id: 'charcoal', n: 'Charcoal', hex: '#343439' }];
+// cloak: 'teal' is the sprite's own cloak (no recolour). 'none' hides it on the paper doll only: the world sprite has no cloakless art yet.
+CR.CLOAKS = [{ id: 'teal', n: 'Sea teal', hex: null }, { id: 'crimson', n: 'Crimson', hex: '#8a2a2a' }, { id: 'royal', n: 'Royal blue', hex: '#2a3a8a' },
+  { id: 'violet', n: 'Violet', hex: '#5a2a6a' }, { id: 'ash', n: 'Ash', hex: '#3a3a3a' }, { id: 'mustard', n: 'Mustard', hex: '#8a6a2a' }, { id: 'none', n: 'No cloak', hex: null }];
+const byId = L => { const o = {}; for (const x of L) o[x.id] = x; return o; };
+CR.SKIN_ID = byId(CR.SKIN); CR.HAIR_ID = byId(CR.HAIR_STYLES); CR.HCOL_ID = byId(CR.HAIR_COLORS); CR.FACE_ID = byId(CR.FACIAL); CR.CLOTH_ID = byId(CR.CLOTHING); CR.CLOAK_ID = byId(CR.CLOAKS);
+CR.LOOK_KEYS = ['body', 'skinTone', 'hairStyle', 'hairColor', 'facialHairStyle', 'facialHairColor', 'clothingColor', 'cloak'];
+CR.hairFor = body => CR.HAIR_STYLES.filter(h => !h.body || h.body === body);
+CR.defaultLook = body => body === 'female'
+  ? { body: 'female', skinTone: 'light', hairStyle: 'long', hairColor: 'chestnut', facialHairStyle: 'none', facialHairColor: 'chestnut', clothingColor: 'oatmeal', cloak: 'teal' }
+  : { body: 'male', skinTone: 'light', hairStyle: 'short', hairColor: 'darkbrown', facialHairStyle: 'none', facialHairColor: 'darkbrown', clothingColor: 'oatmeal', cloak: 'teal' };
+/* checkLook(look) → error strings. Every field must be an allowlisted id; female characters have no facial hair. */
+CR.checkLook = look => {
+  const e = []; if (!look || typeof look !== 'object' || Array.isArray(look)) return ['Appearance is missing.'];
+  if (!CR.BODIES.some(b => b.id === look.body)) e.push('Choose male or female.');
+  if (!has(CR.SKIN_ID, look.skinTone)) e.push('Choose a skin tone.');
+  if (!has(CR.HAIR_ID, look.hairStyle) || (CR.HAIR_ID[look.hairStyle].body && CR.HAIR_ID[look.hairStyle].body !== look.body)) e.push('Choose a hairstyle for this body.');
+  if (!has(CR.HCOL_ID, look.hairColor)) e.push('Choose a hair colour.');
+  if (!has(CR.FACE_ID, look.facialHairStyle) || (look.body === 'female' && look.facialHairStyle !== 'none')) e.push('Choose a valid facial hair style.');
+  if (!has(CR.HCOL_ID, look.facialHairColor)) e.push('Choose a facial hair colour.');
+  if (!has(CR.CLOTH_ID, look.clothingColor)) e.push('Choose a clothing colour.');
+  if (!has(CR.CLOAK_ID, look.cloak)) e.push('Choose a cloak.');
+  return e;
+};
+/* normalizeLook(old) → a valid look for an existing character (save migration). Keeps every valid field and any unknown
+   extra field; a legacy cloak colour (v1 saves stored a hex) maps to its cloak id. Idempotent. */
+CR.normalizeLook = old => {
+  const o = old && typeof old === 'object' && !Array.isArray(old) ? old : {};
+  const body = CR.BODIES.some(b => b.id === o.body) ? o.body : 'male';
+  const d = CR.defaultLook(body), out = Object.assign({}, o, { body });
+  if (typeof o.cloak === 'string' && o.cloak[0] === '#') { const c = CR.CLOAKS.find(x => x.hex && x.hex.toLowerCase() === o.cloak.toLowerCase()); out.cloak = c ? c.id : 'teal'; }
+  else if (o.cloak === null || o.cloak === undefined || o.cloak === '') out.cloak = 'teal';
+  for (const k of CR.LOOK_KEYS) if (k !== 'body' && CR.checkLook(Object.assign({}, d, { [k]: out[k] })).length) out[k] = d[k];   // each field on its own
+  if (body === 'female') out.facialHairStyle = 'none';
+  return out;
+};
+CR.hex = (list, id) => { const x = byId(list)[id]; return x ? x.hex : null; };
+CR.cloakHex = look => { if (!look) return null; if (typeof look.cloak === 'string' && look.cloak[0] === '#') return look.cloak; const c = CR.CLOAK_ID[look.cloak]; return c ? c.hex : null; };
+CR.skinHex = look => { const s = look && CR.SKIN_ID[look.skinTone]; return s && s.id !== 'light' ? s.hex : null; };
+CR.lookKey = look => CR.LOOK_KEYS.map(k => look ? look[k] : '').join('|');
+
+/* ---------------- skills that can be chosen ---------------- */
+// one-line descriptions of what each skill does in this build (shown in the creator's skill picker)
+CR.SKILL_INFO = {
+  swordsmanship: 'Hit chance and defence with swords, axes and the halberd.', macefighting: 'Hit chance with maces, hammers and the war axe; blows drain stamina and wear armour.',
+  fencing: 'Hit chance and defence with daggers, kryss and spears.', archery: 'Hit chance with bows and crossbows. Stand still to aim.',
+  wrestling: 'Unarmed attack and defence.', tactics: 'Weapon damage: half at 0, one and a half times at 100.',
+  anatomy: 'More weapon damage and better bandages; judge a creature’s strength.', parrying: 'Block part of a hit with a shield.',
+  healing: 'Bandage wounds; cure poison at 60 (with 60 Anatomy).', spellcraft: 'Cast spells from a spellbook with reagents and mana.',
+  focus: 'Raises spell damage and helps against resistance.', wardcraft: 'Resist harmful spells.',
+  meditation: 'Faster mana regeneration; meditate to recover mana.', alchemy: 'Brew potions from reagents.',
+  venomcraft: 'Coat a weapon with poison.', concealment: 'Hide from creatures and people.', search: 'Find hidden traps, chests and people.',
+  tracking: 'Point the way to nearby creatures.', pickpocketing: 'Steal coin from smugglers and other fair targets.',
+  lockwork: 'Pick the locks of chests with lockpicks.', taming: 'Tame wild animals as pets.', beasthandling: 'Command pets and judge animals.',
+  veterinary: 'Heal your pets.', musicianship: 'Play an instrument; every bard skill needs it.', lullaby: 'Calm a hostile creature with music.',
+  provocation: 'Turn a creature against another with music.', woodcutting: 'Fell trees for logs.', mining: 'Dig ore with a pickaxe.',
+  fishing: 'Fish from shore with a rod.', smithing: 'Smelt ore, forge weapons and armour, repair metal.', carpentry: 'Work wood into furniture, shields and staves.',
+  tailoring: 'Sew cloth and leather gear.', fletching: 'Make bows, arrows and bolts.', engineering: 'Make tools, hinges, locks and traps.',
+  cooking: 'Cook meat and fish.', appraisal: 'Learn an item’s worth and properties.' };
+// a skill can be chosen when it is implemented, not barred by SF.SKILL_NOCREATE, and the creator has a description for it
+CR.creatable = k => !!(SF.SKILL[k] && SF.SKILL[k].live && !has(SF.SKILL_NOCREATE, k) && CR.SKILL_INFO[k]);
+CR.CREATABLE = SF.SKILLS.map(s => s[0]).filter(CR.creatable);
+
+/* ---------------- starting templates: editable suggestions, never classes ---------------- */
+// stats [STR, DEX, INT] (sum 65); skills by canonical name, resolved through SF.skillKey (sum 100)
+CR.TEMPLATES = [
+  { id: 'swordsman', n: 'Swordsman', s: [35, 20, 10], k: [['Swordsmanship', 50], ['Tactics', 30], ['Healing', 20]], town: 'quay', d: 'A blade, a steady arm and bandages.' },
+  { id: 'maceman', n: 'Maceman', s: [35, 20, 10], k: [['Mace Fighting', 50], ['Tactics', 30], ['Healing', 20]], town: 'quay', d: 'Crushing blows that tire the foe and dent their armour.' },
+  { id: 'fencer', n: 'Fencer', s: [25, 30, 10], k: [['Fencing', 50], ['Tactics', 30], ['Healing', 20]], town: 'quay', d: 'Quick thrusts with a light blade.' },
+  { id: 'archer', n: 'Archer', s: [25, 30, 10], k: [['Archery', 50], ['Tactics', 30], ['Anatomy', 20]], town: 'skara', d: 'Bow and arrows from range.' },
+  { id: 'mage', n: 'Mage', s: [15, 10, 40], k: [['Magery', 50], ['Evaluating Intelligence', 30], ['Meditation', 20]], town: 'moonglen', d: 'Spells from a spellbook, fuelled by reagents and mana.' },
+  { id: 'blacksmith', n: 'Blacksmith', s: [40, 15, 10], k: [['Blacksmithy', 50], ['Mining', 50]], town: 'mynoc', d: 'Mine ore, smelt it and forge.' },
+  { id: 'carpenter', n: 'Carpenter', s: [35, 20, 10], k: [['Carpentry', 50], ['Lumberjacking', 50]], town: 'vespar', d: 'Fell trees and work the wood.' },
+  { id: 'rogue', n: 'Rogue', s: [20, 35, 10], k: [['Hiding', 50], ['Lockpicking', 30], ['Stealing', 20]], town: 'vespar', d: 'Unseen, light-fingered, good with locks.' },
+  { id: 'healer', n: 'Healer', s: [20, 20, 25], k: [['Healing', 50], ['Anatomy', 30], ['Magery', 20]], town: 'quay', d: 'Bandages first, a little magic after.' },
+  { id: 'bard', n: 'Bard', s: [15, 25, 25], k: [['Musicianship', 50], ['Provocation', 30], ['Peacemaking', 20]], town: 'vespar', d: 'Music that calms or sets creatures on each other.' },
+  { id: 'tamer', n: 'Animal Tamer', s: [25, 15, 25], k: [['Animal Taming', 50], ['Animal Lore', 30], ['Veterinary', 20]], town: 'skara', d: 'Wild animals as companions.' },
+  { id: 'advanced', n: 'Advanced', s: [25, 20, 20], k: [], town: 'quay', d: 'Choose every number yourself.', advanced: true }];
+CR.TEMPLATE = byId(CR.TEMPLATES);
+/* template(id) → a fresh draft allocation { stats: [s,d,i], skills: [[key, pts] ×3] } (runtime keys), or null */
+CR.template = id => { const t = CR.TEMPLATE[id]; if (!t) return null; const sk = t.k.map(([n, v]) => [SF.skillKey(n), v]); while (sk.length < SF.CREATE_SKILL_SLOTS) sk.push([null, 0]); return { stats: t.s.slice(), skills: sk }; };
+/* templateIssues(id): why a template cannot be used as is (an unbuilt skill), so the UI marks it rather than substituting */
+CR.templateIssues = id => { const t = CR.TEMPLATE[id]; if (!t) return ['unknown template']; return t.k.filter(([n]) => !CR.creatable(SF.skillKey(n))).map(([n]) => n + ' is not available yet'); };
+/* matchTemplate(stats, skills): the template these exact numbers are, else null (anything edited reads as Custom) */
+CR.matchTemplate = (stats, skills) => { const norm = L => L.filter(([k, v]) => k && v > 0).map(([k, v]) => k + ':' + v).sort().join(','); const sk = norm(skills);
+  for (const t of CR.TEMPLATES) { if (t.advanced) continue; const a = CR.template(t.id); if (a.stats.join() === stats.join() && norm(a.skills) === sk) return t.id; } return null; };
+
+/* ---------------- starting towns ---------------- */
+// shrine: the SHRINES id the soul is bound to (and the spawn is taken beside). Every town listed is walkable, protected, and
+// has a bank, a healer, merchants and a route on (checked again at boot: CR.townReady; a failed check falls back to the Quay).
+CR.TOWNS = [
+  { id: 'quay', n: 'Saltmarsh Quay', shrine: 'quay', tutorial: true, d: 'A small harbour on the starter isle. Wren the sellsword, the Shore Beacon quest, gentle wildlife, a packet boat to Vespar.', services: ['bank', 'healer', 'trainer', 'shops', 'boat to Vespar'] },
+  { id: 'vespar', n: 'Vespar', shrine: 'vespar', d: 'The river-trade town: tailor, tinker, provisioner, fish hall. Boats to Moonglen and the Quay.', services: ['bank', 'healer', 'shops', 'boats'] },
+  { id: 'mynoc', n: 'Mynoc', shrine: 'mynoc', d: 'The mining town beside Mynoc Mine, with the forge and the mine stores.', services: ['bank', 'healer', 'forge', 'mine'] },
+  { id: 'skara', n: 'Skara Bryn', shrine: 'skara', d: 'Rangers, the bowyer and the fletcher, on the forest coast. Ferry across the strait.', services: ['bank', 'healer', 'bowyer', 'ferry'] },
+  { id: 'moonglen', n: 'Moonglen', shrine: 'moonglen', d: 'The college town of mages: reagents, the library, the observatory. Boat to Vespar.', services: ['bank', 'healer', 'reagents', 'boat to Vespar'] }];
+CR.TOWN = byId(CR.TOWNS);
+/* townReady(id, world) → { ok, reason }. world: { shrines: [{id,x,y}], npcs: [{role,town}], stand(x,y) } from the game after genWorld */
+CR.TOWN_NEEDS = { quay: null, vespar: ['banker', 'healer'], mynoc: ['banker', 'healer'], skara: ['banker', 'healer'], moonglen: ['banker', 'healer'] };
+CR.spawnOf = sh => ({ x: sh.x + .5, y: sh.y + 1.7 });
+CR.townReady = (id, world) => {
+  const t = CR.TOWN[id]; if (!t) return { ok: false, reason: 'unknown town' };
+  if (id === 'quay') return { ok: true, spawn: { x: 92.5, y: 304.5 }, bound: 'quay' };       // the verified starter spawn on the plaza
+  const sh = (world.shrines || []).find(s => s.id === t.shrine); if (!sh) return { ok: false, reason: 'no shrine' };
+  for (const r of CR.TOWN_NEEDS[id] || []) if (!(world.npcs || []).some(n => n.role === r && n.town === id)) return { ok: false, reason: 'no ' + r };
+  const sp = CR.spawnOf(sh); if (world.stand && !world.stand(sp.x, sp.y)) return { ok: false, reason: 'spawn blocked' };
+  return { ok: true, spawn: sp, bound: t.shrine };
+};
+
+/* ---------------- validation (shared by the UI, boot and a future server) ---------------- */
+// name policy: letters (any script), numbers, spaces, apostrophes and hyphens; trimmed, inner runs of spaces collapsed; 2–16
+CR.cleanName = n => typeof n === 'string' ? n.replace(/\s+/g, ' ').trim() : '';
+CR.checkName = n => { const c = CR.cleanName(n); if (typeof n !== 'string' || !c) return 'Enter a name.';
+  if (/[\u0000-\u001f\u007f-\u009f]/.test(n)) return 'The name has invisible control characters.';
+  if (!/^[\p{L}\p{N}' \-]+$/u.test(c)) return 'Use letters, numbers, spaces, apostrophes and hyphens only.';
+  if (!/\p{L}/u.test(c)) return 'The name needs at least one letter.';
+  const len = [...c].length; if (len < CR.NAME_MIN) return 'The name needs at least 2 characters.'; if (len > CR.NAME_MAX) return 'The name can have at most 16 characters.';
+  return null; };
+/* validate(payload) → { ok, errors: [string], field: { name, look, stats, skills, town }, value }
+   payload: { name, look: {…}, str, dex, int, skills: [[id, points], …] or { id: points }, town, template? }
+   Skill ids may be runtime keys or canonical ids; duplicates are found after resolving aliases and before any merge.
+   value (only when ok) is the normalized creation: { name, look, str, dex, int, skills: { key: points }, town, template }. */
+CR.validate = o => {
+  const F = { name: [], look: [], stats: [], skills: [], town: [] }; const out = { ok: false, errors: [], field: F, value: null };
+  const done = () => { for (const k in F) out.errors.push(...F[k]); out.ok = !out.errors.length; return out; };
+  if (!o || typeof o !== 'object' || Array.isArray(o)) { F.name.push('Nothing to create.'); return done(); }
+  const ne = CR.checkName(o.name); if (ne) F.name.push(ne);
+  F.look.push(...CR.checkLook(o.look));
+  const st = [o.str, o.dex, o.int];
+  if (st.some(v => typeof v !== 'number' || !Number.isFinite(v) || !Number.isInteger(v))) F.stats.push('Attributes must be whole numbers.');
+  else {
+    if (st.some(v => v < SF.CREATE_STAT_MIN || v > SF.CREATE_STAT_MAX)) F.stats.push(`Each attribute must be between ${SF.CREATE_STAT_MIN} and ${SF.CREATE_STAT_MAX}.`);
+    const t = st[0] + st[1] + st[2]; if (t !== SF.CREATE_STATS) F.stats.push(`Spend exactly ${SF.CREATE_STATS} attribute points (now ${t}).`);
+  }
+  let rows = o.skills;
+  if (rows && typeof rows === 'object' && !Array.isArray(rows)) rows = Object.keys(rows).map(k => [k, rows[k]]);
+  const skills = {};
+  if (!Array.isArray(rows)) F.skills.push('Choose your starting skills.');
+  else {
+    const seen = new Set(); let tot = 0, n = 0, bad = false;
+    for (const r of rows) {
+      if (!Array.isArray(r) || r.length !== 2) { bad = true; continue; }
+      const [id, v] = r;
+      if (typeof v !== 'number' || !Number.isFinite(v) || !Number.isInteger(v) || v < 0 || v > SF.CREATE_SKILL_MAX) { F.skills.push(`Skill points must be whole numbers from 0 to ${SF.CREATE_SKILL_MAX}.`); bad = true; continue; }
+      if (v === 0 && (id === null || id === undefined || id === '')) continue;    // an empty row
+      const k = SF.skillKey(id);
+      if (!k) { F.skills.push('Unknown skill: ' + String(id).slice(0, 24) + '.'); bad = true; continue; }
+      if (!CR.creatable(k)) { F.skills.push((SF.SKILL_NOCREATE[k] || SF.SKILL[k].n + ' cannot be chosen yet.')); bad = true; continue; }
+      if (seen.has(k)) { F.skills.push(SF.SKILL[k].n + ' is chosen twice.'); bad = true; continue; }
+      seen.add(k); if (v > 0) { skills[k] = v; tot += v; n++; }
+    }
+    if (rows.length > SF.CREATE_SKILL_SLOTS) F.skills.push(`At most ${SF.CREATE_SKILL_SLOTS} skill rows.`);
+    if (!bad) {
+      if (n < 2) F.skills.push('Choose two or three skills.');
+      if (tot !== SF.CREATE_SKILLS) F.skills.push(`Spend exactly ${SF.CREATE_SKILLS} skill points (now ${tot}).`);
+    }
+  }
+  if (!has(CR.TOWN, o.town)) F.town.push('Choose a starting town.');
+  done();
+  if (out.ok) out.value = { name: CR.cleanName(o.name), look: CR.LOOK_KEYS.reduce((a, k) => (a[k] = o.look[k], a), {}), str: o.str, dex: o.dex, int: o.int, skills, town: o.town,
+    template: CR.matchTemplate([o.str, o.dex, o.int], Object.keys(skills).map(k => [k, skills[k]])) || 'custom' };
+  return out;
+};
+
+/* ---------------- character and starter kit ---------------- */
+/* progression(v) → the starting progression block: skills in tenths (points × 10 once), every other skill 0.0, all locks Raise;
+   attribute locks Raise; a fresh attribute-gain state. */
+CR.progression = (v, seed) => {
+  const skills = SF.newSkills(); for (const k in v.skills) skills[k].v = v.skills[k] * 10;
+  return { str: v.str, dex: v.dex, int: v.int, skills, statLocks: SF.STATS.newLocks(), statGain: SF.STATS.newState(seed) };
+};
+/* kit(v) → the starter kit manifest for a validated creation (data only; applyKit makes the items).
+   Common: plain clothes, journal, food, 100 gold, 10 bandages. Then one weapon or tool for each positive skill that uses one.
+   No grants for zero skills, no expensive materials, no weapon the character cannot use, a shield only beside a one-handed weapon. */
+CR.STARTER = { gold: 100, bandages: 10, food: 3, arrows: 50, reagents: 10, lockpicks: 5, vials: 4 };
+// weapon per fighting skill, best first; the first whose Strength requirement is met is worn
+CR.WEAPON_PREF = { swordsmanship: ['sword', 'knife'], macefighting: ['mace'], fencing: ['dagger'], archery: ['shortbow'] };
+CR.TOOL_FOR = [['mining', 'pickaxe'], ['woodcutting', 'hatchet'], ['smithing', 'tongs'], ['engineering', 'tongs'], ['tailoring', 'sewkit'],
+  ['carpentry', 'knife'], ['fletching', 'knife'], ['fishing', 'rod'], ['skinning', 'knife']];
+CR.kit = v => {
+  const k = v.skills, pos = s => (k[s] || 0) > 0, notes = [];
+  const m = { wear: { shirt: 'shirt', trousers: 'trousers', feet: 'shoes' }, pack: [['journal', 1], ['gold', CR.STARTER.gold], ['bandage', CR.STARTER.bandages], ['cookedmeat', CR.STARTER.food]], spells: [], hotbar: [], notes };
+  const fight = ['swordsmanship', 'macefighting', 'fencing', 'archery'].filter(pos).sort((a, b) => k[b] - k[a]);
+  if (fight.length) {
+    const s = fight[0], w = CR.WEAPON_PREF[s].find(id => SF.EQ.strReq({ id }) <= v.str);
+    if (w) { m.wear.weapon = w; if (w === 'shortbow') m.pack.push(['arrow', CR.STARTER.arrows]); }
+    else notes.push(`No ${SF.SKILL[s].n} weapon is light enough for ${v.str} Strength; buy one when you are stronger.`);
+  }
+  if (pos('parrying') && m.wear.weapon && !SF.WEAPONS[SF.ITEMS[m.wear.weapon].wpn].two) m.wear.shield = 'buckler';
+  const tools = new Set(); for (const [s, t] of CR.TOOL_FOR) if (pos(s) && m.wear.weapon !== t) tools.add(t);
+  for (const t of tools) m.pack.push([t, 1]);
+  if (pos('spellcraft')) { m.pack.push(['spellbook', 1]); m.spells = SF.MAGERY.STARTER.slice();
+    const regs = new Set(); for (const id of m.spells) for (const r of (SF.MAGERY.SPELLS.find(x => x.id === id) || {}).regs || []) regs.add(r);
+    for (const r of regs) m.pack.push([r, CR.STARTER.reagents]); }
+  if (pos('lockwork')) m.pack.push(['lockpick', CR.STARTER.lockpicks]);
+  if (pos('musicianship') || pos('lullaby') || pos('provocation')) m.pack.push(['lute', 1]);
+  if (pos('alchemy')) m.pack.push(['vial', CR.STARTER.vials]);
+  // hotbar: only things this character has or can do
+  const hb = [{ k: 'item', id: 'bandage' }];
+  if (pos('spellcraft')) for (const id of m.spells) hb.push({ k: 'spell', id });
+  if (pos('concealment')) hb.push({ k: 'act', id: 'hide' });
+  if (pos('tracking')) hb.push({ k: 'act', id: 'track' });
+  if (pos('spellcraft') || pos('meditation')) hb.push({ k: 'act', id: 'meditate' });
+  hb.push({ k: 'act', id: 'bandother' });
+  m.hotbar = hb.slice(0, 5); while (m.hotbar.length < 4) m.hotbar.push(null);
+  return m;
+};
+/* applyKit(ch, manifest) — once, on a committed new character. Worn pieces are equipped directly (the character is empty);
+   non-stacking starter items carry starter: true (no vendor resale). Returns { ok, weight, cap, stage }; never overloads:
+   optional supplies are trimmed if the total would pass the first encumbrance stage. */
+CR.applyKit = (ch, m) => {
+  const make = id => { const it = SF.EQ.isGear(id) || (SF.WEARABLE(id) && !SF.ITEMS[id].stack) ? SF.EQ.make(id, { origin: 'npc' }) : SF.newItem(id, 1); if (!SF.ITEMS[id].stack) it.starter = true; return it; };
+  for (const s in m.wear) { const it = make(m.wear[s]); const c = SF.EQ.canEquip ? SF.EQ.canEquip(ch, it, s) : { ok: true }; if (c && c.ok === false) { SF.addItem(ch.pack, it); continue; } ch.equip[s] = it; }
+  for (const [id, q] of m.pack) { if (id === 'spellbook') { const b = SF.newItem('spellbook', 1, { spells: m.spells.slice() }); b.starter = true; ch.pack.items.push(b); ch.pack.ver = (ch.pack.ver || 0) + 1; continue; }
+    if (SF.ITEMS[id].stack) SF.addItem(ch.pack, SF.newItem(id, q)); else for (let i = 0; i < q; i++) SF.addItem(ch.pack, make(id)); }
+  const trim = ['cookedmeat', 'arrow', 'bandage'];
+  let en = SF.EQ.encumbrance(ch);
+  while (en.stage > 0 && trim.length) { const id = trim.shift(); const it = ch.pack.items.find(x => x.id === id); if (it) { ch.pack.items.splice(ch.pack.items.indexOf(it), 1); ch.pack.ver = (ch.pack.ver || 0) + 1; } en = SF.EQ.encumbrance(ch); }
+  ch.hotbar = m.hotbar.slice();
+  return { ok: en.stage === 0, weight: en.wt, cap: en.cap, stage: en.stage };
+};
+
+/* title(ch): the character's title from what they have actually raised (never from the template): the classic rank of the highest
+   skill and its profession, e.g. "Journeyman Swordsman". Below 30.0 in everything: "Neophyte". */
+CR.RANKS = [[100, 'Grandmaster'], [90, 'Master'], [80, 'Adept'], [70, 'Expert'], [60, 'Journeyman'], [50, 'Apprentice'], [40, 'Novice'], [30, 'Neophyte']];
+CR.TITLE_NOUN = { swordsmanship: 'Swordsman', macefighting: 'Armsman', fencing: 'Fencer', archery: 'Archer', wrestling: 'Wrestler', tactics: 'Tactician',
+  anatomy: 'Healer', parrying: 'Duelist', healing: 'Healer', spellcraft: 'Mage', focus: 'Scholar', wardcraft: 'Warder', meditation: 'Stoic', alchemy: 'Alchemist',
+  venomcraft: 'Assassin', concealment: 'Rogue', shadowstep: 'Rogue', search: 'Scout', tracking: 'Ranger', pickpocketing: 'Pickpocket', lockwork: 'Infiltrator',
+  trapcraft: 'Trap Specialist', taming: 'Tamer', beasthandling: 'Naturalist', veterinary: 'Veterinarian', musicianship: 'Bard', lullaby: 'Pacifier',
+  discord: 'Demoralizer', provocation: 'Rouser', woodcutting: 'Lumberjack', mining: 'Miner', foraging: 'Forager', skinning: 'Skinner', fishing: 'Fisherman',
+  smithing: 'Blacksmith', carpentry: 'Carpenter', tailoring: 'Tailor', fletching: 'Bowyer', engineering: 'Tinker', cooking: 'Chef', appraisal: 'Merchant' };
+CR.title = ch => { let best = null; for (const k in ch.skills || {}) if (!best || ch.skills[k].v > ch.skills[best].v) best = k; const v = best ? ch.skills[best].v / 10 : 0;
+  const r = CR.RANKS.find(([min]) => v >= min); return r ? r[1] + ' ' + (CR.TITLE_NOUN[best] || SF.SKILL[best].n) : 'Neophyte'; };
+
+/* preview(v): derived numbers for the creator, from the shared rules (no formula of its own) */
+CR.preview = s => { const c = { str: s[0], dex: s[1], int: s[2], equip: {} }; return { hp: SF.maxHp(c), stam: SF.maxStam(c), mana: SF.maxMana(c), carry: SF.carryCap(c) }; };
+
+SF.CREATION = CR;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+</script>
+<script>
 /* Shardfall world simulation core (SIM) — Living World Phase 1 (docs/WORLD_SIMULATION_PROGRESS.md).
    Pure, renderer-free, network-free: no DOM, no Canvas, no timers, no Math.random. Runs in the browser (globalThis.SIM)
    and in node for tests (module.exports). The game (src/game.js) owns the entities; SIM gives them:
@@ -1579,7 +2057,8 @@ SIM.newRegistry = newRegistry;
    Listeners see every event; only non-transient types are kept, in a ring of `cap` records, so the log never grows
    without bound. Movement is transient: it is never kept. */
 SIM.EVENT_TYPES = ['ActorSpawned', 'ActorRemoved', 'ActorMoved', 'ActorDamaged', 'ActorHealed', 'ActorKilled', 'CombatStarted', 'CombatEnded',
-  'ItemTransferred', 'ItemCrafted', 'CrimeCommitted', 'CrimeWitnessed', 'ResourceGathered', 'MerchantArrived', 'CampCleared', 'PopulationReplenished', 'AppearanceChanged'];   // AppearanceChanged: v0.25 equipment, for the future layered sprites
+  'ItemTransferred', 'ItemCrafted', 'CrimeCommitted', 'CrimeWitnessed', 'ResourceGathered', 'MerchantArrived', 'CampCleared', 'PopulationReplenished', 'AppearanceChanged',
+  'StatChanged', 'CharacterCreated'];   // AppearanceChanged: v0.25 equipment, for the future layered sprites; StatChanged, CharacterCreated: v0.30 natural attributes and creation
 SIM.TRANSIENT = { ActorMoved: 1 };
 function newBus(opt) {
   opt = opt || {}; const cap = opt.cap || 256, clock = opt.clock || (() => 0), known = new Set(SIM.EVENT_TYPES);
@@ -2207,9 +2686,9 @@ function castSlot(id, opt) {
   if (!sp.legacy) {
     if (!scroll && !knownSpells().has(id)) { if (!SF.count(P.pack, 'spellbook')) return log('You need your spellbook to cast ' + sp.n + '.', '#ffb070'); return log(sp.n + ' is not in your spellbook' + (SF.count(P.pack, sp.scroll) ? ' — read the scroll from your pack, or learn it.' : '.'), '#ffb070'); }
     if (scroll && !SF.count(P.pack, sp.scroll)) return log('You have no scroll of ' + sp.n + '.', '#ffb070');
-    if (!scroll && M < sp.min) return log(`${sp.n} needs Spellcraft ${sp.min}.`, '#ffb070');
-    if (scroll && MG.scrollChance(sp, M) <= 0) return log(`The scroll's words slip away from you (Spellcraft above ${MG.scrollGate(sp)} needed).`, '#ffb070');
-  } else if (M < sp.min) return log(`${sp.n} needs Spellcraft ${sp.min}.`, '#ffb070');
+    if (!scroll && M < sp.min) return log(`${sp.n} needs Magery ${sp.min}.`, '#ffb070');
+    if (scroll && MG.scrollChance(sp, M) <= 0) return log(`The scroll's words slip away from you (Magery above ${MG.scrollGate(sp)} needed).`, '#ffb070');
+  } else if (M < sp.min) return log(`${sp.n} needs Magery ${sp.min}.`, '#ffb070');
   const items = scroll ? [sp.scroll] : sp.regs;
   const miss = items.filter(r => !SF.count(P.pack, r)); if (miss.length) return log('Missing reagents: ' + miss.map(r => SF.ITEMS[r].n).join(', ') + '.', '#ffb070');
   if (P.mana < sp.mp) return log('Not enough mana.', '#ffb070');
@@ -2453,7 +2932,7 @@ function chestSpell(sp, pt, M, E) {
   if (sp.effect === 'lock') { log('Arcane Lock seals only a container you own. This chest is not yours.', '#ffb070'); return false; }
   if (sp.effect === 'trap') { if (c.rtrap) { log('That latch already carries a rune trap.'); return true; } c.rtrap = { M, E, by: P.name }; FX.push({ k: 'ring', x: cpos.x, y: cpos.y, c: '#ff8a40', t0: GT, dur: .6 }); log('A spark settles into the latch.', '#ffb070'); return true; }
   if (sp.effect === 'disarm') { if (!c.rtrap) { log('There is no rune trap on that latch.'); return true; } c.rtrap = null; FX.push({ k: 'ring', x: cpos.x, y: cpos.y, c: '#c8c8c8', t0: GT, dur: .6 }); log('You pull the spark from the latch.', '#7ee08a'); return true; }
-  if (sp.effect === 'unlock') { if (c.open && GT <= c.refill) { log('That chest is already open.'); return true; } const need = c.mlock || MLOCK_REQ[c.tier] || 70; if (M < need) { log(`The seal is too strong (Spellcraft ${need}).`, '#ffb070'); return true; } c.open = true; c.refill = GT + 600; c.cont = chestLoot(c.tier); c.mlock = 0; log('The lock gives way. Any trap on it is still armed.', '#ffe08a'); return true; }
+  if (sp.effect === 'unlock') { if (c.open && GT <= c.refill) { log('That chest is already open.'); return true; } const need = c.mlock || MLOCK_REQ[c.tier] || 70; if (M < need) { log(`The seal is too strong (Magery ${need}).`, '#ffb070'); return true; } c.open = true; c.refill = GT + 600; c.cont = chestLoot(c.tier); c.mlock = 0; log('The lock gives way. Any trap on it is still armed.', '#ffe08a'); return true; }
   if (sp.effect === 'object_use') { FX.push({ k: 'ring', x: cpos.x, y: cpos.y, c: '#c8e0ff', t0: GT, dur: .6 }); if (c.rtrap) springRuneTrap(c, true); else log('The far hand touches the latch. Nothing happens.'); return true; }
   return true;
 }
@@ -2591,8 +3070,8 @@ function magicArmor(a) { const g = a.mg; return g && g.armor && g.armor.until > 
 function recomputeStats() {
   if (!P.base) P.base = { str: P.str, dex: P.dex, int: P.int };
   const g = P.mg || {}; const eff = P._eff || {};
-  for (const s of ['str', 'dex', 'int']) { if (eff[s] !== undefined && P[s] !== eff[s]) P.base[s] += P[s] - eff[s];   // trained outside magic: keep the change on the base
-    P[s] = MG.effectiveStat(P.base[s], g.mods, s, GT); eff[s] = P[s]; }
+  // P.base holds the natural attributes and only SF.STATS changes them (v0.30); P.str/dex/int are always derived from it
+  for (const s of ['str', 'dex', 'int']) { P[s] = MG.effectiveStat(P.base[s], g.mods, s, GT); eff[s] = P[s]; }
   P._eff = eff;
   // pools never fill on a cap increase; they clamp down on a decrease. A living character keeps at least 1 HP.
   P.hp = Math.min(P.hp, SF.maxHp(P)); if (!P.ghost) P.hp = Math.max(1, P.hp); P.stam = Math.min(P.stam, SF.maxStam(P)); P.mana = Math.min(P.mana, SF.maxMana(P));
@@ -2671,7 +3150,7 @@ const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
 let MDET = null;
 function spellbookPanel() {
   const M = mval(), known = knownSpells(), hasBook = SF.count(P.pack, 'spellbook') > 0; const c = +(PTAB || 1) || 1;
-  let h = `<div class="note">Spellcraft ${f1(P.skills.spellcraft.v)} · Focus ${f1(P.skills.focus.v)} · ${hasBook ? known.size + ' / 64 spells in your book' : '<b class="warn">no spellbook in your pack</b>'}. Tap a slot to prepare, then tap a target to release (3 s hold). Drag a sign to the bar, or long-press it.</div>`;
+  let h = `<div class="note">Magery ${f1(P.skills.spellcraft.v)} · Evaluating Intelligence ${f1(P.skills.focus.v)} · ${hasBook ? known.size + ' / 64 spells in your book' : '<b class="warn">no spellbook in your pack</b>'}. Tap a slot to prepare, then tap a target to release (3 s hold). Drag a sign to the bar, or long-press it.</div>`;
   h += `<div class="chips">${[1, 2, 3, 4, 5, 6, 7, 8].map(i => btn('mtab', ROMAN[i], { c: i }, i === c ? 'ac' : '')).join('')}</div>`;
   for (const sp of MG.SPELLS.filter(s => s.circle === c)) {
     const k = known.has(sp.id), sc = SF.count(P.pack, sp.scroll), ch = MG.bookChance(sp, M), rg = sp.regs.map(r => `${SF.ITEMS[r].n}${SF.count(P.pack, r) ? '' : ' ✗'}`).join(', ');
@@ -2699,11 +3178,6 @@ function magicItemActions(it) {
   if (d.spell) { a += btn('mread', 'Read', { s: d.spell }); if (SF.count(P.pack, 'spellbook') && !knownSpells().has(d.spell)) a += btn('mlearn', 'Learn', { s: d.spell }); }
   if (it.id === 'spellbook') a += btn('open', 'Open', { p: 'spells' });
   return a;
-}
-function mageryStarter(add) {
-  if (P.skills.spellcraft.v < 100) P.skills.spellcraft.v = 100;            // magic starters begin with at least 10.0 Spellcraft
-  P.pack.items.push(SF.newItem('spellbook', 1, { spells: MG.STARTER.slice() }));
-  for (const r of Object.keys(MG.REAGENTS)) add(r, 12); add('rune', 1);
 }
 
 /* ---------- boot: shops, loot, migration, panels, actions ---------- */
@@ -4474,8 +4948,23 @@ function gain(key, diff, ctx) {
   const r = SF.tryGain(P, key, diff, Object.assign({ now: GT }, ctx || {}));
   SKLOG.push({ k: key, at: GT, r: r.gained ? `+0.1 → ${f1(P.skills[key].v)}` + (r.lowered ? ` (−0.1 ${SF.SKILL[r.lowered].n})` : '') : r.reason }); if (SKLOG.length > 80) SKLOG.shift();
   if (r.gained) { log(`${SF.SKILL[key].n} +0.1 (${f1(P.skills[key].v)})`, '#7fd4ff', 'skill'); if (GT - SND.gainAt > 1.5) { SND.gainAt = GT; snd('skill.gain'); } }
+  statRoll(key, r, ctx);
   return r;
 }
+/* attributes grow from the same resolved actions (src/stats.js, SF.STATS): one roll per action (the action id is the step time
+   unless the caller passes one; auxiliary checks pass aux: true), independent of whether the skill itself gained. The skill
+   check's verdict sets the challenge: a fitting or Grandmaster use counts fully, a trivial or repeated one a quarter. */
+function statRoll(key, r, ctx) {
+  if (!P || P.ghost) return null; const why = r.reason || '';
+  const challenge = r.gained || r.chance > 0 || /no gain this time|skill is at 100|too difficult/.test(why) ? 1 : /too easy|times in 10 minutes/.test(why) ? SF.STATS.CFG.trivial : 0;
+  const s = SF.STATS.tryStatGain(P, key, { now: GT, action: ctx && ctx.action !== undefined ? ctx.action : 't' + GT.toFixed(3), challenge, aux: !!(ctx && ctx.aux) });
+  if (!s.gained) return s;
+  recomputeStats(); log(SF.STATS.message(s), '#9fe08a', 'skill'); if (GT - SND.gainAt > 1.5) { SND.gainAt = GT; snd('skill.gain'); }
+  simEmit('StatChanged', { actor: aidOf(P), stat: s.stat, value: s.value, lowered: s.lowered || null, skill: key });
+  if (s.lowered === 'str') strDropped(); eqChanged(); return s;
+}
+/* a Strength point given up at the 225 cap can leave worn gear above the requirement: it goes back to the backpack, never dropped */
+function strDropped() { for (const sl of SF.EQ.SLOT_IDS) { const it = P.equip[sl]; if (it && SF.EQ.strReq(it) > P.str && unequipTo(sl)) log(`${iname(it)} is too heavy for your Strength now; you put it in your backpack.`, '#ffb070'); } }
 
 /* ---------- sound: src/audio.js (SFXA) plays the sound pack; this section decides what plays and where ---------- */
 let AC = null, muted = false;   // AC is SFXA's shared AudioContext once a gesture unlocks it; muted persists in SETTINGS
@@ -4578,22 +5067,18 @@ function sndTick() {
 }
 
 /* ---------- player ---------- */
+/* newChar(o): the player object. A new character comes from a validated creation (SF.CREATION.validate → value): its skill
+   points become tenths once (SF.CREATION.progression), every other skill starts at 0.0, every lock at Raise. A loaded character
+   passes skills: {} and its saved fields are laid over this. */
 function newChar(o) {
   const c = { kind: 'player', pid: 'p1', name: o.name, x: 92.5, y: 304.5, sect: 0, str: o.str, dex: o.dex, int: o.int, skills: SF.newSkills(), pack: SF.newContainer('pack', 'p1'), bank: SF.newContainer('bank', 'p1'), equip: emptyEquip(), eqMig: SF.EQ.MIGRATION, look: o.look || {}, bound: 'quay', freeLessons: 2, hotbar: [null, null, null, null], sw: SF.newSwing(), combatMig: SF.COMBAT_MIGRATION };
-  c.id = 'p1'; for (const [k, v] of Object.entries(o.skills)) c.skills[k].v = v * 10;
+  c.id = 'p1'; Object.assign(c, SF.CREATION.progression({ str: o.str, dex: o.dex, int: o.int, skills: o.skills || {} }, (Math.random() * 4294967296) >>> 0));
   c.hp = SF.maxHp(c); c.stam = SF.maxStam(c); c.mana = SF.maxMana(c); return c;
 }
-function starterKit() {
-  const add = (id, q) => SF.addItem(P.pack, SF.newItem(id, q));
-  add('journal', 1); P.equip.shirt = SF.EQ.make('shirt', { origin: 'npc' }); P.equip.trousers = SF.EQ.make('trousers', { origin: 'npc' }); P.equip.feet = SF.EQ.make('shoes', { origin: 'npc' }); add('gold', 150); add('bandage', 12); add('cookedmeat', 3);
-  const top = ['swordsmanship', 'fencing', 'macefighting', 'archery'].sort((a, b) => P.skills[b].v - P.skills[a].v)[0];
-  const w = { swordsmanship: P.skills.parrying.v > 0 || P.str < SF.WEAPONS.glaive.str ? 'sword' : 'glaive', fencing: 'dagger', macefighting: 'mace', archery: 'shortbow' }[top];
-  if (P.skills[top].v > 0) { P.equip.weapon = SF.newItem(w, 1); if (w === 'shortbow') add('arrow', 80); } else add('dagger', 1);
-  if (P.skills.parrying.v > 0 && !(P.equip.weapon && SF.weaponOf(P.equip.weapon).two)) P.equip.shield = SF.EQ.make('buckler', { origin: 'npc' });
-  for (const [k, tool] of [['woodcutting', 'hatchet'], ['mining', 'pickaxe'], ['skinning', 'knife'], ['fishing', 'rod'], ['smithing', 'tongs'], ['tailoring', 'sewkit'], ['carpentry', 'knife'], ['fletching', 'knife']]) if (P.skills[k].v > 0 && !SF.count(P.pack, tool)) add(tool, 1);
-  if (P.skills.spellcraft.v > 0) mageryStarter(add);
-  if (P.skills.alchemy.v > 0) add('vial', 6);
-  P.hotbar = [{ k: 'item', id: 'bandage' }, P.skills.spellcraft.v > 0 ? { k: 'spell', id: 'magery.04' } : { k: 'item', id: 'draught' }, P.skills.spellcraft.v > 0 ? { k: 'spell', id: 'magery.05' } : P.skills.concealment.v > 0 ? { k: 'act', id: 'hide' } : { k: 'act', id: 'track' }, { k: 'act', id: 'meditate' }, { k: 'act', id: 'bandother' }];
+/* the starter kit (SF.CREATION.kit / applyKit): granted once, only for a committed new character */
+function starterKit(v) {
+  const r = SF.CREATION.applyKit(P, SF.CREATION.kit(v)); for (const n of SF.CREATION.kit(v).notes) log(n, '#ffb070');
+  if (!r.ok) console.warn('starter kit over the light load', r);
 }
 /* equipment and weight (src/equipment.js, SF.EQ). Weight is shown in weight units (SF.WU per authored kg); worn gear counts. */
 const emptyEquip = () => { const e = {}; for (const s of SF.EQ.SLOT_IDS) e[s] = null; return e; };
@@ -4750,7 +5235,7 @@ function applyBlow(A, t, opt) {
   if (D.shieldAR > 0) { if (t === P) gain('parrying', A.diff); if (m.parried) { wear(D.shieldItem, .3); floater(t.x, t.y, 'parry', '#cfe8ff'); } }
   if (D.armorItem) { if (A.w && A.w.mace) { if (m.armorWear > 0) wear(D.armorItem, m.armorWear); } else wear(D.armorItem, .2); }
   if (A.w && A.w.mace) drainStam(t, rnd(SF.MACE_STAM[0], SF.MACE_STAM[1]));
-  if (a === P) { gain('tactics', D.diff); gain('anatomy', D.diff); if (A.it && A.w.hp) wear(A.it, 25 / A.w.hp);
+  if (a === P) { gain('tactics', D.diff, { aux: true }); gain('anatomy', D.diff, { aux: true }); if (A.it && A.w.hp) wear(A.it, 25 / A.w.hp);
     const it = A.it; if (it && it.venom && it.venom.charges > 0 && !A.w.ammo) { it.venom.charges--; applyPoison(t, it.venom.tier); if (!it.venom.charges) { delete it.venom; log('The venom on your weapon is spent.'); } } }
   m.raw = raw;
   if (m.final <= 0) { floater(t.x, t.y, m.parried ? 'parried' : 'absorbed', '#c8c8c8'); noHarmSound(t, m.parried); return m; }
@@ -5022,7 +5507,7 @@ function finishFirstAid() {
   if (now !== b.kind) return out(b.kind === 'res' ? `${cap1(who)} is no longer a ghost.` : now === 'res' ? `${cap1(who)} died before you finished.` : now === 'cure' ? `${cap1(who)} was poisoned before you finished; this bandage was for wounds.` : now === 'heal' ? `The poison is already gone; this bandage was for poison.` : `${cap1(who)} no longer needs treatment.`);
   const heal = sv('healing'), ana = sv('anatomy');
   const r = SF.firstAidResolve({ kind: b.kind, heal, ana, slips: b.slips, missing: st.max - st.hp }, R);
-  if (r.chance > 0 && r.chance < 1) { gain('healing', heal + 5); gain('anatomy', ana + 5); }    // a sure or impossible treatment teaches nothing
+  if (r.chance > 0 && r.chance < 1) { gain('healing', heal + 5); gain('anatomy', ana + 5, { aux: true }); }    // a sure or impossible treatment teaches nothing
   const sl = b.slips ? ` (${b.slips} slip${b.slips > 1 ? 's' : ''})` : '';
   if (b.kind === 'heal') {
     if (!r.success) { floater(e.x, e.y, 'no effect', '#c8c8c8'); return out(`You fail to stop the bleeding${sl}.`); }
@@ -5557,8 +6042,8 @@ const ABIL = {
   lullaby: { n: 'Lullaby', cd: SF.BARD.cd, fn: () => bard('lullaby') },
   discord: { n: 'Discord', cd: SF.BARD.cd, fn: () => bard('discord') },
   provoke: { n: 'Provoke', cd: SF.BARD.cd, fn: () => bard('provocation') },
-  pick: { n: 'Pickpocket', fn: () => { const m = P.sel; if (!m || m.kind !== 'mon' || !MON[m.type].purse) return log('Select an unaware smuggler to pick their pocket.', '#ffb070'); if (dist(m, P) > SF.PICK_RANGE) return log('Get within 1.5 m.', '#ffb070'); if (m.target === P) return log('They are watching you too closely.', '#ffb070'); m.pickCd = m.pickCd || 0; if (GT < m.pickCd) return log('Wait before trying that pocket again.'); m.pickCd = GT + SF.PICK_COOLDOWN; P.task = { kind: 'pick', m, label: 'Pickpocketing', t0: GT, t1: GT + SF.PICK_TIME, still: true, x0: P.x, y0: P.y }; } },
-  coat: { n: 'Coat weapon', fn: () => { const w = P.equip.weapon; if (!w || wDef().ammo || wDef() === SF.WEAPONS.unarmed) return log('Equip a melee weapon to coat.', '#ffb070'); if (wDef().skill === 'macefighting') return log('Mace Fighting weapons cannot carry poison.', '#ffb070'); if (!SF.count(P.pack, 'venom')) return log('You need a mire venom vial (craft one at an alchemy still).', '#ffb070'); const tier = SF.venomTier(sv('venomcraft')); if (!tier) return log('Coating needs Venomcraft 30.', '#ffb070'); P.task = { kind: 'coat', label: 'Coating', t0: GT, t1: GT + 1, still: true, x0: P.x, y0: P.y }; } },
+  pick: { n: 'Pickpocket', fn: () => { const m = P.sel; if (!m || m.kind !== 'mon' || !MON[m.type].purse) return log('Select an unaware smuggler to pick their pocket.', '#ffb070'); if (dist(m, P) > SF.PICK_RANGE) return log('Get within 1.5 m.', '#ffb070'); if (m.target === P) return log('They are watching you too closely.', '#ffb070'); m.pickCd = m.pickCd || 0; if (GT < m.pickCd) return log('Wait before trying that pocket again.'); m.pickCd = GT + SF.PICK_COOLDOWN; P.task = { kind: 'pick', m, label: 'Stealing', t0: GT, t1: GT + SF.PICK_TIME, still: true, x0: P.x, y0: P.y }; } },
+  coat: { n: 'Coat weapon', fn: () => { const w = P.equip.weapon; if (!w || wDef().ammo || wDef() === SF.WEAPONS.unarmed) return log('Equip a melee weapon to coat.', '#ffb070'); if (wDef().skill === 'macefighting') return log('Mace Fighting weapons cannot carry poison.', '#ffb070'); if (!SF.count(P.pack, 'venom')) return log('You need a mire venom vial (craft one at an alchemy still).', '#ffb070'); const tier = SF.venomTier(sv('venomcraft')); if (!tier) return log('Coating needs Poisoning 30.', '#ffb070'); P.task = { kind: 'coat', label: 'Coating', t0: GT, t1: GT + 1, still: true, x0: P.x, y0: P.y }; } },
   trap: { n: 'Set snare', fn: () => { if (!SF.count(P.pack, 'trapkit')) return log('You need a snare kit.', '#ffb070'); if (TRAPS.filter(t => t.owner === 'P').length >= SF.TRAP.max) return log('You already have two snares set.', '#ffb070'); if (TRAPS.some(t => Math.hypot(t.x - P.x, t.y - P.y) < SF.TRAP.spacing)) return log('Snares must be at least 4 m apart.', '#ffb070'); P.task = { kind: 'trap', label: 'Setting snare', t0: GT, t1: GT + SF.TRAP.place, still: true, x0: P.x, y0: P.y }; } } };
 function bard(skill) {
   const id = { lullaby: 'lullaby', discord: 'discord', provocation: 'provoke' }[skill];
@@ -5935,8 +6420,31 @@ function updateFacing(e, vx, vy) {
 function faceToward(e, tx, ty) { const vx = tx - e.x, vy = ty - e.y; const s = e.sect; e.sect = undefined; updateFacing(e, vx, vy); if (e.sect === undefined) e.sect = s || 0; }
 function hexHsl(h) { const n = parseInt(h.slice(1), 16); let r = (n >> 16) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b); let H = 0, S = 0, L = (mx + mn) / 2; if (mx !== mn) { const d = mx - mn; S = L > .5 ? d / (2 - mx - mn) : d / (mx + mn); H = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; H *= 60; } return [H, S, L]; }
 function hsl2rgb(h, s, l) { h /= 360; const f = (p, q, t) => { t < 0 && (t += 1); t > 1 && (t -= 1); return t < 1 / 6 ? p + (q - p) * 6 * t : t < .5 ? q : t < 2 / 3 ? p + (q - p) * (2 / 3 - t) * 6 : p; }; if (!s) return [l, l, l]; const q = l < .5 ? l * (1 + s) : l + s - l * s, p = 2 * l - q; return [f(p, q, h + 1 / 3), f(p, q, h), f(p, q, h - 1 / 3)]; }
+/* ---- appearance on the traveller sprite (Character Creation v2): skin tone and cloak colour are recoloured from the drawn
+   sheets. Each sheet gets a class mask once (1 skin, 2 cloak); each look a cached copy. Hair, beards, clothing colours and female
+   sheets are not drawn yet, so the world sprite shows only these two (docs/design/character-creation-v2-status.md). ---- */
+const TINT = { prep: new Map(), out: new Map() };
+function rgbHsl(r, g, b) { r /= 255; g /= 255; b /= 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b); let H = 0, S = 0; const L = (mx + mn) / 2; if (mx !== mn) { const d = mx - mn; S = L > .5 ? d / (2 - mx - mn) : d / (mx + mn); H = (mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4) * 60; } return [H, S, L]; }
+function tintPrep(src) {
+  let p = TINT.prep.get(src); if (p) return p; const w = src.width, h = src.height, c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); g.drawImage(src, 0, 0);
+  const d = g.getImageData(0, 0, w, h), a = d.data, n = w * h, cls = new Uint8Array(n), hsl = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { if (!a[i * 4 + 3]) continue; const [H, S, L] = rgbHsl(a[i * 4], a[i * 4 + 1], a[i * 4 + 2]); hsl[i * 3] = H; hsl[i * 3 + 1] = S; hsl[i * 3 + 2] = L;
+    if (H > 150 && H < 220 && S > .1) cls[i] = 2; else if (H >= 10 && H <= 40 && S >= .25 && S <= .85 && L >= .52) cls[i] = 1; }
+  p = { w, h, d, cls, hsl }; TINT.prep.set(src, p); return p;
+}
+function tinted(src, look, tag) {
+  if (!src || !look || typeof look !== 'object') return src; const ck = SF.CREATION.cloakHex(look), sk = SF.CREATION.skinHex(look); if (!ck && !sk) return src;
+  const key = tag + '|' + (ck || '') + '|' + (sk || ''); let c = TINT.out.get(key); if (c) return c;
+  const p = tintPrep(src); c = document.createElement('canvas'); c.width = p.w; c.height = p.h; const g = c.getContext('2d'); const d = g.createImageData(p.w, p.h), a = d.data; a.set(p.d.data);
+  const C = ck && hexHsl(ck), K = sk && hexHsl(sk);
+  for (let i = 0, n = p.w * p.h; i < n; i++) { const k = p.cls[i]; if (!k) continue; const S = p.hsl[i * 3 + 1], L = p.hsl[i * 3 + 2]; let rgb = null;
+    if (k === 2 && C) rgb = hsl2rgb(C[0], Math.min(1, S * .5 + C[1] * .7), cl(L * (.5 + C[2]), 0, 1));
+    else if (k === 1 && K) rgb = hsl2rgb(K[0], cl(S * K[1] / .5, 0, 1), cl(L * K[2] / .66, 0, 1));
+    if (rgb) { a[i * 4] = rgb[0] * 255; a[i * 4 + 1] = rgb[1] * 255; a[i * 4 + 2] = rgb[2] * 255; } }
+  g.putImageData(d, 0, 0); if (TINT.out.size > 120) TINT.out.clear(); TINT.out.set(key, c); return c;
+}
 function scoutSheet(col) {
-  if (!SCOUT.img) return null; const key = col || 'orig'; let c = SCOUT.cache.get(key); if (c) return c;
+  if (!SCOUT.img) return null; if (col && typeof col === 'object') return tinted(SCOUT.img, col, 'atlas'); const key = col || 'orig'; let c = SCOUT.cache.get(key); if (c) return c;
   c = document.createElement('canvas'); c.width = SCOUT.img.width; c.height = SCOUT.img.height; const g = c.getContext('2d'); g.drawImage(SCOUT.img, 0, 0);
   if (col === 'ghost') { const d = g.getImageData(0, 0, c.width, c.height), a = d.data; for (let i = 0; i < a.length; i += 4) { if (!a[i + 3]) continue; const l = (a[i] + a[i + 1] + a[i + 2]) / 3; a[i] = l * .7 + 60; a[i + 1] = l * .8 + 80; a[i + 2] = l + 110; a[i + 3] = 150; } g.putImageData(d, 0, 0); }
   else if (col) { const [th, ts, tl] = hexHsl(col); const d = g.getImageData(0, 0, c.width, c.height), a = d.data; for (let i = 0; i < a.length; i += 4) { if (!a[i + 3]) continue; const [h, s, l] = hexHsl('#' + ((1 << 24) | (a[i] << 16) | (a[i + 1] << 8) | a[i + 2]).toString(16).slice(1)); if (h > 150 && h < 220 && s > .1) { const rgb = hsl2rgb(th, Math.min(1, s * .5 + ts * .7), cl(l * (.5 + tl * 1.0), 0, 1)); a[i] = rgb[0] * 255; a[i + 1] = rgb[1] * 255; a[i + 2] = rgb[2] * 255; } } g.putImageData(d, 0, 0); }
@@ -5959,7 +6467,7 @@ function playerClip() {
 }
 function drawPlayerAnim(g, e, x, y, col) {
   if (P.ghost) { const im = animSheet('Walk', true); if (!im) return false; const f = e.speed > .3 ? Math.floor(GT * 12) % 8 : 0; g.drawImage(im, f * 128, (e.sect || 0) * 128, 128, 128, Math.round(x - 64), Math.round(y - 106), 128, 128); return true; }
-  const [k, f] = playerClip(); const im = animSheet(k); if (!im) return false;
+  const [k, f] = playerClip(); const im = tinted(animSheet(k), P.look, k); if (!im) return false;
   g.imageSmoothingEnabled = false; g.drawImage(im, f * 128, (e.sect || 0) * 128, 128, 128, Math.round(x - 64), Math.round(y - 106), 128, 128); return true;
 }
 function drawScout(g, e, x, y, col) {
@@ -6054,7 +6562,7 @@ function drawEnt(e) {
   if (e.kind === 'pet') { g.strokeStyle = '#5aa8ff'; g.lineWidth = 1.5; g.beginPath(); g.ellipse(x, y, 14 * big, 7 * big, 0, 0, 7); g.stroke(); }
   if (P.sel === e && !P.ghost) { g.strokeStyle = relColor(e); g.lineWidth = 2; g.beginPath(); g.ellipse(x, y, 20 * big, 10 * big, 0, 0, 7); g.stroke(); }
   if (e.kind === 'player' && drawForm(g, e, x, y)) { }
-  else if (e.kind === 'player') drawScout(g, e, x, y, P.ghost ? 'ghost' : (P.look.cloak || null));
+  else if (e.kind === 'player') drawScout(g, e, x, y, P.ghost ? 'ghost' : P.look);
   else if (e.kind === 'ally') { if (e.ghost) g.globalAlpha = .75; drawScout(g, e, x, y, e.ghost ? 'ghost' : '#2f7a46'); }
   else if (e.kind === 'npc') drawScout(g, e, x, y, NPC_COL[e.role] || (e.life && LIFE_COL[e.life.prof]) || '#5a5a5a');
   else if (e.kind === 'mon' && MON[e.type].scout) drawScout(g, e, x, y, MON[e.type].scout);
@@ -6298,18 +6806,22 @@ function bagActions(it) {
   if (d.trade) a += btn('drop', 'Drop', { u: it.uid });
   return a;
 }
+/* natural attributes with their locks (src/stats.js). Effective values (spells, equipment) show beside when they differ. */
+function statRowsHtml() { const b = SF.STATS.natural(P), L = P.statLocks || SF.STATS.newLocks(), sym = { raise: '▲', hold: '■', lower: '▼' };
+  return SF.STATS.KEYS.map(k => { const eff = k === 'dex' ? P.dex + (P.eqDex || 0) : P[k]; const tip = SF.STATS.NAME[k] + ' is trained by ' + SF.STATS.trainedBy(k).join(', ');
+    return `<span title="${esc(tip)}">${SF.STATS.NAME[k]}</span><span><button class="lk lk-${L[k]}" data-a="statlock" data-k="${k}" aria-label="${SF.STATS.NAME[k]} lock: ${L[k]} (tap to change)" title="${L[k]}">${sym[L[k]]}</button> ${b[k]}${eff !== b[k] ? ` <span class="note">(${eff} now)</span>` : ''}</span>`; }).join(''); }
 const PANELS = {
   bag: bagPanel,
-  gear: () => { const t = (k, n) => `<span>${n}</span><span>${P[k]}</span>`; let h = `<div class="kv">${t('str', 'Strength')}${t('dex', 'Dexterity')}${t('int', 'Intellect')}<span>Stat total</span><span>${P.str + P.dex + P.int} / 225</span><span>Health</span><span>${Math.floor(P.hp)} / ${SF.maxHp(P)}</span><span>Stamina</span><span>${Math.floor(P.stam)} / ${SF.maxStam(P)}</span><span>Mana</span><span>${Math.floor(P.mana)} / ${SF.maxMana(P)}</span><span>Armor rating</span><span>${armorVal()}</span><span>Carried</span><span>${fmtWt(carryWt())} / ${fmtWt(SF.carryCap(P))} · ${encumb().n}</span><span>Weapon</span><span>${wDef().fam} · ${wDef().dmg.join('–')} · reach ${wDef().reach} m · swing every ${SF.swingDelay(P.stam, wDef().speed).toFixed(2)} s</span><span>Bound shrine</span><span>${SHRINES.find(s => s.id === P.bound).n}</span><span>Skills</span><span>${f1(SF.totalSkill(P))} / 700.0</span></div><div class="sec">Equipped ${btn('eqwin', 'Paper doll (C)', {}, 'ac')}</div>`;
+  gear: () => { let h = `<div class="kv"><span>Title</span><span>${esc(SF.CREATION.title(P))}</span>${statRowsHtml()}<span>Attribute total</span><span>${SF.STATS.total(P)} / ${SF.STAT_CAP}</span><span>Health</span><span>${Math.floor(P.hp)} / ${SF.maxHp(P)}</span><span>Stamina</span><span>${Math.floor(P.stam)} / ${SF.maxStam(P)}</span><span>Mana</span><span>${Math.floor(P.mana)} / ${SF.maxMana(P)}</span><span>Armor rating</span><span>${armorVal()}</span><span>Carried</span><span>${fmtWt(carryWt())} / ${fmtWt(SF.carryCap(P))} · ${encumb().n}</span><span>Weapon</span><span>${wDef().fam} · ${wDef().dmg.join('–')} · reach ${wDef().reach} m · swing every ${SF.swingDelay(P.stam, wDef().speed).toFixed(2)} s</span><span>Bound shrine</span><span>${SHRINES.find(s => s.id === P.bound).n}</span><span>Skills</span><span>${f1(SF.totalSkill(P))} / 700.0</span></div><div class="sec">Equipped ${btn('eqwin', 'Paper doll (C)', {}, 'ac')}</div>`;
     for (const s of SF.EQ.SLOT_IDS) { const it = P.equip[s]; if (!it && !['weapon', 'shield', 'chest'].includes(s)) continue; h += `<div class="row"><span class="v" style="width:5.5em">${SF.EQ.SLOT[s].n}</span>${it ? rowIcon(it) : ''}<span class="nm">${it ? esc(iname(it)) : '<span class="note">empty</span>'}</span>${it && SF.WEARABLE(it.id) && it.cond !== undefined && it.cond < (it.maxc || 100) ? btn('repair', 'Repair', { u: it.uid }) : ''}${it && SF.ITEMS[it.id].trade ? btn('uneq', 'Remove', { s }) : ''}</div>`; }
-    return ['Character', h + '<p class="note">Stats do not grow by use. Buy points from Master Vey (up to 225 total).</p>']; },
+    return ['Character', h + '<p class="note">Attributes grow as you use your skills (up to 100 each, 225 together). ▲ raise · ■ hold · ▼ lower: at 225 a gain takes a point from an attribute set to Lower.</p>']; },
   skills: () => { let h = `<div class="note">Total ${f1(SF.totalSkill(P))} / 700.0 · ▲ raise · ■ hold · ▼ lower (gives points when you hit the cap)</div>`;
     if (P.skillPool > 0) h += `<div class="sec">Combat reform</div><p class="note">${f1(P.skillPool)} trained points from skills that merged in the combat reform are waiting. Tap +1.0 on a skill to place them (never past 100.0 or the 700.0 total).</p>`;
     for (const [k, n, g, live] of SF.SKILLS) { const s = P.skills[k]; const lk = s.lock === 'raise' ? '▲' : s.lock === 'hold' ? '■' : '▼'; const tip = SF.SKILL_TIP[k]; h += `<div class="row ${live ? '' : 'na'}"${tip ? ` title="${esc(tip)}"` : ''}><span class="nm">${n}${live ? '' : ' <span class="note">later milestone</span>'}${tip ? `<br><span class="note">${esc(tip)}</span>` : ''}</span><span class="v">${f1(s.v)}</span>${P.skillPool > 0 && s.v < SF.SKILL_MAX ? btn('pool', '+1.0', { k }) : ''}${btn('lock', lk, { k })}</div>`; }
     h += '<div class="sec">Recent skill checks</div>' + (SKLOG.slice(-14).reverse().map(l => `<div class="note">${SF.SKILL[l.k].n}: ${esc(l.r)}</div>`).join('') || '<p class="note">None yet.</p>');
     return ['Skills', h]; },
   spells: () => spellbookPanel(),
-  abilities: () => ['Abilities', `<p class="note">Use now or put an action on a hotbar slot (two bars of four).</p>` + [['bandother', 'Bandage other (Healing: an ally or a player ghost)'], ['anatomy', 'Anatomy (judge a living target)'], ['hide', 'Hide (Concealment)'], ['track', 'Track (Tracking)'], ['meditate', 'Meditate'], ['brace', 'Braced Guard (Parrying 50)'], ['search', 'Search (finds hidden foes and snares)'], ['tame', 'Tame (Taming)'], ['vet', 'Treat pet (Veterinary)'], ['lullaby', 'Lullaby (needs a lute)'], ['discord', 'Discord (needs a lute)'], ['provoke', 'Provoke (needs a lute)'], ['pick', 'Pickpocket a smuggler'], ['coat', 'Coat weapon with venom (Venomcraft 30)'], ['trap', 'Set a snare (Trapcraft)']].map(([id, n]) => `<div class="row"><span class="nm">${n}</span>${ABIL[id] ? btn('abil', 'Use', { id }) : ''}${btn('assign', 'Slot', { k: 'act', id })}</div>`).join('')],
+  abilities: () => ['Abilities', `<p class="note">Use now or put an action on a hotbar slot (two bars of four).</p>` + [['bandother', 'Bandage other (Healing: an ally or a player ghost)'], ['anatomy', 'Anatomy (judge a living target)'], ['hide', 'Hide (Hiding)'], ['track', 'Track (Tracking)'], ['meditate', 'Meditate'], ['brace', 'Braced Guard (Parrying 50)'], ['search', 'Search (finds hidden foes and snares)'], ['tame', 'Tame (Animal Taming)'], ['vet', 'Treat pet (Veterinary)'], ['lullaby', 'Lullaby: Peacemaking (needs a lute)'], ['discord', 'Discord: Discordance (needs a lute)'], ['provoke', 'Provoke (needs a lute)'], ['pick', 'Pickpocket a smuggler (Stealing)'], ['coat', 'Coat weapon with venom (Poisoning 30)'], ['trap', 'Set a snare (Remove Trap)']].map(([id, n]) => `<div class="row"><span class="nm">${n}</span>${ABIL[id] ? btn('abil', 'Use', { id }) : ''}${btn('assign', 'Slot', { k: 'act', id })}</div>`).join('')],
   assign: () => ['Choose a slot', `<p class="note">Assign ${esc(ASSIGN.k === 'spell' ? SF.SPELL[ASSIGN.id].n : ASSIGN.k === 'item' ? SF.ITEMS[ASSIGN.id].n : (ABIL[ASSIGN.id] ? ABIL[ASSIGN.id].n : ASSIGN.id))} to:</p><div class="grid2">${P.hotbar.map((_, i) => btn('setslot', 'Bar ' + (1 + Math.floor(i / 3)) + ' · ' + (i % 3 + 1) + ': ' + esc(slotLabel(P.hotbar[i])[0]), { i })).join('')}</div>`],
   loot: () => { const c = P.lootOpen; if (!c || c.gone) return null; const ls = c.cont ? SF.lootStatus(c.cont, P.id, GT) : { label: '' }; let h = `<div class="note">${c.mine ? 'Your body · ' : ''}${esc(ls.label || '')} · crumbles in ${Math.ceil((c.expires - GT) / 60)} min · pack ${P.pack.items.length}/${SF.SLOTS}, ${packKg().toFixed(1)}/${SF.carryKg(P).toFixed(1)} kg</div>`;
     if (!c.cont.items.length) h += '<p class="note">Empty.</p>'; else h += btn('takeall', 'Take all', {}, 'ac');
@@ -6323,11 +6835,11 @@ const PANELS = {
     return [P.talkTo ? P.talkTo.name : 'Bank', h]; },
   shop: () => { const n = P.talkTo; if (!n || dist(n, P) > 4) return null; const stock = SHOPS[n.role] || []; const tab = PTAB || 'buy'; let h = `<div class="tabs">${btn('tab', 'Buy', { t: 'buy' }, tab === 'buy' ? 'ac' : '')}${btn('tab', 'Sell', { t: 'sell' }, tab === 'sell' ? 'ac' : '')}<span class="note" style="margin-left:auto">${SF.count(P.pack, 'gold')} gold</span></div>`;
     if (tab === 'buy') for (const id of stock) { const p = SF.PRICES[id]; const st = SF.ITEMS[id].stack; h += `<div class="row">${rowIcon({ id })}<span class="nm">${esc(SF.itemName({ id, qty: 1 }))}</span><span class="v">${p} gp</span>${btn('buy', 'Buy', { id, n: 1 })}${st ? btn('buy', '×10', { id, n: 10 }) : ''}</div>`; }
-    else for (const it of P.pack.items) { if (!SF.ITEMS[it.id].trade || it.id === 'gold') continue; const p = Math.max(1, Math.floor((SF.PRICES[it.id] || 1) * .4)); h += `<div class="row">${rowIcon(it)}<span class="nm">${esc(iname(it))}</span><span class="v">${p} gp ea</span>${btn('sell', 'Sell 1', { u: it.uid })}${it.qty > 1 ? btn('sell', 'All', { u: it.uid, all: 1 }) : ''}</div>`; }
+    else for (const it of P.pack.items) { if (!SF.ITEMS[it.id].trade || it.id === 'gold' || it.starter) continue; const p = Math.max(1, Math.floor((SF.PRICES[it.id] || 1) * .4)); h += `<div class="row">${rowIcon(it)}<span class="nm">${esc(iname(it))}</span><span class="v">${p} gp ea</span>${btn('sell', 'Sell 1', { u: it.uid })}${it.qty > 1 ? btn('sell', 'All', { u: it.uid, all: 1 }) : ''}</div>`; }
     return [n.name, h]; },
   trainer: () => { const tab = PTAB || 'skills'; let h = `<div class="tabs">${btn('tab', 'Lessons', { t: 'skills' }, tab === 'skills' ? 'ac' : '')}${btn('tab', 'Attributes', { t: 'stats' }, tab === 'stats' ? 'ac' : '')}<span class="note" style="margin-left:auto">${SF.count(P.pack, 'gold')} gold · ${P.freeLessons} free lessons</span></div>`;
     if (tab === 'skills') { h += '<p class="note">Lessons raise a skill to 30. Your first two are free. Skills set to Hold or Lower cannot be trained.</p>'; for (const [k, n, , live] of SF.SKILLS) { if (!live) continue; const v = P.skills[k].v / 10; if (v >= 30) continue; const cost = P.freeLessons > 0 ? 0 : SF.trainCost(v, 30); h += `<div class="row"><span class="nm">${n} <span class="note">${v.toFixed(1)} → 30</span></span><span class="v">${cost ? cost + ' gp' : 'free'}</span>${btn('train', 'Learn', { k })}</div>`; } }
-    else { h += `<p class="note">Attribute points cost ${SF.statTrainCost(1)} gold each. Total ${P.str + P.dex + P.int} / 225, each at most 100.</p>`; for (const [k, n] of [['str', 'Strength'], ['dex', 'Dexterity'], ['int', 'Intellect']]) h += `<div class="row"><span class="nm">${n}</span><span class="v">${P[k]}</span>${btn('stat', '+1', { k, n: 1 })}${btn('stat', '+5', { k, n: 5 })}</div>`; }
+    else { h += `<p class="note">Attributes cannot be bought. Strength, Dexterity and Intelligence grow on their own as you use your skills, up to 100 each and 225 together. Set an attribute to Lower on your Character page to let it give points once you reach 225.</p>`; for (const k of SF.STATS.KEYS) h += `<div class="row"><span class="nm">${SF.STATS.NAME[k]} <span class="note">${SF.STATS.natural(P)[k]}</span><br><span class="note">trained by ${esc(SF.STATS.trainedBy(k).join(', '))}</span></span></div>`; }
     return ['Master Vey, trainer', h]; },
   log: () => ['Combat and system log', LOG.slice(-150).reverse().map(l => `<div style="color:${l.c};padding:2px 0">${esc(l.t)}</div>`).join('')],
   picker: () => ['Which one?', PICK.map((e, i) => `<div class="row"><span class="nm">${esc(e.name)}</span><span class="v">${dist(e, P).toFixed(1)} m</span>${btn('pick', 'Select', { i })}</div>`).join('')],
@@ -6370,9 +6882,9 @@ const ACT = {
   wd: d => { const it = findU(P.bank, d.u); if (!it) return; const r = SF.transfer(P.bank, P.pack, it.uid, it.qty, { cap: cap() }); if (!r.ok) log(r.reason, '#ffb070'); save(); renderPanel(); },
   tab: d => { PTAB = d.t; renderPanel(true); snd('ui.page'); },
   buy: d => { const p = SF.PRICES[d.id] * +d.n; if (SF.count(P.pack, 'gold') < p) return log('Not enough gold.', '#ffb070'); const it = SF.EQ.isGear(d.id) || (SF.WEARABLE(d.id) && !SF.ITEMS[d.id].stack) ? SF.EQ.make(d.id, { origin: 'npc' }) : SF.newItem(d.id, +d.n, SF.ITEMS[d.id].stack ? null : { cond: 100 }); const r = SF.addItem(P.pack, it, cap()); if (!r.ok) return log(r.reason, '#ffb070'); SF.removeQty(P.pack, 'gold', p); snd('loot.coin'); renderPanel(); },
-  sell: d => { const it = findU(P.pack, d.u); if (!it) return; const n = d.all ? it.qty : 1, g = Math.max(1, Math.floor((SF.PRICES[it.id] || 1) * .4 * (SF.WORK_TOOLS[it.id] && !SF.ITEMS[it.id].stack ? SF.toolUses(it) / SF.TOOL_USES : 1))) * n; it.qty -= n; if (it.qty <= 0) P.pack.items.splice(P.pack.items.indexOf(it), 1); P.pack.ver++; SF.addItem(P.pack, SF.newItem('gold', g)); snd('loot.coin'); renderPanel(); },
+  sell: d => { const it = findU(P.pack, d.u); if (!it) return; if (it.starter) return log('Merchants do not buy back starter gear.', '#ffb070'); /* v0.30: the starter kit is not a gold source */ const n = d.all ? it.qty : 1, g = Math.max(1, Math.floor((SF.PRICES[it.id] || 1) * .4 * (SF.WORK_TOOLS[it.id] && !SF.ITEMS[it.id].stack ? SF.toolUses(it) / SF.TOOL_USES : 1))) * n; it.qty -= n; if (it.qty <= 0) P.pack.items.splice(P.pack.items.indexOf(it), 1); P.pack.ver++; SF.addItem(P.pack, SF.newItem('gold', g)); snd('loot.coin'); renderPanel(); },
   train: d => { const s = P.skills[d.k]; if (s.lock !== 'raise') return log('Set that skill to Raise first.', '#ffb070'); const v = s.v / 10; const cost = P.freeLessons > 0 ? 0 : SF.trainCost(v, 30); const add = 300 - s.v; if (SF.totalSkill(P) + add > SF.SKILL_CAP) return log('That would pass the 700 cap.', '#ffb070'); if (cost && SF.count(P.pack, 'gold') < cost) return log('Not enough gold.', '#ffb070'); if (cost) SF.removeQty(P.pack, 'gold', cost); else P.freeLessons--; s.v = 300; log(`You train ${SF.SKILL[d.k].n} to 30.`, '#7fd4ff'); save(); renderPanel(); },
-  stat: d => { const n = +d.n, k = d.k; if (P.str + P.dex + P.int + n > SF.STAT_CAP) return log('Attribute total is capped at 225.', '#ffb070'); if (P[k] + n > SF.STAT_MAX) return log('Each attribute is capped at 100.', '#ffb070'); const c = SF.statTrainCost(n); if (SF.count(P.pack, 'gold') < c) return log('Not enough gold.', '#ffb070'); SF.removeQty(P.pack, 'gold', c); P[k] += n; save(); renderPanel(); },
+  statlock: d => { const k = d.k; if (!SF.STATS.KEYS.includes(k)) return; const cur = (P.statLocks || SF.STATS.newLocks())[k]; SF.STATS.setLock(P, k, SF.STATS.cycleLock(cur)); save(); eqChanged(); renderPanel(); },
   craft: d => { startCraft(d.r, +(d.n || 1)); },
   pick: d => { P.sel = PICK[+d.i]; closePanel(); },
   petatk: () => petCommand('attack'),
@@ -6499,7 +7011,7 @@ const GQD = {
       { t: 'Forge 8 iron rivets at the anvil (Mara lends tongs there)', short: 'Forge iron rivets', need: 8, ev: e => e.type === 'make' && e.out === 'rivet' && e.mat === 'iron' ? e.qty : 0, at: () => QUAY_ANVIL() },
       { t: 'Give Mara 4 iron rivets (keep the other four)', short: 'Give Mara 4 rivets', deliver: { id: 'rivet', mat: 'iron', n: 4 }, at: () => npcBy('qsmith') }],
     reward: { gold: 15, pins: ['anvil'], ledger: true }, done: '“That will hold. Keep the other four — a carpenter will want them for hinges. Here is my supply ledger.”',
-    next: 'An Edge for Brine Road (Smithing 20) opens in a later build.' } };
+    next: 'An Edge for Brine Road (Blacksmithy 20) opens in a later build.' } };
 function gqAll() { const q = Q(); return q.guild || (q.guild = {}); }
 function gq(id) { const g = gqAll(); return g[id] || { s: 'none' }; }
 const npcBy = role => ents.find(e => e.kind === 'npc' && e.role === role);
@@ -6704,8 +7216,20 @@ function migrateSave(s, raw) {
   }
   if (s.v < 6) migrateV6(s, raw);
   if (s.v < 7) migrateV7(s, raw);
+  if (s.v < 8) migrateV8(s, raw);
   return s;
 }
+/* v0.30 character creation v2: additive and idempotent. The appearance gains its new fields (a v1 cloak colour becomes its cloak
+   id; unknown fields are kept), attributes gain locks and the gain state (src/stats.js), the character a stable id. Saved
+   attributes, skills, locks, items, position, quests and world are untouched: creation limits never apply to an existing
+   character, and nothing is granted. A snapshot of the old save is kept once. */
+function migrateV8(s, raw) {
+  try { if (raw && !localStorage.getItem(SAVEKEY + '.prev7')) localStorage.setItem(SAVEKEY + '.prev7', raw); } catch (e) { }
+  const c = s.char; c.look = SF.CREATION.normalizeLook(c.look);
+  const fixes = SF.STATS.migrateChar(c); if (fixes.some(f => !/^(locks|lock |gain state)/.test(f))) s.statRepair = fixes;
+  if (!c.charId) c.charId = newCharId(); s.v = 8;
+}
+const newCharId = () => 'c' + Date.now().toString(36) + Math.floor(Math.random() * 1e9).toString(36);
 /* v0.23 world expansion: the grid grew from 2100 × 900 to W × H and Anniabreen was stretched (annStretch). Everything saved at
    an Anniabreen position follows it: towns move by whole tiles, so town records stay exact; wilderness resource and survey
    records are dropped (that ground was redrawn). A snapshot of the old save is kept once. */
@@ -6812,7 +7336,7 @@ let deletingSave = false;
 const SAVEKEY = 'shardfall.save.v1';
 function save() {
   if (!P || deletingSave) return false; try {
-    const c = {}; for (const k of ['name', 'x', 'y', 'str', 'dex', 'int', 'hp', 'stam', 'mana', 'skills', 'pack', 'bank', 'equip', 'look', 'bound', 'quest', 'freeLessons', 'hotbar', 'ghost', 'ghostAt', 'gainLog', 'recipeN', 'cx', 'skillPool', 'combatMig', 'eqMig', 'bandSeq', 'bandDone', 'lowerRank']) c[k] = P[k];
+    const c = {}; for (const k of ['name', 'x', 'y', 'str', 'dex', 'int', 'hp', 'stam', 'mana', 'skills', 'pack', 'bank', 'equip', 'look', 'bound', 'quest', 'freeLessons', 'hotbar', 'ghost', 'ghostAt', 'gainLog', 'recipeN', 'cx', 'skillPool', 'combatMig', 'eqMig', 'bandSeq', 'bandDone', 'lowerRank', 'statLocks', 'statGain', 'charId', 'created']) c[k] = P[k];
     c.bandage = bandageSave();
     if (P.base) Object.assign(c, P.base); c.magery = { mig: (P.mg && P.mg.mig) || 0 };
     const corpses = ents.filter(e => e.mine && !e.gone).map(e => ({ x: e.x, y: e.y, items: e.cont.items, left: e.expires - GT, diedAgo: GT - e.cont.diedAt }));
@@ -6820,55 +7344,35 @@ function save() {
     const pets = ents.filter(e => e.kind === 'pet' && e.type && !e.summon && !e.gone && e.hp > 0).map(e => ({ type: e.type, hp: e.hp, order: e.order === 'stay' ? 'stay' : 'follow', slots: e.slots, name: e.name, dx: e.x - P.x, dy: e.y - P.y }));
     const nodes = []; for (const [k, o] of RES) nodes.push([k, o.gen || 1, o.spec || 0, o.n, o.max || 0, Math.round(o.t * 10) / 10]);
     const ally = allySave(); if (ally) { Object.values(ally.equip || {}).forEach(scan); ally.pack.forEach(scan); if (ally.body) ally.body.items.forEach(scan); }
-    localStorage.setItem(SAVEKEY, JSON.stringify({ v: 7, char: c, corpses, pets, nodes, ally, sim: WS ? WS.save() : null, eco: ecoSave(), life: lifeSave(), uid: maxUid + 1, gt: GT, savedAt: Date.now() }));
+    localStorage.setItem(SAVEKEY, JSON.stringify({ v: 8, char: c, corpses, pets, nodes, ally, sim: WS ? WS.save() : null, eco: ecoSave(), life: lifeSave(), uid: maxUid + 1, gt: GT, savedAt: Date.now() }));
     DEV.lastSave = { ok: true, at: GT }; return true;
   } catch (e) { DEV.lastSave = { ok: false, at: GT }; return false; }
 }
 function loadSave() { try { const s = localStorage.getItem(SAVEKEY); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
 
-/* ---------- boot & creation ---------- */
-const PROFILES = {
-  'Glaive hybrid': { s: [55, 45, 50], k: { swordsmanship: 50, spellcraft: 30, tactics: 20 }, ideal: 'Swordsmanship, Tactics, Spellcraft, Spell Focus, Wardcraft, Meditation, Wrestling' },
-  'Venom skirmisher': { s: [50, 60, 40], k: { fencing: 50, tactics: 30, healing: 20 }, ideal: 'Fencing, Tactics, Anatomy, Healing, Wardcraft, Venomcraft, Concealment' },
-  'Group healer': { s: [40, 40, 70], k: { spellcraft: 50, healing: 30, meditation: 20 }, ideal: 'Spellcraft, Spell Focus, Wardcraft, Meditation, Wrestling, Healing, Anatomy' },
-  'Archer scout': { s: [45, 65, 40], k: { archery: 50, tactics: 30, concealment: 20 }, ideal: 'Archery, Tactics, Anatomy, Healing, Tracking, Concealment, Shadowstep' },
-  'Mace dexer': { s: [60, 60, 30], k: { macefighting: 50, tactics: 30, healing: 20 }, ideal: 'Mace Fighting, Tactics, Anatomy, Healing, Parrying, Wardcraft, Wrestling' },
-  'Merchant smith': { s: [60, 50, 40], k: { mining: 40, smithing: 40, woodcutting: 20 }, ideal: 'Mining, Smithing, Engineering, Carpentry, Woodcutting, Appraisal, Tailoring' } };
-let CC = { name: '', prof: 'Glaive hybrid', s: [55, 45, 50], k: Object.entries(PROFILES['Glaive hybrid'].k), cloak: '' };
-const CLOAKS = ['', '#8a2a2a', '#2a3a8a', '#5a2a6a', '#3a3a3a', '#8a6a2a'];
-function renderCC() {
-  const sv0 = loadSave(), live = SF.SKILLS.filter(s => s[3]); const opts = sel => live.map(s => `<option value="${s[0]}"${s[0] === sel ? ' selected' : ''}>${esc(s[1])}</option>`).join('');
-  const tot = CC.s.reduce((a, b) => a + b, 0), kt = CC.k.reduce((a, b) => a + b[1], 0);
-  $('#ccin').innerHTML = `<div class="cchead"><img src="${SCOUT_SRC}" alt="" class="ccimg"><div><h1>Shardfall</h1><div class="sub">Saltmarsh Quay · offline island slice</div></div></div>
-  ${sv0 ? `<button class="btn ac big" data-c="cont">Continue as ${esc(sv0.char.name)}${sv0.char.ghost ? ' (ghost)' : ''}</button><div class="sub" style="margin:8px 0 0">or create a new character below (replaces the saved one)</div>` : ''}
-  <div class="ccgrid"><div><label for="ccn">Name</label><input id="ccn" maxlength="16" value="${esc(CC.name)}" placeholder="e.g. Tess" autocomplete="off">
-  <label>Starting idea <span class="note">(editable, no class is locked in)</span></label><div class="chips">${Object.keys(PROFILES).map(p => `<button class="btn sm ${CC.prof === p ? 'ac' : ''}" data-c="prof" data-p="${p}">${p}</button>`).join('')}</div>
-  ${PROFILES[CC.prof] ? `<p class="note">At the cap: ${PROFILES[CC.prof].ideal}.</p>` : ''}
-  <label>Cloak</label><div class="sw">${CLOAKS.map(c => `<button style="background:${c || '#2f5a5a'}" class="${CC.cloak === c ? 'on' : ''}" data-c="cloak" data-v="${c}" aria-label="cloak colour"></button>`).join('')}</div></div>
-  <div><label>Attributes <span class="note">(${tot} / 150, each 25–100)</span></label>${['Strength', 'Dexterity', 'Intellect'].map((n, i) => `<div class="stat"><span>${n}</span><button class="btn sm" data-c="st" data-i="${i}" data-d="-5">−</button><b>${CC.s[i]}</b><button class="btn sm" data-c="st" data-i="${i}" data-d="5">+</button></div>`).join('')}
-  <p class="note">HP ${50 + Math.floor(CC.s[0] / 2)} · stamina ${CC.s[1]} · mana ${CC.s[2]}</p>
-  <label>Starting skills <span class="note">(${kt} / 100, at most 50 each)</span></label>${CC.k.map((k, i) => `<div class="skl"><select data-c="sk" data-i="${i}" aria-label="Skill ${i + 1}">${opts(k[0])}</select><select data-c="kv" data-i="${i}" aria-label="Skill ${i + 1} points">${[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50].map(v => `<option${v === k[1] ? ' selected' : ''}>${v}</option>`).join('')}</select></div>`).join('')}</div></div>
-  <div id="ccerr" class="warn"></div><button class="btn ac big" data-c="go">Enter Saltmarsh Quay</button><p class="note" style="text-align:center">Saves in this browser. Your first two trainer lessons are free.</p>`;
-}
-$('#cc').addEventListener('click', ev => { const b = ev.target.closest('[data-c]'); if (!b || b.tagName === 'SELECT') return; const c = b.dataset.c; CC.name = $('#ccn')?.value ?? CC.name;
-  if (c === 'cont') { const s = loadSave(); if (s) boot(s); return; }
-  if (c === 'prof') { CC.prof = b.dataset.p; const p = PROFILES[CC.prof]; CC.s = p.s.slice(); CC.k = Object.entries(p.k); }
-  if (c === 'st') { const i = +b.dataset.i, d = +b.dataset.d, nv = CC.s[i] + d, tot = CC.s.reduce((a, x) => a + x, 0) + d; if (nv >= 25 && nv <= 100 && tot <= 150) CC.s[i] = nv; }
-  if (c === 'cloak') CC.cloak = b.dataset.v;
-  if (c === 'go') { const err = $('#ccerr'); const name = CC.name.trim().replace(/[^\p{L}\p{N} '\-]/gu, '').slice(0, 16); if (name.length < 2) return err.textContent = 'Choose a name of at least 2 letters.'; const sk = {}; for (const [k, v] of CC.k) sk[k] = (sk[k] || 0) + v; const e = SF.validateCreation({ str: CC.s[0], dex: CC.s[1], int: CC.s[2], skills: sk }); if (e.length) return err.textContent = e.join(' '); if (CC.k.some(([k], i) => CC.k.findIndex(x => x[0] === k) !== i && CC.k[i][1] > 0)) return err.textContent = 'Pick different skills.'; boot(null, { name, str: CC.s[0], dex: CC.s[1], int: CC.s[2], skills: sk, look: { cloak: CC.cloak || null } }); return; }
-  renderCC(); });
-$('#cc').addEventListener('change', ev => { const s = ev.target; if (!s.dataset || !s.dataset.c) return; CC.name = $('#ccn')?.value ?? CC.name; const i = +s.dataset.i; if (s.dataset.c === 'sk') CC.k[i][0] = s.value; if (s.dataset.c === 'kv') CC.k[i][1] = +s.value; CC.prof = 'Custom'; renderCC(); });
+/* ---------- boot ---------- (the character creator is src/creation-ui.js) */
+/* boot(saved) continues a saved character; boot(null, payload) creates one from a creation payload, which is validated here
+   again with the same SF.CREATION.validate the creator uses. Returns true once the game runs. A failed creation leaves the
+   existing save untouched: nothing is written until the new character is complete. */
 function boot(saved, fresh) {
+  if (P) return false;                                                       // the game is already running (a double submit)
+  let cv0 = null; if (!saved) { cv0 = SF.CREATION.validate(fresh); if (!cv0.ok) { console.warn('creation rejected', cv0.errors); return false; } cv0 = cv0.value; }
   genWorld(); buildTiles(); buildMini(); resize();
   if (saved) { try { saved = migrateSave(saved, localStorage.getItem(SAVEKEY)); } catch (e) { console.error(e); } for (const [k, gen, spec, n, max, t] of saved.nodes || []) RES.set(k, { gen, spec: spec || undefined, n, max, t });
     const c = saved.char; P = newChar({ name: c.name, str: c.str, dex: c.dex, int: c.int, skills: {}, look: c.look }); Object.assign(P, c); P.equip = Object.assign(emptyEquip(), P.equip); delete P.equip.armor; SF.setUidBase(saved.uid || 1); GT = saved.gt || 0;
     for (const k of Object.keys(SF.newSkills())) if (!P.skills[k]) P.skills[k] = { v: 0, lock: 'raise' };
     for (const co of saved.corpses || []) { const cont = SF.newContainer('corpse', 'p1'); cont.items = co.items; cont.diedAt = GT - (co.diedAgo ?? 999); cont.expires = GT + co.left; addEnt({ kind: 'corpse', mine: true, name: 'your body', x: co.x, y: co.y, cont, expires: GT + co.left }); }
     if (P.ghost && !Number.isFinite(c.ghostAt)) P.ghostAt = GT - 12; }
-  else { P = newChar(fresh); starterKit(); }
+  else {
+    P = newChar(cv0); P.look = Object.assign({}, cv0.look); P.charId = newCharId(); P.created = { v: SF.CREATION.VERSION, template: cv0.template, town: cv0.town };
+    const tr = SF.CREATION.townReady(cv0.town, { shrines: SHRINES, npcs: ANN.npcs, stand: (x, y) => canStand(P, x, y) });
+    if (tr.ok) { P.x = tr.spawn.x; P.y = tr.spawn.y; P.bound = tr.bound; } else { P.created.town = 'quay'; log(`${SF.CREATION.TOWN[cv0.town].n} is not ready (${tr.reason}); you start at Saltmarsh Quay.`, '#ffb070'); }
+    starterKit(cv0);
+  }
   P.cx = Object.assign({ survey: {}, pins: [], track: null, mark: false, doors: {} }, P.cx || {}); P.batch = null; applyDoorState();
   if (saved && !canStand(P, P.x, P.y)) { find: for (let r = 1; r <= 12; r++) for (let a = 0; a < 16; a++) { const x = P.x + Math.cos(a / 8 * Math.PI) * r, y = P.y + Math.sin(a / 8 * Math.PI) * r; if (canStand(P, x, y)) { P.x = x; P.y = y; break find; } } }   // never load into a wall or a tree
   WS = SIM.create({ clock: () => GT, saved: saved && saved.sim, onError: e => console.error(e) }); simAdopt(P);   // actor ids continue from the save
+  if (!saved) simEmit('CharacterCreated', { actor: aidOf(P), charId: P.charId, template: P.created.template, town: P.created.town, body: P.look.body });
   if (saved && !(saved.sim && saved.sim.clock)) WS.clock.setHour(GT, (GT / 60 + 9) % 24);   // older saves keep the hour they were at; from now on a day lasts 120 minutes
   NAV.walk = null; NAV.edge = null; NAV.graph = null; devInit();
   ents.unshift(P); P.sect = P.sect || 0; P.drawn = false; P.sw = SF.newSwing(); P.movedAt = -99; while (P.hotbar.length < 9) P.hotbar.push(null); Q(); ecoLoad(saved && saved.eco); populate(); lifeLoad(saved && saved.life); seedTraps();
@@ -6877,22 +7381,24 @@ function boot(saved, fresh) {
   if (saved) for (const pt of saved.pets || []) { const d = MON[pt.type]; if (!d) continue; const near = Math.hypot(pt.dx || 0, pt.dy || 0) < 12; addEnt({ kind: 'pet', type: pt.type, name: pt.name || 'your ' + d.n, x: P.x + (near ? pt.dx : 1), y: P.y + (near ? pt.dy : 0), hp: Math.min(pt.hp, d.hp), max: d.hp, state: '', home: { x: P.x, y: P.y }, sect: 0, ward: 0, order: pt.order, slots: pt.slots || 1, target: null }); }
   mageryBoot(saved);
   $('#cc').hidden = true; document.body.classList.toggle('mirror', SETTINGS.mirror);
-  log('Welcome to Saltmarsh Quay, ' + P.name + '. Bank what you cannot afford to lose.', '#ffe08a');
+  const startTown = !saved && P.created && P.created.town !== 'quay' ? SF.CREATION.TOWN[P.created.town].n : null;
+  log('Welcome to ' + (startTown || 'Saltmarsh Quay') + ', ' + P.name + '. Bank what you cannot afford to lose.', '#ffe08a');
   log('Left stick moves; the Sprint button runs. Tap to target. Attack arms your swings. Interact gathers, loots and talks.', '#b6a68a');
   if (P.ghost) log('You are a ghost. Follow the golden arrow to a shrine or healer.', '#ff6a5a');
   if (saved && saved.combatReform && saved.combatReform.changed) { log('The combat skills now follow the Second Age: Swordsmanship, Mace Fighting, Fencing, Archery, Wrestling, Parrying and Healing. Your trained points moved with them.', '#ffe08a'); if (P.skillPool > 0) log(`${f1(P.skillPool)} points from merged skills wait on your Skills page.`, '#ffe08a'); }
-  if (!saved) log('Wren, a quay sellsword, nurses a wound by the plaza. Tap her to bandage her or ask her to follow you.', '#b6a68a');
-  if (VH > VW) $('#rot').hidden = false; save(); refreshHud();
+  if (!saved && !startTown) log('Wren, a quay sellsword, nurses a wound by the plaza. Tap her to bandage her or ask her to follow you.', '#b6a68a');
+  if (!saved) log('Your attributes and skills grow as you use them. No trainer sells attributes.', '#b6a68a');
+  if (saved && saved.statRepair) log('Some saved attribute values were out of range and have been repaired: ' + saved.statRepair.join(', ') + '.', '#ffb070');
+  if (VH > VW) $('#rot').hidden = false; save(); refreshHud(); return true;
 }
 let last = performance.now(), hudT = 0;
 function loop(t) { const dt = Math.min(.5, (t - last) / 1000); last = t; try { if (!SIMPAUSE) { const r = STEPPER.advance(dt, s => { simStep(s); DEV.steps++; }); ALPHA = r.alpha; } if (DEV.on) devFrame(dt); renderInterp(); if (DEV.open && t - (DEV.panelT || 0) > 300) { DEV.panelT = t; devRender(); } if (P && t - hudT > 120) { hudT = t; refreshHud(); drawMini(); if (PANEL === 'loot' || PANEL === 'shop') renderPanel(); renderLog(); } } catch (e) { console.error(e); } requestAnimationFrame(loop); }
 addEventListener('visibilitychange', () => { if (document.hidden) save(); else { last = performance.now(); STEPPER.reset(); } });   // the world pauses while the game is hidden
-loadScout(SCOUT_SRC); renderCC(); resize(); requestAnimationFrame(loop);
 /* dev/test hook: put a creature beside the player, e.g. __SF.spawnMon('lich_lord'). Not used by normal play. */
 function spawnMon(type, dx = 3, dy = 0) { const d = MON[type]; if (!d) return null; let x = P.x + dx, y = P.y + dy;
   for (let r = 0; r < 6 && BLK[tAt(Math.floor(x), Math.floor(y))]; r += .5) for (let a = 0; a < 8; a++) { const nx = P.x + dx + Math.cos(a * Math.PI / 4) * r, ny = P.y + dy + Math.sin(a * Math.PI / 4) * r; if (!BLK[tAt(Math.floor(nx), Math.floor(ny))]) { x = nx; y = ny; break; } }
   return addEnt({ kind: 'mon', type, name: d.n, x, y, hp: d.hp, max: d.hp, state: 'idle', home: { x, y }, sect: 0, ward: 0 }); }
-window.__SF = { get WS() { return WS; }, dist, closePanel, lifeSave, LIFE, LIFE_SCHED, lifeTick, lifeResume, lifeInspect, lifeTownGeo, lifeTalk, talk, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
+window.__SF = { get WS() { return WS; }, SHRINES, statRoll, dist, closePanel, lifeSave, LIFE, LIFE_SCHED, lifeTick, lifeResume, lifeInspect, lifeTownGeo, lifeTalk, talk, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
 
 /* ================= EQUIPMENT UI (v0.25): paper doll window, backpack, item tooltips, drag and drop, armor crafting =================
    Every change to items goes through the validated commands in SF.EQ (equipItem, unequipItem, dropItem, pickupItem, splitStack,
@@ -7022,17 +7528,20 @@ function eqStatsHtml() {
   const kv = (k, v, c) => `<span>${k}</span><span class="${c || ''}">${v}</span>`;
   return `<div class="eqstat">${kv('Armor rating', `<b>${f1w(e.ar)}</b>${magicArmor(P) ? ' +' + magicArmor(P) + ' magic' : ''}`)}${kv('Weapon', esc(weaponLabel(P)) + ` · ${lo}–${hi} dmg`)}${kv('Attack speed', SF.swingDelay(P.stam, w.speed).toFixed(2) + ' s per swing')}`
     + kv('Equipment weight', f1w(e.eqWt)) + kv('Carried', `${f1w(en.wt)} / ${f1w(en.cap)}`, en.stage >= 2 ? 'bad' : en.stage === 1 ? 'warn' : '') + kv('Encumbrance', `${en.n} (${Math.round(en.ratio * 100)}%)`, en.stage >= 2 ? 'bad' : en.stage === 1 ? 'warn' : '')
-    + kv('Strength', `${e.str}`) + kv('Dexterity', `${e.dex}${e.dexMod ? ` <span class="note">(${P.dex} ${e.dexMod})</span>` : ''}`, e.dexMod ? 'warn' : '') + kv('Intelligence', `${e.int}`)
+    + statRowsHtml() + kv('Attribute total', `${SF.STATS.total(P)} / ${SF.STAT_CAP}`) + (e.dexMod ? kv('Dexterity now', `${e.dex} <span class="note">(${P.dex} ${e.dexMod})</span>`, 'warn') : '')
     + kv('Dexterity penalty', e.dexMod ? String(e.dexMod) : 'none') + kv('Meditation', e.med ? `−${Math.round(e.med * 100)}% mana regeneration` : 'unhindered', e.med ? 'warn' : '')
     + (e.broken.length ? kv('Broken', e.broken.map(s => EQ.SLOT[s].n).join(', ') + ' · repair them', 'bad') : '') + '</div>';
 }
+/* the paper doll figure: the traveller's front cell, in this character's skin tone and cloak colour (cached per look) */
+const DOLL = { key: '', src: '' };
+function dollSrc() { const k = SF.CREATION.lookKey(P.look); if (k === DOLL.key && DOLL.src) return DOLL.src; const sh = scoutSheet(P.look); if (!sh || !sh.toDataURL) return SCOUT_SRC; DOLL.key = k; DOLL.src = sh.toDataURL(); return DOLL.src; }
 function renderEqWin(force) {
   const el = $('#eqwin'); if (!el) return;
   const open = !!(P && SETTINGS.eqOpen && !SCREEN); document.body.classList.toggle('eqopen', open);
   if (!open) { if (!el.hidden) { el.hidden = true; EQW.html = ''; } return; }
   const e = EQ.effective(P);
   let h = `<div class="eqh" data-eqmove><b>${esc(P.name)}</b><span class="note">AR ${f1w(e.ar)} · ${f1w(encumb().wt)}/${f1w(SF.carryCap(P))}</span><button class="x" data-a="eqclose" aria-label="Close equipment">×</button></div><div class="eqb">`;
-  h += `<div class="eqdoll"><div class="eqcol">${EQ_LEFT.map(eqSlotHtml).join('')}</div><div class="eqfig" data-drop="eq:auto"><i class="doll" style="background-image:url(${SCOUT_SRC})"></i>${P.ghost ? '<span class="note">ghost</span>' : ''}</div><div class="eqcol">${EQ_RIGHT.map(eqSlotHtml).join('')}</div></div>`;
+  h += `<div class="eqdoll"><div class="eqcol">${EQ_LEFT.map(eqSlotHtml).join('')}</div><div class="eqfig" data-drop="eq:auto"><i class="doll" style="background-image:url(${dollSrc()})"></i>${P.ghost ? '<span class="note">ghost</span>' : ''}</div><div class="eqcol">${EQ_RIGHT.map(eqSlotHtml).join('')}</div></div>`;
   h += `<div class="eqrow">${EQ_BOTTOM.map(eqSlotHtml).join('')}</div>`;
   const sel = EQW.sel && P.equip[EQW.sel];
   if (EQW.sel) h += `<div class="eqcard">${sel ? itemTip(sel, { compare: false, icon: 40 }) + `<div class="acts">${SF.ITEMS[sel.id].trade || sel.id === 'garment' ? btn('uneq', 'Remove', { s: EQW.sel }) : ''}${SF.WEARABLE(sel.id) && sel.cond !== undefined && sel.cond < (sel.maxc || 100) ? btn('repair', 'Repair', { u: sel.uid }) : ''}${SF.ITEMS[sel.id].trade ? btn('drop', 'Drop', { u: sel.uid }) : ''}</div>` : `<p class="note">${EQ.SLOT[EQW.sel].n}: empty. Drag an item here, or double-click it in the backpack.</p>`}</div>`;
@@ -7285,6 +7794,266 @@ Object.assign(ACT, {
   csec: d => { CUI.sec = d.m; renderPanel(); } });
 /* test hook additions (see tests/equipment-smoke) */
 if (window.__SF) Object.assign(window.__SF, { EQ, toggleEqWin, renderEqWin, equipUid, unequipTo, EQW, BAG, openCraft, performDrop, eqTick, encumb, itemTip, tipItem, playerMove, SHOPS, get CRAFT_SUB() { return CRAFT_SUB; } });
+/* ---------- character creation v2.0 (docs/design/character-creation-v2.md) ----------
+   The title screen and the four-step creator: Identity & Appearance → Starting Profession → Stats & Skills → Starting Town &
+   Review. The draft (CCD) is transient and separate from the game: nothing in the world is generated or ticks behind the
+   wizard, and nothing is saved until boot() succeeds with a payload that SF.CREATION.validate accepts (the same validator boot
+   runs again). The rules live in src/creation.js; this file is only the screen. It also starts the game loop (last line). */
+const CR = SF.CREATION;
+const CC_STEPS = ['Identity', 'Profession', 'Stats & Skills', 'Town & Review'];
+const CC_GROUPS = [['combat', 'Combat'], ['support', 'Healing'], ['magic', 'Magic'], ['stealth', 'Thieving'], ['wild', 'Wilderness'], ['bard', 'Bardic'], ['gather', 'Gathering'], ['craft', 'Crafting']];
+const CCD = { screen: 'home', step: 0, name: '', look: CR.defaultLook('male'), tpl: 'swordsman', edited: false, pending: null, stats: [35, 20, 10], skills: [], town: 'quay', replace: false, facing: 0, guide: '', creating: false, err: '', tried: false };
+function ccSetTemplate(id) { const a = CR.template(id); if (!a) return; CCD.tpl = id; CCD.stats = a.stats; CCD.skills = a.skills; CCD.edited = false; CCD.pending = null; }
+ccSetTemplate('swordsman');
+const ccSkillName = k => (SF.SKILL[k] || SF.SKILL[SF.skillKey(k)] || { n: String(k) }).n;   // drafts may hold any spelling (tests, old links)
+const ccSum = a => a.reduce((x, y) => x + y, 0);
+const ccSkillTotal = () => CCD.skills.reduce((x, r) => x + (r[0] ? r[1] : 0), 0);
+function ccPayload() { return { name: CCD.name, look: Object.assign({}, CCD.look), str: CCD.stats[0], dex: CCD.stats[1], int: CCD.stats[2], skills: CCD.skills.map(r => [r[0], r[0] ? r[1] : 0]), town: CCD.town }; }
+function ccValidate() { return CR.validate(ccPayload()); }
+function ccMarkEdited() { const m = CR.matchTemplate(CCD.stats, CCD.skills); CCD.edited = !m || m !== CCD.tpl; if (m) CCD.tpl = m; }
+const ccTplName = () => CCD.edited ? 'Custom' : CR.TEMPLATE[CCD.tpl].n;
+
+/* ---- the portrait: an original procedural paper-doll figure that shows every appearance choice (front view) ---- */
+function ccShade(hex, k) { const n = parseInt(hex.slice(1), 16); const f = v => Math.max(0, Math.min(255, Math.round(v + k * (k < 0 ? v : 255 - v) / 100))); return '#' + ((1 << 24) | (f(n >> 16) << 16) | (f(n >> 8 & 255) << 8) | f(n & 255)).toString(16).slice(1); }
+function drawDoll(cv, look) {
+  const o = document.createElement('canvas'); o.width = 48; o.height = 96; const g = o.getContext('2d');
+  const R = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
+  const fem = look.body === 'female', skin = (CR.SKIN_ID[look.skinTone] || CR.SKIN[1]).hex, hair = (CR.HCOL_ID[look.hairColor] || CR.HAIR_COLORS[1]).hex;
+  const beard = (CR.HCOL_ID[look.facialHairColor] || CR.HAIR_COLORS[1]).hex, shirt = (CR.CLOTH_ID[look.clothingColor] || CR.CLOTHING[0]).hex;
+  const cloak = look.cloak === 'none' ? null : (CR.cloakHex(look) || '#2f6766'), trou = '#4a3a2b', boot = '#5b3b1f', belt = '#3a2616';
+  const hs = look.hairStyle, hd = ccShade(hair, -30);
+  // back layer: cloak and long hair behind the body
+  if (cloak) { for (let y = 25; y < 82; y++) { const t = (y - 25) / 57, half = Math.round(10 + t * 4); R(24 - half, y, half * 2, 1, y % 9 === 0 ? ccShade(cloak, -18) : cloak); } R(9, 80, 30, 2, ccShade(cloak, -35)); }
+  if (hs === 'long') { R(14, 12, 4, fem ? 24 : 20, hd); R(30, 12, 4, fem ? 24 : 20, hd); }
+  if (hs === 'pigtails') { R(11, 14, 4, 22, hair); R(33, 14, 4, 22, hair); R(11, 34, 4, 2, hd); R(33, 34, 4, 2, hd); }
+  if (hs === 'ponytail') { R(31, 10, 3, 4, hair); R(32, 14, 3, 18, hd); }
+  // legs and boots
+  const lx = fem ? [18, 25] : [17, 26]; for (const x of lx) { R(x, 57, 5, 27, trou); R(x + 4, 57, 1, 27, ccShade(trou, -25)); R(x - 1, 84, 7, 7, boot); R(x - 1, 90, 7, 1, ccShade(boot, -40)); }
+  // torso and arms
+  if (fem) { R(16, 25, 16, 6, shirt); R(16, 31, 16, 12, shirt); R(18, 43, 12, 7, shirt); R(16, 50, 16, 8, ccShade(shirt, -8)); R(19, 33, 4, 2, ccShade(shirt, -15)); R(25, 33, 4, 2, ccShade(shirt, -15)); }
+  else { R(14, 25, 20, 6, shirt); R(15, 31, 18, 15, shirt); R(16, 46, 16, 12, shirt); }
+  R(fem ? 30 : 31, 27, 2, 29, ccShade(shirt, -22));
+  const ax = fem ? [12, 32] : [10, 34]; for (const x of ax) { R(x, 26, 4, 20, ccShade(shirt, -6)); R(x, 46, 4, 5, skin); R(x, 50, 4, 1, ccShade(skin, -25)); }
+  R(fem ? 18 : 16, 49, fem ? 12 : 16, 3, belt); R(23, 49, 3, 3, '#b08d4a');
+  R(17, 24, 14, 2, ccShade(shirt, -18));                                   // collar line
+  // neck and head
+  R(21, 20, 6, 6, ccShade(skin, -12));
+  R(18, 7, 12, 15, skin); R(17, 9, 14, 10, skin); R(19, 21, 10, 1, skin); R(29, 9, 2, 10, ccShade(skin, -10));
+  R(20, 14, 2, 2, '#241812'); R(26, 14, 2, 2, '#241812'); R(20, 14, 1, 1, '#f4efe6'); R(26, 14, 1, 1, '#f4efe6');
+  R(23, 16, 2, 2, ccShade(skin, -18)); R(22, 19, 4, 1, ccShade(skin, -35));
+  if (fem) { R(19, 13, 3, 1, hd); R(26, 13, 3, 1, hd); R(21, 19, 6, 1, ccShade(skin, -45)); } else { R(19, 12, 4, 1, hd); R(25, 12, 4, 1, hd); }
+  // hair on top
+  const cap = () => { R(17, 4, 14, 4, hair); R(16, 6, 16, 4, hair); R(16, 10, 2, 5, hair); R(30, 10, 2, 5, hair); R(18, 4, 12, 1, ccShade(hair, 25)); };
+  if (hs === 'short' || hs === 'ponytail') cap();
+  if (hs === 'long') { cap(); R(15, 10, 3, 12, hair); R(30, 10, 3, 12, hair); }
+  if (hs === 'pigtails') { cap(); R(15, 10, 3, 6, hair); R(30, 10, 3, 6, hair); }
+  if (hs === 'pageboy') { cap(); R(15, 9, 3, 13, hair); R(30, 9, 3, 13, hair); R(18, 8, 12, 3, hair); R(15, 21, 3, 1, hd); R(30, 21, 3, 1, hd); }
+  if (hs === 'receding') { R(16, 8, 3, 7, hair); R(29, 8, 3, 7, hair); R(19, 5, 10, 1, hd); }
+  if (hs === 'mohawk') { R(22, 0, 4, 9, hair); R(22, 0, 4, 1, ccShade(hair, 25)); R(16, 10, 2, 4, hd); R(30, 10, 2, 4, hd); }
+  if (hs === 'buns') { cap(); R(13, 3, 5, 5, hair); R(30, 3, 5, 5, hair); R(14, 4, 3, 1, ccShade(hair, 25)); R(31, 4, 3, 1, ccShade(hair, 25)); }
+  if (hs === 'bald') R(20, 7, 6, 1, ccShade(skin, 20));
+  // facial hair (male only; the validator clears it for female characters)
+  const fh = fem ? 'none' : look.facialHairStyle, bd = ccShade(beard, -25);
+  if (fh === 'mustache' || fh === 'vandyke') { R(20, 18, 8, 1, beard); R(20, 19, 1, 1, bd); R(27, 19, 1, 1, bd); }
+  if (fh === 'goatee' || fh === 'vandyke') { R(22, 20, 4, 3, beard); R(23, 23, 2, fh === 'vandyke' ? 2 : 1, bd); }
+  if (fh === 'short') { R(17, 15, 2, 6, beard); R(29, 15, 2, 6, beard); R(18, 18, 12, 1, beard); R(18, 20, 12, 3, beard); R(20, 23, 8, 1, bd); R(22, 19, 4, 1, ccShade(skin, -35)); }
+  if (fh === 'long') { R(17, 15, 2, 7, beard); R(29, 15, 2, 7, beard); R(18, 18, 12, 1, beard); R(18, 20, 12, 6, beard); R(19, 26, 10, 3, beard); R(21, 29, 6, 3, bd); R(22, 19, 4, 1, ccShade(skin, -35)); }
+  const out = outlined(o); const g2 = cv.getContext('2d'); g2.clearRect(0, 0, cv.width, cv.height); g2.imageSmoothingEnabled = false;
+  const k = Math.max(1, Math.floor(Math.min(cv.width / out.width, cv.height / out.height))); g2.drawImage(out, Math.round((cv.width - out.width * k) / 2), Math.round(cv.height - out.height * k), out.width * k, out.height * k);
+}
+/* ---- the world sprite: the same sheets and recolouring the game draws (tinted, src/game.js) ---- */
+function ccSpriteFrame(cv, t) {
+  const g = cv.getContext('2d'); g.clearRect(0, 0, cv.width, cv.height); g.imageSmoothingEnabled = false;
+  const im = ANIM.img.Walk ? tinted(ANIM.img.Walk, CCD.look, 'Walk') : null;
+  if (im) { const f = Math.floor(t * 9) % 8; g.drawImage(im, f * 128 + 24, CCD.facing * 128 + 14, 80, 104, 0, 0, cv.width, cv.height); return; }   // the figure, cropped from its 128 px cell
+  const sh = scoutSheet(CCD.look); if (!sh) return; const s = CCD.facing, cx = (s % 4) * 96, cy = Math.floor(s / 4) * 96; g.drawImage(sh, cx + 18, cy + 6, 60, 82, 0, 0, cv.width, cv.height);
+}
+let CC_RAF = 0;
+function ccAnimate(ts) { CC_RAF = 0; if ($('#cc').hidden || CCD.screen !== 'wiz') return; const cv = $('#ccsprite'); if (cv) ccSpriteFrame(cv, ts / 1000); CC_RAF = requestAnimationFrame(ccAnimate); }
+function ccStartAnim() { if (!CC_RAF) CC_RAF = requestAnimationFrame(ccAnimate); }
+function ccPreview() {
+  const d = $('#ccdoll'); if (d) drawDoll(d, CCD.look);
+  const n = $('#ccpname'); if (n) n.textContent = CR.cleanName(CCD.name) || 'Unnamed';
+  const t = $('#ccptpl'); if (t) t.textContent = ccTplName() + ' · ' + (CCD.look.body === 'female' ? 'Female' : 'Male');
+  const p = CR.preview(CCD.stats), dv = $('#ccderived'); if (dv) dv.innerHTML = `<span>Health</span><b>${p.hp}</b><span>Stamina</span><b>${p.stam}</b><span>Mana</span><b>${p.mana}</b><span>Carry</span><b>${Math.round(p.carry)}</b>`;
+  const ws = $('#ccwnote'); if (ws) ws.textContent = CCD.look.cloak === 'none' ? 'In the world your traveller keeps a cloak: cloakless sprites are not drawn yet.' : 'In the world: skin tone and cloak colour. Hair, beards and clothing colour show on the portrait until their sprite layers are drawn.';
+}
+
+/* ---- markup helpers ---- */
+const ccBtn = (c, label, data, cls, extra) => `<button type="button" class="ccb ${cls || ''}" data-c="${c}"${Object.entries(data || {}).map(([k, v]) => ` data-${k}="${esc(String(v))}"`).join('')}${extra || ''}>${label}</button>`;
+function ccSwatches(key, list, label) {
+  return `<div class="ccfield"><div class="cclab" id="lab-${key}">${label}</div><div class="ccsw" role="radiogroup" aria-labelledby="lab-${key}" data-group="${key}">${list.map(x => {
+    const on = CCD.look[key] === x.id; const sw = x.hex !== undefined ? `<i style="background:${x.hex || (key === 'cloak' ? (x.id === 'none' ? 'transparent' : '#2f6766') : '#888')}"${x.id === 'none' ? ' class="none"' : ''}></i>` : '';
+    return `<button type="button" role="radio" aria-checked="${on}" class="${on ? 'on' : ''} ${x.hex !== undefined ? 'col' : 'txt'}" data-c="look" data-k="${key}" data-v="${x.id}" aria-label="${esc(x.n)}" title="${esc(x.n)}">${sw}${x.hex !== undefined ? '' : esc(x.n)}</button>`; }).join('')}</div></div>`;
+}
+function ccStepHtml() {
+  const L = CCD.look, step = CCD.step;
+  if (step === 0) return `<h2>Identity &amp; appearance</h2>
+    <div class="ccfield"><label class="cclab" for="ccn">Name</label><input id="ccn" maxlength="24" value="${esc(CCD.name)}" placeholder="2–16 letters" autocomplete="off" autocapitalize="words" spellcheck="false" aria-describedby="ccn-err"><div id="ccn-err" class="ccerr" role="alert"></div></div>
+    <div class="ccfield"><div class="cclab" id="lab-body">Body</div><div class="ccseg" role="radiogroup" aria-labelledby="lab-body">${CR.BODIES.map(b => `<button type="button" role="radio" aria-checked="${L.body === b.id}" class="${L.body === b.id ? 'on' : ''}" data-c="body" data-v="${b.id}">${b.n}</button>`).join('')}</div><p class="ccnote">Human only for now. Body never changes stats, skills or gear.</p></div>
+    ${ccSwatches('skinTone', CR.SKIN, 'Skin tone')}${ccSwatches('hairStyle', CR.hairFor(L.body), 'Hairstyle')}${ccSwatches('hairColor', CR.HAIR_COLORS, 'Hair colour')}
+    ${L.body === 'male' ? ccSwatches('facialHairStyle', CR.FACIAL, 'Facial hair') + (L.facialHairStyle !== 'none' ? ccSwatches('facialHairColor', CR.HAIR_COLORS, 'Facial hair colour') : '') : ''}
+    ${ccSwatches('clothingColor', CR.CLOTHING, 'Shirt colour')}${ccSwatches('cloak', CR.CLOAKS, 'Cloak')}`;
+  if (step === 1) return `<h2>Starting profession</h2><p class="ccnote">A template only fills in the numbers on the next page. There are no classes: you can change everything, and your title comes from the skills you actually raise.</p>
+    ${CCD.pending ? `<div class="ccwarn" role="alertdialog" aria-labelledby="ccpendt"><b id="ccpendt">Replace your edited numbers with ${esc(CR.TEMPLATE[CCD.pending].n)}?</b> Your name and appearance stay.<div class="ccrow">${ccBtn('tplok', 'Replace', { t: CCD.pending }, 'pri')}${ccBtn('tplno', 'Keep mine')}</div></div>` : ''}
+    <div class="cctpls" role="radiogroup" aria-label="Templates">${CR.TEMPLATES.map(t => { const on = !CCD.edited && CCD.tpl === t.id, iss = CR.templateIssues(t.id);
+      return `<button type="button" role="radio" aria-checked="${on}" class="cctpl ${on ? 'on' : ''}" data-c="tpl" data-t="${t.id}"${iss.length ? ' disabled' : ''}><b>${esc(t.n)}</b><span class="ccts">${t.s.join(' / ')}</span><span class="cctk">${t.advanced ? 'Pick your own skills' : t.k.map(([n, v]) => esc(n) + ' ' + v).join(' · ')}</span><span class="ccnote">${esc(t.d)}${iss.length ? ' — ' + esc(iss.join(', ')) : ''}</span></button>`; }).join('')}</div>
+    ${CCD.edited ? '<p class="ccnote">Current numbers: <b>Custom</b>.</p>' : ''}`;
+  if (step === 2) {
+    const left = SF.CREATE_STATS - ccSum(CCD.stats), sl = SF.CREATE_SKILLS - ccSkillTotal();
+    const statRow = (i, n) => `<div class="ccstat"><label for="st${i}">${n}</label>${ccBtn('st', '−', { i, d: -1 }, 'pm', ` aria-label="Lower ${n}"`)}<input type="range" id="st${i}" min="${SF.CREATE_STAT_MIN}" max="${SF.CREATE_STAT_MAX}" value="${CCD.stats[i]}" data-c="stv" data-i="${i}"><input type="number" class="ccnum" min="${SF.CREATE_STAT_MIN}" max="${SF.CREATE_STAT_MAX}" value="${CCD.stats[i]}" data-c="stn" data-i="${i}" aria-label="${n} value" inputmode="numeric">${ccBtn('st', '+', { i, d: 1 }, 'pm', ` aria-label="Raise ${n}"`)}</div>`;
+    const opts = (cur, i) => `<option value="">— none —</option>` + CC_GROUPS.map(([g, gn]) => { const ks = CR.CREATABLE.filter(k => SF.SKILL[k].g === g); if (!ks.length) return ''; return `<optgroup label="${gn}">${ks.map(k => { const used = CCD.skills.some((r, j) => j !== i && r[0] === k); return `<option value="${k}"${k === cur ? ' selected' : ''}${used ? ' disabled' : ''}>${esc(SF.SKILL[k].n)}${used ? ' (chosen)' : ''}</option>`; }).join('')}</optgroup>`; }).join('');
+    const skRow = (r, i) => `<div class="ccsk"><select data-c="sk" data-i="${i}" aria-label="Skill ${i + 1}">${opts(r[0], i)}</select><div class="ccstat sm">${ccBtn('kv', '−', { i, d: -1 }, 'pm', ` aria-label="Lower skill ${i + 1}"${r[0] ? '' : ' disabled'}`)}<input type="range" min="0" max="${SF.CREATE_SKILL_MAX}" value="${r[0] ? r[1] : 0}" data-c="kvv" data-i="${i}" aria-label="Skill ${i + 1} points"${r[0] ? '' : ' disabled'}><input type="number" class="ccnum" min="0" max="${SF.CREATE_SKILL_MAX}" value="${r[0] ? r[1] : 0}" data-c="kvn" data-i="${i}" aria-label="Skill ${i + 1} points value" inputmode="numeric"${r[0] ? '' : ' disabled'}>${ccBtn('kv', '+', { i, d: 1 }, 'pm', ` aria-label="Raise skill ${i + 1}"${r[0] ? '' : ' disabled'}`)}</div><div class="ccnote" id="skd${i}">${r[0] ? esc(CR.SKILL_INFO[SF.skillKey(r[0])] || '') : 'Empty row: leave at 0 or pick a skill.'}</div></div>`;
+    return `<h2>Stats &amp; skills <span class="ccbadge">${esc(ccTplName())}</span></h2>
+    <div class="ccsec"><div class="cchd"><span>Attributes</span><span id="ccstleft" class="${left ? 'bad' : 'good'}">${left} of ${SF.CREATE_STATS} left</span></div>
+    ${statRow(0, 'Strength')}${statRow(1, 'Dexterity')}${statRow(2, 'Intelligence')}
+    <p class="ccnote">Each ${SF.CREATE_STAT_MIN}–${SF.CREATE_STAT_MAX} now. They grow as you use skills, to 100 each and ${SF.STAT_CAP} together.</p></div>
+    <div class="ccsec"><div class="cchd"><span>Skills</span><span id="ccskleft" class="${sl ? 'bad' : 'good'}">${sl} of ${SF.CREATE_SKILLS} left</span></div>
+    ${CCD.skills.map(skRow).join('')}
+    <p class="ccnote">Two or three different skills, at most ${SF.CREATE_SKILL_MAX} each. All other skills start at 0.0, every skill set to ▲ Raise. Skills grow to 100.0 each, ${SF.SKILL_CAP / 10} together.</p>
+    <details class="ccguide"${CCD.guide ? ' open' : ''}><summary>Skill guide</summary><input id="ccgq" type="search" placeholder="Search skills" value="${esc(CCD.guide)}" aria-label="Search skills" autocomplete="off"><div id="ccglist">${ccGuideHtml()}</div></details></div>
+    <div class="ccrow">${ccBtn('reset', 'Reset to ' + esc(CR.TEMPLATE[CCD.tpl].n))}</div>`;
+  }
+  // step 3: town and review
+  const v = ccValidate(); const val = v.ok ? v.value : null; const kit = val ? CR.kit(val) : null; const sv0 = ccSaved();
+  return `<h2>Starting town &amp; review</h2>
+    <div class="cctowns" role="radiogroup" aria-label="Starting town">${CR.TOWNS.map(t => { const on = CCD.town === t.id, rec = CR.TEMPLATES.filter(x => x.town === t.id && !x.advanced).map(x => x.n);
+      return `<button type="button" role="radio" aria-checked="${on}" class="cctown ${on ? 'on' : ''}" data-c="town" data-t="${t.id}"><b>${esc(t.n)}</b>${t.tutorial ? '<span class="ccbadge">Tutorial · recommended</span>' : ''}<span class="ccnote">${esc(t.d)}</span><span class="cctk">${t.services.map(esc).join(' · ')}</span>${rec.length ? `<span class="ccnote">Suits: ${esc(rec.join(', '))}</span>` : ''}</button>`; }).join('')}</div>
+    ${CCD.town !== 'quay' ? '<p class="ccnote">The Quay\'s tutorial (Wren and the Shore Beacon) stays at Saltmarsh Quay; you can sail there from Vespar.</p>' : ''}
+    <div class="ccsec ccrev"><div class="cchd"><span>Review</span></div>
+    <div class="cckv"><span>Name</span><b>${esc(CR.cleanName(CCD.name) || '—')}</b><span>Body</span><b>${CCD.look.body === 'female' ? 'Female' : 'Male'}</b><span>Template</span><b>${esc(ccTplName())}</b>
+    <span>Attributes</span><b>STR ${CCD.stats[0]} · DEX ${CCD.stats[1]} · INT ${CCD.stats[2]}</b><span>Skills</span><b>${CCD.skills.filter(r => r[0] && r[1] > 0).map(r => esc(ccSkillName(r[0])) + ' ' + r[1]).join(' · ') || '—'}</b><span>Town</span><b>${esc(CR.TOWN[CCD.town].n)}</b>
+    ${kit ? `<span>Starting kit</span><b>${ccKitText(kit)}</b>` : ''}</div>
+    ${kit && kit.notes.length ? `<p class="ccwarnline">${kit.notes.map(esc).join(' ')}</p>` : ''}</div>
+    ${v.ok ? '' : `<div class="ccerrs" role="alert" tabindex="-1" id="ccerrs"><b>Before you can begin:</b><ul>${Object.entries(v.field).filter(([, e]) => e.length).map(([f, e]) => `<li>${e.map(esc).join(' ')} ${ccBtn('fix', 'Fix', { f }, 'sm')}</li>`).join('')}</ul></div>`}
+    ${sv0 ? `<div class="ccwarn"><label class="ccchk"><input type="checkbox" data-c="replace"${CCD.replace ? ' checked' : ''}> Replace <b>${esc(sv0.char.name)}</b>. Only one character fits in this browser; the old one is gone once the new one starts.</label><div class="ccrow">${ccBtn('export', 'Download ' + esc(sv0.char.name) + '\'s save first')}</div></div>` : ''}
+    <div id="ccerr" class="ccerr" role="alert">${esc(CCD.err)}</div>`;
+}
+function ccKitText(k) {
+  const L = Object.values(k.wear).map(id => SF.ITEMS[id] ? SF.itemName({ id }) : id);
+  for (const [id, q] of k.pack) L.push((SF.ITEMS[id].stack && q > 1 ? q + ' ' : '') + SF.itemName({ id, qty: q }) + (id === 'spellbook' ? ` (${k.spells.length} spells)` : ''));
+  return L.map(esc).join(', ');
+}
+function ccGuideHtml() {
+  const q = CCD.guide.trim().toLowerCase();
+  return SF.SKILLS.filter(([k, n]) => !q || n.toLowerCase().includes(q) || (CR.SKILL_INFO[k] || '').toLowerCase().includes(q)).map(([k, n, g]) => {
+    const ok = CR.creatable(k), used = CCD.skills.some(r => r[0] === k), free = CCD.skills.findIndex(r => !r[0]);
+    return `<div class="ccgi${ok ? '' : ' na'}"><b>${esc(n)}</b> <span class="ccnote">${esc((CC_GROUPS.find(x => x[0] === g) || [, ''])[1])}</span><br><span class="ccnote">${esc(ok ? CR.SKILL_INFO[k] : (SF.SKILL_NOCREATE[k] || 'Not available yet.'))}</span>${ok && !used && free >= 0 ? ' ' + ccBtn('gadd', 'Add', { k }, 'sm') : ''}${used ? ' <span class="ccbadge">chosen</span>' : ''}</div>`; }).join('') || '<p class="ccnote">No skill matches.</p>';
+}
+function ccSaved() { const s = loadSave(); return s && s.char && typeof s.char.name === 'string' ? s : null; }
+
+/* ---- screens ---- */
+function ccHomeHtml() {
+  const sv0 = ccSaved();
+  return `<div class="cchome"><div class="ccbrand"><h1>Shardfall</h1><div class="ccsub">A Second Age sandbox · Anniabreen</div></div>
+    <div class="ccmenu">${sv0 ? ccBtn('cont', `Continue as ${esc(sv0.char.name)}${sv0.char.ghost ? ' (ghost)' : ''}`, {}, 'pri big') : ''}${ccBtn('new', 'New character', {}, (sv0 ? '' : 'pri ') + 'big')}</div>
+    ${sv0 ? '<p class="ccnote">Your character saves in this browser. Starting a new one asks before it replaces the old one.</p>' : '<p class="ccnote">Your character saves in this browser.</p>'}</div>`;
+}
+function ccWizHtml() {
+  const v = ccValidate();
+  return `<div class="ccwiz"><header class="cctop"><b class="ccmark">Shardfall</b><nav class="ccsteps" aria-label="Creation steps">${CC_STEPS.map((n, i) => `<button type="button" class="${i === CCD.step ? 'on' : ''}${i < CCD.step ? ' done' : ''}" data-c="step" data-s="${i}" aria-current="${i === CCD.step ? 'step' : 'false'}"><i>${i + 1}</i><span>${n}</span></button>`).join('')}</nav></header>
+    <div class="ccbody"><aside class="ccprev" aria-label="Preview"><div class="ccfig"><canvas id="ccdoll" width="150" height="300" role="img" aria-label="Portrait of your character"></canvas><div class="ccws"><canvas id="ccsprite" width="80" height="104" role="img" aria-label="Your character as seen in the world"></canvas><div class="ccrot">${ccBtn('face', '⟲', { d: 1 }, 'pm', ' aria-label="Turn left"')}${ccBtn('face', '⟳', { d: -1 }, 'pm', ' aria-label="Turn right"')}</div></div></div>
+      <div class="ccpinfo"><b id="ccpname"></b><span id="ccptpl" class="ccnote"></span><div id="ccderived" class="ccderived"></div><p id="ccwnote" class="ccnote"></p></div></aside>
+      <main class="ccmain" id="ccmain">${ccStepHtml()}</main></div>
+    <footer class="ccnav">${ccBtn('back', CCD.step ? '← Back' : '← Title', {}, '')}<span class="ccnote ccwhy" id="ccwhy">${CCD.step === 3 && !v.ok ? esc(v.errors[0]) : ''}</span>${CCD.step < 3 ? ccBtn('next', 'Next →', {}, 'pri') : ccBtn('go', 'Begin your journey', {}, 'pri', ccGoBlocked(v) ? ' disabled aria-disabled="true"' : '')}</footer></div>`;
+}
+const ccGoBlocked = v => !v.ok || CCD.creating || (ccSaved() && !CCD.replace);
+function ccRender(focusSel) {
+  const el = $('#ccin'); el.innerHTML = CCD.screen === 'home' ? ccHomeHtml() : ccWizHtml(); el.className = CCD.screen;
+  if (CCD.screen === 'wiz') { ccPreview(); ccStartAnim(); ccNameErr(); }
+  const f = focusSel && el.querySelector(focusSel); if (f) f.focus();
+}
+function ccRenderStep(focusSel) { const m = $('#ccmain'); if (!m) return ccRender(focusSel); const st = m.scrollTop; m.innerHTML = ccStepHtml(); m.scrollTop = st; ccRefreshNav(); ccPreview(); ccNameErr(); const f = focusSel && m.querySelector(focusSel); if (f) f.focus(); }
+function ccRefreshNav() {
+  const v = ccValidate(), go = $('#ccin [data-c=go]'); if (go) { const b = ccGoBlocked(v); go.disabled = b; go.setAttribute('aria-disabled', String(b)); }
+  const w = $('#ccwhy'); if (w) w.textContent = CCD.step === 3 ? (!v.ok ? v.errors[0] : ccSaved() && !CCD.replace ? 'Tick “Replace” to start a new character.' : '') : '';
+  document.querySelectorAll('#ccin .ccsteps button').forEach((b, i) => { b.classList.toggle('on', i === CCD.step); b.classList.toggle('done', i < CCD.step); b.setAttribute('aria-current', i === CCD.step ? 'step' : 'false'); });
+}
+function ccNameErr() { const e = $('#ccn-err'); if (!e) return; const m = CR.checkName(CCD.name); e.textContent = CCD.tried || CCD.name ? (m || '') : ''; }
+// live numbers on the stats page without re-rendering it (sliders keep focus and the drag)
+function ccLiveNumbers() {
+  const left = SF.CREATE_STATS - ccSum(CCD.stats), sl = SF.CREATE_SKILLS - ccSkillTotal();
+  const a = $('#ccstleft'); if (a) { a.textContent = `${left} of ${SF.CREATE_STATS} left`; a.className = left ? 'bad' : 'good'; }
+  const b = $('#ccskleft'); if (b) { b.textContent = `${sl} of ${SF.CREATE_SKILLS} left`; b.className = sl ? 'bad' : 'good'; }
+  CCD.stats.forEach((v, i) => { for (const sel of [`[data-c=stv][data-i="${i}"]`, `[data-c=stn][data-i="${i}"]`]) { const el = $('#ccin ' + sel); if (el && document.activeElement !== el) el.value = v; } });
+  CCD.skills.forEach((r, i) => { for (const sel of [`[data-c=kvv][data-i="${i}"]`, `[data-c=kvn][data-i="${i}"]`]) { const el = $('#ccin ' + sel); if (el && document.activeElement !== el) el.value = r[0] ? r[1] : 0; } });
+  const bd = $('#ccin h2 .ccbadge'); if (bd) bd.textContent = ccTplName(); ccPreview(); ccRefreshNav();
+}
+/* the budget rules: a value moves only as far as the remaining points allow, so the total never goes over */
+function ccSetStat(i, v) { if (!Number.isFinite(v)) return; v = Math.round(v); const room = SF.CREATE_STATS - (ccSum(CCD.stats) - CCD.stats[i]); CCD.stats[i] = cl(v, SF.CREATE_STAT_MIN, Math.min(SF.CREATE_STAT_MAX, Math.max(SF.CREATE_STAT_MIN, room))); ccMarkEdited(); }
+function ccSetSkill(i, v) { const r = CCD.skills[i]; if (!r || !r[0] || !Number.isFinite(v)) return; v = Math.round(v); const room = SF.CREATE_SKILLS - (ccSkillTotal() - r[1]); r[1] = cl(v, 0, Math.min(SF.CREATE_SKILL_MAX, Math.max(0, room))); ccMarkEdited(); }
+function ccGoStep(s) { CCD.step = cl(s, 0, 3); CCD.err = ''; ccRender(); const m = $('#ccmain'); if (m) { m.scrollTop = 0; const h = m.querySelector('h2'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); } } }
+function ccExport() {
+  const raw = localStorage.getItem(SAVEKEY); if (!raw) return; const s = ccSaved(); const name = (s && s.char.name || 'character').replace(/[^\p{L}\p{N}_-]+/gu, '_');
+  try { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([raw], { type: 'application/json' })); a.download = `Shardfall_${name}_save.json`; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); } catch (e) { console.error(e); }
+}
+/* commit: the one path from the creator into the game (also __CC.quick for tests). Validates, keeps a copy of a replaced save,
+   then boots; boot validates again. A second press while it runs does nothing. */
+function ccCommit() {
+  if (CCD.creating || P) return false; CCD.tried = true; const v = ccValidate();
+  if (!v.ok) { CCD.err = ''; if (CCD.step !== 3) ccGoStep(3); else ccRenderStep(); const e = $('#ccerrs'); if (e) e.focus(); return false; }
+  const old = localStorage.getItem(SAVEKEY); if (old && ccSaved() && !CCD.replace) { CCD.err = 'Tick “Replace” to start a new character.'; ccRenderStep(); return false; }
+  CCD.creating = true; ccRefreshNav();
+  let ok = false; try { if (old) { try { localStorage.setItem(SAVEKEY + '.replaced', old); } catch (e) { } } ok = boot(null, ccPayload()); } catch (e) { console.error(e); ok = false; }
+  if (!ok) { CCD.creating = false; if (!P) { CCD.err = 'The character could not be created. Nothing was changed.'; ccRender(); } return false; }
+  cancelAnimationFrame(CC_RAF); CC_RAF = 0; return true;
+}
+function ccContinue() { const s = loadSave(); if (s && !P) boot(s); }
+
+/* ---- events: one delegated listener per kind; typing and dragging never re-render the page ---- */
+$('#cc').addEventListener('click', ev => {
+  const b = ev.target.closest('[data-c]'); if (!b || b.disabled || b.tagName === 'SELECT' || b.tagName === 'INPUT') return; const c = b.dataset.c; const d = b.dataset;
+  if (c === 'cont') return ccContinue();
+  if (c === 'new') { CCD.screen = 'wiz'; CCD.step = 0; CCD.replace = false; CCD.err = ''; ccRender('#ccn'); snd('ui.page'); return; }
+  if (c === 'back') { if (CCD.step) ccGoStep(CCD.step - 1); else { CCD.screen = 'home'; ccRender('[data-c=new]'); } return; }
+  if (c === 'next') { if (CCD.step === 0) { CCD.tried = true; ccNameErr(); if (CR.checkName(CCD.name) || CR.checkLook(CCD.look).length) { const n = $('#ccn'); if (n) n.focus(); return; } } ccGoStep(CCD.step + 1); snd('ui.page'); return; }
+  if (c === 'step') { ccGoStep(+d.s); return; }
+  if (c === 'go') { ccCommit(); return; }
+  if (c === 'look') { CCD.look[d.k] = d.v; if (d.k === 'facialHairStyle') return ccRenderStep(`[data-c=look][data-k="${d.k}"][data-v="${d.v}"]`);
+    b.parentElement.querySelectorAll('button').forEach(x => { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-checked', String(on)); }); ccPreview(); return; }
+  if (c === 'body') { const L = CCD.look; L.body = d.v; if (!CR.hairFor(L.body).some(h => h.id === L.hairStyle)) L.hairStyle = CR.defaultLook(L.body).hairStyle; if (L.body === 'female') L.facialHairStyle = 'none'; ccRenderStep(`[data-c=body][data-v="${d.v}"]`); return; }
+  if (c === 'face') { CCD.facing = (CCD.facing + 8 + (+d.d)) % 8; return; }
+  // a template overwrites edited numbers only after a warning; the town is never changed for you (the town cards show what suits)
+  if (c === 'tpl') { if (CCD.edited) { CCD.pending = d.t; ccRenderStep('[data-c=tplok]'); return; } ccSetTemplate(d.t); ccRenderStep(`[data-c=tpl][data-t="${d.t}"]`); return; }
+  if (c === 'tplok') { ccSetTemplate(d.t); ccRenderStep(`[data-c=tpl][data-t="${d.t}"]`); return; }
+  if (c === 'tplno') { CCD.pending = null; ccRenderStep(); return; }
+  if (c === 'st') { ccSetStat(+d.i, CCD.stats[+d.i] + (+d.d)); ccLiveNumbers(); return; }
+  if (c === 'kv') { const r = CCD.skills[+d.i]; if (r && r[0]) { ccSetSkill(+d.i, r[1] + (+d.d)); ccLiveNumbers(); } return; }
+  if (c === 'reset') { ccSetTemplate(CCD.tpl); ccRenderStep(); return; }
+  if (c === 'gadd') { const i = CCD.skills.findIndex(r => !r[0]); if (i >= 0 && CR.creatable(d.k) && !CCD.skills.some(r => r[0] === d.k)) { CCD.skills[i] = [d.k, 0]; ccMarkEdited(); ccRenderStep(`select[data-i="${i}"]`); } return; }
+  if (c === 'town') { CCD.town = d.t; ccRenderStep(`[data-c=town][data-t="${d.t}"]`); return; }
+  if (c === 'fix') { ccGoStep({ name: 0, look: 0, stats: 2, skills: 2, town: 3 }[d.f] || 0); return; }
+  if (c === 'export') { ccExport(); return; }
+});
+$('#cc').addEventListener('input', ev => {
+  const t = ev.target, c = t.dataset && t.dataset.c;
+  if (t.id === 'ccn') { CCD.name = t.value; ccNameErr(); ccPreview(); ccRefreshNav(); return; }
+  if (t.id === 'ccgq') { CCD.guide = t.value; const L = $('#ccglist'); if (L) L.innerHTML = ccGuideHtml(); return; }
+  if (c === 'stv') { ccSetStat(+t.dataset.i, +t.value); t.value = CCD.stats[+t.dataset.i]; ccLiveNumbers(); return; }
+  if (c === 'kvv') { ccSetSkill(+t.dataset.i, +t.value); t.value = CCD.skills[+t.dataset.i][1]; ccLiveNumbers(); return; }
+});
+$('#cc').addEventListener('change', ev => {
+  const t = ev.target, c = t.dataset && t.dataset.c;
+  if (c === 'stn') { const v = parseInt(t.value, 10); if (Number.isFinite(v)) ccSetStat(+t.dataset.i, v); t.value = CCD.stats[+t.dataset.i]; ccLiveNumbers(); return; }
+  if (c === 'kvn') { const v = parseInt(t.value, 10); if (Number.isFinite(v)) ccSetSkill(+t.dataset.i, v); t.value = CCD.skills[+t.dataset.i][1]; ccLiveNumbers(); return; }
+  if (c === 'sk') { const i = +t.dataset.i, k = t.value || null; if (k && (!CR.creatable(k) || CCD.skills.some((r, j) => j !== i && r[0] === k))) { t.value = CCD.skills[i][0] || ''; return; }   // atomic: a duplicate is refused, nothing changes
+    const keep = CCD.skills[i][0] ? CCD.skills[i][1] : 0; CCD.skills[i] = [k, k ? keep : 0]; if (k) ccSetSkill(i, keep); ccMarkEdited(); ccRenderStep(`select[data-i="${i}"]`); return; }
+  if (c === 'replace') { CCD.replace = t.checked; CCD.err = ''; ccRefreshNav(); const e = $('#ccerr'); if (e) e.textContent = ''; return; }
+});
+$('#cc').addEventListener('keydown', ev => {
+  if (ev.key === 'Enter' && ev.target.id === 'ccn') { ev.preventDefault(); const n = $('#ccin [data-c=next]'); if (n) n.click(); }
+  if (ev.key === 'Enter' && ev.target.classList && ev.target.classList.contains('ccnum')) ev.target.blur();
+});
+
+/* test and tooling hook: the real creator state and commit path (no shortcut around validation) */
+window.__CC = {
+  get draft() { return JSON.parse(JSON.stringify(CCD)); }, validate: () => ccValidate(), render: ccRender, step: ccGoStep, CR,
+  // quick({ name, template, town, look, stats, skills, replace }) → true when the game started
+  quick(o) { o = o || {}; CCD.screen = 'wiz'; ccSetTemplate(o.template || 'swordsman'); CCD.name = o.name || 'Tess'; CCD.look = Object.assign(CR.defaultLook((o.look && o.look.body) || 'male'), o.look || {});
+    if (o.stats) CCD.stats = o.stats.slice(); if (o.skills) { CCD.skills = o.skills.map(r => r.slice()); while (CCD.skills.length < SF.CREATE_SKILL_SLOTS) CCD.skills.push([null, 0]); ccMarkEdited(); }
+    CCD.town = o.town || 'quay'; CCD.replace = o.replace !== false; CCD.step = 3; ccRender(); return ccCommit(); } };
+
+loadScout(SCOUT_SRC); ccRender(); resize(); requestAnimationFrame(loop);
 }
 </script>
 </body></html>

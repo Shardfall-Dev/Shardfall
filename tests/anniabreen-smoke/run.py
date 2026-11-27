@@ -14,7 +14,7 @@ def check(c, msg):
   if not c: fails.append(msg)
 def new_char(pg, prof='Merchant smith'):
   pg.goto('file://' + f); pg.wait_for_timeout(400); pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_timeout(400)
-  pg.click(f'[data-c=prof][data-p="{prof}"]'); pg.fill('#ccn', 'Tess'); pg.click('[data-c=go]'); pg.wait_for_timeout(1200)
+  pg.evaluate("o => __CC.quick(o)", {'name': 'Tess', 'template': {'Glaive hybrid': 'swordsman', 'Mace dexer': 'maceman', 'Merchant smith': 'blacksmith'}.get(prof, 'swordsman')}); pg.wait_for_timeout(1200)
 def run(pg, body): return pg.evaluate('() => {' + WALK + body + '; return out; }')
 with sync_playwright() as p:
   b = p.chromium.launch(executable_path=chrome, args=['--no-sandbox'])

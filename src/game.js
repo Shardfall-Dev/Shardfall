@@ -86,8 +86,23 @@ function gain(key, diff, ctx) {
   const r = SF.tryGain(P, key, diff, Object.assign({ now: GT }, ctx || {}));
   SKLOG.push({ k: key, at: GT, r: r.gained ? `+0.1 → ${f1(P.skills[key].v)}` + (r.lowered ? ` (−0.1 ${SF.SKILL[r.lowered].n})` : '') : r.reason }); if (SKLOG.length > 80) SKLOG.shift();
   if (r.gained) { log(`${SF.SKILL[key].n} +0.1 (${f1(P.skills[key].v)})`, '#7fd4ff', 'skill'); if (GT - SND.gainAt > 1.5) { SND.gainAt = GT; snd('skill.gain'); } }
+  statRoll(key, r, ctx);
   return r;
 }
+/* attributes grow from the same resolved actions (src/stats.js, SF.STATS): one roll per action (the action id is the step time
+   unless the caller passes one; auxiliary checks pass aux: true), independent of whether the skill itself gained. The skill
+   check's verdict sets the challenge: a fitting or Grandmaster use counts fully, a trivial or repeated one a quarter. */
+function statRoll(key, r, ctx) {
+  if (!P || P.ghost) return null; const why = r.reason || '';
+  const challenge = r.gained || r.chance > 0 || /no gain this time|skill is at 100|too difficult/.test(why) ? 1 : /too easy|times in 10 minutes/.test(why) ? SF.STATS.CFG.trivial : 0;
+  const s = SF.STATS.tryStatGain(P, key, { now: GT, action: ctx && ctx.action !== undefined ? ctx.action : 't' + GT.toFixed(3), challenge, aux: !!(ctx && ctx.aux) });
+  if (!s.gained) return s;
+  recomputeStats(); log(SF.STATS.message(s), '#9fe08a', 'skill'); if (GT - SND.gainAt > 1.5) { SND.gainAt = GT; snd('skill.gain'); }
+  simEmit('StatChanged', { actor: aidOf(P), stat: s.stat, value: s.value, lowered: s.lowered || null, skill: key });
+  if (s.lowered === 'str') strDropped(); eqChanged(); return s;
+}
+/* a Strength point given up at the 225 cap can leave worn gear above the requirement: it goes back to the backpack, never dropped */
+function strDropped() { for (const sl of SF.EQ.SLOT_IDS) { const it = P.equip[sl]; if (it && SF.EQ.strReq(it) > P.str && unequipTo(sl)) log(`${iname(it)} is too heavy for your Strength now; you put it in your backpack.`, '#ffb070'); } }
 
 /* ---------- sound: src/audio.js (SFXA) plays the sound pack; this section decides what plays and where ---------- */
 let AC = null, muted = false;   // AC is SFXA's shared AudioContext once a gesture unlocks it; muted persists in SETTINGS
@@ -190,22 +205,18 @@ function sndTick() {
 }
 
 /* ---------- player ---------- */
+/* newChar(o): the player object. A new character comes from a validated creation (SF.CREATION.validate → value): its skill
+   points become tenths once (SF.CREATION.progression), every other skill starts at 0.0, every lock at Raise. A loaded character
+   passes skills: {} and its saved fields are laid over this. */
 function newChar(o) {
   const c = { kind: 'player', pid: 'p1', name: o.name, x: 92.5, y: 304.5, sect: 0, str: o.str, dex: o.dex, int: o.int, skills: SF.newSkills(), pack: SF.newContainer('pack', 'p1'), bank: SF.newContainer('bank', 'p1'), equip: emptyEquip(), eqMig: SF.EQ.MIGRATION, look: o.look || {}, bound: 'quay', freeLessons: 2, hotbar: [null, null, null, null], sw: SF.newSwing(), combatMig: SF.COMBAT_MIGRATION };
-  c.id = 'p1'; for (const [k, v] of Object.entries(o.skills)) c.skills[k].v = v * 10;
+  c.id = 'p1'; Object.assign(c, SF.CREATION.progression({ str: o.str, dex: o.dex, int: o.int, skills: o.skills || {} }, (Math.random() * 4294967296) >>> 0));
   c.hp = SF.maxHp(c); c.stam = SF.maxStam(c); c.mana = SF.maxMana(c); return c;
 }
-function starterKit() {
-  const add = (id, q) => SF.addItem(P.pack, SF.newItem(id, q));
-  add('journal', 1); P.equip.shirt = SF.EQ.make('shirt', { origin: 'npc' }); P.equip.trousers = SF.EQ.make('trousers', { origin: 'npc' }); P.equip.feet = SF.EQ.make('shoes', { origin: 'npc' }); add('gold', 150); add('bandage', 12); add('cookedmeat', 3);
-  const top = ['swordsmanship', 'fencing', 'macefighting', 'archery'].sort((a, b) => P.skills[b].v - P.skills[a].v)[0];
-  const w = { swordsmanship: P.skills.parrying.v > 0 || P.str < SF.WEAPONS.glaive.str ? 'sword' : 'glaive', fencing: 'dagger', macefighting: 'mace', archery: 'shortbow' }[top];
-  if (P.skills[top].v > 0) { P.equip.weapon = SF.newItem(w, 1); if (w === 'shortbow') add('arrow', 80); } else add('dagger', 1);
-  if (P.skills.parrying.v > 0 && !(P.equip.weapon && SF.weaponOf(P.equip.weapon).two)) P.equip.shield = SF.EQ.make('buckler', { origin: 'npc' });
-  for (const [k, tool] of [['woodcutting', 'hatchet'], ['mining', 'pickaxe'], ['skinning', 'knife'], ['fishing', 'rod'], ['smithing', 'tongs'], ['tailoring', 'sewkit'], ['carpentry', 'knife'], ['fletching', 'knife']]) if (P.skills[k].v > 0 && !SF.count(P.pack, tool)) add(tool, 1);
-  if (P.skills.spellcraft.v > 0) mageryStarter(add);
-  if (P.skills.alchemy.v > 0) add('vial', 6);
-  P.hotbar = [{ k: 'item', id: 'bandage' }, P.skills.spellcraft.v > 0 ? { k: 'spell', id: 'magery.04' } : { k: 'item', id: 'draught' }, P.skills.spellcraft.v > 0 ? { k: 'spell', id: 'magery.05' } : P.skills.concealment.v > 0 ? { k: 'act', id: 'hide' } : { k: 'act', id: 'track' }, { k: 'act', id: 'meditate' }, { k: 'act', id: 'bandother' }];
+/* the starter kit (SF.CREATION.kit / applyKit): granted once, only for a committed new character */
+function starterKit(v) {
+  const r = SF.CREATION.applyKit(P, SF.CREATION.kit(v)); for (const n of SF.CREATION.kit(v).notes) log(n, '#ffb070');
+  if (!r.ok) console.warn('starter kit over the light load', r);
 }
 /* equipment and weight (src/equipment.js, SF.EQ). Weight is shown in weight units (SF.WU per authored kg); worn gear counts. */
 const emptyEquip = () => { const e = {}; for (const s of SF.EQ.SLOT_IDS) e[s] = null; return e; };
@@ -362,7 +373,7 @@ function applyBlow(A, t, opt) {
   if (D.shieldAR > 0) { if (t === P) gain('parrying', A.diff); if (m.parried) { wear(D.shieldItem, .3); floater(t.x, t.y, 'parry', '#cfe8ff'); } }
   if (D.armorItem) { if (A.w && A.w.mace) { if (m.armorWear > 0) wear(D.armorItem, m.armorWear); } else wear(D.armorItem, .2); }
   if (A.w && A.w.mace) drainStam(t, rnd(SF.MACE_STAM[0], SF.MACE_STAM[1]));
-  if (a === P) { gain('tactics', D.diff); gain('anatomy', D.diff); if (A.it && A.w.hp) wear(A.it, 25 / A.w.hp);
+  if (a === P) { gain('tactics', D.diff, { aux: true }); gain('anatomy', D.diff, { aux: true }); if (A.it && A.w.hp) wear(A.it, 25 / A.w.hp);
     const it = A.it; if (it && it.venom && it.venom.charges > 0 && !A.w.ammo) { it.venom.charges--; applyPoison(t, it.venom.tier); if (!it.venom.charges) { delete it.venom; log('The venom on your weapon is spent.'); } } }
   m.raw = raw;
   if (m.final <= 0) { floater(t.x, t.y, m.parried ? 'parried' : 'absorbed', '#c8c8c8'); noHarmSound(t, m.parried); return m; }
@@ -634,7 +645,7 @@ function finishFirstAid() {
   if (now !== b.kind) return out(b.kind === 'res' ? `${cap1(who)} is no longer a ghost.` : now === 'res' ? `${cap1(who)} died before you finished.` : now === 'cure' ? `${cap1(who)} was poisoned before you finished; this bandage was for wounds.` : now === 'heal' ? `The poison is already gone; this bandage was for poison.` : `${cap1(who)} no longer needs treatment.`);
   const heal = sv('healing'), ana = sv('anatomy');
   const r = SF.firstAidResolve({ kind: b.kind, heal, ana, slips: b.slips, missing: st.max - st.hp }, R);
-  if (r.chance > 0 && r.chance < 1) { gain('healing', heal + 5); gain('anatomy', ana + 5); }    // a sure or impossible treatment teaches nothing
+  if (r.chance > 0 && r.chance < 1) { gain('healing', heal + 5); gain('anatomy', ana + 5, { aux: true }); }    // a sure or impossible treatment teaches nothing
   const sl = b.slips ? ` (${b.slips} slip${b.slips > 1 ? 's' : ''})` : '';
   if (b.kind === 'heal') {
     if (!r.success) { floater(e.x, e.y, 'no effect', '#c8c8c8'); return out(`You fail to stop the bleeding${sl}.`); }
@@ -1169,8 +1180,8 @@ const ABIL = {
   lullaby: { n: 'Lullaby', cd: SF.BARD.cd, fn: () => bard('lullaby') },
   discord: { n: 'Discord', cd: SF.BARD.cd, fn: () => bard('discord') },
   provoke: { n: 'Provoke', cd: SF.BARD.cd, fn: () => bard('provocation') },
-  pick: { n: 'Pickpocket', fn: () => { const m = P.sel; if (!m || m.kind !== 'mon' || !MON[m.type].purse) return log('Select an unaware smuggler to pick their pocket.', '#ffb070'); if (dist(m, P) > SF.PICK_RANGE) return log('Get within 1.5 m.', '#ffb070'); if (m.target === P) return log('They are watching you too closely.', '#ffb070'); m.pickCd = m.pickCd || 0; if (GT < m.pickCd) return log('Wait before trying that pocket again.'); m.pickCd = GT + SF.PICK_COOLDOWN; P.task = { kind: 'pick', m, label: 'Pickpocketing', t0: GT, t1: GT + SF.PICK_TIME, still: true, x0: P.x, y0: P.y }; } },
-  coat: { n: 'Coat weapon', fn: () => { const w = P.equip.weapon; if (!w || wDef().ammo || wDef() === SF.WEAPONS.unarmed) return log('Equip a melee weapon to coat.', '#ffb070'); if (wDef().skill === 'macefighting') return log('Mace Fighting weapons cannot carry poison.', '#ffb070'); if (!SF.count(P.pack, 'venom')) return log('You need a mire venom vial (craft one at an alchemy still).', '#ffb070'); const tier = SF.venomTier(sv('venomcraft')); if (!tier) return log('Coating needs Venomcraft 30.', '#ffb070'); P.task = { kind: 'coat', label: 'Coating', t0: GT, t1: GT + 1, still: true, x0: P.x, y0: P.y }; } },
+  pick: { n: 'Pickpocket', fn: () => { const m = P.sel; if (!m || m.kind !== 'mon' || !MON[m.type].purse) return log('Select an unaware smuggler to pick their pocket.', '#ffb070'); if (dist(m, P) > SF.PICK_RANGE) return log('Get within 1.5 m.', '#ffb070'); if (m.target === P) return log('They are watching you too closely.', '#ffb070'); m.pickCd = m.pickCd || 0; if (GT < m.pickCd) return log('Wait before trying that pocket again.'); m.pickCd = GT + SF.PICK_COOLDOWN; P.task = { kind: 'pick', m, label: 'Stealing', t0: GT, t1: GT + SF.PICK_TIME, still: true, x0: P.x, y0: P.y }; } },
+  coat: { n: 'Coat weapon', fn: () => { const w = P.equip.weapon; if (!w || wDef().ammo || wDef() === SF.WEAPONS.unarmed) return log('Equip a melee weapon to coat.', '#ffb070'); if (wDef().skill === 'macefighting') return log('Mace Fighting weapons cannot carry poison.', '#ffb070'); if (!SF.count(P.pack, 'venom')) return log('You need a mire venom vial (craft one at an alchemy still).', '#ffb070'); const tier = SF.venomTier(sv('venomcraft')); if (!tier) return log('Coating needs Poisoning 30.', '#ffb070'); P.task = { kind: 'coat', label: 'Coating', t0: GT, t1: GT + 1, still: true, x0: P.x, y0: P.y }; } },
   trap: { n: 'Set snare', fn: () => { if (!SF.count(P.pack, 'trapkit')) return log('You need a snare kit.', '#ffb070'); if (TRAPS.filter(t => t.owner === 'P').length >= SF.TRAP.max) return log('You already have two snares set.', '#ffb070'); if (TRAPS.some(t => Math.hypot(t.x - P.x, t.y - P.y) < SF.TRAP.spacing)) return log('Snares must be at least 4 m apart.', '#ffb070'); P.task = { kind: 'trap', label: 'Setting snare', t0: GT, t1: GT + SF.TRAP.place, still: true, x0: P.x, y0: P.y }; } } };
 function bard(skill) {
   const id = { lullaby: 'lullaby', discord: 'discord', provocation: 'provoke' }[skill];
@@ -1547,8 +1558,31 @@ function updateFacing(e, vx, vy) {
 function faceToward(e, tx, ty) { const vx = tx - e.x, vy = ty - e.y; const s = e.sect; e.sect = undefined; updateFacing(e, vx, vy); if (e.sect === undefined) e.sect = s || 0; }
 function hexHsl(h) { const n = parseInt(h.slice(1), 16); let r = (n >> 16) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b); let H = 0, S = 0, L = (mx + mn) / 2; if (mx !== mn) { const d = mx - mn; S = L > .5 ? d / (2 - mx - mn) : d / (mx + mn); H = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; H *= 60; } return [H, S, L]; }
 function hsl2rgb(h, s, l) { h /= 360; const f = (p, q, t) => { t < 0 && (t += 1); t > 1 && (t -= 1); return t < 1 / 6 ? p + (q - p) * 6 * t : t < .5 ? q : t < 2 / 3 ? p + (q - p) * (2 / 3 - t) * 6 : p; }; if (!s) return [l, l, l]; const q = l < .5 ? l * (1 + s) : l + s - l * s, p = 2 * l - q; return [f(p, q, h + 1 / 3), f(p, q, h), f(p, q, h - 1 / 3)]; }
+/* ---- appearance on the traveller sprite (Character Creation v2): skin tone and cloak colour are recoloured from the drawn
+   sheets. Each sheet gets a class mask once (1 skin, 2 cloak); each look a cached copy. Hair, beards, clothing colours and female
+   sheets are not drawn yet, so the world sprite shows only these two (docs/design/character-creation-v2-status.md). ---- */
+const TINT = { prep: new Map(), out: new Map() };
+function rgbHsl(r, g, b) { r /= 255; g /= 255; b /= 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b); let H = 0, S = 0; const L = (mx + mn) / 2; if (mx !== mn) { const d = mx - mn; S = L > .5 ? d / (2 - mx - mn) : d / (mx + mn); H = (mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4) * 60; } return [H, S, L]; }
+function tintPrep(src) {
+  let p = TINT.prep.get(src); if (p) return p; const w = src.width, h = src.height, c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); g.drawImage(src, 0, 0);
+  const d = g.getImageData(0, 0, w, h), a = d.data, n = w * h, cls = new Uint8Array(n), hsl = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { if (!a[i * 4 + 3]) continue; const [H, S, L] = rgbHsl(a[i * 4], a[i * 4 + 1], a[i * 4 + 2]); hsl[i * 3] = H; hsl[i * 3 + 1] = S; hsl[i * 3 + 2] = L;
+    if (H > 150 && H < 220 && S > .1) cls[i] = 2; else if (H >= 10 && H <= 40 && S >= .25 && S <= .85 && L >= .52) cls[i] = 1; }
+  p = { w, h, d, cls, hsl }; TINT.prep.set(src, p); return p;
+}
+function tinted(src, look, tag) {
+  if (!src || !look || typeof look !== 'object') return src; const ck = SF.CREATION.cloakHex(look), sk = SF.CREATION.skinHex(look); if (!ck && !sk) return src;
+  const key = tag + '|' + (ck || '') + '|' + (sk || ''); let c = TINT.out.get(key); if (c) return c;
+  const p = tintPrep(src); c = document.createElement('canvas'); c.width = p.w; c.height = p.h; const g = c.getContext('2d'); const d = g.createImageData(p.w, p.h), a = d.data; a.set(p.d.data);
+  const C = ck && hexHsl(ck), K = sk && hexHsl(sk);
+  for (let i = 0, n = p.w * p.h; i < n; i++) { const k = p.cls[i]; if (!k) continue; const S = p.hsl[i * 3 + 1], L = p.hsl[i * 3 + 2]; let rgb = null;
+    if (k === 2 && C) rgb = hsl2rgb(C[0], Math.min(1, S * .5 + C[1] * .7), cl(L * (.5 + C[2]), 0, 1));
+    else if (k === 1 && K) rgb = hsl2rgb(K[0], cl(S * K[1] / .5, 0, 1), cl(L * K[2] / .66, 0, 1));
+    if (rgb) { a[i * 4] = rgb[0] * 255; a[i * 4 + 1] = rgb[1] * 255; a[i * 4 + 2] = rgb[2] * 255; } }
+  g.putImageData(d, 0, 0); if (TINT.out.size > 120) TINT.out.clear(); TINT.out.set(key, c); return c;
+}
 function scoutSheet(col) {
-  if (!SCOUT.img) return null; const key = col || 'orig'; let c = SCOUT.cache.get(key); if (c) return c;
+  if (!SCOUT.img) return null; if (col && typeof col === 'object') return tinted(SCOUT.img, col, 'atlas'); const key = col || 'orig'; let c = SCOUT.cache.get(key); if (c) return c;
   c = document.createElement('canvas'); c.width = SCOUT.img.width; c.height = SCOUT.img.height; const g = c.getContext('2d'); g.drawImage(SCOUT.img, 0, 0);
   if (col === 'ghost') { const d = g.getImageData(0, 0, c.width, c.height), a = d.data; for (let i = 0; i < a.length; i += 4) { if (!a[i + 3]) continue; const l = (a[i] + a[i + 1] + a[i + 2]) / 3; a[i] = l * .7 + 60; a[i + 1] = l * .8 + 80; a[i + 2] = l + 110; a[i + 3] = 150; } g.putImageData(d, 0, 0); }
   else if (col) { const [th, ts, tl] = hexHsl(col); const d = g.getImageData(0, 0, c.width, c.height), a = d.data; for (let i = 0; i < a.length; i += 4) { if (!a[i + 3]) continue; const [h, s, l] = hexHsl('#' + ((1 << 24) | (a[i] << 16) | (a[i + 1] << 8) | a[i + 2]).toString(16).slice(1)); if (h > 150 && h < 220 && s > .1) { const rgb = hsl2rgb(th, Math.min(1, s * .5 + ts * .7), cl(l * (.5 + tl * 1.0), 0, 1)); a[i] = rgb[0] * 255; a[i + 1] = rgb[1] * 255; a[i + 2] = rgb[2] * 255; } } g.putImageData(d, 0, 0); }
@@ -1571,7 +1605,7 @@ function playerClip() {
 }
 function drawPlayerAnim(g, e, x, y, col) {
   if (P.ghost) { const im = animSheet('Walk', true); if (!im) return false; const f = e.speed > .3 ? Math.floor(GT * 12) % 8 : 0; g.drawImage(im, f * 128, (e.sect || 0) * 128, 128, 128, Math.round(x - 64), Math.round(y - 106), 128, 128); return true; }
-  const [k, f] = playerClip(); const im = animSheet(k); if (!im) return false;
+  const [k, f] = playerClip(); const im = tinted(animSheet(k), P.look, k); if (!im) return false;
   g.imageSmoothingEnabled = false; g.drawImage(im, f * 128, (e.sect || 0) * 128, 128, 128, Math.round(x - 64), Math.round(y - 106), 128, 128); return true;
 }
 function drawScout(g, e, x, y, col) {
@@ -1666,7 +1700,7 @@ function drawEnt(e) {
   if (e.kind === 'pet') { g.strokeStyle = '#5aa8ff'; g.lineWidth = 1.5; g.beginPath(); g.ellipse(x, y, 14 * big, 7 * big, 0, 0, 7); g.stroke(); }
   if (P.sel === e && !P.ghost) { g.strokeStyle = relColor(e); g.lineWidth = 2; g.beginPath(); g.ellipse(x, y, 20 * big, 10 * big, 0, 0, 7); g.stroke(); }
   if (e.kind === 'player' && drawForm(g, e, x, y)) { }
-  else if (e.kind === 'player') drawScout(g, e, x, y, P.ghost ? 'ghost' : (P.look.cloak || null));
+  else if (e.kind === 'player') drawScout(g, e, x, y, P.ghost ? 'ghost' : P.look);
   else if (e.kind === 'ally') { if (e.ghost) g.globalAlpha = .75; drawScout(g, e, x, y, e.ghost ? 'ghost' : '#2f7a46'); }
   else if (e.kind === 'npc') drawScout(g, e, x, y, NPC_COL[e.role] || (e.life && LIFE_COL[e.life.prof]) || '#5a5a5a');
   else if (e.kind === 'mon' && MON[e.type].scout) drawScout(g, e, x, y, MON[e.type].scout);
@@ -1910,18 +1944,22 @@ function bagActions(it) {
   if (d.trade) a += btn('drop', 'Drop', { u: it.uid });
   return a;
 }
+/* natural attributes with their locks (src/stats.js). Effective values (spells, equipment) show beside when they differ. */
+function statRowsHtml() { const b = SF.STATS.natural(P), L = P.statLocks || SF.STATS.newLocks(), sym = { raise: '▲', hold: '■', lower: '▼' };
+  return SF.STATS.KEYS.map(k => { const eff = k === 'dex' ? P.dex + (P.eqDex || 0) : P[k]; const tip = SF.STATS.NAME[k] + ' is trained by ' + SF.STATS.trainedBy(k).join(', ');
+    return `<span title="${esc(tip)}">${SF.STATS.NAME[k]}</span><span><button class="lk lk-${L[k]}" data-a="statlock" data-k="${k}" aria-label="${SF.STATS.NAME[k]} lock: ${L[k]} (tap to change)" title="${L[k]}">${sym[L[k]]}</button> ${b[k]}${eff !== b[k] ? ` <span class="note">(${eff} now)</span>` : ''}</span>`; }).join(''); }
 const PANELS = {
   bag: bagPanel,
-  gear: () => { const t = (k, n) => `<span>${n}</span><span>${P[k]}</span>`; let h = `<div class="kv">${t('str', 'Strength')}${t('dex', 'Dexterity')}${t('int', 'Intellect')}<span>Stat total</span><span>${P.str + P.dex + P.int} / 225</span><span>Health</span><span>${Math.floor(P.hp)} / ${SF.maxHp(P)}</span><span>Stamina</span><span>${Math.floor(P.stam)} / ${SF.maxStam(P)}</span><span>Mana</span><span>${Math.floor(P.mana)} / ${SF.maxMana(P)}</span><span>Armor rating</span><span>${armorVal()}</span><span>Carried</span><span>${fmtWt(carryWt())} / ${fmtWt(SF.carryCap(P))} · ${encumb().n}</span><span>Weapon</span><span>${wDef().fam} · ${wDef().dmg.join('–')} · reach ${wDef().reach} m · swing every ${SF.swingDelay(P.stam, wDef().speed).toFixed(2)} s</span><span>Bound shrine</span><span>${SHRINES.find(s => s.id === P.bound).n}</span><span>Skills</span><span>${f1(SF.totalSkill(P))} / 700.0</span></div><div class="sec">Equipped ${btn('eqwin', 'Paper doll (C)', {}, 'ac')}</div>`;
+  gear: () => { let h = `<div class="kv"><span>Title</span><span>${esc(SF.CREATION.title(P))}</span>${statRowsHtml()}<span>Attribute total</span><span>${SF.STATS.total(P)} / ${SF.STAT_CAP}</span><span>Health</span><span>${Math.floor(P.hp)} / ${SF.maxHp(P)}</span><span>Stamina</span><span>${Math.floor(P.stam)} / ${SF.maxStam(P)}</span><span>Mana</span><span>${Math.floor(P.mana)} / ${SF.maxMana(P)}</span><span>Armor rating</span><span>${armorVal()}</span><span>Carried</span><span>${fmtWt(carryWt())} / ${fmtWt(SF.carryCap(P))} · ${encumb().n}</span><span>Weapon</span><span>${wDef().fam} · ${wDef().dmg.join('–')} · reach ${wDef().reach} m · swing every ${SF.swingDelay(P.stam, wDef().speed).toFixed(2)} s</span><span>Bound shrine</span><span>${SHRINES.find(s => s.id === P.bound).n}</span><span>Skills</span><span>${f1(SF.totalSkill(P))} / 700.0</span></div><div class="sec">Equipped ${btn('eqwin', 'Paper doll (C)', {}, 'ac')}</div>`;
     for (const s of SF.EQ.SLOT_IDS) { const it = P.equip[s]; if (!it && !['weapon', 'shield', 'chest'].includes(s)) continue; h += `<div class="row"><span class="v" style="width:5.5em">${SF.EQ.SLOT[s].n}</span>${it ? rowIcon(it) : ''}<span class="nm">${it ? esc(iname(it)) : '<span class="note">empty</span>'}</span>${it && SF.WEARABLE(it.id) && it.cond !== undefined && it.cond < (it.maxc || 100) ? btn('repair', 'Repair', { u: it.uid }) : ''}${it && SF.ITEMS[it.id].trade ? btn('uneq', 'Remove', { s }) : ''}</div>`; }
-    return ['Character', h + '<p class="note">Stats do not grow by use. Buy points from Master Vey (up to 225 total).</p>']; },
+    return ['Character', h + '<p class="note">Attributes grow as you use your skills (up to 100 each, 225 together). ▲ raise · ■ hold · ▼ lower: at 225 a gain takes a point from an attribute set to Lower.</p>']; },
   skills: () => { let h = `<div class="note">Total ${f1(SF.totalSkill(P))} / 700.0 · ▲ raise · ■ hold · ▼ lower (gives points when you hit the cap)</div>`;
     if (P.skillPool > 0) h += `<div class="sec">Combat reform</div><p class="note">${f1(P.skillPool)} trained points from skills that merged in the combat reform are waiting. Tap +1.0 on a skill to place them (never past 100.0 or the 700.0 total).</p>`;
     for (const [k, n, g, live] of SF.SKILLS) { const s = P.skills[k]; const lk = s.lock === 'raise' ? '▲' : s.lock === 'hold' ? '■' : '▼'; const tip = SF.SKILL_TIP[k]; h += `<div class="row ${live ? '' : 'na'}"${tip ? ` title="${esc(tip)}"` : ''}><span class="nm">${n}${live ? '' : ' <span class="note">later milestone</span>'}${tip ? `<br><span class="note">${esc(tip)}</span>` : ''}</span><span class="v">${f1(s.v)}</span>${P.skillPool > 0 && s.v < SF.SKILL_MAX ? btn('pool', '+1.0', { k }) : ''}${btn('lock', lk, { k })}</div>`; }
     h += '<div class="sec">Recent skill checks</div>' + (SKLOG.slice(-14).reverse().map(l => `<div class="note">${SF.SKILL[l.k].n}: ${esc(l.r)}</div>`).join('') || '<p class="note">None yet.</p>');
     return ['Skills', h]; },
   spells: () => spellbookPanel(),
-  abilities: () => ['Abilities', `<p class="note">Use now or put an action on a hotbar slot (two bars of four).</p>` + [['bandother', 'Bandage other (Healing: an ally or a player ghost)'], ['anatomy', 'Anatomy (judge a living target)'], ['hide', 'Hide (Concealment)'], ['track', 'Track (Tracking)'], ['meditate', 'Meditate'], ['brace', 'Braced Guard (Parrying 50)'], ['search', 'Search (finds hidden foes and snares)'], ['tame', 'Tame (Taming)'], ['vet', 'Treat pet (Veterinary)'], ['lullaby', 'Lullaby (needs a lute)'], ['discord', 'Discord (needs a lute)'], ['provoke', 'Provoke (needs a lute)'], ['pick', 'Pickpocket a smuggler'], ['coat', 'Coat weapon with venom (Venomcraft 30)'], ['trap', 'Set a snare (Trapcraft)']].map(([id, n]) => `<div class="row"><span class="nm">${n}</span>${ABIL[id] ? btn('abil', 'Use', { id }) : ''}${btn('assign', 'Slot', { k: 'act', id })}</div>`).join('')],
+  abilities: () => ['Abilities', `<p class="note">Use now or put an action on a hotbar slot (two bars of four).</p>` + [['bandother', 'Bandage other (Healing: an ally or a player ghost)'], ['anatomy', 'Anatomy (judge a living target)'], ['hide', 'Hide (Hiding)'], ['track', 'Track (Tracking)'], ['meditate', 'Meditate'], ['brace', 'Braced Guard (Parrying 50)'], ['search', 'Search (finds hidden foes and snares)'], ['tame', 'Tame (Animal Taming)'], ['vet', 'Treat pet (Veterinary)'], ['lullaby', 'Lullaby: Peacemaking (needs a lute)'], ['discord', 'Discord: Discordance (needs a lute)'], ['provoke', 'Provoke (needs a lute)'], ['pick', 'Pickpocket a smuggler (Stealing)'], ['coat', 'Coat weapon with venom (Poisoning 30)'], ['trap', 'Set a snare (Remove Trap)']].map(([id, n]) => `<div class="row"><span class="nm">${n}</span>${ABIL[id] ? btn('abil', 'Use', { id }) : ''}${btn('assign', 'Slot', { k: 'act', id })}</div>`).join('')],
   assign: () => ['Choose a slot', `<p class="note">Assign ${esc(ASSIGN.k === 'spell' ? SF.SPELL[ASSIGN.id].n : ASSIGN.k === 'item' ? SF.ITEMS[ASSIGN.id].n : (ABIL[ASSIGN.id] ? ABIL[ASSIGN.id].n : ASSIGN.id))} to:</p><div class="grid2">${P.hotbar.map((_, i) => btn('setslot', 'Bar ' + (1 + Math.floor(i / 3)) + ' · ' + (i % 3 + 1) + ': ' + esc(slotLabel(P.hotbar[i])[0]), { i })).join('')}</div>`],
   loot: () => { const c = P.lootOpen; if (!c || c.gone) return null; const ls = c.cont ? SF.lootStatus(c.cont, P.id, GT) : { label: '' }; let h = `<div class="note">${c.mine ? 'Your body · ' : ''}${esc(ls.label || '')} · crumbles in ${Math.ceil((c.expires - GT) / 60)} min · pack ${P.pack.items.length}/${SF.SLOTS}, ${packKg().toFixed(1)}/${SF.carryKg(P).toFixed(1)} kg</div>`;
     if (!c.cont.items.length) h += '<p class="note">Empty.</p>'; else h += btn('takeall', 'Take all', {}, 'ac');
@@ -1935,11 +1973,11 @@ const PANELS = {
     return [P.talkTo ? P.talkTo.name : 'Bank', h]; },
   shop: () => { const n = P.talkTo; if (!n || dist(n, P) > 4) return null; const stock = SHOPS[n.role] || []; const tab = PTAB || 'buy'; let h = `<div class="tabs">${btn('tab', 'Buy', { t: 'buy' }, tab === 'buy' ? 'ac' : '')}${btn('tab', 'Sell', { t: 'sell' }, tab === 'sell' ? 'ac' : '')}<span class="note" style="margin-left:auto">${SF.count(P.pack, 'gold')} gold</span></div>`;
     if (tab === 'buy') for (const id of stock) { const p = SF.PRICES[id]; const st = SF.ITEMS[id].stack; h += `<div class="row">${rowIcon({ id })}<span class="nm">${esc(SF.itemName({ id, qty: 1 }))}</span><span class="v">${p} gp</span>${btn('buy', 'Buy', { id, n: 1 })}${st ? btn('buy', '×10', { id, n: 10 }) : ''}</div>`; }
-    else for (const it of P.pack.items) { if (!SF.ITEMS[it.id].trade || it.id === 'gold') continue; const p = Math.max(1, Math.floor((SF.PRICES[it.id] || 1) * .4)); h += `<div class="row">${rowIcon(it)}<span class="nm">${esc(iname(it))}</span><span class="v">${p} gp ea</span>${btn('sell', 'Sell 1', { u: it.uid })}${it.qty > 1 ? btn('sell', 'All', { u: it.uid, all: 1 }) : ''}</div>`; }
+    else for (const it of P.pack.items) { if (!SF.ITEMS[it.id].trade || it.id === 'gold' || it.starter) continue; const p = Math.max(1, Math.floor((SF.PRICES[it.id] || 1) * .4)); h += `<div class="row">${rowIcon(it)}<span class="nm">${esc(iname(it))}</span><span class="v">${p} gp ea</span>${btn('sell', 'Sell 1', { u: it.uid })}${it.qty > 1 ? btn('sell', 'All', { u: it.uid, all: 1 }) : ''}</div>`; }
     return [n.name, h]; },
   trainer: () => { const tab = PTAB || 'skills'; let h = `<div class="tabs">${btn('tab', 'Lessons', { t: 'skills' }, tab === 'skills' ? 'ac' : '')}${btn('tab', 'Attributes', { t: 'stats' }, tab === 'stats' ? 'ac' : '')}<span class="note" style="margin-left:auto">${SF.count(P.pack, 'gold')} gold · ${P.freeLessons} free lessons</span></div>`;
     if (tab === 'skills') { h += '<p class="note">Lessons raise a skill to 30. Your first two are free. Skills set to Hold or Lower cannot be trained.</p>'; for (const [k, n, , live] of SF.SKILLS) { if (!live) continue; const v = P.skills[k].v / 10; if (v >= 30) continue; const cost = P.freeLessons > 0 ? 0 : SF.trainCost(v, 30); h += `<div class="row"><span class="nm">${n} <span class="note">${v.toFixed(1)} → 30</span></span><span class="v">${cost ? cost + ' gp' : 'free'}</span>${btn('train', 'Learn', { k })}</div>`; } }
-    else { h += `<p class="note">Attribute points cost ${SF.statTrainCost(1)} gold each. Total ${P.str + P.dex + P.int} / 225, each at most 100.</p>`; for (const [k, n] of [['str', 'Strength'], ['dex', 'Dexterity'], ['int', 'Intellect']]) h += `<div class="row"><span class="nm">${n}</span><span class="v">${P[k]}</span>${btn('stat', '+1', { k, n: 1 })}${btn('stat', '+5', { k, n: 5 })}</div>`; }
+    else { h += `<p class="note">Attributes cannot be bought. Strength, Dexterity and Intelligence grow on their own as you use your skills, up to 100 each and 225 together. Set an attribute to Lower on your Character page to let it give points once you reach 225.</p>`; for (const k of SF.STATS.KEYS) h += `<div class="row"><span class="nm">${SF.STATS.NAME[k]} <span class="note">${SF.STATS.natural(P)[k]}</span><br><span class="note">trained by ${esc(SF.STATS.trainedBy(k).join(', '))}</span></span></div>`; }
     return ['Master Vey, trainer', h]; },
   log: () => ['Combat and system log', LOG.slice(-150).reverse().map(l => `<div style="color:${l.c};padding:2px 0">${esc(l.t)}</div>`).join('')],
   picker: () => ['Which one?', PICK.map((e, i) => `<div class="row"><span class="nm">${esc(e.name)}</span><span class="v">${dist(e, P).toFixed(1)} m</span>${btn('pick', 'Select', { i })}</div>`).join('')],
@@ -1982,9 +2020,9 @@ const ACT = {
   wd: d => { const it = findU(P.bank, d.u); if (!it) return; const r = SF.transfer(P.bank, P.pack, it.uid, it.qty, { cap: cap() }); if (!r.ok) log(r.reason, '#ffb070'); save(); renderPanel(); },
   tab: d => { PTAB = d.t; renderPanel(true); snd('ui.page'); },
   buy: d => { const p = SF.PRICES[d.id] * +d.n; if (SF.count(P.pack, 'gold') < p) return log('Not enough gold.', '#ffb070'); const it = SF.EQ.isGear(d.id) || (SF.WEARABLE(d.id) && !SF.ITEMS[d.id].stack) ? SF.EQ.make(d.id, { origin: 'npc' }) : SF.newItem(d.id, +d.n, SF.ITEMS[d.id].stack ? null : { cond: 100 }); const r = SF.addItem(P.pack, it, cap()); if (!r.ok) return log(r.reason, '#ffb070'); SF.removeQty(P.pack, 'gold', p); snd('loot.coin'); renderPanel(); },
-  sell: d => { const it = findU(P.pack, d.u); if (!it) return; const n = d.all ? it.qty : 1, g = Math.max(1, Math.floor((SF.PRICES[it.id] || 1) * .4 * (SF.WORK_TOOLS[it.id] && !SF.ITEMS[it.id].stack ? SF.toolUses(it) / SF.TOOL_USES : 1))) * n; it.qty -= n; if (it.qty <= 0) P.pack.items.splice(P.pack.items.indexOf(it), 1); P.pack.ver++; SF.addItem(P.pack, SF.newItem('gold', g)); snd('loot.coin'); renderPanel(); },
+  sell: d => { const it = findU(P.pack, d.u); if (!it) return; if (it.starter) return log('Merchants do not buy back starter gear.', '#ffb070'); /* v0.30: the starter kit is not a gold source */ const n = d.all ? it.qty : 1, g = Math.max(1, Math.floor((SF.PRICES[it.id] || 1) * .4 * (SF.WORK_TOOLS[it.id] && !SF.ITEMS[it.id].stack ? SF.toolUses(it) / SF.TOOL_USES : 1))) * n; it.qty -= n; if (it.qty <= 0) P.pack.items.splice(P.pack.items.indexOf(it), 1); P.pack.ver++; SF.addItem(P.pack, SF.newItem('gold', g)); snd('loot.coin'); renderPanel(); },
   train: d => { const s = P.skills[d.k]; if (s.lock !== 'raise') return log('Set that skill to Raise first.', '#ffb070'); const v = s.v / 10; const cost = P.freeLessons > 0 ? 0 : SF.trainCost(v, 30); const add = 300 - s.v; if (SF.totalSkill(P) + add > SF.SKILL_CAP) return log('That would pass the 700 cap.', '#ffb070'); if (cost && SF.count(P.pack, 'gold') < cost) return log('Not enough gold.', '#ffb070'); if (cost) SF.removeQty(P.pack, 'gold', cost); else P.freeLessons--; s.v = 300; log(`You train ${SF.SKILL[d.k].n} to 30.`, '#7fd4ff'); save(); renderPanel(); },
-  stat: d => { const n = +d.n, k = d.k; if (P.str + P.dex + P.int + n > SF.STAT_CAP) return log('Attribute total is capped at 225.', '#ffb070'); if (P[k] + n > SF.STAT_MAX) return log('Each attribute is capped at 100.', '#ffb070'); const c = SF.statTrainCost(n); if (SF.count(P.pack, 'gold') < c) return log('Not enough gold.', '#ffb070'); SF.removeQty(P.pack, 'gold', c); P[k] += n; save(); renderPanel(); },
+  statlock: d => { const k = d.k; if (!SF.STATS.KEYS.includes(k)) return; const cur = (P.statLocks || SF.STATS.newLocks())[k]; SF.STATS.setLock(P, k, SF.STATS.cycleLock(cur)); save(); eqChanged(); renderPanel(); },
   craft: d => { startCraft(d.r, +(d.n || 1)); },
   pick: d => { P.sel = PICK[+d.i]; closePanel(); },
   petatk: () => petCommand('attack'),
@@ -2111,7 +2149,7 @@ const GQD = {
       { t: 'Forge 8 iron rivets at the anvil (Mara lends tongs there)', short: 'Forge iron rivets', need: 8, ev: e => e.type === 'make' && e.out === 'rivet' && e.mat === 'iron' ? e.qty : 0, at: () => QUAY_ANVIL() },
       { t: 'Give Mara 4 iron rivets (keep the other four)', short: 'Give Mara 4 rivets', deliver: { id: 'rivet', mat: 'iron', n: 4 }, at: () => npcBy('qsmith') }],
     reward: { gold: 15, pins: ['anvil'], ledger: true }, done: '“That will hold. Keep the other four — a carpenter will want them for hinges. Here is my supply ledger.”',
-    next: 'An Edge for Brine Road (Smithing 20) opens in a later build.' } };
+    next: 'An Edge for Brine Road (Blacksmithy 20) opens in a later build.' } };
 function gqAll() { const q = Q(); return q.guild || (q.guild = {}); }
 function gq(id) { const g = gqAll(); return g[id] || { s: 'none' }; }
 const npcBy = role => ents.find(e => e.kind === 'npc' && e.role === role);
@@ -2316,8 +2354,20 @@ function migrateSave(s, raw) {
   }
   if (s.v < 6) migrateV6(s, raw);
   if (s.v < 7) migrateV7(s, raw);
+  if (s.v < 8) migrateV8(s, raw);
   return s;
 }
+/* v0.30 character creation v2: additive and idempotent. The appearance gains its new fields (a v1 cloak colour becomes its cloak
+   id; unknown fields are kept), attributes gain locks and the gain state (src/stats.js), the character a stable id. Saved
+   attributes, skills, locks, items, position, quests and world are untouched: creation limits never apply to an existing
+   character, and nothing is granted. A snapshot of the old save is kept once. */
+function migrateV8(s, raw) {
+  try { if (raw && !localStorage.getItem(SAVEKEY + '.prev7')) localStorage.setItem(SAVEKEY + '.prev7', raw); } catch (e) { }
+  const c = s.char; c.look = SF.CREATION.normalizeLook(c.look);
+  const fixes = SF.STATS.migrateChar(c); if (fixes.some(f => !/^(locks|lock |gain state)/.test(f))) s.statRepair = fixes;
+  if (!c.charId) c.charId = newCharId(); s.v = 8;
+}
+const newCharId = () => 'c' + Date.now().toString(36) + Math.floor(Math.random() * 1e9).toString(36);
 /* v0.23 world expansion: the grid grew from 2100 × 900 to W × H and Anniabreen was stretched (annStretch). Everything saved at
    an Anniabreen position follows it: towns move by whole tiles, so town records stay exact; wilderness resource and survey
    records are dropped (that ground was redrawn). A snapshot of the old save is kept once. */
@@ -2424,7 +2474,7 @@ let deletingSave = false;
 const SAVEKEY = 'shardfall.save.v1';
 function save() {
   if (!P || deletingSave) return false; try {
-    const c = {}; for (const k of ['name', 'x', 'y', 'str', 'dex', 'int', 'hp', 'stam', 'mana', 'skills', 'pack', 'bank', 'equip', 'look', 'bound', 'quest', 'freeLessons', 'hotbar', 'ghost', 'ghostAt', 'gainLog', 'recipeN', 'cx', 'skillPool', 'combatMig', 'eqMig', 'bandSeq', 'bandDone', 'lowerRank']) c[k] = P[k];
+    const c = {}; for (const k of ['name', 'x', 'y', 'str', 'dex', 'int', 'hp', 'stam', 'mana', 'skills', 'pack', 'bank', 'equip', 'look', 'bound', 'quest', 'freeLessons', 'hotbar', 'ghost', 'ghostAt', 'gainLog', 'recipeN', 'cx', 'skillPool', 'combatMig', 'eqMig', 'bandSeq', 'bandDone', 'lowerRank', 'statLocks', 'statGain', 'charId', 'created']) c[k] = P[k];
     c.bandage = bandageSave();
     if (P.base) Object.assign(c, P.base); c.magery = { mig: (P.mg && P.mg.mig) || 0 };
     const corpses = ents.filter(e => e.mine && !e.gone).map(e => ({ x: e.x, y: e.y, items: e.cont.items, left: e.expires - GT, diedAgo: GT - e.cont.diedAt }));
@@ -2432,55 +2482,35 @@ function save() {
     const pets = ents.filter(e => e.kind === 'pet' && e.type && !e.summon && !e.gone && e.hp > 0).map(e => ({ type: e.type, hp: e.hp, order: e.order === 'stay' ? 'stay' : 'follow', slots: e.slots, name: e.name, dx: e.x - P.x, dy: e.y - P.y }));
     const nodes = []; for (const [k, o] of RES) nodes.push([k, o.gen || 1, o.spec || 0, o.n, o.max || 0, Math.round(o.t * 10) / 10]);
     const ally = allySave(); if (ally) { Object.values(ally.equip || {}).forEach(scan); ally.pack.forEach(scan); if (ally.body) ally.body.items.forEach(scan); }
-    localStorage.setItem(SAVEKEY, JSON.stringify({ v: 7, char: c, corpses, pets, nodes, ally, sim: WS ? WS.save() : null, eco: ecoSave(), life: lifeSave(), uid: maxUid + 1, gt: GT, savedAt: Date.now() }));
+    localStorage.setItem(SAVEKEY, JSON.stringify({ v: 8, char: c, corpses, pets, nodes, ally, sim: WS ? WS.save() : null, eco: ecoSave(), life: lifeSave(), uid: maxUid + 1, gt: GT, savedAt: Date.now() }));
     DEV.lastSave = { ok: true, at: GT }; return true;
   } catch (e) { DEV.lastSave = { ok: false, at: GT }; return false; }
 }
 function loadSave() { try { const s = localStorage.getItem(SAVEKEY); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
 
-/* ---------- boot & creation ---------- */
-const PROFILES = {
-  'Glaive hybrid': { s: [55, 45, 50], k: { swordsmanship: 50, spellcraft: 30, tactics: 20 }, ideal: 'Swordsmanship, Tactics, Spellcraft, Spell Focus, Wardcraft, Meditation, Wrestling' },
-  'Venom skirmisher': { s: [50, 60, 40], k: { fencing: 50, tactics: 30, healing: 20 }, ideal: 'Fencing, Tactics, Anatomy, Healing, Wardcraft, Venomcraft, Concealment' },
-  'Group healer': { s: [40, 40, 70], k: { spellcraft: 50, healing: 30, meditation: 20 }, ideal: 'Spellcraft, Spell Focus, Wardcraft, Meditation, Wrestling, Healing, Anatomy' },
-  'Archer scout': { s: [45, 65, 40], k: { archery: 50, tactics: 30, concealment: 20 }, ideal: 'Archery, Tactics, Anatomy, Healing, Tracking, Concealment, Shadowstep' },
-  'Mace dexer': { s: [60, 60, 30], k: { macefighting: 50, tactics: 30, healing: 20 }, ideal: 'Mace Fighting, Tactics, Anatomy, Healing, Parrying, Wardcraft, Wrestling' },
-  'Merchant smith': { s: [60, 50, 40], k: { mining: 40, smithing: 40, woodcutting: 20 }, ideal: 'Mining, Smithing, Engineering, Carpentry, Woodcutting, Appraisal, Tailoring' } };
-let CC = { name: '', prof: 'Glaive hybrid', s: [55, 45, 50], k: Object.entries(PROFILES['Glaive hybrid'].k), cloak: '' };
-const CLOAKS = ['', '#8a2a2a', '#2a3a8a', '#5a2a6a', '#3a3a3a', '#8a6a2a'];
-function renderCC() {
-  const sv0 = loadSave(), live = SF.SKILLS.filter(s => s[3]); const opts = sel => live.map(s => `<option value="${s[0]}"${s[0] === sel ? ' selected' : ''}>${esc(s[1])}</option>`).join('');
-  const tot = CC.s.reduce((a, b) => a + b, 0), kt = CC.k.reduce((a, b) => a + b[1], 0);
-  $('#ccin').innerHTML = `<div class="cchead"><img src="${SCOUT_SRC}" alt="" class="ccimg"><div><h1>Shardfall</h1><div class="sub">Saltmarsh Quay · offline island slice</div></div></div>
-  ${sv0 ? `<button class="btn ac big" data-c="cont">Continue as ${esc(sv0.char.name)}${sv0.char.ghost ? ' (ghost)' : ''}</button><div class="sub" style="margin:8px 0 0">or create a new character below (replaces the saved one)</div>` : ''}
-  <div class="ccgrid"><div><label for="ccn">Name</label><input id="ccn" maxlength="16" value="${esc(CC.name)}" placeholder="e.g. Tess" autocomplete="off">
-  <label>Starting idea <span class="note">(editable, no class is locked in)</span></label><div class="chips">${Object.keys(PROFILES).map(p => `<button class="btn sm ${CC.prof === p ? 'ac' : ''}" data-c="prof" data-p="${p}">${p}</button>`).join('')}</div>
-  ${PROFILES[CC.prof] ? `<p class="note">At the cap: ${PROFILES[CC.prof].ideal}.</p>` : ''}
-  <label>Cloak</label><div class="sw">${CLOAKS.map(c => `<button style="background:${c || '#2f5a5a'}" class="${CC.cloak === c ? 'on' : ''}" data-c="cloak" data-v="${c}" aria-label="cloak colour"></button>`).join('')}</div></div>
-  <div><label>Attributes <span class="note">(${tot} / 150, each 25–100)</span></label>${['Strength', 'Dexterity', 'Intellect'].map((n, i) => `<div class="stat"><span>${n}</span><button class="btn sm" data-c="st" data-i="${i}" data-d="-5">−</button><b>${CC.s[i]}</b><button class="btn sm" data-c="st" data-i="${i}" data-d="5">+</button></div>`).join('')}
-  <p class="note">HP ${50 + Math.floor(CC.s[0] / 2)} · stamina ${CC.s[1]} · mana ${CC.s[2]}</p>
-  <label>Starting skills <span class="note">(${kt} / 100, at most 50 each)</span></label>${CC.k.map((k, i) => `<div class="skl"><select data-c="sk" data-i="${i}" aria-label="Skill ${i + 1}">${opts(k[0])}</select><select data-c="kv" data-i="${i}" aria-label="Skill ${i + 1} points">${[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50].map(v => `<option${v === k[1] ? ' selected' : ''}>${v}</option>`).join('')}</select></div>`).join('')}</div></div>
-  <div id="ccerr" class="warn"></div><button class="btn ac big" data-c="go">Enter Saltmarsh Quay</button><p class="note" style="text-align:center">Saves in this browser. Your first two trainer lessons are free.</p>`;
-}
-$('#cc').addEventListener('click', ev => { const b = ev.target.closest('[data-c]'); if (!b || b.tagName === 'SELECT') return; const c = b.dataset.c; CC.name = $('#ccn')?.value ?? CC.name;
-  if (c === 'cont') { const s = loadSave(); if (s) boot(s); return; }
-  if (c === 'prof') { CC.prof = b.dataset.p; const p = PROFILES[CC.prof]; CC.s = p.s.slice(); CC.k = Object.entries(p.k); }
-  if (c === 'st') { const i = +b.dataset.i, d = +b.dataset.d, nv = CC.s[i] + d, tot = CC.s.reduce((a, x) => a + x, 0) + d; if (nv >= 25 && nv <= 100 && tot <= 150) CC.s[i] = nv; }
-  if (c === 'cloak') CC.cloak = b.dataset.v;
-  if (c === 'go') { const err = $('#ccerr'); const name = CC.name.trim().replace(/[^\p{L}\p{N} '\-]/gu, '').slice(0, 16); if (name.length < 2) return err.textContent = 'Choose a name of at least 2 letters.'; const sk = {}; for (const [k, v] of CC.k) sk[k] = (sk[k] || 0) + v; const e = SF.validateCreation({ str: CC.s[0], dex: CC.s[1], int: CC.s[2], skills: sk }); if (e.length) return err.textContent = e.join(' '); if (CC.k.some(([k], i) => CC.k.findIndex(x => x[0] === k) !== i && CC.k[i][1] > 0)) return err.textContent = 'Pick different skills.'; boot(null, { name, str: CC.s[0], dex: CC.s[1], int: CC.s[2], skills: sk, look: { cloak: CC.cloak || null } }); return; }
-  renderCC(); });
-$('#cc').addEventListener('change', ev => { const s = ev.target; if (!s.dataset || !s.dataset.c) return; CC.name = $('#ccn')?.value ?? CC.name; const i = +s.dataset.i; if (s.dataset.c === 'sk') CC.k[i][0] = s.value; if (s.dataset.c === 'kv') CC.k[i][1] = +s.value; CC.prof = 'Custom'; renderCC(); });
+/* ---------- boot ---------- (the character creator is src/creation-ui.js) */
+/* boot(saved) continues a saved character; boot(null, payload) creates one from a creation payload, which is validated here
+   again with the same SF.CREATION.validate the creator uses. Returns true once the game runs. A failed creation leaves the
+   existing save untouched: nothing is written until the new character is complete. */
 function boot(saved, fresh) {
+  if (P) return false;                                                       // the game is already running (a double submit)
+  let cv0 = null; if (!saved) { cv0 = SF.CREATION.validate(fresh); if (!cv0.ok) { console.warn('creation rejected', cv0.errors); return false; } cv0 = cv0.value; }
   genWorld(); buildTiles(); buildMini(); resize();
   if (saved) { try { saved = migrateSave(saved, localStorage.getItem(SAVEKEY)); } catch (e) { console.error(e); } for (const [k, gen, spec, n, max, t] of saved.nodes || []) RES.set(k, { gen, spec: spec || undefined, n, max, t });
     const c = saved.char; P = newChar({ name: c.name, str: c.str, dex: c.dex, int: c.int, skills: {}, look: c.look }); Object.assign(P, c); P.equip = Object.assign(emptyEquip(), P.equip); delete P.equip.armor; SF.setUidBase(saved.uid || 1); GT = saved.gt || 0;
     for (const k of Object.keys(SF.newSkills())) if (!P.skills[k]) P.skills[k] = { v: 0, lock: 'raise' };
     for (const co of saved.corpses || []) { const cont = SF.newContainer('corpse', 'p1'); cont.items = co.items; cont.diedAt = GT - (co.diedAgo ?? 999); cont.expires = GT + co.left; addEnt({ kind: 'corpse', mine: true, name: 'your body', x: co.x, y: co.y, cont, expires: GT + co.left }); }
     if (P.ghost && !Number.isFinite(c.ghostAt)) P.ghostAt = GT - 12; }
-  else { P = newChar(fresh); starterKit(); }
+  else {
+    P = newChar(cv0); P.look = Object.assign({}, cv0.look); P.charId = newCharId(); P.created = { v: SF.CREATION.VERSION, template: cv0.template, town: cv0.town };
+    const tr = SF.CREATION.townReady(cv0.town, { shrines: SHRINES, npcs: ANN.npcs, stand: (x, y) => canStand(P, x, y) });
+    if (tr.ok) { P.x = tr.spawn.x; P.y = tr.spawn.y; P.bound = tr.bound; } else { P.created.town = 'quay'; log(`${SF.CREATION.TOWN[cv0.town].n} is not ready (${tr.reason}); you start at Saltmarsh Quay.`, '#ffb070'); }
+    starterKit(cv0);
+  }
   P.cx = Object.assign({ survey: {}, pins: [], track: null, mark: false, doors: {} }, P.cx || {}); P.batch = null; applyDoorState();
   if (saved && !canStand(P, P.x, P.y)) { find: for (let r = 1; r <= 12; r++) for (let a = 0; a < 16; a++) { const x = P.x + Math.cos(a / 8 * Math.PI) * r, y = P.y + Math.sin(a / 8 * Math.PI) * r; if (canStand(P, x, y)) { P.x = x; P.y = y; break find; } } }   // never load into a wall or a tree
   WS = SIM.create({ clock: () => GT, saved: saved && saved.sim, onError: e => console.error(e) }); simAdopt(P);   // actor ids continue from the save
+  if (!saved) simEmit('CharacterCreated', { actor: aidOf(P), charId: P.charId, template: P.created.template, town: P.created.town, body: P.look.body });
   if (saved && !(saved.sim && saved.sim.clock)) WS.clock.setHour(GT, (GT / 60 + 9) % 24);   // older saves keep the hour they were at; from now on a day lasts 120 minutes
   NAV.walk = null; NAV.edge = null; NAV.graph = null; devInit();
   ents.unshift(P); P.sect = P.sect || 0; P.drawn = false; P.sw = SF.newSwing(); P.movedAt = -99; while (P.hotbar.length < 9) P.hotbar.push(null); Q(); ecoLoad(saved && saved.eco); populate(); lifeLoad(saved && saved.life); seedTraps();
@@ -2489,19 +2519,21 @@ function boot(saved, fresh) {
   if (saved) for (const pt of saved.pets || []) { const d = MON[pt.type]; if (!d) continue; const near = Math.hypot(pt.dx || 0, pt.dy || 0) < 12; addEnt({ kind: 'pet', type: pt.type, name: pt.name || 'your ' + d.n, x: P.x + (near ? pt.dx : 1), y: P.y + (near ? pt.dy : 0), hp: Math.min(pt.hp, d.hp), max: d.hp, state: '', home: { x: P.x, y: P.y }, sect: 0, ward: 0, order: pt.order, slots: pt.slots || 1, target: null }); }
   mageryBoot(saved);
   $('#cc').hidden = true; document.body.classList.toggle('mirror', SETTINGS.mirror);
-  log('Welcome to Saltmarsh Quay, ' + P.name + '. Bank what you cannot afford to lose.', '#ffe08a');
+  const startTown = !saved && P.created && P.created.town !== 'quay' ? SF.CREATION.TOWN[P.created.town].n : null;
+  log('Welcome to ' + (startTown || 'Saltmarsh Quay') + ', ' + P.name + '. Bank what you cannot afford to lose.', '#ffe08a');
   log('Left stick moves; the Sprint button runs. Tap to target. Attack arms your swings. Interact gathers, loots and talks.', '#b6a68a');
   if (P.ghost) log('You are a ghost. Follow the golden arrow to a shrine or healer.', '#ff6a5a');
   if (saved && saved.combatReform && saved.combatReform.changed) { log('The combat skills now follow the Second Age: Swordsmanship, Mace Fighting, Fencing, Archery, Wrestling, Parrying and Healing. Your trained points moved with them.', '#ffe08a'); if (P.skillPool > 0) log(`${f1(P.skillPool)} points from merged skills wait on your Skills page.`, '#ffe08a'); }
-  if (!saved) log('Wren, a quay sellsword, nurses a wound by the plaza. Tap her to bandage her or ask her to follow you.', '#b6a68a');
-  if (VH > VW) $('#rot').hidden = false; save(); refreshHud();
+  if (!saved && !startTown) log('Wren, a quay sellsword, nurses a wound by the plaza. Tap her to bandage her or ask her to follow you.', '#b6a68a');
+  if (!saved) log('Your attributes and skills grow as you use them. No trainer sells attributes.', '#b6a68a');
+  if (saved && saved.statRepair) log('Some saved attribute values were out of range and have been repaired: ' + saved.statRepair.join(', ') + '.', '#ffb070');
+  if (VH > VW) $('#rot').hidden = false; save(); refreshHud(); return true;
 }
 let last = performance.now(), hudT = 0;
 function loop(t) { const dt = Math.min(.5, (t - last) / 1000); last = t; try { if (!SIMPAUSE) { const r = STEPPER.advance(dt, s => { simStep(s); DEV.steps++; }); ALPHA = r.alpha; } if (DEV.on) devFrame(dt); renderInterp(); if (DEV.open && t - (DEV.panelT || 0) > 300) { DEV.panelT = t; devRender(); } if (P && t - hudT > 120) { hudT = t; refreshHud(); drawMini(); if (PANEL === 'loot' || PANEL === 'shop') renderPanel(); renderLog(); } } catch (e) { console.error(e); } requestAnimationFrame(loop); }
 addEventListener('visibilitychange', () => { if (document.hidden) save(); else { last = performance.now(); STEPPER.reset(); } });   // the world pauses while the game is hidden
-loadScout(SCOUT_SRC); renderCC(); resize(); requestAnimationFrame(loop);
 /* dev/test hook: put a creature beside the player, e.g. __SF.spawnMon('lich_lord'). Not used by normal play. */
 function spawnMon(type, dx = 3, dy = 0) { const d = MON[type]; if (!d) return null; let x = P.x + dx, y = P.y + dy;
   for (let r = 0; r < 6 && BLK[tAt(Math.floor(x), Math.floor(y))]; r += .5) for (let a = 0; a < 8; a++) { const nx = P.x + dx + Math.cos(a * Math.PI / 4) * r, ny = P.y + dy + Math.sin(a * Math.PI / 4) * r; if (!BLK[tAt(Math.floor(nx), Math.floor(ny))]) { x = nx; y = ny; break; } }
   return addEnt({ kind: 'mon', type, name: d.n, x, y, hp: d.hp, max: d.hp, state: 'idle', home: { x, y }, sect: 0, ward: 0 }); }
-window.__SF = { get WS() { return WS; }, dist, closePanel, lifeSave, LIFE, LIFE_SCHED, lifeTick, lifeResume, lifeInspect, lifeTownGeo, lifeTalk, talk, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
+window.__SF = { get WS() { return WS; }, SHRINES, statRoll, dist, closePanel, lifeSave, LIFE, LIFE_SCHED, lifeTick, lifeResume, lifeInspect, lifeTownGeo, lifeTalk, talk, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };

@@ -12,7 +12,7 @@ def check(ok, msg, got=None):
     print(('ok   ' if ok else 'FAIL ') + msg + ('' if ok or got is None else f'  (got {got!r})'))
     if not ok: fails.append(msg)
 
-FILL = """() => { const S = __SF, P = S.P, SF = S.SF; P.pack.items.length = 0;
+FILL = """() => { const S = __SF, P = S.P, SF = S.SF; P.pack.items.length = 0; P.base.str = P.str = 60;   // fixture: strong enough for the sword and the chain tunic (v0.30 templates start at 65 points)
   for (const [id, q] of [['sword',1],['chain_tunic',1],['bandage',5],['draught',3],['cookedmeat',2],['reedash',12],['pine',4],['gold',40]]) SF.addItem(P.pack, SF.newItem(id, q));
   S.save(); }"""
 NAMES = "() => [...document.querySelectorAll('#panel .bagcell small')].map(e => e.textContent)"
@@ -31,7 +31,7 @@ def start(pg, errs, fresh):
         pg.evaluate("s => { localStorage.clear(); localStorage.setItem('shardfall.save.v1', s); }", SAVE['raw']); pg.reload(); pg.wait_for_timeout(600)
     if fresh:
         pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_timeout(600)
-        pg.click('[data-c=prof][data-p="Group healer"]'); pg.fill('#ccn', 'Tess'); pg.click('[data-c=go]'); pg.wait_for_timeout(1000)
+        pg.evaluate("o => __CC.quick(o)", {'name': 'Tess', 'template': 'mage'}); pg.wait_for_timeout(1000)
         pg.evaluate(FILL); pg.reload(); pg.wait_for_timeout(600)
     pg.click('[data-c=cont]'); pg.wait_for_timeout(900)
 

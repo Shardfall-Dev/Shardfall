@@ -15,8 +15,10 @@ def page(b, url=None):
   pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('console', lambda m: errs.append('console: ' + m.text) if m.type == 'error' else None)
   pg.add_init_script(HOLD); pg.goto('file://' + (url or f)); pg.wait_for_timeout(400); return ctx, pg, errs
 def new_char(pg):
-  pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_timeout(400); pg.fill('#ccn', 'Tess')
-  return pg.evaluate("() => { const t0 = performance.now(); document.querySelector('[data-c=go]').click(); return performance.now() - t0; }")
+  pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_timeout(400)
+  if pg.evaluate("typeof __CC === 'undefined'"):   # an old build (the v0.22 save source) still has the one-page creator
+    pg.fill('#ccn', 'Tess'); return pg.evaluate("() => { const t0 = performance.now(); document.querySelector('[data-c=go]').click(); return performance.now() - t0; }")
+  return pg.evaluate("() => { const t0 = performance.now(); __CC.quick({ name: 'Tess' }); return performance.now() - t0; }")
 J = lambda pg, js: pg.evaluate(js)
 CALM = "for (const m of S.ents) if (m.kind === 'mon') m.pacified = 1e9;"
 

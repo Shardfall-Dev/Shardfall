@@ -32,7 +32,7 @@ def start(pg, errs):
     pg.on('pageerror', lambda e: errs.append(str(e)))
     pg.goto('file://' + f); pg.wait_for_timeout(600)
     pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_timeout(600)
-    pg.click('[data-c=prof][data-p="Group healer"]'); pg.fill('#ccn', 'Tess'); pg.click('[data-c=go]'); pg.wait_for_timeout(1200)
+    pg.evaluate("o => __CC.quick(o)", {'name': 'Tess', 'template': 'mage'}); pg.wait_for_timeout(1200)
 
 def batches(n):
     for i in range(0, len(IDS), n): yield IDS[i:i + n]

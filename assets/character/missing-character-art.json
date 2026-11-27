@@ -1,0 +1,22 @@
+{
+  "version": "1.0.0",
+  "for": "Character Creation v2.0 (Shardfall v0.30)",
+  "format": {
+    "clipCell": 128,
+    "feetAnchor": [64, 106],
+    "facingRows": ["S", "SW", "W", "NW", "N", "NE", "E", "SE"],
+    "clips": ["Idle", "Walk", "CastPrepare", "CastHold", "CastRelease", "Unarmed_Ready", "Unarmed_Attack", "Dagger_Ready", "Dagger_Walk", "Dagger_Attack", "Sword_Ready", "Sword_Walk", "Sword_Attack", "Hammer_Ready", "Hammer_Walk", "Hammer_Attack", "Glaive_Ready", "Glaive_Walk", "Glaive_Attack", "Shortbow_Ready", "Shortbow_Walk", "Shortbow_Attack", "Crossbow_Ready", "Crossbow_Walk", "Crossbow_Attack"],
+    "atlas": { "cell": 96, "feetAnchor": [48, 86], "layout": "4 x 2 facings" },
+    "tintable": "layers drawn in a neutral grey ramp so the game can tint them to the chosen colour"
+  },
+  "missing": [
+    { "id": "body_female", "what": "Female traveller body: every clip and the idle atlas, same scale, anchor, frame order and timing as the male sheets", "priority": 1 },
+    { "id": "body_base_unhooded", "what": "Male and female base bodies without the painted hood and cloak, so hair shows and a cloak can be a separate layer", "priority": 1 },
+    { "id": "layer_cloak", "what": "Cloak (and raised hood) as its own tintable layer, every clip and facing", "priority": 2 },
+    { "id": "layer_hair", "what": "Hair layers, one per style: short, long, ponytail, pageboy, receding (male), mohawk (male), buns (female), pigtails (female); bald needs none", "priority": 2 },
+    { "id": "layer_facial_hair", "what": "Facial hair layers: mustache, goatee, short beard, long beard, vandyke", "priority": 3 },
+    { "id": "layer_clothing", "what": "Shirt and trousers as tintable layers (a skirt too, if a skirt item is added)", "priority": 3 },
+    { "id": "paperdoll_body", "what": "Front-view paper-doll body art, male and female, about 96 x 192, for the creator portrait and the equipment window", "priority": 2 }
+  ],
+  "fallback": "Until these exist the world sprite and the equipment paper doll show the male hooded traveller recoloured for skin tone and cloak colour; the creator's portrait is an original procedural figure that shows every choice."
+}

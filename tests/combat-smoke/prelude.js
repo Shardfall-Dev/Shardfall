@@ -11,4 +11,4 @@ let nid = 91000; const add = (type, dx, dy, hp) => { const d = S.MON[type]; cons
 const give = (id, n, extra) => { const it = SF.newItem(id, n || 1, extra || (SF.ITEMS[id].stack ? null : { cond: 100, maxc: 100, omax: 100 })); SF.addItem(P.pack, it); return it; };
 const equip = id => { if (id === 'fists') { if (P.equip.weapon) S.ACT.uneq({ s: 'weapon' }); return; } const it = give(id); S.ACT.equip({ u: it.uid }); return it; };
 const wren = S.allyOf(); const near = (a, b, e) => Math.abs(a - b) <= (e || .051);
-P.str = 100; P.dex = 100; P.stam = 100; P.base = { str: 100, dex: 100, int: P.int }; P.hp = SF.maxHp(P);
+P.base.str = P.str = 100; P.base.dex = P.dex = 100; P.stam = 100; P.base = { str: 100, dex: 100, int: P.int }; P.hp = SF.maxHp(P);

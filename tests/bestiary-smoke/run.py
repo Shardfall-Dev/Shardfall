@@ -18,7 +18,7 @@ with sync_playwright() as p:
   b = p.chromium.launch(executable_path=chrome, args=['--no-sandbox'])
   errs = []; pg = b.new_page(viewport={'width': 1280, 'height': 720}); pg.on('pageerror', lambda e: errs.append(str(e)))
   pg.goto('file://' + f); pg.wait_for_timeout(600); pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_timeout(600)
-  pg.click('[data-c=prof][data-p="Group healer"]'); pg.fill('#ccn', 'Tess'); pg.click('[data-c=go]'); pg.wait_for_timeout(1200)
+  pg.evaluate("o => __CC.quick(o)", {'name': 'Tess', 'template': 'mage'}); pg.wait_for_timeout(1200)
   out = pg.evaluate(open(os.path.join(here, 'scenario.js')).read())
   W, H = man['frame']['width'] * len(man['columns']), man['frame']['height'] * len(man['rows'])
   for id in ids:

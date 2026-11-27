@@ -36,9 +36,9 @@ function castSlot(id, opt) {
   if (!sp.legacy) {
     if (!scroll && !knownSpells().has(id)) { if (!SF.count(P.pack, 'spellbook')) return log('You need your spellbook to cast ' + sp.n + '.', '#ffb070'); return log(sp.n + ' is not in your spellbook' + (SF.count(P.pack, sp.scroll) ? ' — read the scroll from your pack, or learn it.' : '.'), '#ffb070'); }
     if (scroll && !SF.count(P.pack, sp.scroll)) return log('You have no scroll of ' + sp.n + '.', '#ffb070');
-    if (!scroll && M < sp.min) return log(`${sp.n} needs Spellcraft ${sp.min}.`, '#ffb070');
-    if (scroll && MG.scrollChance(sp, M) <= 0) return log(`The scroll's words slip away from you (Spellcraft above ${MG.scrollGate(sp)} needed).`, '#ffb070');
-  } else if (M < sp.min) return log(`${sp.n} needs Spellcraft ${sp.min}.`, '#ffb070');
+    if (!scroll && M < sp.min) return log(`${sp.n} needs Magery ${sp.min}.`, '#ffb070');
+    if (scroll && MG.scrollChance(sp, M) <= 0) return log(`The scroll's words slip away from you (Magery above ${MG.scrollGate(sp)} needed).`, '#ffb070');
+  } else if (M < sp.min) return log(`${sp.n} needs Magery ${sp.min}.`, '#ffb070');
   const items = scroll ? [sp.scroll] : sp.regs;
   const miss = items.filter(r => !SF.count(P.pack, r)); if (miss.length) return log('Missing reagents: ' + miss.map(r => SF.ITEMS[r].n).join(', ') + '.', '#ffb070');
   if (P.mana < sp.mp) return log('Not enough mana.', '#ffb070');
@@ -282,7 +282,7 @@ function chestSpell(sp, pt, M, E) {
   if (sp.effect === 'lock') { log('Arcane Lock seals only a container you own. This chest is not yours.', '#ffb070'); return false; }
   if (sp.effect === 'trap') { if (c.rtrap) { log('That latch already carries a rune trap.'); return true; } c.rtrap = { M, E, by: P.name }; FX.push({ k: 'ring', x: cpos.x, y: cpos.y, c: '#ff8a40', t0: GT, dur: .6 }); log('A spark settles into the latch.', '#ffb070'); return true; }
   if (sp.effect === 'disarm') { if (!c.rtrap) { log('There is no rune trap on that latch.'); return true; } c.rtrap = null; FX.push({ k: 'ring', x: cpos.x, y: cpos.y, c: '#c8c8c8', t0: GT, dur: .6 }); log('You pull the spark from the latch.', '#7ee08a'); return true; }
-  if (sp.effect === 'unlock') { if (c.open && GT <= c.refill) { log('That chest is already open.'); return true; } const need = c.mlock || MLOCK_REQ[c.tier] || 70; if (M < need) { log(`The seal is too strong (Spellcraft ${need}).`, '#ffb070'); return true; } c.open = true; c.refill = GT + 600; c.cont = chestLoot(c.tier); c.mlock = 0; log('The lock gives way. Any trap on it is still armed.', '#ffe08a'); return true; }
+  if (sp.effect === 'unlock') { if (c.open && GT <= c.refill) { log('That chest is already open.'); return true; } const need = c.mlock || MLOCK_REQ[c.tier] || 70; if (M < need) { log(`The seal is too strong (Magery ${need}).`, '#ffb070'); return true; } c.open = true; c.refill = GT + 600; c.cont = chestLoot(c.tier); c.mlock = 0; log('The lock gives way. Any trap on it is still armed.', '#ffe08a'); return true; }
   if (sp.effect === 'object_use') { FX.push({ k: 'ring', x: cpos.x, y: cpos.y, c: '#c8e0ff', t0: GT, dur: .6 }); if (c.rtrap) springRuneTrap(c, true); else log('The far hand touches the latch. Nothing happens.'); return true; }
   return true;
 }
@@ -420,8 +420,8 @@ function magicArmor(a) { const g = a.mg; return g && g.armor && g.armor.until > 
 function recomputeStats() {
   if (!P.base) P.base = { str: P.str, dex: P.dex, int: P.int };
   const g = P.mg || {}; const eff = P._eff || {};
-  for (const s of ['str', 'dex', 'int']) { if (eff[s] !== undefined && P[s] !== eff[s]) P.base[s] += P[s] - eff[s];   // trained outside magic: keep the change on the base
-    P[s] = MG.effectiveStat(P.base[s], g.mods, s, GT); eff[s] = P[s]; }
+  // P.base holds the natural attributes and only SF.STATS changes them (v0.30); P.str/dex/int are always derived from it
+  for (const s of ['str', 'dex', 'int']) { P[s] = MG.effectiveStat(P.base[s], g.mods, s, GT); eff[s] = P[s]; }
   P._eff = eff;
   // pools never fill on a cap increase; they clamp down on a decrease. A living character keeps at least 1 HP.
   P.hp = Math.min(P.hp, SF.maxHp(P)); if (!P.ghost) P.hp = Math.max(1, P.hp); P.stam = Math.min(P.stam, SF.maxStam(P)); P.mana = Math.min(P.mana, SF.maxMana(P));
@@ -500,7 +500,7 @@ const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
 let MDET = null;
 function spellbookPanel() {
   const M = mval(), known = knownSpells(), hasBook = SF.count(P.pack, 'spellbook') > 0; const c = +(PTAB || 1) || 1;
-  let h = `<div class="note">Spellcraft ${f1(P.skills.spellcraft.v)} · Focus ${f1(P.skills.focus.v)} · ${hasBook ? known.size + ' / 64 spells in your book' : '<b class="warn">no spellbook in your pack</b>'}. Tap a slot to prepare, then tap a target to release (3 s hold). Drag a sign to the bar, or long-press it.</div>`;
+  let h = `<div class="note">Magery ${f1(P.skills.spellcraft.v)} · Evaluating Intelligence ${f1(P.skills.focus.v)} · ${hasBook ? known.size + ' / 64 spells in your book' : '<b class="warn">no spellbook in your pack</b>'}. Tap a slot to prepare, then tap a target to release (3 s hold). Drag a sign to the bar, or long-press it.</div>`;
   h += `<div class="chips">${[1, 2, 3, 4, 5, 6, 7, 8].map(i => btn('mtab', ROMAN[i], { c: i }, i === c ? 'ac' : '')).join('')}</div>`;
   for (const sp of MG.SPELLS.filter(s => s.circle === c)) {
     const k = known.has(sp.id), sc = SF.count(P.pack, sp.scroll), ch = MG.bookChance(sp, M), rg = sp.regs.map(r => `${SF.ITEMS[r].n}${SF.count(P.pack, r) ? '' : ' ✗'}`).join(', ');
@@ -528,11 +528,6 @@ function magicItemActions(it) {
   if (d.spell) { a += btn('mread', 'Read', { s: d.spell }); if (SF.count(P.pack, 'spellbook') && !knownSpells().has(d.spell)) a += btn('mlearn', 'Learn', { s: d.spell }); }
   if (it.id === 'spellbook') a += btn('open', 'Open', { p: 'spells' });
   return a;
-}
-function mageryStarter(add) {
-  if (P.skills.spellcraft.v < 100) P.skills.spellcraft.v = 100;            // magic starters begin with at least 10.0 Spellcraft
-  P.pack.items.push(SF.newItem('spellbook', 1, { spells: MG.STARTER.slice() }));
-  for (const r of Object.keys(MG.REAGENTS)) add(r, 12); add('rune', 1);
 }
 
 /* ---------- boot: shops, loot, migration, panels, actions ---------- */
