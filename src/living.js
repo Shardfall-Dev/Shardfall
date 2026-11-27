@@ -157,7 +157,7 @@ const navPlaces = () => navGraph().ids().map(id => navGraph().node(id)).filter(n
 /* ---------- the navigator: one actor following a journey leg by leg, opening doors, recovering when stuck ---------- */
 function navTo(e, gx, gy, o) {
   o = Object.assign({ doors: true, speed: SF.WALK, name: null }, o || {});
-  const sameLevel = levelAt(Math.floor(e.x), Math.floor(e.y)) === levelAt(Math.floor(gx), Math.floor(gy)), near = sameLevel && Math.hypot(gx - e.x, gy - e.y) < 60;
+  const sameLevel = levelAt(Math.floor(e.x), Math.floor(e.y)) === levelAt(Math.floor(gx), Math.floor(gy)), near = sameLevel && (o.direct || Math.hypot(gx - e.x, gy - e.y) < 60);   // direct: one local search (sliced over steps), no travel graph
   let legs = [];
   if (near) legs = [{ kind: 'walk', x: gx, y: gy }];
   else {
@@ -190,6 +190,7 @@ function navStep(e, dt) {
   if (n.wi >= n.wp.length) { n.li++; n.wp = null; n.stuck = 0; n.retries = 0; if (n.li >= n.legs.length) { n.state = 'done'; e.speed = 0; navCloseDoors(e, 1); } return; }
   const [tx, ty] = n.wp[n.wi], dx = tx - e.x, dy = ty - e.y, l = Math.hypot(dx, dy);
   if (l < .35) { n.wi++; return; }
+  { const d = nearDoorTo(e, 1.2); if (d && ents.some(o => o !== e && !o.gone && o.kind === 'npc' && o.nav && o.nav.state === 'moving' && Math.hypot(o.x - d.x - .5, o.y - d.y) < .7 && o.id < e.id) && (n.doorWait || 0) < 1.2) { n.doorWait = (n.doorWait || 0) + dt; e.speed = 0; return; } if (!d) n.doorWait = 0; }   // one at a time through a doorway (§14 crowding)
   if (n.o.doors) { const d = nearDoorTo(e, 1.4); if (d && !d.open) { setDoor(d, true); n.opened.push(d); sndAt('door.' + d.mat + '.open', { x: d.x + .1, y: d.y }, { key: 'door' + d.key }); } }
   const s = Math.min(l, n.o.speed * MOVE_SCALE * dt), mv = moveBy(e, dx / l * s, dy / l * s);
   if (mv < s * .3) moveBy(e, (n.stuck % 2 ? 1 : -1) * -dy / l * s, (n.stuck % 2 ? 1 : -1) * dx / l * s);
@@ -264,7 +265,8 @@ function devRender() {
   time ${SIM.fmtHour(h)} · day ${C.dayAt(GT)} · ${PERIOD_NAME[C.periodAt(GT)]} · ${C.dayMinutes} min/day · light ${lightNow().dark.toFixed(2)}<br>
   paths: queue ${NAV.jobs.length} · cache ${NAV.cache.size} · searched ${NAV.searches} · failed ${NAV.failed} · cache hits ${NAV.hits}<br>
   AI ${DEV.aiMs.toFixed(3)} ms/step · audio voices ${SFXA.stats.voices} · save ${saveKB} · last save ${ls ? (ls.ok ? 'ok' : 'FAILED') + ' at ' + Math.round(ls.at) + ' s' : '—'}<br>
-  ${devEco()}
+  ${devEco()}<br>
+  ${lifeDev()}
   <hr style="border-color:#334">
   ${B('hour', 'Dawn', 'data-h="5.5"')}${B('hour', 'Noon', 'data-h="12"')}${B('hour', 'Dusk', 'data-h="17.8"')}${B('hour', 'Midnight', 'data-h="0"')}${B('shift', '−1 h', 'data-h="-1"')}${B('shift', '+1 h', 'data-h="1"')}${B('daynight', 'Day/night')}<br>
   ${B('pause', SIMPAUSE ? 'Resume' : 'Pause')}${B('step', 'Step')}${B('adv', 'Run +1 min', 'data-s="60"')}${B('adv', 'Run +10 min', 'data-s="600"')}${DEV.advance ? ' running… ' + Math.ceil(DEV.advance) + ' s' : ''}${B('save', 'Save now')}<br>
@@ -290,7 +292,7 @@ function devInspect(e) {
   return SIM.inspect(e, Object.assign({ goal: n ? (n.goal.name || Math.round(n.goal.x) + ',' + Math.round(n.goal.y)) + ' · ' + n.state + (n.reason ? ' (' + n.reason + ')' : '') : null,
     destination: n && n.legs && n.legs[n.li] ? Math.round(n.legs[n.li].x) + ',' + Math.round(n.legs[n.li].y) + ' leg ' + (n.li + 1) + '/' + n.legs.length : null,
     territory: d ? 'territory ' + ecoP(e.type).terr + ' m, pursuit ' + (ecoP(e.type).pur || d.leash) + ' m, aggro ' + d.aggro + ' m' : null, reason: e.state ? 'state ' + e.state + (e.target ? ' → ' + aidOf(e.target) : '') : null,
-    criminal: SIM.hasComponent(e.archetype, 'notoriety') ? 'innocent (law: phase 5)' : null }, ecoInspect(e), e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null));
+    criminal: SIM.hasComponent(e.archetype, 'notoriety') ? 'innocent (law: phase 5)' : null }, ecoInspect(e), lifeInspect(e), e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null));
 }
 /* world-space debug overlays, drawn after the light so they read at night */
 function devDraw(camX, camY) {

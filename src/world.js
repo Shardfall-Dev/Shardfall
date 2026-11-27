@@ -365,6 +365,63 @@ SIM.newCamp = (def, saved) => {
   return C;
 };
 
+/* ================= Phase 4: living NPCs (master spec §7) =================
+   Pure parts: daily schedules on the world clock, lightweight needs, and a short memory of significant encounters. The game
+   (src/townlife.js) owns homes, workplaces, professions and the controllers that walk townsfolk through their day. */
+
+/* ---------------- daily schedules ----------------
+   A schedule is a list of blocks [fromHour, toHour, act, place] covering the day; a block may wrap midnight (22 → 5.5).
+   scheduleAt(blocks, hour) → { act, place, from, to, i }. Schedules are preferences: the controller may override them
+   (danger, hunger, exhaustion). validSchedule checks that the blocks cover all 24 hours without overlap. */
+const inBlock = (h, a, b) => a <= b ? h >= a && h < b : h >= a || h < b;
+SIM.scheduleAt = (blocks, hour) => {
+  const h = ((hour % 24) + 24) % 24;
+  for (let i = 0; i < blocks.length; i++) { const [a, b, act, place] = blocks[i]; if (inBlock(h, a, b)) return { act, place, from: a, to: b, i }; }
+  return null;
+};
+SIM.validSchedule = blocks => {
+  const len = ([a, b]) => ((b - a) % 24 + 24) % 24 || 24; let tot = 0; for (const bl of blocks) tot += len(bl);
+  if (Math.abs(tot - 24) > 1e-6) return false;
+  for (let k = 0; k < 96; k++) { const h = k / 4 + .01; if (blocks.filter(([a, b]) => inBlock(h, a, b)).length !== 1) return false; }
+  return true;
+};
+/* hours until the next block starts (for leaving early enough to arrive on time) */
+SIM.hoursUntil = (from, to) => ((to - from) % 24 + 24) % 24;
+
+/* ---------------- needs (§7: hunger, fatigue, safety, wealth, work, social) ----------------
+   Values run 0 (satisfied) … 1 (urgent). They rise with game hours and fall while the matching activity runs. Kept small on
+   purpose: they bend the schedule (an early meal, an early night, a visit to the hall), they never replace it. Safety is not
+   a slow need: it is set by what the NPC perceives and decays within minutes. */
+SIM.NEEDS = {
+  hunger:  { rise: 1 / 9,  fall: { eat: 3, social: .8 } },             // a full meal every ~9 hours; the evening gathering is supper
+  fatigue: { rise: 1 / 17, fall: { sleep: 1 / 6 } },                   // ~17 waking hours; six hours of sleep restore it
+  social:  { rise: 1 / 20, fall: { social: 1.2, eat: .4 } },
+  work:    { rise: 1 / 16, fall: { work: .5, gather: .5, trade: .5, patrol: .5, watch: .5 } },
+  safety:  { rise: 0, decay: 6 } };                                    // set on fright, falls back over ~10 game minutes
+SIM.newNeeds = saved => Object.assign({ hunger: .2, fatigue: .1, social: .3, work: .3, safety: 0, wealth: .5 }, saved || {});
+SIM.needsTick = (n, hours, act) => {
+  for (const k of ['hunger', 'fatigue', 'social', 'work']) {
+    const d = SIM.NEEDS[k], fall = d.fall[act] || 0, rise = act === 'sleep' && k !== 'fatigue' ? d.rise * .3 : d.rise;
+    n[k] = Math.min(1, Math.max(0, n[k] + (rise - fall) * hours));
+  }
+  n.safety = Math.max(0, n.safety - SIM.NEEDS.safety.decay * hours);
+  return n;
+};
+SIM.frighten = (n, amount) => { n.safety = Math.min(1, Math.max(n.safety, amount)); return n; };
+SIM.urgentNeed = n => { let best = null, v = .8; for (const k of ['safety', 'fatigue', 'hunger']) if (n[k] >= v) { v = n[k]; best = k; } return best; };
+
+/* ---------------- memory of significant encounters ----------------
+   A small ring per NPC: { t, what, who, where }. Repeats of the same thing with the same actor within `merge` seconds update
+   the newest record instead of adding one, so memory stays meaningful and bounded. */
+SIM.newMemory = (cap, saved) => {
+  cap = cap || 8; const list = (saved || []).slice(-cap);
+  return {
+    note(t, what, who, where, merge) { const last = list[list.length - 1]; if (last && last.what === what && last.who === (who || null) && t - last.t < (merge ?? 60)) { last.t = t; last.n = (last.n || 1) + 1; return last; }
+      const r = { t, what, who: who || null, where: where || null }; list.push(r); if (list.length > cap) list.shift(); return r; },
+    recent: k => list.slice(-(k || cap)), knows: (what, who) => list.some(r => r.what === what && (!who || r.who === who)),
+    save: () => list.map(r => Object.assign({}, r)), get size() { return list.length; } };
+};
+
 /* ---------------- debug view of one actor (developer tools; no gameplay depends on it) ---------------- */
 SIM.inspect = (e, extra) => {
   if (!e) return null; const a = e.archetype, has = c => SIM.hasComponent(a, c), r1 = v => Math.round(v * 100) / 100;
