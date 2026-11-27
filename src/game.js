@@ -91,9 +91,13 @@ function noteLearn(key, r) {
   SKLOG.push({ k: key, at: GT, r: r.gained ? `+${f1(r.amount)} → ${f1(P.skills[key].v)}` + (r.lowered ? ` (−${f1(r.amount)} ${SF.SKILL[r.lowered].n})` : '') : r.reason || '' }); if (SKLOG.length > 80) SKLOG.shift();
   if (r.gained) { log(`${SF.SKILL[key].n} +${f1(r.amount)} (${f1(P.skills[key].v)})`, '#7fd4ff', 'skill'); if (GT - SND.gainAt > 1.5) { SND.gainAt = GT; snd('skill.gain'); } }
   if (r.stat && P.base && typeof recomputeStats === 'function') recomputeStats();
-  if (r.stat) log(`Your ${STAT_NAME[r.stat.stat]} rises to ${r.stat.value}.` + (r.stat.lowered ? ` Your ${STAT_NAME[r.stat.lowered]} falls to ${(P.base || P)[r.stat.lowered]} (225 is the most anyone can hold).` : ''), '#ffe08a', 'skill');
+  if (r.stat) { log(`Your ${STAT_NAME[r.stat.stat]} rises to ${r.stat.value}.` + (r.stat.lowered ? ` Your ${STAT_NAME[r.stat.lowered]} falls to ${(P.base || P)[r.stat.lowered]} (it is set to Lower, and 225 is the most anyone can hold).` : ''), '#ffe08a', 'skill');
+    simEmit('StatChanged', { actor: aidOf(P), stat: r.stat.stat, value: r.stat.value, lowered: r.stat.lowered || null, skill: key });
+    if (r.stat.lowered === 'str') strDropped(); eqChanged(); }
   return r;
 }
+/* a Strength point given up at the 225 cap can leave worn gear above the requirement: it goes back to the backpack, never dropped */
+function strDropped() { for (const sl of SF.EQ.SLOT_IDS) { const it = P.equip[sl]; if (it && SF.EQ.strReq(it) > P.str && unequipTo(sl)) log(`${iname(it)} is too heavy for your Strength now; you put it in your backpack.`, '#ffb070'); } }
 const skCtx = ctx => Object.assign({ rng: R, now: GT, stats: P.base || P, locks: P.statLocks }, ctx || {});   // stat gains land on the unbuffed stats (src/magic.js keeps buffs on top)
 /* a use checked against a difficulty window [min, max] in skill points: returns whether it succeeded; teaches when it was a challenge */
 function skillCheck(key, min, max, ctx) { const r = SF.SK.check(P, key, min, max, skCtx(ctx)); noteLearn(key, r.learn); return r.success; }
@@ -2461,6 +2465,7 @@ const ACT = {
   wd: d => { const it = findU(P.bank, d.u); if (!it) return; const r = SF.transfer(P.bank, P.pack, it.uid, it.qty, { cap: cap() }); if (!r.ok) log(r.reason, '#ffb070'); save(); renderPanel(); },
   tab: d => { PTAB = d.t; renderPanel(true); snd('ui.page'); },
   buy: d => { const p = SF.PRICES[d.id] * +d.n; if (SF.count(P.pack, 'gold') < p) return log('Not enough gold.', '#ffb070'); const it = SF.EQ.isGear(d.id) || (SF.WEARABLE(d.id) && !SF.ITEMS[d.id].stack) ? SF.EQ.make(d.id, { origin: 'npc' }) : SF.newItem(d.id, +d.n, SF.ITEMS[d.id].stack ? null : { cond: 100 }); const r = SF.addItem(P.pack, it, cap()); if (!r.ok) return log(r.reason, '#ffb070'); SF.removeQty(P.pack, 'gold', p); snd('loot.coin'); renderPanel(); },
+  statlock: d => { const k = d.k; if (!SF.STATS.KEYS.includes(k)) return; const cur = (P.statLocks || SF.STATS.newLocks())[k]; SF.STATS.setLock(P, k, SF.STATS.cycleLock(cur)); save(); eqChanged(); renderPanel(); },
   sell: d => { const it = findU(P.pack, d.u); if (!it) return; if (it.starter) return log('Merchants do not buy back starter gear.', '#ffb070'); const n = d.all ? it.qty : 1, g = Math.max(1, Math.floor((SF.PRICES[it.id] || 1) * .4 * (SF.WORK_TOOLS[it.id] && !SF.ITEMS[it.id].stack ? SF.toolUses(it) / SF.TOOL_USES : 1))) * n; it.qty -= n; if (it.qty <= 0) P.pack.items.splice(P.pack.items.indexOf(it), 1); P.pack.ver++; SF.addItem(P.pack, SF.newItem('gold', g)); snd('loot.coin'); renderPanel(); },
   train: d => { const n = P.talkTo; if (!n || dist(n, P) > 4 || !(SF.SK.TRAINERS[trainerRole(n)] || []).includes(d.k)) return log('Speak to a teacher of that skill.', '#ffb070');
     const free = P.freeLessons > 0, q = SF.SK.train(P, d.k, SF.count(P.pack, 'gold'), free); if (!q.ok) return log(q.reason, '#ffb070');

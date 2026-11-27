@@ -56,7 +56,7 @@ with sync_playwright() as p:
     check(r['taken'] == 50 and r2['open'] and r2['remain'] == ['bandage:3'] and 0 < r2['left'] <= r['left'] + .01, f'[{tag}] an opened chest keeps what is left and its relock time through a reload', [r, r2])
 
     # ---- A04: a spell being prepared is interrupted by the reload exactly once (scroll back, half the mana spent)
-    r = J(pg, """() => { const S = __SF, P = S.P, SF = S.SF; const sp = SF.SPELL['magery.01']; P.skills.spellcraft.v = 1000; SF.addItem(P.pack, SF.newItem(sp.scroll, 1)); P.mana = 30; P.spellReadyAt = 0;
+    r = J(pg, """() => { const S = __SF, P = S.P, SF = S.SF; const sp = SF.SPELL['magery.01']; P.skills.magery.v = 1000; SF.addItem(P.pack, SF.newItem(sp.scroll, 1)); P.mana = 30; P.spellReadyAt = 0;
       const sc0 = SF.count(P.pack, sp.scroll); S.castSlot('magery.01', { scroll: true }); const o = { prep: !!P.prep, sc0, sc1: SF.count(P.pack, sp.scroll), mana: P.mana, mp: sp.mp }; S.save(); return o; }""")
     cont(pg)
     r2 = J(pg, """() => { const S = __SF, P = S.P, SF = S.SF, sp = SF.SPELL['magery.01']; return { prep: !!P.prep, held: !!P.held, sc: SF.count(P.pack, sp.scroll), mana: P.mana }; }""")

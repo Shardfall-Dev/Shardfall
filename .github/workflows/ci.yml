@@ -1,6 +1,6 @@
 # Checks for every push and pull request, and the gate in front of every Pages deployment (pages.yml calls this workflow).
 #   build:  every script block compiles, the committed build equals ./build.sh output, assets and manifests are complete,
-#           and all six rules suites pass against the built game.
+#           and every node rules suite passes against the built game.
 #   smoke:  every browser suite in Chrome (desktop and phone sizes), including the stabilization save/reload checks.
 name: Checks
 
@@ -29,7 +29,7 @@ jobs:
         run: python3 tests/check-build.py "$GAME"
       - name: Rules suites
         run: |
-          for t in rules magery equipment combat world inventory; do
+          for t in rules skills stats creation magery equipment combat world inventory gear painted wardrobe; do
             echo "::group::$t"; node "tests/$t.test.js" "$GAME"; echo "::endgroup::"
           done
 
@@ -62,4 +62,8 @@ jobs:
           run anniabreen  python3 tests/anniabreen-smoke/run.py "$G"
           run ui          python3 tests/ui-smoke/run.py "$G"
           run world       python3 tests/world-smoke/run.py "$G"
+          run creation    python3 tests/creation-smoke/run.py "$G"
+          run skills      python3 tests/skills-smoke/run.py "$G"
+          run gear        python3 tests/gear-smoke/run.py "$G"
+          run painted     python3 tests/painted-smoke/run.py "$G"
           exit $fail

@@ -1,0 +1,499 @@
+{
+ "version": "1.0.0",
+ "renderer": "classic humans v2 (src/humans.js)",
+ "rig": "2.1.0",
+ "status": "No painted frames are integrated. Every human is drawn by the procedural rig behind the feature flag.",
+ "cell": {
+  "width": 144,
+  "height": 144,
+  "anchorX": 72,
+  "anchorY": 112,
+  "note": "rig cell; a painted atlas may use its own cell if it records its anchor"
+ },
+ "order": {
+  "directions": [
+   "S",
+   "SW",
+   "W",
+   "NW",
+   "N",
+   "NE",
+   "E",
+   "SE"
+  ],
+  "atlas": "columns = frames, rows = directions S..SE; one atlas per body"
+ },
+ "sheets": [
+  {
+   "id": "idle",
+   "frames": 4,
+   "looped": true,
+   "directions": 8,
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "totalFrames": 64,
+   "painted": "partial: 8 of 8 directions (one frame per direction, no breathing cycle; pack not in the repository)"
+  },
+  {
+   "id": "walk",
+   "frames": 8,
+   "looped": true,
+   "directions": 8,
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "totalFrames": 128,
+   "painted": "partial: 2 of 8 directions"
+  },
+  {
+   "id": "run",
+   "frames": 8,
+   "looped": true,
+   "directions": 8,
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "totalFrames": 128,
+   "painted": "none"
+  },
+  {
+   "id": "ready",
+   "frames": 4,
+   "looped": true,
+   "directions": 8,
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "totalFrames": 64,
+   "painted": "none"
+  },
+  {
+   "id": "unarmed",
+   "frames": 8,
+   "looped": false,
+   "directions": 8,
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "totalFrames": 128,
+   "painted": "none"
+  },
+  {
+   "id": "slash1h",
+   "frames": 8,
+   "looped": false,
+   "directions": 8,
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "totalFrames": 128,
+   "painted": "none"
+  },
+  {
+   "id": "slash2h",
+   "frames": 8,
+   "looped": false,
+   "directions": 8,
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "totalFrames": 128,
+   "painted": "none"
+  },
+  {
+   "id": "chop1h",
+   "frames": 8,
+   "looped": false,
+   "directions": 8,
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "totalFrames": 128,
+   "painted": "none"
+  },
+  {
+   "id": "chop2h",
+   "frames": 8,
+   "looped": false,
+   "directions": 8,
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "totalFrames": 128,
+   "painted": "none"
+  },
+  {
+   "id": "blunt1h",
+   "frames": 8,
+   "looped": false,
+   "directions": 8,
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "totalFrames": 128,
+   "painted": "none"
+  },
+  {
+   "id": "blunt2h",
+   "frames": 8,
+   "looped": false,
+   "directions": 8,
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "totalFrames": 128,
+   "painted": "none"
+  },
+  {
+   "id": "thrust1h",
+   "frames": 8,
+   "looped": false,
+   "directions": 8,
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "totalFrames": 128,
+   "painted": "none"
+  },
+  {
+   "id": "thrust2h",
+   "frames": 8,
+   "looped": false,
+   "directions": 8,
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "totalFrames": 128,
+   "painted": "none"
+  },
+  {
+   "id": "polearm",
+   "frames": 8,
+   "looped": false,
+   "directions": 8,
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "totalFrames": 128,
+   "painted": "none"
+  },
+  {
+   "id": "staff",
+   "frames": 8,
+   "looped": false,
+   "directions": 8,
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "totalFrames": 128,
+   "painted": "none"
+  },
+  {
+   "id": "bow",
+   "frames": 8,
+   "looped": false,
+   "directions": 8,
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "totalFrames": 128,
+   "painted": "none"
+  },
+  {
+   "id": "crossbow",
+   "frames": 8,
+   "looped": false,
+   "directions": 8,
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "totalFrames": 128,
+   "painted": "none"
+  },
+  {
+   "id": "hcrossbow",
+   "frames": 8,
+   "looped": false,
+   "directions": 8,
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "totalFrames": 128,
+   "painted": "none"
+  },
+  {
+   "id": "cast1h",
+   "frames": 8,
+   "looped": false,
+   "directions": 8,
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "totalFrames": 128,
+   "painted": "partial: 2 of 8 directions"
+  },
+  {
+   "id": "cast2h",
+   "frames": 8,
+   "looped": false,
+   "directions": 8,
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "totalFrames": 128,
+   "painted": "none"
+  },
+  {
+   "id": "caststaff",
+   "frames": 8,
+   "looped": false,
+   "directions": 8,
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "totalFrames": 128,
+   "painted": "none"
+  },
+  {
+   "id": "block",
+   "frames": 6,
+   "looped": true,
+   "directions": 8,
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "totalFrames": 96,
+   "painted": "none"
+  },
+  {
+   "id": "hit",
+   "frames": 4,
+   "looped": false,
+   "directions": 8,
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "totalFrames": 64,
+   "painted": "none"
+  },
+  {
+   "id": "death",
+   "frames": 8,
+   "looped": false,
+   "directions": 8,
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "totalFrames": 128,
+   "painted": "none"
+  },
+  {
+   "id": "corpse",
+   "frames": 1,
+   "looped": false,
+   "directions": 8,
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "totalFrames": 16,
+   "painted": "none"
+  },
+  {
+   "id": "mine",
+   "frames": 8,
+   "looped": true,
+   "directions": 8,
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "totalFrames": 128,
+   "painted": "none"
+  },
+  {
+   "id": "chopwood",
+   "frames": 8,
+   "looped": true,
+   "directions": 8,
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "totalFrames": 128,
+   "painted": "none"
+  },
+  {
+   "id": "smith",
+   "frames": 8,
+   "looped": true,
+   "directions": 8,
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "totalFrames": 128,
+   "painted": "none"
+  },
+  {
+   "id": "craft",
+   "frames": 8,
+   "looped": true,
+   "directions": 8,
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "totalFrames": 128,
+   "painted": "none"
+  },
+  {
+   "id": "bandage",
+   "frames": 8,
+   "looped": true,
+   "directions": 8,
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "totalFrames": 128,
+   "painted": "none"
+  },
+  {
+   "id": "fish",
+   "frames": 8,
+   "looped": true,
+   "directions": 8,
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "totalFrames": 128,
+   "painted": "none"
+  }
+ ],
+ "totalFramesPerLayerSet": 3632,
+ "layers": {
+  "hair": [
+   "cropped",
+   "short",
+   "parted",
+   "long",
+   "ponytail",
+   "bun",
+   "braid"
+  ],
+  "facialHair": [
+   "stubble",
+   "goatee",
+   "short",
+   "full"
+  ],
+  "armorFamilies": [
+   "leather",
+   "studded",
+   "bone",
+   "ringmail",
+   "chain",
+   "plate",
+   "dragon"
+  ],
+  "armorRegions": [
+   "torso",
+   "arms",
+   "legs",
+   "hands",
+   "neck"
+  ],
+  "garments": [
+   "shirt/tunic",
+   "trousers",
+   "robe",
+   "cloak",
+   "tabard",
+   "apron",
+   "vest",
+   "hood",
+   "coat"
+  ],
+  "helmets": [
+   "cap",
+   "leathercap",
+   "bonehelm",
+   "coif",
+   "openhelm",
+   "closedhelm",
+   "greathelm"
+  ],
+  "shields": [
+   "buckler",
+   "round",
+   "kite",
+   "heater"
+  ],
+  "weapons": [
+   "sword",
+   "halberd",
+   "battleaxe",
+   "hatchet",
+   "knife",
+   "pickaxe",
+   "warhammer",
+   "mace",
+   "axe",
+   "dagger",
+   "kryss",
+   "spear",
+   "bow",
+   "crossbow",
+   "heavycrossbow"
+  ],
+  "tools": [
+   "pickaxe",
+   "hatchet",
+   "fishingpole",
+   "smithhammer"
+  ],
+  "futureWeapons": [
+   "greatsword",
+   "broadsword",
+   "katana",
+   "rapier",
+   "doubleaxe",
+   "maul",
+   "club",
+   "shortspear",
+   "bardiche",
+   "staff",
+   "quarterstaff",
+   "longbow",
+   "wand"
+  ]
+ },
+ "tint": "armor and shields are tinted by material colour (SF.EQ.matColor); cloth by the appearance clothing colour — paint them in neutral greys"
+}

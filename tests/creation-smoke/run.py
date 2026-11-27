@@ -57,26 +57,26 @@ with sync_playwright() as p:
     pg.click('[data-c=next]'); pg.wait_for_selector('[data-c=tpl]')
     tpls = J(pg, "[...document.querySelectorAll('[data-c=tpl]')].map(b => b.dataset.t)")
     check(len(tpls) == 12 and 'swordsman' in tpls and 'advanced' in tpls, 'twelve templates incl. Advanced', tpls)
-    pg.click('[data-c=tpl][data-t=archer]'); check(J(pg, "__CC.draft.stats") == [25, 30, 10], 'Archer fills 25/30/10')
+    pg.click('[data-c=tpl][data-t=archer]'); check(J(pg, "__CC.draft.stats") == [30, 40, 10], 'Archer fills 30/40/10')
     check(J(pg, "__CC.draft.town") == 'quay', 'a template never changes the town')
     pg.screenshot(path=f'{shots}/d2-profession.png')
     pg.click('[data-c=next]'); pg.wait_for_selector('[data-c=stv]')
     # budget: + at 0 left does nothing; − then + on another moves a point
-    pg.click('[data-c=st][data-i="0"][data-d="1"]'); check(J(pg, "__CC.draft.stats") == [25, 30, 10], '+ with no points left does nothing')
-    pg.click('[data-c=st][data-i="1"][data-d="-1"]'); pg.click('[data-c=st][data-i="0"][data-d="1"]'); check(J(pg, "__CC.draft.stats") == [26, 29, 10], '− frees a point, + spends it')
+    pg.click('[data-c=st][data-i="0"][data-d="1"]'); check(J(pg, "__CC.draft.stats") == [30, 40, 10], '+ with no points left does nothing')
+    pg.click('[data-c=st][data-i="1"][data-d="-1"]'); pg.click('[data-c=st][data-i="0"][data-d="1"]'); check(J(pg, "__CC.draft.stats") == [31, 39, 10], '− frees a point, + spends it')
     check('Custom' in pg.inner_text('#ccmain h2'), 'an edit marks the numbers Custom')
-    pg.fill('[data-c=stn][data-i="2"]', '99'); pg.press('[data-c=stn][data-i="2"]', 'Tab'); check(J(pg, "__CC.draft.stats") == [26, 29, 10], 'typed 99 is clamped to what the budget allows')
-    J(pg, "(() => { const r = document.querySelector('[data-c=stv][data-i=\"2\"]'); r.value = 45; r.dispatchEvent(new Event('input', { bubbles: true })); })()")
-    check(J(pg, "__CC.draft.stats") == [26, 29, 10], 'slider dragged to 45 stays inside the 65-point budget')
-    pg.click('[data-c=st][data-i="1"][data-d="-1"]'); J(pg, "(() => { const r = document.querySelector('[data-c=stv][data-i=\"2\"]'); r.value = 45; r.dispatchEvent(new Event('input', { bubbles: true })); })()")
-    check(J(pg, "__CC.draft.stats") == [26, 28, 11], 'slider takes only the free point')
-    check(pg.inner_text('#ccstleft').startswith('0 of 65'), 'points-left counter live', pg.inner_text('#ccstleft'))
+    pg.fill('[data-c=stn][data-i="2"]', '99'); pg.press('[data-c=stn][data-i="2"]', 'Tab'); check(J(pg, "__CC.draft.stats") == [31, 39, 10], 'typed 99 is clamped to what the budget allows')
+    J(pg, "(() => { const r = document.querySelector('[data-c=stv][data-i=\"2\"]'); r.value = 60; r.dispatchEvent(new Event('input', { bubbles: true })); })()")
+    check(J(pg, "__CC.draft.stats") == [31, 39, 10], 'slider dragged to 60 stays inside the 80-point budget')
+    pg.click('[data-c=st][data-i="1"][data-d="-1"]'); J(pg, "(() => { const r = document.querySelector('[data-c=stv][data-i=\"2\"]'); r.value = 60; r.dispatchEvent(new Event('input', { bubbles: true })); })()")
+    check(J(pg, "__CC.draft.stats") == [31, 38, 11], 'slider takes only the free point')
+    check(pg.inner_text('#ccstleft').startswith('0 of 80'), 'points-left counter live', pg.inner_text('#ccstleft'))
     # duplicate skill refused atomically
     before = J(pg, "__CC.draft.skills")
     J(pg, "(() => { const s = document.querySelector('[data-c=sk][data-i=\"1\"]'); s.value = 'archery'; s.dispatchEvent(new Event('change', { bubbles: true })); })()")
     check(J(pg, "__CC.draft.skills") == before, 'choosing a skill already in another row is refused, nothing changes')
     check(J(pg, "document.querySelector('[data-c=sk][data-i=\"1\"] option[value=archery]').disabled"), 'a chosen skill is disabled in the other rows')
-    check(J(pg, "!document.querySelector('[data-c=sk] option[value=shadowstep]') && !document.querySelector('[data-c=sk] option[value=trapcraft]')"), 'Stealth and Remove Trap are not offered')
+    check(J(pg, "!document.querySelector('[data-c=sk] option[value=stealth]') && !document.querySelector('[data-c=sk] option[value=removetrap]')"), 'Stealth and Remove Trap are not offered')
     check(J(pg, "[...document.querySelectorAll('[data-c=sk][data-i=\"0\"] option')].some(o => o.textContent === 'Magery') && ![...document.querySelectorAll('[data-c=sk] option')].some(o => /Spellcraft|Concealment|Smithing/.test(o.textContent))"), 'canonical UO names in the picker')
     pg.select_option('[data-c=sk][data-i="2"]', 'healing'); check(J(pg, "__CC.draft.skills[2]") == ['healing', 20], 'swapping a skill keeps its points')
     J(pg, "(() => { const r = document.querySelector('[data-c=kvv][data-i=\"0\"]'); r.value = 50; r.dispatchEvent(new Event('input', { bubbles: true })); })()")
@@ -85,8 +85,8 @@ with sync_playwright() as p:
     pg.screenshot(path=f'{shots}/d3-stats.png')
     # template warning after edits
     pg.click('[data-c=step][data-s="1"]'); pg.click('[data-c=tpl][data-t=mage]'); pg.wait_for_selector('[data-c=tplok]')
-    pg.click('[data-c=tplno]'); check(J(pg, "__CC.draft.edited") and J(pg, "__CC.draft.stats") == [26, 28, 11], 'Keep mine keeps the edited numbers')
-    pg.click('[data-c=tpl][data-t=swordsman]'); pg.click('[data-c=tplok]'); check(J(pg, "__CC.draft.stats") == [35, 20, 10] and J(pg, "__CC.draft.name") == 'Tess Vane' and J(pg, "__CC.draft.look.hairStyle") == 'buns', 'Replace loads the template, name and look kept')
+    pg.click('[data-c=tplno]'); check(J(pg, "__CC.draft.edited") and J(pg, "__CC.draft.stats") == [31, 38, 11], 'Keep mine keeps the edited numbers')
+    pg.click('[data-c=tpl][data-t=swordsman]'); pg.click('[data-c=tplok]'); check(J(pg, "__CC.draft.stats") == [45, 25, 10] and J(pg, "__CC.draft.name") == 'Tess Vane' and J(pg, "__CC.draft.look.hairStyle") == 'buns', 'Replace loads the template, name and look kept')
     pg.click('[data-c=step][data-s="3"]'); pg.wait_for_selector('[data-c=go]')
     check(not J(pg, "document.querySelector('[data-c=go]').disabled"), 'valid draft: Begin enabled')
     check('sword' in pg.inner_text('#ccmain') and '100 Gold' in pg.inner_text('#ccmain') and '10 Bandage' in pg.inner_text('#ccmain'), 'review lists the starting kit', pg.inner_text('#ccmain')[-400:])
@@ -99,8 +99,8 @@ with sync_playwright() as p:
     J(pg, "(() => { const b = document.querySelector('[data-c=go]'); b.click(); b.click(); __CC.quick && 0; })()"); pg.wait_for_timeout(800)
     st = P(pg, "({ name: P.name, look: P.look, base: P.base, sk: Object.fromEntries(Object.entries(P.skills).filter(([k, v]) => v.v).map(([k, v]) => [k, v.v])), zero: Object.values(P.skills).filter(s => !s.v).length, locks: [...new Set(Object.values(P.skills).map(s => s.lock))], sl: P.statLocks, gold: SF.count(P.pack, 'gold'), w: P.equip.weapon && P.equip.weapon.id, books: P.pack.items.filter(i => i.id === 'journal').length, bound: P.bound, id: P.charId })")
     check(st['name'] == 'Tess Vane' and st['look']['body'] == 'female' and st['look']['hairStyle'] == 'buns' and st['look']['cloak'] == 'royal', 'created with the chosen name and look', st['look'])
-    check(st['base'] == {'str': 35, 'dex': 20, 'int': 10}, '35/20/10 natural', st['base'])
-    check(st['sk'] == {'swordsmanship': 500, 'tactics': 300, 'healing': 200} and st['zero'] == 38, 'skills 50.0/30.0/20.0 in tenths, 38 others at 0.0', st['sk'])
+    check(st['base'] == {'str': 45, 'dex': 25, 'int': 10}, '45/25/10 natural', st['base'])
+    check(st['sk'] == {'swordsmanship': 500, 'tactics': 300, 'healing': 200} and st['zero'] == 46, 'skills 50.0/30.0/20.0 in tenths, 46 others at 0.0', st['sk'])
     check(st['locks'] == ['raise'] and st['sl'] == {'str': 'raise', 'dex': 'raise', 'int': 'raise'}, 'all skill and attribute locks Raise')
     check(st['gold'] == 100 and st['books'] == 1 and st['w'] == 'sword', 'one starter kit (100 gold, one journal, sword) after a double click', st)
     check(bool(st['id']), 'a stable character id')
@@ -108,7 +108,7 @@ with sync_playwright() as p:
     # character page: natural stats, locks, no stat purchase
     J(pg, "__SF.openPanel('gear')"); pg.wait_for_timeout(100)
     check('Intelligence' in pg.inner_text('#panel') and '/ 225' in pg.inner_text('#panel') and 'Intellect' not in pg.inner_text('#panel'), 'Character page: Intelligence, total / 225')
-    pg.click('#panel [data-a=statlock][data-k=str]'); check(P(pg, "P.statLocks.str") == 'hold' and P(pg, "P.base.str") == 35, 'tapping a lock cycles it and never changes the value')
+    pg.click('#panel [data-a=statlock][data-k=str]'); check(P(pg, "P.statLocks.str") == 'hold' and P(pg, "P.base.str") == 45, 'tapping a lock cycles it and never changes the value')
     pg.click('#panel [data-a=statlock][data-k=str]'); pg.click('#panel [data-a=statlock][data-k=str]'); check(P(pg, "P.statLocks.str") == 'raise', 'lock cycles raise → hold → lower → raise')
     J(pg, "__SF.closePanel()")
     check(P(pg, "typeof S.ACT.stat") == 'undefined' and P(pg, "typeof SF.statTrainCost") == 'undefined', 'no attribute purchase command or price exists')
@@ -118,7 +118,7 @@ with sync_playwright() as p:
     check('Tess Vane' in pg.inner_text('[data-c=cont]'), 'title: Continue as the saved hero')
     pg.click('[data-c=cont]'); pg.wait_for_function('window.__SF && __SF.P')
     st2 = P(pg, "({ gold: SF.count(P.pack, 'gold'), base: P.base, look: P.look, j: P.pack.items.filter(i => i.id === 'journal').length, sk: P.skills.swordsmanship.v })")
-    check(st2['gold'] == 100 and st2['j'] == 1 and st2['base'] == {'str': 35, 'dex': 20, 'int': 10} and st2['look']['hairStyle'] == 'buns' and st2['sk'] == 500, 'Continue: no second kit, stats, skills and look kept', st2)
+    check(st2['gold'] == 100 and st2['j'] == 1 and st2['base'] == {'str': 45, 'dex': 25, 'int': 10} and st2['look']['hairStyle'] == 'buns' and st2['sk'] == 500, 'Continue: no second kit, stats, skills and look kept', st2)
     # replacing needs explicit consent; a refused creation never touches the save
     pg.reload(); pg.wait_for_selector('[data-c=new]'); raw0 = J(pg, "localStorage.getItem('shardfall.save.v1')")
     pg.click('[data-c=new]'); pg.fill('#ccn', 'Second'); pg.click('[data-c=step][data-s="3"]'); pg.wait_for_selector('[data-c=go]')
@@ -141,7 +141,7 @@ with sync_playwright() as p:
     for t, w in MAP.items():
         ctx, pg, errs = page(b); ok = quick(pg, {'name': 'Tess', 'template': t, 'replace': True})
         r = P(pg, "({ w: P.equip.weapon && P.equip.weapon.id, legal: Object.values(P.equip).filter(Boolean).every(i => SF.EQ.strReq(i) <= P.str), st: SF.EQ.encumbrance(P).stage, tot: SF.totalSkill(P), stats: P.base.str + P.base.dex + P.base.int, hb: P.hotbar.filter(Boolean).map(h => h.id), book: (P.pack.items.find(i => i.id === 'spellbook') || {}).spells, tools: P.pack.items.filter(i => SF.WORK_TOOLS[i.id] || ['lute', 'lockpick'].includes(i.id)).map(i => i.id) })")
-        check(ok and r['w'] == w and r['legal'] and r['st'] == 0 and r['tot'] == 1000 and r['stats'] == 65, f'{t}: weapon {w}, legal, unencumbered, 100.0 skills, 65 stats', r)
+        check(ok and r['w'] == w and r['legal'] and r['st'] == 0 and r['tot'] == 1000 and r['stats'] == 80, f'{t}: weapon {w}, legal, unencumbered, 100.0 skills, 80 stats', r)
         if t in ('mage', 'healer'): check(r['book'] == ['magery.04', 'magery.05'] and 'magery.05' in r['hb'], f'{t}: first-circle spellbook on the hotbar', r)
         if t == 'blacksmith': check('pickaxe' in r['tools'] and 'tongs' in r['tools'], 'blacksmith: pickaxe and tongs', r)
         if t == 'bard': check('lute' in r['tools'], 'bard: lute', r)
@@ -165,13 +165,13 @@ with sync_playwright() as p:
       const rat = S.spawnMon('rat', 1.2, 0); P.sel = rat; P.armed = true; let t = 0; while (!rat.dead && t < 60) { step(.5); t += .5; P.sel = rat; P.armed = true; }
       P.armed = false; P.hp = Math.max(1, SF.maxHp(P) - 20); const hp0 = P.hp; S.firstAid(P); step(9); return { killed: !!rat.dead, t, healed: P.hp > hp0, band: SF.count(P.pack, 'bandage') }; })()""")
     check(r['killed'] and r['healed'] and r['band'] == 9, 'a new Swordsman kills a rat and bandages himself', r)
-    # a natural attribute gain from a real swing: put the stream where the next roll succeeds, then hit
-    r = J(pg, """(() => { const S = __SF, P = S.P, SF = S.SF, ST = SF.STATS; const step = (sec) => { for (let i = 0; i < Math.round(sec / .05); i++) S.update(.05); };
-      const find = () => { for (let seed = 1; seed < 200000; seed++) { const st = { seed }; const c = JSON.parse(JSON.stringify({ base: P.base, skills: P.skills, statLocks: P.statLocks })); c.statGain = Object.assign(ST.newState(seed), { seed }); const r = ST.tryStatGain(c, 'swordsmanship', { now: 1e9, action: 'probe' }); if (r.gained) return seed; } return 0; };
-      const b0 = Object.assign({}, P.base); let gained = null;
-      for (let k = 0; k < 25 && !gained; k++) { P.statGain.cd = 0; P.statGain.seed = find(); const rat = S.spawnMon('rat', 1.2, 0); rat.hp = rat.max = 400; P.sel = rat; P.armed = true; const n0 = P.statGain.n || 0; let t = 0; while ((P.statGain.n || 0) === n0 && t < 8) { step(.25); t += .25; P.sel = rat; P.armed = true; } if ((P.statGain.n || 0) > n0) gained = true; rat.hp = 0; S.killMon && S.killMon(rat); }
-      P.armed = false; return { gained, b0, b1: P.base, msg: S.LOG.filter(l => /has increased to/.test(l.t)).map(l => l.t), eff: [P.str, P.dex] }; })()""")
-    check(r['gained'] and sum(r['b1'].values()) == sum(r['b0'].values()) + 1 and any('has increased to' in m for m in r['msg']) and r['eff'] == [r['b1']['str'], r['b1']['dex']], 'fighting raises Strength or Dexterity naturally, with a journal line', r)
+    # a natural attribute gain from a real swing (src/skills.js SK.statGain): with the roll forced low the next skill gain also raises a stat
+    r = J(pg, """(() => { const S = __SF, P = S.P, SF = S.SF; const step = (sec) => { for (let i = 0; i < Math.round(sec / .05); i++) S.update(.05); };
+      const b0 = Object.assign({}, P.base), sum = b => b.str + b.dex + b.int; const rat = S.spawnMon('rat', 1.2, 0); rat.hp = rat.max = 400; S.setRng(() => 0);
+      let t = 0; while (sum(P.base) === sum(b0) && t < 20) { step(.25); t += .25; P.sel = rat; P.armed = true; rat.hp = Math.max(rat.hp, 100); }
+      S.setRng(null); P.armed = false; rat.hp = 0; S.killMon && S.killMon(rat);
+      return { gained: sum(P.base) > sum(b0), b0, b1: P.base, msg: S.LOG.filter(l => /rises to/.test(l.t)).map(l => l.t), eff: [P.str, P.dex] }; })()""")
+    check(r['gained'] and sum(r['b1'].values()) == sum(r['b0'].values()) + 1 and any('rises to' in m for m in r['msg']) and r['eff'] == [r['b1']['str'], r['b1']['dex']], 'fighting raises Strength or Dexterity naturally, with a journal line', r)
     check(not errs, 'no page errors (warrior)', errs[:3]); ctx.close()
 
     # ================= play: a mage casts =================
@@ -204,11 +204,11 @@ with sync_playwright() as p:
     pg.close(); pg = ctx.new_page(); pg.on('pageerror', lambda e: errs.append(str(e)))   # the running game saves when its page closes; inject after that
     pg.goto('file://' + f); pg.wait_for_selector('[data-c=new]'); J(pg, "r => { localStorage.clear(); localStorage.setItem('shardfall.save.v1', r); }", raw)
     pg.reload(); pg.wait_for_selector('[data-c=cont]'); pg.click('[data-c=cont]'); pg.wait_for_function('window.__SF && __SF.P'); pg.wait_for_timeout(300)
-    r = P(pg, "({ base: P.base, eff: [P.str, P.dex, P.int], sk: P.skills.swordsmanship.v, tl: P.skills.tactics.lock, gold: SF.count(P.pack, 'gold'), look: P.look, sl: P.statLocks, id: !!P.charId, prev: !!localStorage.getItem('shardfall.save.v1.prev7'), w: P.equip.weapon && P.equip.weapon.id })")
+    r = P(pg, "({ base: P.base, eff: [P.str, P.dex, P.int], sk: P.skills.swordsmanship.v, tl: P.skills.tactics.lock, gold: SF.count(P.pack, 'gold'), look: P.look, sl: P.statLocks, id: !!P.charId, prev: !!localStorage.getItem('shardfall.save.v1.prev8'), w: P.equip.weapon && P.equip.weapon.id })")
     check(r['base'] == {'str': 60, 'dex': 50, 'int': 40} and r['eff'] == [60, 50, 40], 'old 150-point stats kept, not clamped to creation limits', r)
     check(r['sk'] == 873 and r['tl'] == 'lower' and r['gold'] == 4321 and r['w'] == 'sword', 'skills, locks, gold and gear kept; no kit regranted', r)
-    check(r['look']['cloak'] == 'crimson' and r['look']['body'] == 'male' and r['sl'] == {'str': 'raise', 'dex': 'raise', 'int': 'raise'} and r['id'] and r['prev'], 'v7 → v8: look normalized (cloak colour → id), locks added, id given, backup kept', r)
-    J(pg, "__SF.save()"); v = J(pg, "JSON.parse(localStorage.getItem('shardfall.save.v1')).v"); check(v == 8, 'saved as v8', v)
+    check(r['look']['cloak'] == 'crimson' and r['look']['body'] == 'male' and r['sl'] == {'str': 'raise', 'dex': 'raise', 'int': 'raise'} and r['id'] and r['prev'], 'v7 → v9: skills reformed, look normalized (cloak colour → id), locks added, id given, backup kept', r)
+    J(pg, "__SF.save()"); v = J(pg, "JSON.parse(localStorage.getItem('shardfall.save.v1')).v"); check(v == 9, 'saved as v9', v)
     pg.reload(); pg.wait_for_selector('[data-c=cont]'); pg.click('[data-c=cont]'); pg.wait_for_function('window.__SF && __SF.P')
     check(P(pg, "[P.base.str, P.skills.swordsmanship.v, SF.count(P.pack, 'gold')]") == [60, 873, 4321], 'migration idempotent across a second load')
     J(pg, "__SF.P.talkTo = { name: 'Master Vey', x: __SF.P.x, y: __SF.P.y, role: 'trainer' }; window.PTAB = 'stats'");

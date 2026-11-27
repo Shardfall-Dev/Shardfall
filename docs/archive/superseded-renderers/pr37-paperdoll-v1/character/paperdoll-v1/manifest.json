@@ -1,0 +1,1839 @@
+{
+ "version": "1.0.0",
+ "rev": "pd-1.0.0-procedural",
+ "status": "procedural: original code-drawn layers (src/paperdoll.js); no painted production overlay exists yet",
+ "canvas": {
+  "width": 384,
+  "height": 512,
+  "format": "RGBA PNG",
+  "baseline": 496,
+  "logical": [
+   192,
+   256
+  ],
+  "scale": 2
+ },
+ "anchors": {
+  "male": {
+   "cx": 96,
+   "headTop": 20,
+   "chin": 51,
+   "headW": 11.5,
+   "brow": 31,
+   "eyeY": 36,
+   "neckW": 6.5,
+   "neckBot": 60,
+   "shY": 62,
+   "shX": 27,
+   "armpitY": 80,
+   "chestY": 86,
+   "chestX": 21,
+   "waistY": 118,
+   "waistX": 18,
+   "hipY": 134,
+   "hipX": 22,
+   "crotch": 143,
+   "knee": 190,
+   "kneeO": 15,
+   "kneeI": 3.5,
+   "ankle": 234,
+   "ankleO": 10.5,
+   "ankleI": 3.5,
+   "foot": 248,
+   "arm": {
+    "sh": [
+     69,
+     68
+    ],
+    "el": [
+     63,
+     112
+    ],
+    "wr": [
+     60,
+     149
+    ],
+    "hd": [
+     60,
+     160
+    ]
+   },
+   "upR": 7,
+   "foreR": 5.6,
+   "wristR": 4,
+   "handR": 5
+  },
+  "female": {
+   "cx": 96,
+   "headTop": 25,
+   "chin": 53,
+   "headW": 10.5,
+   "brow": 34,
+   "eyeY": 38,
+   "neckW": 5.5,
+   "neckBot": 62,
+   "shY": 64,
+   "shX": 23,
+   "armpitY": 82,
+   "chestY": 90,
+   "chestX": 20,
+   "waistY": 116,
+   "waistX": 14.5,
+   "hipY": 136,
+   "hipX": 24,
+   "crotch": 145,
+   "knee": 190,
+   "kneeO": 15,
+   "kneeI": 3.5,
+   "ankle": 234,
+   "ankleO": 10,
+   "ankleI": 3,
+   "foot": 248,
+   "arm": {
+    "sh": [
+     74,
+     70
+    ],
+    "el": [
+     68,
+     112
+    ],
+    "wr": [
+     66,
+     147
+    ],
+    "hd": [
+     66,
+     157
+    ]
+   },
+   "upR": 6,
+   "foreR": 4.8,
+   "wristR": 3.4,
+   "handR": 4.4
+  }
+ },
+ "order": [
+  "cloak_back",
+  "hair_back",
+  "body",
+  "face",
+  "under",
+  "legs",
+  "feet",
+  "torso",
+  "neck",
+  "arms",
+  "hands",
+  "outer",
+  "belt",
+  "jewelry",
+  "beard",
+  "hair_front",
+  "head",
+  "cloak_front",
+  "off",
+  "main"
+ ],
+ "slotLayer": {
+  "shirt": "under",
+  "trousers": "under",
+  "legs": "legs",
+  "feet": "feet",
+  "chest": "torso",
+  "neck": "neck",
+  "arms": "arms",
+  "hands": "hands",
+  "robe": "outer",
+  "tunic": "outer",
+  "belt": "belt",
+  "ring": "jewelry",
+  "bracelet": "jewelry",
+  "necklace": "jewelry",
+  "head": "head",
+  "cloak": "cloak_back",
+  "weapon": "main",
+  "shield": "off"
+ },
+ "channels": {
+  "primary": "the item's material ramp (metal, hide, wood, or a fixed material)",
+  "secondary": "studs: their own metal ramp",
+  "fixed": "non-tint parts: wood haft, leather grip, string, iron fittings, brass, gems"
+ },
+ "layers": [
+  {
+   "id": "body.male",
+   "bodies": [
+    "male"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "body",
+   "channels": [
+    "skin",
+    "underwear"
+   ]
+  },
+  {
+   "id": "face.male",
+   "bodies": [
+    "male"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "face",
+   "channels": [
+    "skin",
+    "eyes",
+    "lips",
+    "brows"
+   ]
+  },
+  {
+   "id": "body.female",
+   "bodies": [
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "body",
+   "channels": [
+    "skin",
+    "underwear"
+   ]
+  },
+  {
+   "id": "face.female",
+   "bodies": [
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "face",
+   "channels": [
+    "skin",
+    "eyes",
+    "lips",
+    "brows"
+   ]
+  },
+  {
+   "id": "hair.male.short",
+   "bodies": [
+    "male"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "hair",
+   "channels": [
+    "hair"
+   ],
+   "parts": [
+    "back",
+    "front"
+   ]
+  },
+  {
+   "id": "hair.male.long",
+   "bodies": [
+    "male"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "hair",
+   "channels": [
+    "hair"
+   ],
+   "parts": [
+    "back",
+    "front"
+   ]
+  },
+  {
+   "id": "hair.male.ponytail",
+   "bodies": [
+    "male"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "hair",
+   "channels": [
+    "hair"
+   ],
+   "parts": [
+    "back",
+    "front"
+   ]
+  },
+  {
+   "id": "hair.male.pageboy",
+   "bodies": [
+    "male"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "hair",
+   "channels": [
+    "hair"
+   ],
+   "parts": [
+    "back",
+    "front"
+   ]
+  },
+  {
+   "id": "hair.male.receding",
+   "bodies": [
+    "male"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "hair",
+   "channels": [
+    "hair"
+   ],
+   "parts": [
+    "back",
+    "front"
+   ]
+  },
+  {
+   "id": "hair.male.mohawk",
+   "bodies": [
+    "male"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "hair",
+   "channels": [
+    "hair"
+   ],
+   "parts": [
+    "back",
+    "front"
+   ]
+  },
+  {
+   "id": "beard.male.mustache",
+   "bodies": [
+    "male"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "beard",
+   "channels": [
+    "hair"
+   ]
+  },
+  {
+   "id": "beard.male.goatee",
+   "bodies": [
+    "male"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "beard",
+   "channels": [
+    "hair"
+   ]
+  },
+  {
+   "id": "beard.male.short",
+   "bodies": [
+    "male"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "beard",
+   "channels": [
+    "hair"
+   ]
+  },
+  {
+   "id": "beard.male.long",
+   "bodies": [
+    "male"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "beard",
+   "channels": [
+    "hair"
+   ]
+  },
+  {
+   "id": "beard.male.vandyke",
+   "bodies": [
+    "male"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "beard",
+   "channels": [
+    "hair"
+   ]
+  },
+  {
+   "id": "hair.female.short",
+   "bodies": [
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "hair",
+   "channels": [
+    "hair"
+   ],
+   "parts": [
+    "back",
+    "front"
+   ]
+  },
+  {
+   "id": "hair.female.long",
+   "bodies": [
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "hair",
+   "channels": [
+    "hair"
+   ],
+   "parts": [
+    "back",
+    "front"
+   ]
+  },
+  {
+   "id": "hair.female.ponytail",
+   "bodies": [
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "hair",
+   "channels": [
+    "hair"
+   ],
+   "parts": [
+    "back",
+    "front"
+   ]
+  },
+  {
+   "id": "hair.female.pageboy",
+   "bodies": [
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "hair",
+   "channels": [
+    "hair"
+   ],
+   "parts": [
+    "back",
+    "front"
+   ]
+  },
+  {
+   "id": "hair.female.buns",
+   "bodies": [
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "hair",
+   "channels": [
+    "hair"
+   ],
+   "parts": [
+    "back",
+    "front"
+   ]
+  },
+  {
+   "id": "hair.female.pigtails",
+   "bodies": [
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "hair",
+   "channels": [
+    "hair"
+   ],
+   "parts": [
+    "back",
+    "front"
+   ]
+  },
+  {
+   "id": "cloak.look",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "cloak",
+   "channels": [
+    "cloth"
+   ],
+   "parts": [
+    "back",
+    "front"
+   ]
+  },
+  {
+   "id": "eq.bascinet",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "bascinet",
+   "slot": "head",
+   "layer": "head",
+   "fam": "helm",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": [],
+   "occludes": {
+    "hair": "top",
+    "beard": "all"
+   }
+  },
+  {
+   "id": "wpn.battleaxe",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "weapon",
+   "item": "battleaxe",
+   "slot": "weapon",
+   "layer": "main",
+   "fam": "Glaive",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": [
+    "wood",
+    "leather"
+   ],
+   "twoHanded": true
+  },
+  {
+   "id": "eq.belt",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "belt",
+   "slot": "belt",
+   "layer": "belt",
+   "fam": "leather",
+   "primary": "hide",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.bone_arms",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "bone_arms",
+   "slot": "arms",
+   "layer": "arms",
+   "fam": "bone",
+   "primary": "fixed:bone",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.bone_chest",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "bone_chest",
+   "slot": "chest",
+   "layer": "torso",
+   "fam": "bone",
+   "primary": "fixed:bone",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.bone_gloves",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "bone_gloves",
+   "slot": "hands",
+   "layer": "hands",
+   "fam": "bone",
+   "primary": "fixed:bone",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.bone_helm",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "bone_helm",
+   "slot": "head",
+   "layer": "head",
+   "fam": "bone",
+   "primary": "fixed:bone",
+   "secondary": null,
+   "fixedChannels": [],
+   "occludes": {
+    "hair": "all",
+    "beard": "none"
+   }
+  },
+  {
+   "id": "eq.bone_legs",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "bone_legs",
+   "slot": "legs",
+   "layer": "legs",
+   "fam": "bone",
+   "primary": "fixed:bone",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.boots",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "boots",
+   "slot": "feet",
+   "layer": "feet",
+   "fam": "leather",
+   "primary": "hide",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.bracelet",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "jewelry",
+   "item": "bracelet",
+   "slot": "bracelet",
+   "layer": "jewelry",
+   "fam": "jewelry",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.buckler",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "shield",
+   "item": "buckler",
+   "slot": "shield",
+   "layer": "off",
+   "fam": "shield",
+   "primary": "wood",
+   "secondary": null,
+   "fixedChannels": [
+    "metal"
+   ]
+  },
+  {
+   "id": "eq.chain_coif",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "chain_coif",
+   "slot": "head",
+   "layer": "head",
+   "fam": "chain",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": [],
+   "occludes": {
+    "hair": "all",
+    "beard": "mustache"
+   }
+  },
+  {
+   "id": "eq.chain_leggings",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "chain_leggings",
+   "slot": "legs",
+   "layer": "legs",
+   "fam": "chain",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.chain_tunic",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "chain_tunic",
+   "slot": "chest",
+   "layer": "torso",
+   "fam": "chain",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.cloak",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "cloak",
+   "slot": "cloak",
+   "layer": "cloak_back",
+   "fam": "cloth",
+   "primary": "fixed:cloth",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.closed_helm",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "closed_helm",
+   "slot": "head",
+   "layer": "head",
+   "fam": "helm",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": [],
+   "occludes": {
+    "hair": "all",
+    "beard": "none"
+   }
+  },
+  {
+   "id": "eq.cloth_cap",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "cloth_cap",
+   "slot": "head",
+   "layer": "head",
+   "fam": "cloth",
+   "primary": "fixed:cloth",
+   "secondary": null,
+   "fixedChannels": [],
+   "occludes": {
+    "hair": "top",
+    "beard": "all"
+   }
+  },
+  {
+   "id": "eq.cloth_gloves",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "cloth_gloves",
+   "slot": "hands",
+   "layer": "hands",
+   "fam": "cloth",
+   "primary": "fixed:cloth",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "wpn.crossbow",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "weapon",
+   "item": "crossbow",
+   "slot": "weapon",
+   "layer": "main",
+   "fam": "Crossbow",
+   "primary": "wood",
+   "secondary": null,
+   "fixedChannels": [
+    "string",
+    "leather"
+   ],
+   "twoHanded": true
+  },
+  {
+   "id": "wpn.dagger",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "weapon",
+   "item": "dagger",
+   "slot": "weapon",
+   "layer": "main",
+   "fam": "Dagger",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": [
+    "wood",
+    "leather"
+   ],
+   "twoHanded": false
+  },
+  {
+   "id": "eq.dragon_arms",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "dragon_arms",
+   "slot": "arms",
+   "layer": "arms",
+   "fam": "dragon",
+   "primary": "fixed:dragonscale",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.dragon_chest",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "dragon_chest",
+   "slot": "chest",
+   "layer": "torso",
+   "fam": "dragon",
+   "primary": "fixed:dragonscale",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.dragon_gloves",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "dragon_gloves",
+   "slot": "hands",
+   "layer": "hands",
+   "fam": "dragon",
+   "primary": "fixed:dragonscale",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.dragon_helm",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "dragon_helm",
+   "slot": "head",
+   "layer": "head",
+   "fam": "dragon",
+   "primary": "fixed:dragonscale",
+   "secondary": null,
+   "fixedChannels": [],
+   "occludes": {
+    "hair": "all",
+    "beard": "none"
+   }
+  },
+  {
+   "id": "eq.dragon_legs",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "dragon_legs",
+   "slot": "legs",
+   "layer": "legs",
+   "fam": "dragon",
+   "primary": "fixed:dragonscale",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.garment",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "garment",
+   "slot": "tunic",
+   "layer": "outer",
+   "fam": "cloth",
+   "primary": "fixed:cloth",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "wpn.glaive",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "weapon",
+   "item": "glaive",
+   "slot": "weapon",
+   "layer": "main",
+   "fam": "Glaive",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": [
+    "wood",
+    "leather"
+   ],
+   "twoHanded": true
+  },
+  {
+   "id": "eq.great_helm",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "great_helm",
+   "slot": "head",
+   "layer": "head",
+   "fam": "helm",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": [],
+   "occludes": {
+    "hair": "all",
+    "beard": "none"
+   }
+  },
+  {
+   "id": "wpn.hammer",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "weapon",
+   "item": "hammer",
+   "slot": "weapon",
+   "layer": "main",
+   "fam": "Hammer",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": [
+    "wood",
+    "leather"
+   ],
+   "twoHanded": true
+  },
+  {
+   "id": "wpn.hatchet",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "weapon",
+   "item": "hatchet",
+   "slot": "weapon",
+   "layer": "main",
+   "fam": "Sword",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": [
+    "wood",
+    "leather"
+   ],
+   "twoHanded": true
+  },
+  {
+   "id": "eq.heater_shield",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "shield",
+   "item": "heater_shield",
+   "slot": "shield",
+   "layer": "off",
+   "fam": "shield",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "wpn.heavycrossbow",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "weapon",
+   "item": "heavycrossbow",
+   "slot": "weapon",
+   "layer": "main",
+   "fam": "Crossbow",
+   "primary": "wood",
+   "secondary": null,
+   "fixedChannels": [
+    "string",
+    "leather"
+   ],
+   "twoHanded": true
+  },
+  {
+   "id": "eq.kite_shield",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "shield",
+   "item": "kite_shield",
+   "slot": "shield",
+   "layer": "off",
+   "fam": "shield",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "wpn.knife",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "weapon",
+   "item": "knife",
+   "slot": "weapon",
+   "layer": "main",
+   "fam": "Dagger",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": [
+    "wood",
+    "leather"
+   ],
+   "twoHanded": false
+  },
+  {
+   "id": "wpn.kryss",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "weapon",
+   "item": "kryss",
+   "slot": "weapon",
+   "layer": "main",
+   "fam": "Dagger",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": [
+    "wood",
+    "leather"
+   ],
+   "twoHanded": false
+  },
+  {
+   "id": "eq.leather_cap",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "leather_cap",
+   "slot": "head",
+   "layer": "head",
+   "fam": "leather",
+   "primary": "hide",
+   "secondary": null,
+   "fixedChannels": [],
+   "occludes": {
+    "hair": "top",
+    "beard": "all"
+   }
+  },
+  {
+   "id": "eq.leather_gloves",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "leather_gloves",
+   "slot": "hands",
+   "layer": "hands",
+   "fam": "leather",
+   "primary": "hide",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.leather_gorget",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "leather_gorget",
+   "slot": "neck",
+   "layer": "neck",
+   "fam": "leather",
+   "primary": "hide",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.leather_leggings",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "leather_leggings",
+   "slot": "legs",
+   "layer": "legs",
+   "fam": "leather",
+   "primary": "hide",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.leather_sleeves",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "leather_sleeves",
+   "slot": "arms",
+   "layer": "arms",
+   "fam": "leather",
+   "primary": "hide",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.leather_tunic",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "leather_tunic",
+   "slot": "chest",
+   "layer": "torso",
+   "fam": "leather",
+   "primary": "hide",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "wpn.mace",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "weapon",
+   "item": "mace",
+   "slot": "weapon",
+   "layer": "main",
+   "fam": "Hammer",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": [
+    "wood",
+    "leather"
+   ],
+   "twoHanded": false
+  },
+  {
+   "id": "eq.metal_shield",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "shield",
+   "item": "metal_shield",
+   "slot": "shield",
+   "layer": "off",
+   "fam": "shield",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.necklace",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "jewelry",
+   "item": "necklace",
+   "slot": "necklace",
+   "layer": "jewelry",
+   "fam": "jewelry",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.norse_helm",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "norse_helm",
+   "slot": "head",
+   "layer": "head",
+   "fam": "helm",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": [],
+   "occludes": {
+    "hair": "top",
+    "beard": "all"
+   }
+  },
+  {
+   "id": "eq.open_helm",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "open_helm",
+   "slot": "head",
+   "layer": "head",
+   "fam": "helm",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": [],
+   "occludes": {
+    "hair": "top",
+    "beard": "all"
+   }
+  },
+  {
+   "id": "wpn.pickaxe",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "weapon",
+   "item": "pickaxe",
+   "slot": "weapon",
+   "layer": "main",
+   "fam": "Hammer",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": [
+    "wood",
+    "leather"
+   ],
+   "twoHanded": false
+  },
+  {
+   "id": "eq.plate_arms",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "plate_arms",
+   "slot": "arms",
+   "layer": "arms",
+   "fam": "plate",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.plate_chest",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "plate_chest",
+   "slot": "chest",
+   "layer": "torso",
+   "fam": "plate",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.plate_gauntlets",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "plate_gauntlets",
+   "slot": "hands",
+   "layer": "hands",
+   "fam": "plate",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.plate_gorget",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "plate_gorget",
+   "slot": "neck",
+   "layer": "neck",
+   "fam": "plate",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.plate_helm",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "plate_helm",
+   "slot": "head",
+   "layer": "head",
+   "fam": "helm",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": [],
+   "occludes": {
+    "hair": "all",
+    "beard": "none"
+   }
+  },
+  {
+   "id": "eq.plate_leggings",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "plate_leggings",
+   "slot": "legs",
+   "layer": "legs",
+   "fam": "plate",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.ring",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "jewelry",
+   "item": "ring",
+   "slot": "ring",
+   "layer": "jewelry",
+   "fam": "jewelry",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.ringmail_gloves",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "ringmail_gloves",
+   "slot": "hands",
+   "layer": "hands",
+   "fam": "ringmail",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.ringmail_leggings",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "ringmail_leggings",
+   "slot": "legs",
+   "layer": "legs",
+   "fam": "ringmail",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.ringmail_sleeves",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "ringmail_sleeves",
+   "slot": "arms",
+   "layer": "arms",
+   "fam": "ringmail",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.ringmail_tunic",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "ringmail_tunic",
+   "slot": "chest",
+   "layer": "torso",
+   "fam": "ringmail",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.robe",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "robe",
+   "slot": "robe",
+   "layer": "outer",
+   "fam": "cloth",
+   "primary": "fixed:cloth",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.shirt",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "shirt",
+   "slot": "shirt",
+   "layer": "under",
+   "fam": "cloth",
+   "primary": "fixed:cloth",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.shoes",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "shoes",
+   "slot": "feet",
+   "layer": "feet",
+   "fam": "leather",
+   "primary": "hide",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "wpn.shortbow",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "weapon",
+   "item": "shortbow",
+   "slot": "weapon",
+   "layer": "main",
+   "fam": "Shortbow",
+   "primary": "wood",
+   "secondary": null,
+   "fixedChannels": [
+    "string",
+    "leather"
+   ],
+   "twoHanded": true
+  },
+  {
+   "id": "wpn.spear",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "weapon",
+   "item": "spear",
+   "slot": "weapon",
+   "layer": "main",
+   "fam": "Glaive",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": [
+    "wood",
+    "leather"
+   ],
+   "twoHanded": true
+  },
+  {
+   "id": "eq.studded_gloves",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "studded_gloves",
+   "slot": "hands",
+   "layer": "hands",
+   "fam": "studded",
+   "primary": "hide",
+   "secondary": "metal",
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.studded_gorget",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "studded_gorget",
+   "slot": "neck",
+   "layer": "neck",
+   "fam": "studded",
+   "primary": "hide",
+   "secondary": "metal",
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.studded_leggings",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "studded_leggings",
+   "slot": "legs",
+   "layer": "legs",
+   "fam": "studded",
+   "primary": "hide",
+   "secondary": "metal",
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.studded_sleeves",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "studded_sleeves",
+   "slot": "arms",
+   "layer": "arms",
+   "fam": "studded",
+   "primary": "hide",
+   "secondary": "metal",
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.studded_tunic",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "studded_tunic",
+   "slot": "chest",
+   "layer": "torso",
+   "fam": "studded",
+   "primary": "hide",
+   "secondary": "metal",
+   "fixedChannels": []
+  },
+  {
+   "id": "wpn.sword",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "weapon",
+   "item": "sword",
+   "slot": "weapon",
+   "layer": "main",
+   "fam": "Sword",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": [
+    "wood",
+    "leather"
+   ],
+   "twoHanded": false
+  },
+  {
+   "id": "eq.tabard",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "tabard",
+   "slot": "tunic",
+   "layer": "outer",
+   "fam": "cloth",
+   "primary": "fixed:cloth",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "eq.trousers",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "armor",
+   "item": "trousers",
+   "slot": "trousers",
+   "layer": "under",
+   "fam": "cloth",
+   "primary": "fixed:cloth",
+   "secondary": null,
+   "fixedChannels": []
+  },
+  {
+   "id": "wpn.waraxe",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "weapon",
+   "item": "waraxe",
+   "slot": "weapon",
+   "layer": "main",
+   "fam": "Sword",
+   "primary": "metal",
+   "secondary": null,
+   "fixedChannels": [
+    "wood",
+    "leather"
+   ],
+   "twoHanded": false
+  },
+  {
+   "id": "eq.wooden_shield",
+   "bodies": [
+    "male",
+    "female"
+   ],
+   "source": "procedural",
+   "files": null,
+   "kind": "shield",
+   "item": "wooden_shield",
+   "slot": "shield",
+   "layer": "off",
+   "fam": "shield",
+   "primary": "wood",
+   "secondary": null,
+   "fixedChannels": [
+    "metal"
+   ]
+  }
+ ]
+}
