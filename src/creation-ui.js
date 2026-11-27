@@ -17,54 +17,15 @@ function ccValidate() { return CR.validate(ccPayload()); }
 function ccMarkEdited() { const m = CR.matchTemplate(CCD.stats, CCD.skills); CCD.edited = !m || m !== CCD.tpl; if (m) CCD.tpl = m; }
 const ccTplName = () => CCD.edited ? 'Custom' : CR.TEMPLATE[CCD.tpl].n;
 
-/* ---- the portrait: an original procedural paper-doll figure that shows every appearance choice (front view) ---- */
-function ccShade(hex, k) { const n = parseInt(hex.slice(1), 16); const f = v => Math.max(0, Math.min(255, Math.round(v + k * (k < 0 ? v : 255 - v) / 100))); return '#' + ((1 << 24) | (f(n >> 16) << 16) | (f(n >> 8 & 255) << 8) | f(n & 255)).toString(16).slice(1); }
-function drawDoll(cv, look) {
-  const o = document.createElement('canvas'); o.width = 48; o.height = 96; const g = o.getContext('2d');
-  const R = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
-  const fem = look.body === 'female', skin = (CR.SKIN_ID[look.skinTone] || CR.SKIN[1]).hex, hair = (CR.HCOL_ID[look.hairColor] || CR.HAIR_COLORS[1]).hex;
-  const beard = (CR.HCOL_ID[look.facialHairColor] || CR.HAIR_COLORS[1]).hex, shirt = (CR.CLOTH_ID[look.clothingColor] || CR.CLOTHING[0]).hex;
-  const cloak = look.cloak === 'none' ? null : (CR.cloakHex(look) || '#2f6766'), trou = '#4a3a2b', boot = '#5b3b1f', belt = '#3a2616';
-  const hs = look.hairStyle, hd = ccShade(hair, -30);
-  // back layer: cloak and long hair behind the body
-  if (cloak) { for (let y = 25; y < 82; y++) { const t = (y - 25) / 57, half = Math.round(10 + t * 4); R(24 - half, y, half * 2, 1, y % 9 === 0 ? ccShade(cloak, -18) : cloak); } R(9, 80, 30, 2, ccShade(cloak, -35)); }
-  if (hs === 'long') { R(14, 12, 4, fem ? 24 : 20, hd); R(30, 12, 4, fem ? 24 : 20, hd); }
-  if (hs === 'pigtails') { R(11, 14, 4, 22, hair); R(33, 14, 4, 22, hair); R(11, 34, 4, 2, hd); R(33, 34, 4, 2, hd); }
-  if (hs === 'ponytail') { R(31, 10, 3, 4, hair); R(32, 14, 3, 18, hd); }
-  // legs and boots
-  const lx = fem ? [18, 25] : [17, 26]; for (const x of lx) { R(x, 57, 5, 27, trou); R(x + 4, 57, 1, 27, ccShade(trou, -25)); R(x - 1, 84, 7, 7, boot); R(x - 1, 90, 7, 1, ccShade(boot, -40)); }
-  // torso and arms
-  if (fem) { R(16, 25, 16, 6, shirt); R(16, 31, 16, 12, shirt); R(18, 43, 12, 7, shirt); R(16, 50, 16, 8, ccShade(shirt, -8)); R(19, 33, 4, 2, ccShade(shirt, -15)); R(25, 33, 4, 2, ccShade(shirt, -15)); }
-  else { R(14, 25, 20, 6, shirt); R(15, 31, 18, 15, shirt); R(16, 46, 16, 12, shirt); }
-  R(fem ? 30 : 31, 27, 2, 29, ccShade(shirt, -22));
-  const ax = fem ? [12, 32] : [10, 34]; for (const x of ax) { R(x, 26, 4, 20, ccShade(shirt, -6)); R(x, 46, 4, 5, skin); R(x, 50, 4, 1, ccShade(skin, -25)); }
-  R(fem ? 18 : 16, 49, fem ? 12 : 16, 3, belt); R(23, 49, 3, 3, '#b08d4a');
-  R(17, 24, 14, 2, ccShade(shirt, -18));                                   // collar line
-  // neck and head
-  R(21, 20, 6, 6, ccShade(skin, -12));
-  R(18, 7, 12, 15, skin); R(17, 9, 14, 10, skin); R(19, 21, 10, 1, skin); R(29, 9, 2, 10, ccShade(skin, -10));
-  R(20, 14, 2, 2, '#241812'); R(26, 14, 2, 2, '#241812'); R(20, 14, 1, 1, '#f4efe6'); R(26, 14, 1, 1, '#f4efe6');
-  R(23, 16, 2, 2, ccShade(skin, -18)); R(22, 19, 4, 1, ccShade(skin, -35));
-  if (fem) { R(19, 13, 3, 1, hd); R(26, 13, 3, 1, hd); R(21, 19, 6, 1, ccShade(skin, -45)); } else { R(19, 12, 4, 1, hd); R(25, 12, 4, 1, hd); }
-  // hair on top
-  const cap = () => { R(17, 4, 14, 4, hair); R(16, 6, 16, 4, hair); R(16, 10, 2, 5, hair); R(30, 10, 2, 5, hair); R(18, 4, 12, 1, ccShade(hair, 25)); };
-  if (hs === 'short' || hs === 'ponytail') cap();
-  if (hs === 'long') { cap(); R(15, 10, 3, 12, hair); R(30, 10, 3, 12, hair); }
-  if (hs === 'pigtails') { cap(); R(15, 10, 3, 6, hair); R(30, 10, 3, 6, hair); }
-  if (hs === 'pageboy') { cap(); R(15, 9, 3, 13, hair); R(30, 9, 3, 13, hair); R(18, 8, 12, 3, hair); R(15, 21, 3, 1, hd); R(30, 21, 3, 1, hd); }
-  if (hs === 'receding') { R(16, 8, 3, 7, hair); R(29, 8, 3, 7, hair); R(19, 5, 10, 1, hd); }
-  if (hs === 'mohawk') { R(22, 0, 4, 9, hair); R(22, 0, 4, 1, ccShade(hair, 25)); R(16, 10, 2, 4, hd); R(30, 10, 2, 4, hd); }
-  if (hs === 'buns') { cap(); R(13, 3, 5, 5, hair); R(30, 3, 5, 5, hair); R(14, 4, 3, 1, ccShade(hair, 25)); R(31, 4, 3, 1, ccShade(hair, 25)); }
-  if (hs === 'bald') R(20, 7, 6, 1, ccShade(skin, 20));
-  // facial hair (male only; the validator clears it for female characters)
-  const fh = fem ? 'none' : look.facialHairStyle, bd = ccShade(beard, -25);
-  if (fh === 'mustache' || fh === 'vandyke') { R(20, 18, 8, 1, beard); R(20, 19, 1, 1, bd); R(27, 19, 1, 1, bd); }
-  if (fh === 'goatee' || fh === 'vandyke') { R(22, 20, 4, 3, beard); R(23, 23, 2, fh === 'vandyke' ? 2 : 1, bd); }
-  if (fh === 'short') { R(17, 15, 2, 6, beard); R(29, 15, 2, 6, beard); R(18, 18, 12, 1, beard); R(18, 20, 12, 3, beard); R(20, 23, 8, 1, bd); R(22, 19, 4, 1, ccShade(skin, -35)); }
-  if (fh === 'long') { R(17, 15, 2, 7, beard); R(29, 15, 2, 7, beard); R(18, 18, 12, 1, beard); R(18, 20, 12, 6, beard); R(19, 26, 10, 3, beard); R(21, 29, 6, 3, bd); R(22, 19, 4, 1, ccShade(skin, -35)); }
-  const out = outlined(o); const g2 = cv.getContext('2d'); g2.clearRect(0, 0, cv.width, cv.height); g2.imageSmoothingEnabled = false;
-  const k = Math.max(1, Math.floor(Math.min(cv.width / out.width, cv.height / out.height))); g2.drawImage(out, Math.round((cv.width - out.width * k) / 2), Math.round(cv.height - out.height * k), out.width * k, out.height * k);
+/* the portrait is the paperdoll itself (src/paperdoll.js): the same SF.LOOK descriptor and compositor as the equipment window,
+   wearing the starter kit this draft would receive. The preview items are plain { id } records built here and thrown away:
+   nothing is made, numbered or saved until boot() succeeds. */
+function ccPreviewEquip() {
+  const skills = {}; for (const [k, v] of CCD.skills) if (k && v > 0) skills[k] = v;
+  let wear; try { wear = CR.kit({ skills, str: CCD.stats[0] }).wear; } catch (_) { wear = { shirt: 'shirt', trousers: 'trousers', feet: 'shoes' }; }
+  const eq = {}; for (const s in wear) if (SF.ITEMS[wear[s]]) eq[s] = { id: wear[s] }; return eq;
 }
+function drawDoll(cv, look) { PDOLL.drawTo(cv, SF.LOOK.resolve({ look }, { preview: ccPreviewEquip() })); }
 /* ---- the world sprite: the same sheets and recolouring the game draws (tinted, src/game.js) ---- */
 function ccSpriteFrame(cv, t) {
   const g = cv.getContext('2d'); g.clearRect(0, 0, cv.width, cv.height); g.imageSmoothingEnabled = false;
@@ -80,7 +41,7 @@ function ccPreview() {
   const n = $('#ccpname'); if (n) n.textContent = CR.cleanName(CCD.name) || 'Unnamed';
   const t = $('#ccptpl'); if (t) t.textContent = ccTplName() + ' · ' + (CCD.look.body === 'female' ? 'Female' : 'Male');
   const p = CR.preview(CCD.stats), dv = $('#ccderived'); if (dv) dv.innerHTML = `<span>Health</span><b>${p.hp}</b><span>Stamina</span><b>${p.stam}</b><span>Mana</span><b>${p.mana}</b><span>Carry</span><b>${Math.round(p.carry)}</b>`;
-  const ws = $('#ccwnote'); if (ws) ws.textContent = CCD.look.cloak === 'none' ? 'In the world your traveller keeps a cloak: cloakless sprites are not drawn yet.' : 'In the world: skin tone and cloak colour. Hair, beards and clothing colour show on the portrait until their sprite layers are drawn.';
+  const ws = $('#ccwnote'); if (ws) ws.textContent = CCD.look.cloak === 'none' ? 'In the world your traveller keeps a cloak: cloakless sprites are not drawn yet.' : 'The portrait is your paper doll. In the world: skin tone and cloak colour; hair, beards and clothing colour show on the portrait until their sprite layers are drawn.';
 }
 
 /* ---- markup helpers ---- */
@@ -156,7 +117,7 @@ function ccHomeHtml() {
 function ccWizHtml() {
   const v = ccValidate();
   return `<div class="ccwiz"><header class="cctop"><b class="ccmark">Shardfall</b><nav class="ccsteps" aria-label="Creation steps">${CC_STEPS.map((n, i) => `<button type="button" class="${i === CCD.step ? 'on' : ''}${i < CCD.step ? ' done' : ''}" data-c="step" data-s="${i}" aria-current="${i === CCD.step ? 'step' : 'false'}"><i>${i + 1}</i><span>${n}</span></button>`).join('')}</nav></header>
-    <div class="ccbody"><aside class="ccprev" aria-label="Preview"><div class="ccfig"><canvas id="ccdoll" width="150" height="300" role="img" aria-label="Portrait of your character"></canvas><div class="ccws"><canvas id="ccsprite" width="80" height="104" role="img" aria-label="Your character as seen in the world"></canvas><div class="ccrot">${ccBtn('face', '⟲', { d: 1 }, 'pm', ' aria-label="Turn left"')}${ccBtn('face', '⟳', { d: -1 }, 'pm', ' aria-label="Turn right"')}</div></div></div>
+    <div class="ccbody"><aside class="ccprev" aria-label="Preview"><div class="ccfig"><canvas id="ccdoll" width="192" height="256" role="img" aria-label="Portrait of your character"></canvas><div class="ccws"><canvas id="ccsprite" width="80" height="104" role="img" aria-label="Your character as seen in the world"></canvas><div class="ccrot">${ccBtn('face', '⟲', { d: 1 }, 'pm', ' aria-label="Turn left"')}${ccBtn('face', '⟳', { d: -1 }, 'pm', ' aria-label="Turn right"')}</div></div></div>
       <div class="ccpinfo"><b id="ccpname"></b><span id="ccptpl" class="ccnote"></span><div id="ccderived" class="ccderived"></div><p id="ccwnote" class="ccnote"></p></div></aside>
       <main class="ccmain" id="ccmain">${ccStepHtml()}</main></div>
     <footer class="ccnav">${ccBtn('back', CCD.step ? '← Back' : '← Title', {}, '')}<span class="ccnote ccwhy" id="ccwhy">${CCD.step === 3 && !v.ok ? esc(v.errors[0]) : ''}</span>${CCD.step < 3 ? ccBtn('next', 'Next →', {}, 'pri') : ccBtn('go', 'Begin your journey', {}, 'pri', ccGoBlocked(v) ? ' disabled aria-disabled="true"' : '')}</footer></div>`;

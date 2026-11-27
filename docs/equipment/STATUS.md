@@ -80,6 +80,8 @@ refresh and never saved, so loading cannot stack it.
 
 - **Paper doll** (C, Menu → Equip, Character → Paper doll): draggable, closable, position and open state remembered; character art
   in the middle, 18 slots with icons, durability bars and empty silhouettes, a slot card on tap, statistics at the bottom.
+  Since v0.31 the figure is the classic layered paperdoll (`docs/equipment/PAPERDOLL.md`): every worn piece and the held weapon
+  drawn in its real material, from the shared appearance record `SF.LOOK`; procedural art until painted layers exist.
   On narrow screens the backpack moves beside it.
 - **Interaction:** drag between backpack and slots (mouse: press and move; touch: hold 0.4 s, then move), drop on the figure to
   auto-slot, double-click / double-tap to equip or remove, right-click or long-press for a menu (equip, remove, split, merge,
@@ -99,8 +101,9 @@ refresh and never saved, so loading cannot stack it.
   keeping material, quality, crafter and the worn fraction; the chest piece keeps the suit's uid. A snapshot is kept once in
   `shardfall.save.v1.prev6`. Idempotent (`eqMig`).
 - Appearance: every definition carries `look` (asset id, render layer, tint, bodies, 8 directions, animations). `EQ.appearance(ch)`
-  returns ordered layers; a change emits `AppearanceChanged` to the world event log and a `sf:appearance` DOM event. The world sprite
-  does not change in V1.
+  returns ordered layers; a change emits `AppearanceChanged` to the world event log and a `sf:appearance` DOM event. Since v0.31
+  the hook fires on the visual key from `SF.LOOK` (materials, studs, broken pieces, look), and the event also carries the resolved
+  descriptor. The world sprite shows skin and cloak only (a worn cloak item recolours it); see `docs/equipment/PAPERDOLL.md`.
 - Death: `SF.deathTransaction` moves the real instances into the corpse (material, durability, quality, crafter, uid kept). A
   future `blessed` flag keeps an item; nothing is blessed by default. No new item-loss rule was added.
 

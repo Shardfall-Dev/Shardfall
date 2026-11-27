@@ -1,5 +1,5 @@
 # Browser checks for Character Creation v2.0 (src/creation-ui.js, src/creation.js, src/stats.js).
-# usage: python3 tests/creation-smoke/run.py Shardfall_v0.30.html [/path/to/chrome] [--shots DIR]
+# usage: python3 tests/creation-smoke/run.py Shardfall_v0.31.html [/path/to/chrome] [--shots DIR]
 # Needs Python Playwright and Chrome. Screenshots go to $CC_SHOTS or --shots (default /tmp/cc-shots).
 import sys, os, json
 from playwright.sync_api import sync_playwright
@@ -7,7 +7,7 @@ from playwright.sync_api import sync_playwright
 args = sys.argv[1:]
 shots = os.environ.get('CC_SHOTS', '/tmp/cc-shots')
 if '--shots' in args: i = args.index('--shots'); shots = args[i + 1]; del args[i:i + 2]
-f = os.path.abspath(args[0] if args else 'Shardfall_v0.30.html')
+f = os.path.abspath(args[0] if args else 'Shardfall_v0.31.html')
 chrome = args[1] if len(args) > 1 else '/usr/bin/google-chrome'
 os.makedirs(shots, exist_ok=True)
 fails = []

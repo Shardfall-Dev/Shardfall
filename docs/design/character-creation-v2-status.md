@@ -98,3 +98,6 @@ The machine-readable list is `assets/character/missing-character-art.json`.
 5. **Clothing layers** (shirt, trousers; a skirt if one is added as an item) in a neutral ramp for dye colours.
 6. **Paper-doll body art** (front view, male and female, about 96×192) to replace the procedural portrait and the cropped
    traveller cell in the equipment window.
+   *v0.31:* the portrait and the equipment window now share the layered paperdoll (`docs/equipment/PAPERDOLL.md`) on a
+   384×512 contract that supersedes the 96×192 suggestion; its layers are still procedural, so this entry stays open, and the
+   painted paperdoll layers are listed one by one in `assets/character/missing-character-art.json` v1.1.0.

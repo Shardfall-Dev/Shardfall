@@ -291,8 +291,9 @@ function playerDies(src) {
   simEmit('ActorKilled', { actor: aidOf(P), killer: aidOf(src), x: P.x, y: P.y });
   P.hp = 0; P.ghost = true; P.ghostAt = GT; P.armed = false; P.sel = null; P.prep = null; P.held = null; P.task = null; if (P.bandage) { P.bandDone = P.bandage.id; P.bandage = null; } P.hidden = false; P.poison = null; P.meditating = null; AIM = null; P.batch = null; if (PANEL === 'craft') closePanel();
   const protectedRoad = protAt(P.x, P.y);
-  if (!protectedRoad) { const corpse = SF.deathTransaction(P, GT, { x: P.x, y: P.y });
-  addEnt({ kind: 'corpse', mine: true, name: 'your body', x: P.x, y: P.y, cont: corpse, expires: corpse.expires }); }
+  if (!protectedRoad) { const lookAtDeath = SF.LOOK.wire({ look: P.look, equip: P.equip });   // the body keeps the last worn appearance (visual only; loot is the container)
+  const corpse = SF.deathTransaction(P, GT, { x: P.x, y: P.y });
+  addEnt({ kind: 'corpse', mine: true, name: 'your body', x: P.x, y: P.y, cont: corpse, expires: corpse.expires, look: lookAtDeath }); }
   for (const e of ents) if (e.target === P) { e.target = null; e.state = 'return'; }
   log(`You have died${src ? ' to a ' + (src.name || 'foe') : ''}. ${protectedRoad ? 'Your belongings stay with you on this protected road.' : 'Your tradeable belongings stay on your body for 12 minutes.'}`, '#ff6a5a'); SFXA.cancelPending(); snd('player.death');
   save(); refreshHud(); renderPanel();
@@ -1605,9 +1606,19 @@ function playerClip() {
 }
 function drawPlayerAnim(g, e, x, y, col) {
   if (P.ghost) { const im = animSheet('Walk', true); if (!im) return false; const f = e.speed > .3 ? Math.floor(GT * 12) % 8 : 0; g.drawImage(im, f * 128, (e.sect || 0) * 128, 128, 128, Math.round(x - 64), Math.round(y - 106), 128, 128); return true; }
-  const [k, f] = playerClip(); const im = tinted(animSheet(k), P.look, k); if (!im) return false;
+  const [k, f] = playerClip(); const im = tinted(animSheet(k), playerWorldLook(), k); if (!im) return false;
   g.imageSmoothingEnabled = false; g.drawImage(im, f * 128, (e.sect || 0) * 128, 128, 128, Math.round(x - 64), Math.round(y - 106), 128, 128); return true;
 }
+/* ---- one appearance record for every human renderer (SF.LOOK, Paperdoll v1.0). The world sprite can show only skin tone and a
+   cloak colour today (male hooded traveller sheets; assets/character/missing-character-art.json), so it takes that part of the
+   same descriptor the paper doll draws: a worn cloak item recolours the cloak, the creator's cloak choice otherwise. ---- */
+const WLOOK = { k: '', v: null };
+function playerWorldLook() { const k = EQ_SIG() + '|' + SF.CREATION.lookKey(P.look); if (k !== WLOOK.k) { WLOOK.k = k; WLOOK.v = SF.LOOK.worldLook(SF.LOOK.resolve(P)); } return WLOOK.v; }
+const EQ_SIG = () => SF.EQ.signature(P);
+/* human NPCs: a stable cosmetic look from the NPC's id or name and its role colour (kept as the cloak, as before). Not stored on
+   the entity, so saves are unchanged; an NPC that ever carries real equipment resolves that instead (SF.LOOK.forNpc). */
+const NPC_LOOK = new WeakMap();
+function npcLook(e) { let l = NPC_LOOK.get(e); if (!l) { l = SF.LOOK.npcLook(e.id || e.name || 'npc', NPC_COL[e.role] || (e.life && LIFE_COL[e.life.prof]) || '#5a5a5a'); NPC_LOOK.set(e, l); } return l; }
 function drawScout(g, e, x, y, col) {
   if (e === P && drawPlayerAnim(g, e, x, y, col)) return;
   const sh = scoutSheet(col); if (!sh) return; const s = e.sect || 0, cx = (s % 4) * 96, cy = Math.floor(s / 4) * 96;
@@ -1700,9 +1711,9 @@ function drawEnt(e) {
   if (e.kind === 'pet') { g.strokeStyle = '#5aa8ff'; g.lineWidth = 1.5; g.beginPath(); g.ellipse(x, y, 14 * big, 7 * big, 0, 0, 7); g.stroke(); }
   if (P.sel === e && !P.ghost) { g.strokeStyle = relColor(e); g.lineWidth = 2; g.beginPath(); g.ellipse(x, y, 20 * big, 10 * big, 0, 0, 7); g.stroke(); }
   if (e.kind === 'player' && drawForm(g, e, x, y)) { }
-  else if (e.kind === 'player') drawScout(g, e, x, y, P.ghost ? 'ghost' : P.look);
+  else if (e.kind === 'player') drawScout(g, e, x, y, P.ghost ? 'ghost' : playerWorldLook());
   else if (e.kind === 'ally') { if (e.ghost) g.globalAlpha = .75; drawScout(g, e, x, y, e.ghost ? 'ghost' : '#2f7a46'); }
-  else if (e.kind === 'npc') drawScout(g, e, x, y, NPC_COL[e.role] || (e.life && LIFE_COL[e.life.prof]) || '#5a5a5a');
+  else if (e.kind === 'npc') drawScout(g, e, x, y, npcLook(e).cloak);
   else if (e.kind === 'mon' && MON[e.type].scout) drawScout(g, e, x, y, MON[e.type].scout);
   else if ((e.kind === 'mon' || (e.kind === 'pet' && e.type)) && BESTIARY.src[e.type]) { drawBestiary(g, e, x, y); }
   else if ((e.kind === 'mon' || (e.kind === 'pet' && e.type)) && MSI[e.type]) { drawSheet(g, e.type, e.sect, sheetFrame(e), x, y); }
@@ -2536,4 +2547,4 @@ addEventListener('visibilitychange', () => { if (document.hidden) save(); else {
 function spawnMon(type, dx = 3, dy = 0) { const d = MON[type]; if (!d) return null; let x = P.x + dx, y = P.y + dy;
   for (let r = 0; r < 6 && BLK[tAt(Math.floor(x), Math.floor(y))]; r += .5) for (let a = 0; a < 8; a++) { const nx = P.x + dx + Math.cos(a * Math.PI / 4) * r, ny = P.y + dy + Math.sin(a * Math.PI / 4) * r; if (!BLK[tAt(Math.floor(nx), Math.floor(ny))]) { x = nx; y = ny; break; } }
   return addEnt({ kind: 'mon', type, name: d.n, x, y, hp: d.hp, max: d.hp, state: 'idle', home: { x, y }, sect: 0, ward: 0 }); }
-window.__SF = { get WS() { return WS; }, SHRINES, statRoll, dist, closePanel, lifeSave, LIFE, LIFE_SCHED, lifeTick, lifeResume, lifeInspect, lifeTownGeo, lifeTalk, talk, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
+window.__SF = { get WS() { return WS; }, playerWorldLook, npcLook, SHRINES, statRoll, dist, closePanel, lifeSave, LIFE, LIFE_SCHED, lifeTick, lifeResume, lifeInspect, lifeTownGeo, lifeTalk, talk, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };

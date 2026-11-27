@@ -1,6 +1,10 @@
 {
-  "version": "1.0.0",
-  "for": "Character Creation v2.0 (Shardfall v0.30)",
+  "version": "1.1.0",
+  "for": "Character Creation v2.0 (Shardfall v0.30); Paperdoll v1.0 (Shardfall v0.31)",
+  "history": [
+    "1.0.0 — Character Creation v2.0 (v0.30): the first seven entries, for the world sprite and the paper-doll body.",
+    "1.1.0 — Paperdoll v1.0 (v0.31): the first seven entries are unchanged and still unresolved. The paper doll now has a registered layer contract (paperdoll below); the painted layers it needs are added as six new entries. For the paper doll, the 'about 96 x 192' size in paperdoll_body is superseded by that 384 x 512 contract (versioned migration); the world sprite format is unchanged."
+  ],
   "format": {
     "clipCell": 128,
     "feetAnchor": [64, 106],
@@ -9,6 +13,12 @@
     "atlas": { "cell": 96, "feetAnchor": [48, 86], "layout": "4 x 2 facings" },
     "tintable": "layers drawn in a neutral grey ramp so the game can tint them to the chosen colour"
   },
+  "paperdoll": {
+    "manifest": "assets/character/paperdoll-v1/manifest.json",
+    "canvas": [384, 512], "baseline": 496, "format": "RGBA PNG, one file per body; grey shading with channel masks (primary, secondary, fixed) so the game tints materials; shared anchors from the manifest",
+    "standIn": "src/paperdoll.js draws every layer procedurally (original code-drawn art) until painted PNGs exist. The stand-in does not resolve any entry in this file.",
+    "referenceArt": "Shardfall_Paperdoll_Art_v1.zip (four flattened 384 x 512 portraits) is named by docs/handoffs/paperdoll-v1.md as the art reference. It is not in the repository and was not available to the v0.31 integration. It is a reference only, never runtime layers."
+  },
   "missing": [
     { "id": "body_female", "what": "Female traveller body: every clip and the idle atlas, same scale, anchor, frame order and timing as the male sheets", "priority": 1 },
     { "id": "body_base_unhooded", "what": "Male and female base bodies without the painted hood and cloak, so hair shows and a cloak can be a separate layer", "priority": 1 },
@@ -16,7 +26,13 @@
     { "id": "layer_hair", "what": "Hair layers, one per style: short, long, ponytail, pageboy, receding (male), mohawk (male), buns (female), pigtails (female); bald needs none", "priority": 2 },
     { "id": "layer_facial_hair", "what": "Facial hair layers: mustache, goatee, short beard, long beard, vandyke", "priority": 3 },
     { "id": "layer_clothing", "what": "Shirt and trousers as tintable layers (a skirt too, if a skirt item is added)", "priority": 3 },
-    { "id": "paperdoll_body", "what": "Front-view paper-doll body art, male and female, about 96 x 192, for the creator portrait and the equipment window", "priority": 2 }
+    { "id": "paperdoll_body", "what": "Front-view paper-doll body art, male and female, about 96 x 192, for the creator portrait and the equipment window", "priority": 2 },
+    {"id": "paperdoll_painted_body", "what": "Painted paper-doll base bodies and faces, male and female, 384 x 512 RGBA on the manifest anchors, neutral linen underwear; no hair, armour or weapon baked in", "priority": 1, "layers": ["body.male", "body.female", "face.male", "face.female"]},
+    {"id": "paperdoll_painted_hair", "what": "Painted hair per creator style and body, back and front parts, grey ramp for tinting", "priority": 2, "layers": ["hair.male.short", "hair.male.long", "hair.male.ponytail", "hair.male.pageboy", "hair.male.receding", "hair.male.mohawk", "hair.female.short", "hair.female.long", "hair.female.ponytail", "hair.female.pageboy", "hair.female.buns", "hair.female.pigtails"]},
+    {"id": "paperdoll_painted_beards", "what": "Painted facial hair (male), grey ramp; the mustache part separable for the chain coif's face opening", "priority": 3, "layers": ["beard.male.mustache", "beard.male.goatee", "beard.male.short", "beard.male.long", "beard.male.vandyke"]},
+    {"id": "paperdoll_painted_cloak", "what": "Painted cloak, back and shoulder-drape front parts, tintable", "priority": 3, "layers": ["cloak.look"]},
+    {"id": "paperdoll_painted_gear", "what": "One painted layer per wearable item id, both bodies, keeping the in-world silhouette and motifs, with primary / secondary / fixed channel masks", "priority": 2, "layers": ["eq.bascinet", "eq.belt", "eq.bone_arms", "eq.bone_chest", "eq.bone_gloves", "eq.bone_helm", "eq.bone_legs", "eq.boots", "eq.bracelet", "eq.buckler", "eq.chain_coif", "eq.chain_leggings", "eq.chain_tunic", "eq.cloak", "eq.closed_helm", "eq.cloth_cap", "eq.cloth_gloves", "eq.dragon_arms", "eq.dragon_chest", "eq.dragon_gloves", "eq.dragon_helm", "eq.dragon_legs", "eq.garment", "eq.great_helm", "eq.heater_shield", "eq.kite_shield", "eq.leather_cap", "eq.leather_gloves", "eq.leather_gorget", "eq.leather_leggings", "eq.leather_sleeves", "eq.leather_tunic", "eq.metal_shield", "eq.necklace", "eq.norse_helm", "eq.open_helm", "eq.plate_arms", "eq.plate_chest", "eq.plate_gauntlets", "eq.plate_gorget", "eq.plate_helm", "eq.plate_leggings", "eq.ring", "eq.ringmail_gloves", "eq.ringmail_leggings", "eq.ringmail_sleeves", "eq.ringmail_tunic", "eq.robe", "eq.shirt", "eq.shoes", "eq.studded_gloves", "eq.studded_gorget", "eq.studded_leggings", "eq.studded_sleeves", "eq.studded_tunic", "eq.tabard", "eq.trousers", "eq.wooden_shield"]},
+    {"id": "paperdoll_painted_weapons", "what": "One painted held-weapon layer per weapon item id, grip registered on the main-hand anchor; metal head, wood haft, leather grip and string channels", "priority": 2, "layers": ["wpn.battleaxe", "wpn.crossbow", "wpn.dagger", "wpn.glaive", "wpn.hammer", "wpn.hatchet", "wpn.heavycrossbow", "wpn.knife", "wpn.kryss", "wpn.mace", "wpn.pickaxe", "wpn.shortbow", "wpn.spear", "wpn.sword", "wpn.waraxe"]}
   ],
   "fallback": "Until these exist the world sprite and the equipment paper doll show the male hooded traveller recoloured for skin tone and cloak colour; the creator's portrait is an original procedural figure that shows every choice."
 }

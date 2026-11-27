@@ -1,5 +1,5 @@
-// usage: node tests/stats.test.js Shardfall_v0.30.html — natural attribute progression (SF.STATS) with no browser
-const fs = require('fs'); const html = fs.readFileSync(process.argv[2] || 'Shardfall_v0.30.html', 'utf8');
+// usage: node tests/stats.test.js Shardfall_v0.31.html — natural attribute progression (SF.STATS) with no browser
+const fs = require('fs'); const html = fs.readFileSync(process.argv[2] || 'Shardfall_v0.31.html', 'utf8');
 const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
 const g = {}; const m = { exports: {} };
 new Function('module', 'globalThis', scripts.find(t => t.includes('SF.METALS')))(m, g); g.SF = m.exports;

@@ -131,22 +131,27 @@ function eqStatsHtml() {
     + kv('Dexterity penalty', e.dexMod ? String(e.dexMod) : 'none') + kv('Meditation', e.med ? `−${Math.round(e.med * 100)}% mana regeneration` : 'unhindered', e.med ? 'warn' : '')
     + (e.broken.length ? kv('Broken', e.broken.map(s => EQ.SLOT[s].n).join(', ') + ' · repair them', 'bad') : '') + '</div>';
 }
-/* the paper doll figure: the traveller's front cell, in this character's skin tone and cloak colour (cached per look) */
-const DOLL = { key: '', src: '' };
-function dollSrc() { const k = SF.CREATION.lookKey(P.look); if (k === DOLL.key && DOLL.src) return DOLL.src; const sh = scoutSheet(P.look); if (!sh || !sh.toDataURL) return SCOUT_SRC; DOLL.key = k; DOLL.src = sh.toDataURL(); return DOLL.src; }
+/* the paper doll figure (Paperdoll v1.0): the layered compositor draws exactly what SF.LOOK resolves from P.look and P.equip.
+   Unsupported or unknown items stay in their slot and are named under the figure; nothing is drawn in their place. */
+function eqFigureHtml(look) {
+  const miss = PDOLL.unsupported(look), names = miss.map(id => (SF.ITEMS[id] && SF.ITEMS[id].n) || id);
+  return `<img class="pdoll" alt="${esc(P.name)}" draggable="false" width="192" height="256" data-key="${esc(look.key)}">${P.ghost ? '<span class="pdtag">Ghost</span>' : ''}`
+    + (miss.length ? `<span class="pdmiss" role="note">No paperdoll art yet: ${esc(names.join(', '))}</span>` : '');
+}
 function renderEqWin(force) {
   const el = $('#eqwin'); if (!el) return;
   const open = !!(P && SETTINGS.eqOpen && !SCREEN); document.body.classList.toggle('eqopen', open);
   if (!open) { if (!el.hidden) { el.hidden = true; EQW.html = ''; } return; }
-  const e = EQ.effective(P);
-  let h = `<div class="eqh" data-eqmove><b>${esc(P.name)}</b><span class="note">AR ${f1w(e.ar)} · ${f1w(encumb().wt)}/${f1w(SF.carryCap(P))}</span><button class="x" data-a="eqclose" aria-label="Close equipment">×</button></div><div class="eqb">`;
-  h += `<div class="eqdoll"><div class="eqcol">${EQ_LEFT.map(eqSlotHtml).join('')}</div><div class="eqfig" data-drop="eq:auto"><i class="doll" style="background-image:url(${dollSrc()})"></i>${P.ghost ? '<span class="note">ghost</span>' : ''}</div><div class="eqcol">${EQ_RIGHT.map(eqSlotHtml).join('')}</div></div>`;
+  const e = EQ.effective(P), look = SF.LOOK.resolve(P);
+  let h = `<div class="eqh" data-eqmove><div class="eqname"><b>${esc(P.name)}</b><small>${esc(SF.CREATION.title(P))}</small></div><span class="note eqsum">AR <em>${f1w(e.ar)}</em><br>${f1w(encumb().wt)} / ${f1w(SF.carryCap(P))}</span><button class="x" data-a="eqclose" aria-label="Close equipment">×</button></div><div class="eqb">`;
+  h += `<div class="eqdoll"><div class="eqcol">${EQ_LEFT.map(eqSlotHtml).join('')}</div><div class="eqfig" data-drop="eq:auto">${eqFigureHtml(look)}</div><div class="eqcol">${EQ_RIGHT.map(eqSlotHtml).join('')}</div></div>`;
   h += `<div class="eqrow">${EQ_BOTTOM.map(eqSlotHtml).join('')}</div>`;
   const sel = EQW.sel && P.equip[EQW.sel];
   if (EQW.sel) h += `<div class="eqcard">${sel ? itemTip(sel, { compare: false, icon: 40 }) + `<div class="acts">${SF.ITEMS[sel.id].trade || sel.id === 'garment' ? btn('uneq', 'Remove', { s: EQW.sel }) : ''}${SF.WEARABLE(sel.id) && sel.cond !== undefined && sel.cond < (sel.maxc || 100) ? btn('repair', 'Repair', { u: sel.uid }) : ''}${SF.ITEMS[sel.id].trade ? btn('drop', 'Drop', { u: sel.uid }) : ''}</div>` : `<p class="note">${EQ.SLOT[EQW.sel].n}: empty. Drag an item here, or double-click it in the backpack.</p>`}</div>`;
   h += eqStatsHtml() + '<p class="note eqhint">Drag between the backpack and the slots · double-click to equip or remove · right-click for more</p></div>';
   if (!force && h === EQW.html && !el.hidden) return; EQW.html = h;
   const b = el.querySelector('.eqb'), st = b ? b.scrollTop : 0; el.innerHTML = h; el.hidden = false; const nb = el.querySelector('.eqb'); if (nb) nb.scrollTop = st;
+  const im = el.querySelector('img.pdoll'); if (im) im.src = PDOLL.dataURL(look);
   placeEqWin();
 }
 function placeEqWin() { const el = $('#eqwin'); const p = SETTINGS.eqPos || { x: 8, y: 118 }; const w = el.offsetWidth || 300, h = el.offsetHeight || 300; const x = cl(p.x, 0, Math.max(0, VW - w)), y = cl(p.y, 0, Math.max(0, VH - h)); el.style.left = x + 'px'; el.style.top = y + 'px'; }
@@ -159,8 +164,8 @@ addEventListener('resize', () => { if (SETTINGS.eqOpen) placeEqWin(); });
 /* called after every equipment change and from the HUD refresh: transient effective stats, the appearance-change hook, the window */
 function eqChanged() { renderEqWin(true); if (PANEL === 'bag' || PANEL === 'gear') renderPanel(); }
 function eqTick() {
-  EQ.refresh(P); const sig = EQ.signature(P);
-  if (sig !== EQW.sig) { const first = !EQW.sig; EQW.sig = sig; if (!first) { const look = EQ.appearance(P); simEmit('AppearanceChanged', { actor: aidOf(P), layers: look.map(l => l.asset) }); try { dispatchEvent(new CustomEvent('sf:appearance', { detail: { actor: aidOf(P), layers: look } })); } catch (_) { } } }
+  EQ.refresh(P); const sig = SF.LOOK.signature(P);     // the visual key (items, materials, studs, broken, look), never item UIDs
+  if (sig !== EQW.sig) { const first = !EQW.sig; EQW.sig = sig; if (!first) { const look = EQ.appearance(P); simEmit('AppearanceChanged', { actor: aidOf(P), layers: look.map(l => l.asset) }); try { dispatchEvent(new CustomEvent('sf:appearance', { detail: { actor: aidOf(P), layers: look, look: SF.LOOK.resolve(P) } })); } catch (_) { } } }
   renderEqWin();
 }
 
