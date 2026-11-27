@@ -1,4 +1,4 @@
-# Browser check for backpack icons v1.0.0 (needs Python Playwright + Chrome).
+# Browser check for backpack icons v1.0.1 (v1.0.0 pack + the seven missing icons; needs Python Playwright + Chrome).
 # usage: python3 tests/backpack-smoke/icons.py Shardfall_vX.html [/path/to/chrome]
 # Every id in the pack's items.json must be a game item and render its own atlas tile in the slot, the hover
 # tooltip and the tap card; stack counts must stay readable on top of the icons after each sort; desktop and phone.
@@ -15,7 +15,9 @@ def check(ok, msg, got=None):
     print(('ok   ' if ok else 'FAIL ') + msg + ('' if ok or got is None else f'  (got {got!r})'))
     if not ok: fails.append(msg)
 
-check(ICONS['version'] == '1.0.0' and len(IDS) == 154, 'embedded pack is v1.0.0 with 154 icons', (ICONS['version'], len(IDS)))
+NEW = ['heavycrossbow', 'battleaxe', 'mace', 'waraxe', 'kryss', 'spear', 'wick']   # v1.0.1: the seven that had only a category glyph
+N = len(IDS)
+check(ICONS['version'] == '1.0.1' and N == 161 and all(i in RECT for i in NEW), 'embedded pack is v1.0.1 with 161 icons (154 + the seven missing)', (ICONS['version'], N))
 
 FILL = """ids => { const S = __SF, P = S.P, SF = S.SF; P.pack.items.length = 0;
   ids.forEach((id, i) => SF.addItem(P.pack, SF.newItem(id, SF.ITEMS[id].stack ? 1 + (i * 37) % 250 : 1), { slots: 999, kg: 1e9 })); }"""
@@ -41,16 +43,17 @@ with sync_playwright() as p:
     ctx = b.new_context(viewport={'width': 1280, 'height': 720}); pg = ctx.new_page(); errs = []
     start(pg, errs)
     missing = pg.evaluate("ids => ids.filter(id => !__SF.SF.ITEMS[id])", IDS)
-    check(not missing, 'all 154 icon ids are game item ids', missing)
+    check(not missing, f'all {N} icon ids are game item ids', missing)
     noicon = pg.evaluate("ids => Object.keys(__SF.SF.ITEMS).filter(id => !ids.includes(id))", IDS)
     print('     game items without a painted icon (category glyph):', noicon)
+    check(not [i for i in NEW if i in noicon], 'the seven formerly missing items now have painted icons', [i for i in NEW if i in noicon])
     empty = pg.evaluate("""async ([src, rect]) => { const im = new Image(); im.src = src; await im.decode(); const c = document.createElement('canvas'); c.width = im.width; c.height = im.height;
       const g = c.getContext('2d'); g.drawImage(im, 0, 0); return Object.entries(rect).filter(([k, r]) => { const d = g.getImageData(...r).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 16) n++; return n < 40; }).map(e => e[0]); }""", [ICONS['src'], RECT])
     check(not empty, 'every rect crops a painted (non-empty) tile from the atlas', empty)
     loaded = pg.evaluate("() => { const e = document.createElement('i'); e.className = 'bagico'; document.body.appendChild(e); const u = getComputedStyle(e).backgroundImage; e.remove(); return u.startsWith('url(\"data:image/png'); }")
     check(loaded, 'atlas is applied once through the .bagico CSS rule')
 
-    # ---------- all 154 render in slot + tooltip + card (desktop) ----------
+    # ---------- every id renders in slot + tooltip + card (desktop) ----------
     seen, wrong = set(), []
     for chunk in batches(40):
         pg.evaluate(FILL, chunk); pg.evaluate("__SF.ACT.bag()"); pg.wait_for_timeout(120)
@@ -62,10 +65,10 @@ with sync_playwright() as p:
             if t['icon'] != want or t['tip'] != want or pos != exp or t['size'] != '40px': wrong.append((want, t))
             else: seen.add(want)
     check(not wrong, 'each slot and its tooltip show the icon matching the item id', wrong[:5])
-    check(len(seen) == 154, 'all 154 ids resolved to a rendered icon', 154 - len(seen))
+    check(len(seen) == N, f'all {N} ids resolved to a rendered icon', N - len(seen))
 
     # hover and card on a mixed pack
-    MIX = ['sword', 'heavycrossbow', 'chain', 'bandage', 'draught', 'gold', 'reedash', 'pine', 'scroll.18', 'black_pearl', 'spellbook', 'arrow']
+    MIX = ['sword', 'heavycrossbow', 'kryss', 'wick', 'chain', 'bandage', 'draught', 'gold', 'reedash', 'pine', 'scroll.18', 'black_pearl', 'spellbook', 'arrow']
     pg.evaluate(FILL, MIX); pg.evaluate("__SF.ACT.bag()"); pg.wait_for_timeout(150)
     cell = lambda id: f'#panel .bagcell:has(.bagico[data-icon="{id}"])'
     pg.hover(cell('scroll.18')); pg.wait_for_timeout(120)
@@ -75,7 +78,9 @@ with sync_playwright() as p:
     pg.mouse.move(5, 5); pg.click(cell('sword')); pg.wait_for_timeout(120)
     card = pg.evaluate("() => { const c = document.querySelector('#panel .bagcard'); const i = c && c.querySelector('.baghead .bagico'); return c && { i: i && i.dataset.icon, title: c.querySelector('span').textContent, acts: c.querySelectorAll('button').length }; }")
     check(card and card['i'] == 'sword' and 'sword' in card['title'].lower() and card['acts'] > 0, 'click card shows the same icon with title and actions', card)
+    pg.evaluate("() => { const SF = __SF.SF; SF.ITEMS.__noicon = { n: 'Test trinket', kg: .1, cat: 'tool' }; SF.addItem(__SF.P.pack, SF.newItem('__noicon', 1), { slots: 999, kg: 1e9 }); __SF.ACT.bag(); }"); pg.wait_for_timeout(100)
     gl = pg.evaluate("() => !!document.querySelector('#panel .bagcell .bagglyph')")
+    pg.evaluate("() => { const P = __SF.P; P.pack.items = P.pack.items.filter(i => i.id !== '__noicon'); delete __SF.SF.ITEMS.__noicon; __SF.ACT.bag(); }")
     check(gl, 'item without a painted icon falls back to its category glyph')
     # badges after each sort
     for s in ['Category', 'Name', 'Quantity']:

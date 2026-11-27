@@ -1,19 +1,28 @@
 #!/usr/bin/env python3
 """Embed the backpack icon pack into the single-file build.
 
-usage: python3 tools/embed_backpack_icons.py [assets/backpack-icons/v1.0.0/Shardfall_Backpack_Icons_v1.0.0.zip] [src/backpack-icons.js]
+usage: python3 tools/embed_backpack_icons.py [BASE_ZIP] [OUT_JS] [EXTENSION_DIR ...]
+defaults:
+  BASE_ZIP       assets/backpack-icons/v1.0.0/Shardfall_Backpack_Icons_v1.0.0.zip   (154 icons, atlas 1024x640)
+  OUT_JS         src/backpack-icons.js
+  EXTENSION_DIR  assets/backpack-icons/v1.0.1/icons_64                              (7 icons: <item-id>.png, 64x64)
 
-Reads items.json and backpack.png straight from the versioned ZIP (no extraction needed),
-checks every rect lies inside the atlas, and writes src/backpack-icons.js:
+Reads items.json and backpack.png straight from the versioned ZIP (no extraction needed). Each extension
+directory adds icons named after the inventory item's id (SF.ITEMS key): they go into the next free 64 px
+cells after the base pack, row by row, and the atlas grows downwards by whole rows when it runs out of room.
+The base atlas is copied pixel for pixel; extension PNGs are pasted unchanged (no resampling, no recolouring).
+Every rect is checked to lie inside the atlas, and an extension id that the base pack already has is refused,
+so existing art can never be replaced by accident. Writes:
   const BAG_ICONS = { version, w, h, src: dataURI, rect: { itemId: [x, y, w, h] } };
-items.json is keyed by the inventory item's id (SF.ITEMS key), so the game looks icons up by it.id.
-The PNG bytes are embedded unchanged so the transparent edges stay as painted.
+Without extension directories the base PNG bytes are embedded unchanged (the v1.0.0 behaviour).
+Extensions need Pillow (pip install pillow).
 """
-import base64, json, struct, sys, zipfile
+import base64, glob, io, json, os, struct, sys, zipfile
 
 ZIP = sys.argv[1] if len(sys.argv) > 1 else 'assets/backpack-icons/v1.0.0/Shardfall_Backpack_Icons_v1.0.0.zip'
 OUT = sys.argv[2] if len(sys.argv) > 2 else 'src/backpack-icons.js'
-VERSION = '1.0.0'
+EXT = sys.argv[3:] if len(sys.argv) > 3 else ['assets/backpack-icons/v1.0.1/icons_64']
+CELL = 64
 
 with zipfile.ZipFile(ZIP) as z:
     png = z.read('backpack.png')
@@ -32,9 +41,57 @@ for k, v in items.items():
 if bad:
     raise SystemExit('rects outside the %dx%d atlas: %s' % (W, H, ', '.join(bad)))
 
-data = {'version': VERSION, 'w': W, 'h': H, 'rect': rect}
+version, sources = '1.0.0', [ZIP]
+ext_files = []
+for d in EXT:
+    files = sorted(glob.glob(os.path.join(d, '*.png')))
+    if not files:
+        raise SystemExit('no PNG icons in ' + d)
+    ext_files += files
+    sources.append(d)
+    # the pack version is the folder name above icons_64 (assets/backpack-icons/v1.0.1/icons_64 → 1.0.1)
+    v = os.path.basename(os.path.dirname(os.path.normpath(d))).lstrip('v')
+    if v.count('.') == 2: version = max(version, v, key=lambda s: tuple(map(int, s.split('.'))))
+
+if ext_files:
+    from PIL import Image
+    base = Image.open(io.BytesIO(png)); base.load()
+    if base.mode != 'RGBA':
+        base = base.convert('RGBA')
+    cols = W // CELL
+    used = {(r[0] // CELL, r[1] // CELL) for r in rect.values()}
+    last = max(r[1] // CELL * cols + r[0] // CELL for r in rect.values())   # new icons go after the last used cell
+    slot, placed = last + 1, []
+    for f in ext_files:
+        iid = os.path.splitext(os.path.basename(f))[0]
+        if iid in rect:
+            raise SystemExit('%s: the atlas already has an icon for %r; refusing to replace existing art' % (f, iid))
+        im = Image.open(f); im.load()
+        if im.size != (CELL, CELL):
+            raise SystemExit('%s is %dx%d, expected %dx%d' % (f, im.size[0], im.size[1], CELL, CELL))
+        while (slot % cols, slot // cols) in used: slot += 1
+        cx, cy = slot % cols, slot // cols; used.add((cx, cy)); slot += 1
+        rect[iid] = [cx * CELL, cy * CELL, CELL, CELL]
+        placed.append((im.convert('RGBA'), rect[iid]))
+    H2 = max(H, max(r[1] + r[3] for r in rect.values()))
+    atlas = Image.new('RGBA', (W, H2), (0, 0, 0, 0))
+    atlas.paste(base, (0, 0))
+    for im, (x, y, w, h) in placed:
+        atlas.paste(im, (x, y))
+    buf = io.BytesIO(); atlas.save(buf, 'PNG', optimize=True); png = buf.getvalue()
+    # every old tile must come through untouched, and new icons may only land on cells that were empty
+    for k in items:
+        x, y, w, h = rect[k]
+        if atlas.crop((x, y, x + w, y + h)).tobytes() != base.crop((x, y, x + w, y + h)).tobytes():
+            raise SystemExit('base icon %r changed while extending' % k)
+    for im, (x, y, w, h) in placed:
+        if y < H and base.crop((x, y, x + w, y + h)).getextrema()[3][1] != 0:
+            raise SystemExit('cell %d,%d of the base atlas is not empty' % (x, y))
+    H = H2
+
+data = {'version': version, 'w': W, 'h': H, 'rect': rect}
 with open(OUT, 'w') as f:
-    f.write('/* Backpack icons v%s: generated by tools/embed_backpack_icons.py from %s. Do not edit by hand. */\n' % (VERSION, ZIP))
+    f.write('/* Backpack icons v%s: generated by tools/embed_backpack_icons.py from %s. Do not edit by hand. */\n' % (version, ' + '.join(sources)))
     f.write('const BAG_ICONS = ' + json.dumps(data, separators=(',', ':'))[:-1])
     f.write(',"src":"data:image/png;base64,' + base64.b64encode(png).decode() + '"};\n')
-print('wrote %s: %d icons, atlas %dx%d, %d KB' % (OUT, len(rect), W, H, len(png) // 1024))
+print('wrote %s: v%s, %d icons, atlas %dx%d, %d KB' % (OUT, version, len(rect), W, H, len(png) // 1024))
