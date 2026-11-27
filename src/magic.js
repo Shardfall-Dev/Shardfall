@@ -60,7 +60,7 @@ function prepTick() {
   if (P.prep && GT >= P.prep.t1) {
     const pr = P.prep, sp = pr.sp; P.prep = null; const M = mval();
     const ch = sp.legacy ? SF.spellSuccess(M, sp.min) : MG.chance(sp, M, pr.scroll);
-    const ok = R() < ch; gain('spellcraft', sp.legacy ? sp.min + 15 : (pr.scroll ? MG.scrollGate(sp) : sp.min) + 10);
+    const ok = R() < ch; gain('spellcraft', sp.legacy ? sp.min + 15 : (pr.scroll ? MG.scrollGate(sp) : sp.min) + 10, { act: 'cast:' + pr.rid, statTarget: sp.id });   // the cast's one stat roll (fizzle or not)
     if (!ok) { log((pr.scroll ? 'The scroll crumbles and the spell fizzles.' : 'The spell fizzles.'), '#a8a8a8'); P.spellReadyAt = GT + MG.RECOVERY; snd('magic.fizzle', { key: 'P' }); FX.push({ k: 'puff', x: P.x, y: P.y, t0: GT, dur: .6 }); return; }
     P.held = { sp, t0: GT, until: GT + MG.HOLD, scroll: pr.scroll, rid: pr.rid }; snd('magic.prepare', { key: 'P' });
     if (sp.tgt === 'self' && (sp.legacy || !['magery.56'].includes(sp.id))) { if (releaseHeld(P)) return; }
@@ -145,7 +145,7 @@ function spellHit(sp, a, base, ctx) {
   const eid = ctx.cid + ':' + (a === P ? 'P' : a.id) + (ctx.tag || ''); if (RESOLVED.has(eid)) return null; RESOLVED.add(eid);
   if (!isLiving(a)) return null;
   const r = MG.resolveHit({ mode: ctx.mode || sp.resist, base, circle: ctx.circle || sp.circle, M: ctx.M, E: ctx.E, R: rOf(a) }, R);
-  if (a === P && ctx.src === P) gain('wardcraft', sp.min + 10);
+  if (a === P && ctx.src === P) gain('wardcraft', sp.min + 10, { aux: true });   // part of the player's own cast: no second stat roll
   if (r.applied > 0) hurt(a, r.applied, ctx.src, 'spell'); else floater(a.x, a.y, '0', '#c8c8c8');
   if (a !== P) aggro(a, ctx.src);
   log(`${sp.n}${ctx.reflected ? ' (reflected)' : ''} → ${nameOf(a)}: ${r.applied}${r.resisted ? ' (resisted)' : ''}${ctx.note || ''}`, a === P ? '#ff9a8a' : '#c8a0ff', 'combat');
@@ -176,10 +176,10 @@ function effectOn(sp, t, x) {
   if (sp.tgt === 'living' && a !== P) { const rf = reflectFor(sp, a); if (rf) { a = rf.recipient; ctx.src = rf.src; ctx.reflected = true; } }
   if (sp.tgt === 'living' && a !== P && sp.effect !== 'heal') aggro(a, P);
   switch (sp.effect) {
-    case 'direct': case 'delayed_hit': deliver(sp, a, ctx, () => { const base = MG.rollBase(sp.id, M, R); spellHit(sp, a, base, ctx); if (sp.id === 'magery.51') FX.push({ k: 'boom', x: a.x, y: a.y, r: .9, t0: GT, dur: .6 }); if (sp.id === 'magery.30') FX.push({ k: 'bolt', x: a.x, y: a.y, t0: GT, dur: .3 }); if (sp.id === 'magery.43') FX.push({ k: 'boom', x: a.x, y: a.y, r: 1, t0: GT, dur: .5 }); }); gain('focus', sp.min + 10); return true;
+    case 'direct': case 'delayed_hit': deliver(sp, a, ctx, () => { const base = MG.rollBase(sp.id, M, R); spellHit(sp, a, base, ctx); if (sp.id === 'magery.51') FX.push({ k: 'boom', x: a.x, y: a.y, r: .9, t0: GT, dur: .6 }); if (sp.id === 'magery.30') FX.push({ k: 'bolt', x: a.x, y: a.y, t0: GT, dur: .3 }); if (sp.id === 'magery.43') FX.push({ k: 'boom', x: a.x, y: a.y, r: 1, t0: GT, dur: .5 }); }); gain('focus', sp.min + 10, { aux: true }); return true;
     case 'conditional_hit': { const ci = P.int, ti = intOf(a); const mb = MG.mindburst(ci, ti); const victim = mb.victim === 'caster' ? P : mb.victim === 'target' ? a : null;
       deliver(sp, a, ctx, () => { if (!victim || !mb.amount) { floater(a.x, a.y, 'no effect', '#c8c8c8'); log('Mindburst: equal minds, no effect.', '#c8a0ff'); return; } spellHit(sp, victim, mb.amount, Object.assign({}, ctx, { mode: 'half_only', tag: victim === P ? ':back' : '', note: victim === P ? ' — backfire' : '' })); });
-      gain('focus', sp.min + 10); return true; }
+      gain('focus', sp.min + 10, { aux: true }); return true; }
     case 'heal': { const amt = MG.rollBase(sp.id, M, R); healActor(a, amt); return true; }
     case 'stat_bonus': { applyStats(a, sp.stats, A, GT + MG.boonDuration(M)); floater(a.x, a.y, sp.stats.map(s => '+' + A + ' ' + s.toUpperCase()).join(' '), '#9fe8ff'); return true; }
     case 'stat_penalty': { const until = GT + MG.ceilTick(MG.hexDuration(M, rOf(a))); applyStats(a, sp.stats, -A, until); floater(a.x, a.y, sp.stats.map(s => '−' + A + ' ' + s.toUpperCase()).join(' '), '#c97bff'); log(`${sp.n} → ${nameOf(a)}${ctx.reflected ? ' (reflected)' : ''}: −${A} ${sp.stats.join('/').toUpperCase()} for ${Math.round(until - GT)} s.`, '#c8a0ff'); return true; }
@@ -199,7 +199,7 @@ function effectOn(sp, t, x) {
     case 'disguise': { const g = mgOf(P); g.disguise = { name: pick(['Hooded traveller', 'Grey wanderer', 'Marsh pilgrim', 'Salt-stained sailor']), until: GT + MG.incognito(M) }; log('You now appear as a ' + g.disguise.name.toLowerCase() + '.', '#c8e0ff'); return true; }
     case 'transformation': { const form = x.form || (mgOf(P).lastForm) || 'hound'; const g = mgOf(P); g.form = { type: form, until: GT + MG.polymorph(M) }; g.lastForm = form; FX.push({ k: 'puff', x: P.x, y: P.y, t0: GT, dur: .6 }); log('You take the form of a ' + MON[form].n + '.', '#c8e0ff'); return true; }
     case 'movement': { if (!standable(t.x, t.y) || occupied(t.x, t.y, P)) { log('Blink Step needs open, legal ground.', '#ffb070'); return false; } FX.push({ k: 'puff', x: P.x, y: P.y, t0: GT, dur: .4 }); P.x = t.x; P.y = t.y; FX.push({ k: 'puff', x: P.x, y: P.y, t0: GT, dur: .4 }); return true; }
-    case 'shared_damage': { const c = { x: t.x, y: t.y }; EFX.push({ k: 'groundwarn', x: c.x, y: c.y, r: sp.radius, t0: GT, at: GT + sp.delay, fn: () => areaPool(sp, c, ctx) }); gain('focus', sp.min + 10); return true; }
+    case 'shared_damage': { const c = { x: t.x, y: t.y }; EFX.push({ k: 'groundwarn', x: c.x, y: c.y, r: sp.radius, t0: GT, at: GT + sp.delay, fn: () => areaPool(sp, c, ctx) }); gain('focus', sp.min + 10, { aux: true }); return true; }
     case 'area_percent_hit': { const c = { x: P.x, y: P.y }; EFX.push({ k: 'groundwarn', x: c.x, y: c.y, r: sp.radius, t0: GT, at: GT + sp.delay, fn: () => { for (const v of livingNear(c.x, c.y, sp.radius, e => e !== P && los(c, e))) { const n = MG.earthshaker(v.hp); hurt(v, n, P, 'spell'); aggro(v, P); log(`Earthshaker → ${nameOf(v)}: ${n}`, '#c8a0ff', 'combat'); } FX.push({ k: 'boom', x: c.x, y: c.y, r: 3, t0: GT, dur: .7 }); sndAt('combat.blast', c); } }); return true; }
     case 'barrier': case 'damage_field': case 'poison_field': case 'control_field': return placeField(sp, t, M, E, ctx);
     case 'field_removal': return dispelField(t);
@@ -417,14 +417,15 @@ function summonRanged(p, t) {
 
 /* ---------- statuses, stats and per-frame upkeep ---------- */
 function magicArmor(a) { const g = a.mg; return g && g.armor && g.armor.until > GT ? g.armor.v : 0; }
+/* effective attributes from the natural ones (P.base, SF.STATS) plus magic. P.base is never inferred from P.str/dex/int: permanent
+   change happens only in SF.STATS (gains, the transfer at the cap), at creation and in the save conversion. Called on a gain, on load,
+   when a boon or hex starts or ends, and on death; never per frame. Pools clamp down and never refill. */
 function recomputeStats() {
-  if (!P.base) P.base = { str: P.str, dex: P.dex, int: P.int };
-  const g = P.mg || {}; const eff = P._eff || {};
-  for (const s of ['str', 'dex', 'int']) { if (eff[s] !== undefined && P[s] !== eff[s]) P.base[s] += P[s] - eff[s];   // trained outside magic: keep the change on the base
-    P[s] = MG.effectiveStat(P.base[s], g.mods, s, GT); eff[s] = P[s]; }
-  P._eff = eff;
-  // pools never fill on a cap increase; they clamp down on a decrease. A living character keeps at least 1 HP.
-  P.hp = Math.min(P.hp, SF.maxHp(P)); if (!P.ghost) P.hp = Math.max(1, P.hp); P.stam = Math.min(P.stam, SF.maxStam(P)); P.mana = Math.min(P.mana, SF.maxMana(P));
+  if (!SF.STATS.valid(P.base)) SF.STATS.migrateChar(P);
+  const g = P.mg || {};
+  for (const s of SF.STATS.KEYS) P[s] = MG.effectiveStat(P.base[s], g.mods, s, GT);
+  if (P.equip) SF.EQ.refresh(P);
+  SF.STATS.clampPools(P);
 }
 // a strength hex weakens a creature's blows; a dexterity hex its aim (tuning)
 function monRaw(m, raw) { return raw * (1 + MG.statDelta(m.mg && m.mg.mods, 'str', GT) / 100); }
@@ -444,10 +445,10 @@ function magicTick(dt) {
   if (g.invis && (g.invis <= GT || !P.hidden || Math.hypot(P.x - g.invisAt.x, P.y - g.invisAt.y) > .05 || P.armed || (P.lastHit || -1) > g.invisAt.hit)) { if (P.hidden && g.invis > GT) reveal('Your invisibility ends.'); g.invis = 0; }
   if (g.form && g.form.until <= GT) { g.form = null; log('You return to your own shape.'); }
   if (g.disguise && g.disguise.until <= GT) { g.disguise = null; log('Your borrowed face fades.'); }
-  if (g.mods) for (const s in g.mods) for (const k of ['pos', 'neg']) if (g.mods[s][k] && g.mods[s][k].until <= GT) g.mods[s][k] = null;
+  let expired = false; if (g.mods) for (const s in g.mods) for (const k of ['pos', 'neg']) if (g.mods[s][k] && g.mods[s][k].until <= GT) { g.mods[s][k] = null; expired = true; }
   // control immunity starts when a bind is removed (expiry or damage)
   for (const a of [P, ...ents]) { const m = a.mg; if (m && m.bound && !(a.rooted > GT)) { m.bound = false; m.ctlImmune = GT + MG.CONTROL_IMMUNE; } }
-  recomputeStats();
+  if (expired) recomputeStats();   // only when a boon or hex ended
 }
 function magicChips() { const g = P.mg || {}, c = []; if (g.armor && g.armor.until > GT) c.push('ward +' + g.armor.v); if (g.reactive && g.reactive.until > GT) c.push('rebound ' + g.reactive.pool); if (g.mirror) c.push('mirror'); if (g.night > GT) c.push('night sight'); if (g.invis > GT) c.push('invisible'); if (g.form) c.push(MON[g.form.type].n); if (g.disguise) c.push('as ' + g.disguise.name); if (P.held) c.push(P.held.sp.n + ' held ' + Math.max(0, P.held.until - GT).toFixed(1) + 's'); const ms = g.mods || {}; for (const s of ['str', 'dex', 'int']) { const v = MG.statDelta(ms, s, GT); if (v) c.push(s.toUpperCase() + (v > 0 ? '+' : '') + v); } return c; }
 function nightSight() { return P && P.mg && P.mg.night > GT; }
@@ -544,7 +545,7 @@ function mageryBoot(saved) {
     if (mig.book.length && !P.pack.items.some(it => it.id === 'spellbook')) { P.pack.items.push(SF.newItem('spellbook', 1, { spells: mig.book })); P.pack.ver++; log('Your spells are copied into a classic spellbook (' + mig.book.length + ' pages). The apothecary sells the new reagents.', '#ffe08a'); }
   }
   P.mg = Object.assign({ mig: MG.MIGRATION }, P.magery || {}); P.magery = P.mg;
-  P.base = P.base || { str: P.str, dex: P.dex, int: P.int }; P._eff = null; recomputeStats();
+  recomputeStats();
   if (!SHOPS.apothecary.includes('black_pearl')) { SHOPS.apothecary.push(...Object.keys(MG.REAGENTS), 'spellbook', 'rune', ...MG.SPELLS.filter(s => s.circle <= 3).map(s => s.scroll)); SHOPS.outlaw.push('nightshade', 'black_pearl', ...MG.SPELLS.filter(s => s.circle === 4 || s.circle === 5).map(s => s.scroll)); }
   const L = (k, o) => { if (MON[k] && !MON[k].loot.__mg) Object.assign(MON[k].loot, o, { __mg: 0 }); };
   L('spider', { spider_silk: [1, 3] }); L('wisp', { sulfurous_ash: [1, 3] }); L('smuggler', { black_pearl: [0, 2], nightshade: [0, 2] }); L('boar', { mandrake_root: [0, 1] }); L('captain', { black_pearl: [2, 4], blood_moss: [1, 3] }); L('bellkeeper', { [MG.SPELLS[50].scroll]: [1, 1] });
@@ -568,7 +569,7 @@ function applyLegacy(sp, t) {
   if (sp.summon) { if (petSlotsUsed() > 0) return log('The Reedling needs both control slots. Dismiss your pets first.'); addEnt({ kind: 'pet', type: null, name: 'Reedling', x: P.x + 1, y: P.y, hp: 40, max: 40, until: GT + sp.summon, order: 'follow', slots: 2 }); log('A Reedling rises from the reeds.', '#ffe08a'); spellSnd(sp, { x: P.x + 1, y: P.y }); return; }
   if (sp.cloud) { EFX.push({ k: 'cloud', x: t.x, y: t.y, r: sp.radius, until: GT + sp.cloud }); spellSnd(sp, t); for (const m of ents) if (m.kind === 'mon' && m.target === P && !los(m, P)) { m.state = 'return'; m.target = null; } return; }
   if (sp.root) { EFX.push({ k: 'root', x: t.x, y: t.y, r: sp.radius, until: GT + sp.root }); spellSnd(sp, t); for (const m of ents) if (m.kind === 'mon' && alive(m) && Math.hypot(m.x - t.x, m.y - t.y) <= sp.radius) { m.rooted = GT + sp.root; floater(m.x, m.y, 'rooted', '#c8a070'); if (!m.target) { m.target = P; m.state = 'chase'; } } return; }
-  if (sp.id === 'saltstorm') { EFX.push({ k: 'groundwarn', x: t.x, y: t.y, r: sp.radius, t0: GT, at: GT + sp.warn, fn: () => { FX.push({ k: 'bolt', x: t.x, y: t.y, t0: GT, dur: .3 }); spellSnd(sp, t); for (const m of ents.slice()) if (m.kind === 'mon' && alive(m) && Math.hypot(m.x - t.x, m.y - t.y) <= sp.radius) damageMon(m, spellDmg(sp.dmg), 'spell'); gain('focus', sp.min + 10); } }); return; }
+  if (sp.id === 'saltstorm') { EFX.push({ k: 'groundwarn', x: t.x, y: t.y, r: sp.radius, t0: GT, at: GT + sp.warn, fn: () => { FX.push({ k: 'bolt', x: t.x, y: t.y, t0: GT, dur: .3 }); spellSnd(sp, t); for (const m of ents.slice()) if (m.kind === 'mon' && alive(m) && Math.hypot(m.x - t.x, m.y - t.y) <= sp.radius) damageMon(m, spellDmg(sp.dmg), 'spell'); gain('focus', sp.min + 10, { aux: true }); } }); return; }
   const m = t; if (m === P || m.kind !== 'mon') return; if (!m.target) { m.target = P; m.state = 'chase'; }
   if (sp.unweave) { if (m.ward > 0) { m.ward = 0; floater(m.x, m.y, 'unwoven', '#c8a0ff'); spellSnd(sp, m); } else log('There is no ward on that creature to unweave.'); return; }
   if (sp.hex) { m.hexUntil = GT + sp.hex; floater(m.x, m.y, 'hexed', '#c97bff'); spellSnd(sp, m); return; }

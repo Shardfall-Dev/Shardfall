@@ -41,7 +41,7 @@ with sync_playwright() as p:
     check(empty_svg, 'empty slots show a silhouette')
     pg.screenshot(path=f'{shots}/01-doll-start.png')
     # give a mixed set and equip by double-click from the backpack
-    J(pg, "__SF.P.str = 100")
+    J(pg, "(() => { __SF.P.base.str = 100; __SF.recomputeStats(); })()")
     uids = J(pg, GIVE.replace('(ids)', '(ids)') + "", ) if False else J(pg, f"({GIVE})([['plate_chest', {{ material: 'mithril', quality: 'exceptional', creatorName: 'Aldric', origin: 'crafted' }}], ['chain_coif'], ['leather_gloves', {{ material: 'spined' }}], ['plate_leggings'], ['studded_sleeves'], ['plate_gorget'], ['robe'], ['glaive'], ['buckler'], ['ring', {{ material: 'golden' }}]])")
     J(pg, "__SF.ACT.bag()"); pg.wait_for_timeout(250)
     pg.dblclick(f"#panel .bagcell[data-u='{uids['plate_chest:mithril']}']"); pg.wait_for_timeout(200)
@@ -129,7 +129,7 @@ with sync_playwright() as p:
     J(pg, "(() => { const P = __SF.P; P.pack.items = P.pack.items.filter(i => !(i.origin === 'loot')); })()")
     # encumbrance: overload, immobile, drop to recover; Strength loss never destroys items
     J(pg, "__SF.ACT.close()")
-    enc = J(pg, """(() => { const S = __SF, P = S.P, SF = S.SF; P.str = 50; const ore = SF.newItem('ore', 90); SF.addItem(P.pack, ore);
+    enc = J(pg, """(() => { const S = __SF, P = S.P, SF = S.SF; P.base.str = 50; S.recomputeStats(); const ore = SF.newItem('ore', 90); SF.addItem(P.pack, ore);
       const e1 = S.encumb(); const x0 = P.x, y0 = P.y; S.JOY.on = false; for (const k of ['u']) {} P.sprintOn = false;
       const KEYS = null; return { stage: e1.stage, n: e1.n, ratio: e1.ratio, ore: SF.count(P.pack, 'ore') }; })()""")
     check(enc['stage'] == 3 and enc['ore'] == 90, 'carrying 90 ore at Strength 50: immobile, nothing destroyed', enc)
@@ -139,7 +139,7 @@ with sync_playwright() as p:
     check(blocked is False, 'pickups are refused while over capacity')
     rec = J(pg, "(() => { const S = __SF, P = S.P, SF = S.SF; const ore = P.pack.items.find(i => i.id === 'ore'); S.ACT.drop({ u: ore.uid, q: 70 }); const x0 = P.x, y0 = P.y; document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', bubbles: true })); for (let i = 0; i < 20; i++) S.update(.05); document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'w', bubbles: true })); return [SF.count(P.pack, 'ore'), S.encumb().stage, Math.hypot(P.x - x0, P.y - y0) > .5, S.ents.some(e => e.pile && e.cont.items.some(i => i.id === 'ore' && i.qty === 70))]; })()")
     check(rec[0] == 20 and rec[1] <= 1 and rec[2] and rec[3], 'dropping 70 ore recovers movement; the ore lies on the ground', rec)
-    J(pg, "(() => { const P = __SF.P; P.pack.items = P.pack.items.filter(i => i.id !== 'ore'); P.str = 100; })()")
+    J(pg, "(() => { const P = __SF.P; P.pack.items = P.pack.items.filter(i => i.id !== 'ore'); P.base.str = 100; __SF.recomputeStats(); })()")
     # combat: region mitigation and durability
     cb = J(pg, """(() => { const S = __SF, P = S.P, SF = S.SF; for (const s of SF.EQ.SLOT_IDS) if (P.equip[s] && SF.ITEMS[P.equip[s].id].trade) S.unequipTo(s);
       const ids = ['plate_helm', 'plate_gorget', 'plate_chest', 'plate_arms', 'plate_gauntlets', 'plate_leggings']; for (const id of ids) { const it = SF.EQ.make(id); SF.addItem(P.pack, it); S.equipUid(it.uid); }
@@ -160,7 +160,7 @@ with sync_playwright() as p:
     md = J(pg, "(() => { const S = __SF, P = S.P, SF = S.SF; P.mana = 0; S.update(1); const plate = P.mana; S.unequipTo('chest'); P.mana = 0; S.update(1); return [plate, P.mana]; })()")
     check(md[0] < md[1], 'plate slows mana regeneration', md)
     # effective Dexterity: derived, never stacked
-    dx = J(pg, "(() => { const S = __SF, P = S.P, SF = S.SF; P.dex = 50; const it = P.pack.items.find(i => i.id === 'plate_chest'); S.equipUid(it.uid); S.eqTick(); S.eqTick(); return [P.dex, SF.maxStam(P)]; })()")
+    dx = J(pg, "(() => { const S = __SF, P = S.P, SF = S.SF; P.base.dex = 50; S.recomputeStats(); const it = P.pack.items.find(i => i.id === 'plate_chest'); S.equipUid(it.uid); S.eqTick(); S.eqTick(); return [P.dex, SF.maxStam(P)]; })()")
     check(dx == [50, 48], 'plate chest: Dexterity 50 stays, stamina cap 48', dx)
     # window drag and close
     hb = pg.locator('#eqwin .eqh b').bounding_box(); pg.mouse.move(hb['x'] + 5, hb['y'] + 5); pg.mouse.down(); pg.mouse.move(hb['x'] + 305, hb['y'] + 125, steps=6); pg.mouse.up(); pg.wait_for_timeout(150)
@@ -219,7 +219,7 @@ with sync_playwright() as p:
     # ================= phone (touch, landscape) =================
     ctx = b.new_context(viewport={'width': 844, 'height': 390}, is_mobile=True, has_touch=True, device_scale_factor=2); pg = ctx.new_page(); errs = []
     new_char(pg, errs, 'Merchant smith', 'Tap')
-    J(pg, "__SF.P.str = 100"); uids = J(pg, f"({GIVE})([['studded_tunic'], ['norse_helm']])")
+    J(pg, "(() => { __SF.P.base.str = 100; __SF.recomputeStats(); })()"); uids = J(pg, f"({GIVE})([['studded_tunic'], ['norse_helm']])")
     pg.tap('#b-menu'); pg.wait_for_timeout(200); pg.tap('#menuScr [data-p=eqwin]'); pg.wait_for_timeout(250)
     check(pg.is_visible('#eqwin'), 'phone: Menu → Equip opens the paper doll')
     box = pg.locator('#eqwin').bounding_box()

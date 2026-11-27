@@ -8,12 +8,14 @@ const clamp = (lo, hi, v) => v < lo ? lo : v > hi ? hi : v;      // spec order: 
 const roundHalfUp = v => Math.floor(v + 0.5);
 SF.clamp = clamp; SF.roundHalfUp = roundHalfUp;
 
-/* ---------------- attributes ---------------- */
-SF.STAT_MIN = 10; SF.STAT_MAX = 100; SF.STAT_CAP = 225; SF.CREATE_STATS = 150; SF.CREATE_STAT_MIN = 25;
+/* ---------------- attributes: Second Age (T2A). Natural values live in ch.base (src/stats.js, SF.STATS); ch.str/dex/int are the
+   effective values (natural + magic). Creation: 80 points, each 10–60. Caps: 10–100 each, 225 total. ---------------- */
+SF.STAT_MIN = 10; SF.STAT_MAX = 100; SF.STAT_CAP = 225; SF.CREATE_STATS = 80; SF.CREATE_STAT_MIN = 10; SF.CREATE_STAT_MAX = 60;
 SF.SKILL_MAX = 1000; SF.SKILL_CAP = 7000; SF.CREATE_SKILLS = 100; SF.CREATE_SKILL_MAX = 50;   // tenths
-SF.maxHp = c => Math.floor(50 + 0.5 * c.str);
+/* T2A resources: Health = Strength, Stamina = Dexterity (after equipment penalties), Mana = Intelligence; effective values, at least 1 */
+SF.maxHp = c => Math.max(1, c.str);
 SF.maxStam = c => Math.max(1, c.dex + (c.eqDex || 0));   // eqDex: transient equipment Dexterity modifier (SF.EQ.refresh), never saved
-SF.maxMana = c => c.int;
+SF.maxMana = c => Math.max(1, c.int);
 /* weight: items keep their authored mass (kg) internally; the game shows and balances in weight units (SF.WU per kg).
    Carrying capacity is Strength-based (UO-inspired, configurable): 40 + 3.5 × STR weight units. The backpack has no slot limit. */
 SF.WU = 2.5;
@@ -53,12 +55,16 @@ SF.newSkills = () => { const s = {}; for (const [k] of SF.SKILLS) s[k] = { v: 0,
 SF.totalSkill = ch => Object.values(ch.skills).reduce((a, s) => a + s.v, 0);
 SF.sv = (ch, k) => (ch.skills && ch.skills[k] ? ch.skills[k].v / 10 : (ch.sk && ch.sk[k]) || 0);
 
+/* the one creation check (the UI, boot and tests all call it): attributes and starting skills */
+SF.validateStats = o => {
+  const e = [], st = [o.str, o.dex, o.int];
+  if (st.some(v => !Number.isInteger(v))) { e.push('Attributes must be whole numbers.'); return e; }
+  if (st.reduce((a, b) => a + b, 0) !== SF.CREATE_STATS) e.push(`Spend exactly ${SF.CREATE_STATS} attribute points.`);
+  if (st.some(v => v < SF.CREATE_STAT_MIN || v > SF.CREATE_STAT_MAX)) e.push(`Each attribute must be between ${SF.CREATE_STAT_MIN} and ${SF.CREATE_STAT_MAX}.`);
+  return e;
+};
 SF.validateCreation = o => {
-  const e = [];
-  const st = [o.str, o.dex, o.int];
-  if (st.some(v => !Number.isInteger(v))) e.push('Stats must be whole numbers.');
-  if (st.reduce((a, b) => a + b, 0) !== SF.CREATE_STATS) e.push('Spend exactly 150 stat points.');
-  if (st.some(v => v < SF.CREATE_STAT_MIN || v > SF.STAT_MAX)) e.push('Each stat must be between 25 and 100.');
+  const e = SF.validateStats(o);
   const sk = Object.entries(o.skills || {}).filter(([, v]) => v > 0);
   const tot = sk.reduce((a, [, v]) => a + v, 0);
   if (tot > 100) e.push('Starting skills may total at most 100.');
@@ -637,8 +643,7 @@ SF.VENOM_CHARGES = 5;
 // §9 condition and repair: each repair restores to max minus 3% of the original maximum; below 40% replace
 SF.WEARABLE = id => ['weapon', 'shield', 'armor'].includes(SF.ITEMS[id].cat) && SF.ITEMS[id].trade;
 SF.repairSkill = id => { const d = SF.ITEMS[id]; if (d.wpn === 'shortbow' || d.wpn === 'crossbow' || d.wpn === 'heavycrossbow' || id === 'buckler') return 'carpentry'; if (d.armor === 'cloth' || d.armor === 'leather') return 'tailoring'; return 'smithing'; };
-SF.trainCost = (skill, to) => Math.max(0, Math.round((to * to - skill * skill) * 0.6));
-SF.statTrainCost = n => n * 25;
+SF.trainCost = (skill, to) => Math.max(0, Math.round((to * to - skill * skill) * 0.6));   // skill lessons only (to 30); attributes are never sold
 
 if (typeof module !== 'undefined' && module.exports) module.exports = SF; else root.SF = SF;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

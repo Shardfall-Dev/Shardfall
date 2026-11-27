@@ -6,13 +6,13 @@
   S.MON.boar.dmg = [0, 0]; S.MON.boar.aggro = 0; S.MON.hound.dmg = [10, 10];
   let nid = 91000; const add = (type, dx, dy, hp) => { const d = S.MON[type]; const e = { kind: 'mon', type, name: d.n, x: P.x + dx, y: P.y + dy, hp: hp || d.hp, max: hp || d.hp, state: 'idle', home: { x: P.x + dx, y: P.y + dy }, sect: 0, ward: 0, id: nid++, speed: 0 }; S.ents.push(e); return e; };
   for (const e of S.ents.slice()) if (e.kind === 'mon') e.gone = true, S.ents.splice(S.ents.indexOf(e), 1);
-  P.skills.spellcraft.v = 1000; P.skills.focus.v = 1000; P.skills.wardcraft.v = 1000; P.base.int = 100;
+  P.skills.spellcraft.v = 1000; P.skills.focus.v = 1000; P.skills.wardcraft.v = 1000; P.base.int = 100; S.recomputeStats();   // v0.30: natural values change only through P.base + recompute
   const book = P.pack.items.find(i => i.id === 'spellbook'); book.spells = MG.SPELLS.map(s => s.id);
   for (const r of Object.keys(MG.REAGENTS)) SF.addItem(P.pack, SF.newItem(r, 30));
   const cast = (id, t, extra) => { P.mana = 200; P.spellReadyAt = 0; P.held = null; S.castSlot(id); const sp = MG.SPELL[id]; step(sp.prep + .1); if (!P.held) return 'self-released'; return S.releaseHeld(t, extra); };
   S.setRng(() => .5); step(.2);
   // Mindburst 100 vs 76
-  const b1 = add('boar', 3, 0, 300); P.base.int = 100; step(.1);
+  const b1 = add('boar', 3, 0, 300); P.base.int = 100; S.recomputeStats(); step(.1);
   const intOf = 20 + Math.round(40 * .6); out.boarInt = intOf;
   let h0 = b1.hp; cast('magery.37', b1); step(1.1); out.mind = h0 - b1.hp;
   // Earthshaker

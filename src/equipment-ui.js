@@ -125,9 +125,9 @@ function eqSlotHtml(s) {
 function eqStatsHtml() {
   const e = EQ.effective(P), en = encumb(), w = wDef(), sc = SF.damageScale({ tactics: sv('tactics'), anatomy: sv('anatomy'), str: P.str }), [lo, hi] = dmgRange(w, sc);
   const kv = (k, v, c) => `<span>${k}</span><span class="${c || ''}">${v}</span>`;
-  return `<div class="eqstat">${kv('Armor rating', `<b>${f1w(e.ar)}</b>${magicArmor(P) ? ' +' + magicArmor(P) + ' magic' : ''}`)}${kv('Weapon', esc(weaponLabel(P)) + ` · ${lo}–${hi} dmg`)}${kv('Attack speed', SF.swingDelay(P.stam, w.speed).toFixed(2) + ' s per swing')}`
+  return attrsHtml() + `<div class="eqstat">${kv('Armor rating', `<b>${f1w(e.ar)}</b>${magicArmor(P) ? ' +' + magicArmor(P) + ' magic' : ''}`)}${kv('Weapon', esc(weaponLabel(P)) + ` · ${lo}–${hi} dmg`)}${kv('Attack speed', SF.swingDelay(P.stam, w.speed).toFixed(2) + ' s per swing')}`
     + kv('Equipment weight', f1w(e.eqWt)) + kv('Carried', `${f1w(en.wt)} / ${f1w(en.cap)}`, en.stage >= 2 ? 'bad' : en.stage === 1 ? 'warn' : '') + kv('Encumbrance', `${en.n} (${Math.round(en.ratio * 100)}%)`, en.stage >= 2 ? 'bad' : en.stage === 1 ? 'warn' : '')
-    + kv('Strength', `${e.str}`) + kv('Dexterity', `${e.dex}${e.dexMod ? ` <span class="note">(${P.dex} ${e.dexMod})</span>` : ''}`, e.dexMod ? 'warn' : '') + kv('Intelligence', `${e.int}`)
+    + kv('Max health', `${SF.maxHp(P)}`) + kv('Max stamina', `${SF.maxStam(P)}${e.dexMod ? ` <span class="note">(Dexterity ${P.dex} ${e.dexMod} from armor)</span>` : ''}`, e.dexMod ? 'warn' : '') + kv('Max mana', `${SF.maxMana(P)}`)
     + kv('Dexterity penalty', e.dexMod ? String(e.dexMod) : 'none') + kv('Meditation', e.med ? `−${Math.round(e.med * 100)}% mana regeneration` : 'unhindered', e.med ? 'warn' : '')
     + (e.broken.length ? kv('Broken', e.broken.map(s => EQ.SLOT[s].n).join(', ') + ' · repair them', 'bad') : '') + '</div>';
 }

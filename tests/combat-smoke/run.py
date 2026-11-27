@@ -6,6 +6,8 @@ here = os.path.dirname(os.path.abspath(__file__)); f = os.path.abspath(sys.argv[
 chrome = sys.argv[2] if len(sys.argv) > 2 else '/usr/bin/google-chrome'
 PRE = open(os.path.join(here, 'prelude.js')).read()
 SW = lambda d: {'sword': 'swordsmanship', 'battleaxe': 'swordsmanship', 'mace': 'macefighting', 'dagger': 'fencing', 'fists': 'wrestling', 'shortbow': 'archery', 'crossbow': 'archery'}
+# v0.30: Wren's Health equals her Strength (60, T2A), so a 43-point bandage on her at 20/60 heals the 40 missing and a resurrection
+# brings her back at a quarter of 60
 EXPECT = {
   'weapons.js': {'intervalsMatch': True, 'skills': SW(0), 'allDamaged': True, 'ammo': [17, 17], 'pvpOk': True},
   'archery.js': {'release': {'arrows': 9, 'inFlight': 1, 'hpBefore': True, 'hpAt09': True, 'hpAt11': True}, 'pursuit': {'moved': True, 'readyWhileMoving': True, 'arrowsWhileMoving': True, 'aimDelay': 0.5, 'oneArrow': True},
@@ -17,11 +19,11 @@ EXPECT = {
   'mace.js': {'miss': {'stam': 55, 'cond': 100}, 'hit': {'stamLost': 3, 'cond': 97}, 'creatureStamLost': 3, 'sword': {'stamLost': 0, 'cond': 99.8}, 'toPlayer': {'lost': 23, 'expect': 23}},
   'firstaid.js': {'fullHp': {'spent': 0, 'log': 'You are not hurt.'}, 'self': {'spent': 1, 'dur': 15.0, 'kind': 'heal', 'doneEarly': False, 'healed': 43, 'log': 'You heal yourself for 43 HP.'},
                   'slips': {'healed': 35, 'log': 'You heal yourself for 35 HP (2 slips).'}, 'whileActive': {'stillBandaging': True, 'swung': True, 'done': True}, 'movedWhileBandaging': True,
-                  'other': {'button': 'Bandage Wren', 'dur': 5.0, 'healed': 43, 'log': 'You heal Wren for 43 HP.'}, 'outOfReach': {'healed': False, 'log': 'Wren moved out of reach; the bandage is wasted.'},
+                  'other': {'button': 'Bandage Wren', 'dur': 5.0, 'healed': 40, 'log': 'You heal Wren for 40 HP.'}, 'outOfReach': {'healed': False, 'log': 'Wren moved out of reach; the bandage is wasted.'},
                   'changed': {'healed': True, 'log': 'Wren was poisoned before you finished; this bandage was for wounds.'},
                   'cure': {'dur': 6.0, 'low': {'cured': False, 'log': 'Curing poison needs 60 Healing and 60 Anatomy. The bandage does nothing.'}, 'at60': {'cured': True, 'hpSame': True, 'log': 'You cure Wren of poison.'}, 'fail60': 'You fail to cure the poison.', 'selfDur': 18.0, 'selfCured': True},
                   'ghost': {'ghost': True, 'body': True, 'armorOnBody': True, 'button': 'Bandage: resurrect Wren', 'dur': 10.0, 'low': {'still': True, 'log': 'Resurrection needs 80 Healing and 80 Anatomy. The ghost stays a ghost.'}, 'fail80': True,
-                            'res': {'alive': True, 'hp': 20, 'max': 80, 'armor': 'leather_tunic', 'weapon': 'sword', 'bodyGone': True}}},
+                            'res': {'alive': True, 'hp': 15, 'max': 60, 'armor': 'leather_tunic', 'weapon': 'sword', 'bodyGone': True}}},
 }
 def sub(exp, got, path=''):
   bad = []

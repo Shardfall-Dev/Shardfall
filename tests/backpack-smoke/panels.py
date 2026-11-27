@@ -27,7 +27,7 @@ def start(pg, errs):
     pg.goto('file://' + f); pg.wait_for_timeout(600)
     pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_timeout(600)
     pg.click('[data-c=prof][data-p="Group healer"]'); pg.fill('#ccn', 'Tess'); pg.click('[data-c=go]'); pg.wait_for_timeout(1200)
-    pg.evaluate("() => { const P = __SF.P; P.str = 100; P.pack.items.length = 0; }")   # strong enough for every weapon, empty pack
+    pg.evaluate("() => { const P = __SF.P; P.base.str = 100; __SF.recomputeStats(); P.pack.items.length = 0; }")   # strong enough for every weapon, empty pack
 
 FILL = """ids => { const S = __SF, P = S.P, SF = S.SF; P.pack.items.length = 0;
   ids.forEach(id => SF.addItem(P.pack, SF.newItem(id, 1), { slots: 999, kg: 1e9 })); }"""

@@ -82,11 +82,35 @@ function relColor(e) { if (e === P || e.kind === 'npc' || e.kind === 'pet' || e.
 function log(t, c, kind) { LOG.push({ t, c: c || '#e8e2d2', at: GT, kind: kind || 'sys' }); if (LOG.length > 300) LOG.shift(); renderLog(); }
 function floater(x, y, t, c) { FX.push({ k: 'txt', x, y, t, c, t0: GT, dur: 1.1 }); }
 function say(e, t) { e.say = { t, until: GT + 3 }; }
+/* skill use. ctx: { target, recipe } for SF.tryGain, plus the stat contract (src/stats.js):
+   act = the resolved action's id (calls that share it roll stats once); aux = an auxiliary skill on an action whose primary skill
+   already rolled (Tactics and Anatomy on a swing, Spell Focus and Wardcraft on a cast) — it trains the skill but never rolls stats.
+   The stat roll runs first, on the skill state before this use, with its own random stream; it never depends on the skill gain. */
+let ACTSEQ = 0;
+const actId = kind => kind + ':' + Math.round(GT * 1000) + ':' + (++ACTSEQ);
 function gain(key, diff, ctx) {
-  const r = SF.tryGain(P, key, diff, Object.assign({ now: GT }, ctx || {}));
+  ctx = ctx || {};
+  if (!ctx.aux) statRoll(key, diff, ctx);
+  const r = SF.tryGain(P, key, diff, { now: GT, target: ctx.target, recipe: ctx.recipe });
   SKLOG.push({ k: key, at: GT, r: r.gained ? `+0.1 → ${f1(P.skills[key].v)}` + (r.lowered ? ` (−0.1 ${SF.SKILL[r.lowered].n})` : '') : r.reason }); if (SKLOG.length > 80) SKLOG.shift();
   if (r.gained) { log(`${SF.SKILL[key].n} +0.1 (${f1(P.skills[key].v)})`, '#7fd4ff', 'skill'); if (GT - SND.gainAt > 1.5) { SND.gainAt = GT; snd('skill.gain'); } }
   return r;
+}
+/* one stat roll for one resolved player action (SF.STATS.tryStatGain). Only real play counts: not a ghost, not while the developer
+   panel fast-forwards time. A gain recomputes effective attributes (pools clamp, never refill), reports once, and a permanent loss of
+   Strength at the cap moves gear the character can no longer wear into the backpack. */
+const STATLOG = [];
+function statRoll(key, diff, ctx) {
+  ctx = ctx || {}; if (!P || P.ghost || !P.statState || (typeof DEV !== 'undefined' && DEV.advance > 0)) return null;
+  const r = SF.STATS.tryStatGain(P, key, { action: ctx.act || actId(key), now: GT, actor: aidOf(P), diff, target: ctx.statTarget || ctx.target || ctx.recipe || null, valid: ctx.valid, challenge: ctx.challenge });
+  if (r.reason === 'duplicate action') return r;   // the action already had its roll
+  STATLOG.push({ k: key, at: GT, r: r.gained ? r.stat + ' ' + r.value + (r.lowered ? ' / ' + r.lowered + ' ' + r.lowerValue : '') : r.reason, chance: r.chance }); if (STATLOG.length > 80) STATLOG.shift();
+  if (!r.gained) return r;
+  recomputeStats(); log(SF.STATS.gainText(r), '#9be07f', 'skill'); snd('skill.gain');
+  simEmit('StatChanged', { actor: aidOf(P), stat: r.stat, value: r.value, lowered: r.lowered, lowerValue: r.lowerValue, skill: key });
+  if (r.lowered === 'str') { const moved = SF.STATS.enforceStrength(P); for (const m of moved) log(`You are no longer strong enough for your ${iname(m.item)} (${m.need} Strength); it goes into your backpack.`, '#ffb070'); if (moved.length) { if (moved.some(m => m.slot === 'weapon')) weaponChanged(); eqChanged(); } }
+  if (PANEL === 'gear' || PANEL === 'trainer') renderPanel(); if (typeof renderEqWin === 'function' && !$('#eqwin').hidden) renderEqWin(true);
+  save(); return r;
 }
 
 /* ---------- sound: src/audio.js (SFXA) plays the sound pack; this section decides what plays and where ---------- */
@@ -193,14 +217,21 @@ function sndTick() {
 function newChar(o) {
   const c = { kind: 'player', pid: 'p1', name: o.name, x: 92.5, y: 304.5, sect: 0, str: o.str, dex: o.dex, int: o.int, skills: SF.newSkills(), pack: SF.newContainer('pack', 'p1'), bank: SF.newContainer('bank', 'p1'), equip: emptyEquip(), eqMig: SF.EQ.MIGRATION, look: o.look || {}, bound: 'quay', freeLessons: 2, hotbar: [null, null, null, null], sw: SF.newSwing(), combatMig: SF.COMBAT_MIGRATION };
   c.id = 'p1'; for (const [k, v] of Object.entries(o.skills)) c.skills[k].v = v * 10;
+  SF.STATS.init(c, { str: o.str, dex: o.dex, int: o.int }); c.statMig = SF.STATS.MIGRATION;   // natural attributes, locks all Raise
   c.hp = SF.maxHp(c); c.stam = SF.maxStam(c); c.mana = SF.maxMana(c); return c;
 }
 function starterKit() {
   const add = (id, q) => SF.addItem(P.pack, SF.newItem(id, q));
   add('journal', 1); P.equip.shirt = SF.EQ.make('shirt', { origin: 'npc' }); P.equip.trousers = SF.EQ.make('trousers', { origin: 'npc' }); P.equip.feet = SF.EQ.make('shoes', { origin: 'npc' }); add('gold', 150); add('bandage', 12); add('cookedmeat', 3);
+  // T2A starts are weak (80 attribute points, Health = Strength): every new character gets plain leather, which needs no Strength and
+  // does not hinder meditation. Starter gear, not free attributes (docs/stats/STATUS.md).
+  for (const id of ['leather_cap', 'leather_gorget', 'leather_tunic', 'leather_sleeves', 'leather_gloves', 'leather_leggings']) { const it = SF.EQ.make(id, { origin: 'npc' }); if (SF.EQ.strReq(it) <= P.str) P.equip[SF.ITEMS[id].slot] = it; }
   const top = ['swordsmanship', 'fencing', 'macefighting', 'archery'].sort((a, b) => P.skills[b].v - P.skills[a].v)[0];
   const w = { swordsmanship: P.skills.parrying.v > 0 || P.str < SF.WEAPONS.glaive.str ? 'sword' : 'glaive', fencing: 'dagger', macefighting: 'mace', archery: 'shortbow' }[top];
-  if (P.skills[top].v > 0) { P.equip.weapon = SF.newItem(w, 1); if (w === 'shortbow') add('arrow', 80); } else add('dagger', 1);
+  // starter weapons respect Strength requirements (an 80-point character may be weak): a lighter weapon of the same skill, or the pick in the pack
+  const light = { swordsmanship: ['sword', 'hatchet', 'knife'], fencing: ['dagger'], macefighting: ['mace'], archery: ['shortbow'] }[top];
+  const fit = P.skills[top].v > 0 ? [w].concat(light).find(id => SF.WEAPONS[SF.ITEMS[id].wpn].str <= P.str) : null;
+  if (P.skills[top].v > 0) { if (fit) P.equip.weapon = SF.newItem(fit, 1); else { add(w, 1); add('dagger', 1); } if (w === 'shortbow') add('arrow', 80); } else add('dagger', 1);
   if (P.skills.parrying.v > 0 && !(P.equip.weapon && SF.weaponOf(P.equip.weapon).two)) P.equip.shield = SF.EQ.make('buckler', { origin: 'npc' });
   for (const [k, tool] of [['woodcutting', 'hatchet'], ['mining', 'pickaxe'], ['skinning', 'knife'], ['fishing', 'rod'], ['smithing', 'tongs'], ['tailoring', 'sewkit'], ['carpentry', 'knife'], ['fletching', 'knife']]) if (P.skills[k].v > 0 && !SF.count(P.pack, tool)) add(tool, 1);
   if (P.skills.spellcraft.v > 0) mageryStarter(add);
@@ -359,10 +390,11 @@ function applyBlow(A, t, opt) {
   if (D.regions) { const rg = SF.EQ.regionArmor(t, SF.EQ.pickRegion(R)); D.armorAR = rg.ar + magicArmor(t); D.armorItem = rg.item; D.region = rg.region; }   // one body region per blow; unprotected regions take it bare
   const m = SF.mitigate(v, { parry: D.parry, braced: D.braced, shieldAR: D.shieldAR, armorAR: D.armorAR, player: D.player, mace: !!(A.w && A.w.mace) }, R); m.region = D.region;
   // side effects, each once: parry check and shield wear, armor wear (mace: half what it absorbed), weapon wear, stamina drain, gains
-  if (D.shieldAR > 0) { if (t === P) gain('parrying', A.diff); if (m.parried) { wear(D.shieldItem, .3); floater(t.x, t.y, 'parry', '#cfe8ff'); } }
+  if (D.shieldAR > 0) { if (t === P) gain('parrying', A.diff, { statTarget: 'foe:' + (a.actorId || a.id) }); if (m.parried) { wear(D.shieldItem, .3); floater(t.x, t.y, 'parry', '#cfe8ff'); } }
   if (D.armorItem) { if (A.w && A.w.mace) { if (m.armorWear > 0) wear(D.armorItem, m.armorWear); } else wear(D.armorItem, .2); }
   if (A.w && A.w.mace) drainStam(t, rnd(SF.MACE_STAM[0], SF.MACE_STAM[1]));
-  if (a === P) { gain('tactics', D.diff); gain('anatomy', D.diff); if (A.it && A.w.hp) wear(A.it, 25 / A.w.hp);
+  if (a === P) { gain('tactics', D.diff, { aux: true }); gain('anatomy', D.diff, { aux: true });   // auxiliary: the swing's weapon skill already rolled stats
+    if (A.it && A.w.hp) wear(A.it, 25 / A.w.hp);
     const it = A.it; if (it && it.venom && it.venom.charges > 0 && !A.w.ammo) { it.venom.charges--; applyPoison(t, it.venom.tier); if (!it.venom.charges) { delete it.venom; log('The venom on your weapon is spent.'); } } }
   m.raw = raw;
   if (m.final <= 0) { floater(t.x, t.y, m.parried ? 'parried' : 'absorbed', '#c8c8c8'); noHarmSound(t, m.parried); return m; }
@@ -385,7 +417,7 @@ function swingAt(a, t) {
   SF.swingSpend(a.sw, GT); a.lastCombat = GT; if (a === P) { P.lastCombat = GT; P.drawn = true; P.drawing = 0; }
   faceToward(a, t.x, t.y); const A = fighter(a), D = fighter(t);
   const chance = SF.hitChance(A.atk, D.def), hit = R() < chance;
-  if (a === P) gain(w.skill, D.diff);                                                   // a legitimate attempt
+  if (a === P) gain(w.skill, D.diff, { act: actId('swing'), statTarget: 'foe:' + (t.actorId || t.id) });   // a legitimate attempt: the one stat roll of this swing
   if (a === P) { playOnce((w.fam || 'Unarmed') + '_Attack', 0); P.lunge = .001; } else a.lunge = .001;
   provoke(t, a); swingSound(a, w);
   if (w.ammo) { const s = { id: ++SHOTID, a, t, w, A, hit, x0: a.x, y0: a.y, at: GT + SF.ARCHERY.flight }; a.shots = (a.shots || 0) + 1;
@@ -634,7 +666,9 @@ function finishFirstAid() {
   if (now !== b.kind) return out(b.kind === 'res' ? `${cap1(who)} is no longer a ghost.` : now === 'res' ? `${cap1(who)} died before you finished.` : now === 'cure' ? `${cap1(who)} was poisoned before you finished; this bandage was for wounds.` : now === 'heal' ? `The poison is already gone; this bandage was for poison.` : `${cap1(who)} no longer needs treatment.`);
   const heal = sv('healing'), ana = sv('anatomy');
   const r = SF.firstAidResolve({ kind: b.kind, heal, ana, slips: b.slips, missing: st.max - st.hp }, R);
-  if (r.chance > 0 && r.chance < 1) { gain('healing', heal + 5); gain('anatomy', ana + 5); }    // a sure or impossible treatment teaches nothing
+  const act = 'aid:' + b.id + ':' + Math.round(GT * 1000), who0 = 'pat:' + (e === P ? 'P' : e.actorId || e.id);
+  if (r.chance > 0 && r.chance < 1) { gain('healing', heal + 5, { act, statTarget: who0 }); gain('anatomy', ana + 5, { aux: true }); }    // a sure or impossible treatment teaches no skill …
+  else if (r.chance > 0) statRoll('healing', heal + 5, { act, statTarget: who0 });                                                        // … but a real, completed treatment still exercises the body
   const sl = b.slips ? ` (${b.slips} slip${b.slips > 1 ? 's' : ''})` : '';
   if (b.kind === 'heal') {
     if (!r.success) { floater(e.x, e.y, 'no effect', '#c8c8c8'); return out(`You fail to stop the bleeding${sl}.`); }
@@ -668,7 +702,7 @@ function anatomyCheck() {
   if (t !== P && (dist(t, P) > 8 || !los(P, t))) return log('Move closer to study them.', '#ffb070');
   const d = t.type ? MON[t.type] : null, x = d ? monT2A(d) : null;
   const tv = t === P || isAlly(t) ? { str: t.str, dex: t.dex, stam: t.stam, maxStam: t.dex } : { str: x.str, dex: x.dex, stam: stamOf(t), maxStam: x.dex };
-  const ana = sv('anatomy'); gain('anatomy', d ? d.diff : 40, { target: 'ana:' + (t === P ? 'P' : t.id) });
+  const ana = sv('anatomy'); gain('anatomy', d ? d.diff : 40, { target: 'ana:' + (t === P ? 'P' : t.id), statTarget: 'ana:' + (t === P ? 'P' : t.actorId || t.id) });
   const r = SF.anatomyRead(ana, tv);
   log(`${t === P ? 'You look' : cap1(t.name || 'it') + ' looks'} ${r.strWord} (STR ${r.str[0]}–${r.str[1]}) and ${r.dexWord} (DEX ${r.dex[0]}–${r.dex[1]})${r.stam ? `, stamina ${r.stam[0]}/${r.stam[1]}` : ''}.`, '#e8d8b0');
 }
@@ -784,7 +818,7 @@ function skin(c) {
   P.task = { kind: 'skin', corpse: c, label: 'Skinning', t0: GT, t1: GT + SF.GATHER_TIME.skinning, still: true, x0: P.x, y0: P.y };
 }
 function finishSkin(c) {
-  const d = MON[c.mon]; gain('skinning', d.diff); c.skinned = true; sndAt('skin.cut', c);
+  const d = MON[c.mon]; gain('skinning', d.diff, { statTarget: 'corpse:' + c.id }); c.skinned = true; sndAt('skin.cut', c);
   if (R() >= SF.opposed(sv('skinning'), d.diff)) { log('You ruin the hide.'); renderPanel(); return; }
   for (const k in d.skin) { const q = rnd(d.skin[k][0], d.skin[k][1]); if (q) give(k, q); } log('You skin the ' + d.n + '.'); renderPanel();
 }
@@ -830,7 +864,11 @@ function update(dt) {
     const sMax = SF.maxStam(P); if (GT - (P.lastDrain || -9) > SF.STAM_DELAY) P.stam = Math.min(sMax, P.stam + (inCombat() ? SF.STAM_REGEN_COMBAT : SF.STAM_REGEN) * dt);
     // mana
     const medI = SF.EQ.effective(P).med; let mr = SF.manaRegen(sv('meditation'), medI); if (P.meditating && GT - P.meditating.t0 > SF.MEDITATE_SETTLE) mr += SF.MEDITATE_BONUS * (1 - medI);
-    const mb = P.mana; P.mana = Math.min(SF.maxMana(P), P.mana + mr * dt); if (P.meditating) { P.meditating.gained += P.mana - mb; if (P.mana >= SF.maxMana(P)) { if (P.meditating.gained >= 8) gain('meditation', 40); P.meditating = null; log('Your mana is full.'); } }
+    const mb = P.mana; P.mana = Math.min(SF.maxMana(P), P.mana + mr * dt); if (P.meditating) { const md = P.meditating; md.gained += P.mana - mb;
+      // a completed interval of active meditation that restored real mana is one stat-check action (never idle meditation at full mana)
+      if (md.iv === undefined) { md.iv = md.t0; md.ivGained = 0; }
+      if (GT - md.iv >= SF.STATS.CFG.meditateEvery) { const got = md.gained - md.ivGained; md.iv = GT; md.ivGained = md.gained; if (got >= SF.STATS.CFG.meditateMin && P.mana < SF.maxMana(P)) statRoll('meditation', 40, { act: actId('meditate') }); }
+      if (P.mana >= SF.maxMana(P)) { if (P.meditating.gained >= 8) gain('meditation', 40); P.meditating = null; log('Your mana is full.'); } }
     // health: slow out-of-combat recovery, faster when fed
     if (!inCombat() && !P.poison) P.hp = Math.min(SF.maxHp(P), P.hp + (P.fed > GT ? 1 : .1) * dt);
     if (P.poison && GT >= P.poison.next) { P.poison.next = GT + SF.POISON_GAP; damagePlayer(SF.POISON[P.poison.tier], null, 'poison'); if (P.poison && --P.poison.ticks <= 0) P.poison = null; }
@@ -1192,8 +1230,9 @@ const TASKS = {
     else { log('It shies away from you.'); if (R() < d.bite) { m.target = P; m.state = 'chase'; log('It turns on you!', '#ff8a6a'); } } },
   vet: t => { const p = t.p; if (p.gone || dist(p, P) > SF.VET.range + .3) return log('Your pet moved away.'); gain('veterinary', 40); if (R() < SF.opposed(sv('veterinary'), 30)) { const b = p.hp; p.hp = Math.min(p.max, p.hp + SF.VET.heal(sv('veterinary'))); floater(p.x, p.y, '+' + Math.round(p.hp - b), '#7ee08a'); } else log('The treatment does not take.'); },
   bard: t => { const m = t.m; if (!alive(m)) return; const diff = cl(MON[m.type].diff, 25, 75);
-    gain('musicianship', diff); if (R() >= SF.opposed(sv('musicianship'), diff)) { log('Your playing falters and draws attention.', '#ffb070'); if (!m.target) { m.target = P; m.state = 'chase'; } return; }
-    snd('bard.' + { lullaby: 'lullaby', discord: 'discord', provocation: 'provoke' }[t.skill], { key: 'P' }); gain(t.skill, diff); if (R() >= SF.opposed(sv(t.skill), diff)) { log('The creature shrugs off your song.', '#ffb070'); if (!m.target) { m.target = P; m.state = 'chase'; } return; }
+    const bact = actId('bard'), btgt = 'foe:' + (m.actorId || m.id);   // one performance = one stat roll, on the bard skill (Musicianship is its auxiliary check)
+    gain('musicianship', diff, { aux: true }); if (R() >= SF.opposed(sv('musicianship'), diff)) { statRoll(t.skill, diff, { act: bact, statTarget: btgt }); log('Your playing falters and draws attention.', '#ffb070'); if (!m.target) { m.target = P; m.state = 'chase'; } return; }
+    snd('bard.' + { lullaby: 'lullaby', discord: 'discord', provocation: 'provoke' }[t.skill], { key: 'P' }); gain(t.skill, diff, { act: bact, statTarget: btgt }); if (R() >= SF.opposed(sv(t.skill), diff)) { log('The creature shrugs off your song.', '#ffb070'); if (!m.target) { m.target = P; m.state = 'chase'; } return; }
     if (t.skill === 'lullaby') { m.pacified = GT + SF.BARD.lullaby; m.target = null; m.state = 'idle'; if (P.sel === m) P.armed = false; floater(m.x, m.y, 'lulled', '#9fd0ff'); }
     if (t.skill === 'discord') { m.discordUntil = GT + SF.BARD.discordFor; floater(m.x, m.y, 'discorded', '#c97bff'); }
     if (t.skill === 'provocation') { const o = ents.filter(e => e.kind === 'mon' && e !== m && alive(e) && !MON[e.type].boss).sort((a, b) => dist(a, m) - dist(b, m))[0]; if (!o || dist(o, m) > 8) return log('Nothing nearby to set it against.'); m.target = o; m.provoked = GT + SF.BARD.provoke; m.state = 'chase'; floater(m.x, m.y, 'provoked!', '#ff9a6a'); log(`The ${MON[m.type].n} turns on the ${MON[o.type].n}.`); } },
@@ -1835,6 +1874,17 @@ function resetInput() { PT = null; JOY.on = false; JOY.sprint = false; for (cons
 addEventListener('blur', resetInput);
 function openPanel(k, tab) { resetInput(); PANEL = k; PTAB = tab || null; renderPanel(true); }
 function closePanel() { PANEL = null; const el = $('#panel'); el.hidden = true; el._h = ''; if (P) P.lootOpen = null; }
+/* natural attributes (src/stats.js) in the Character panel and the paper doll: natural value, the effective value when magic changes it,
+   and the lock (▲ raise · ■ locked · ▼ lower). The lock is the only thing the player sets; nothing here writes an attribute. */
+const STAT_ROLE = { str: 'Health, carrying capacity and weapon damage. Heavier weapons and armor need it.', dex: 'Stamina, and with it how fast you swing.', int: 'Mana.' };
+function statTip(k) { const by = SF.STATS.trainedBy(k), a = by.filter(x => x.w >= 75).map(x => SF.SKILL[x.k].n), b = by.filter(x => x.w < 75).map(x => SF.SKILL[x.k].n); return `${SF.STATS.NAME[k]} sets ${STAT_ROLE[k]} It grows while you use ${a.join(', ')}${b.length ? '; a little from ' + b.join(', ') : ''}.`; }
+function attrsHtml() {
+  const ST = SF.STATS; let h = '<div class="attrs" role="group" aria-label="Attributes">';
+  for (const k of ST.KEYS) { const b = P.base[k], e = P[k], m = P.statState.locks[k], nx = ST.lockLabel(ST.nextLock(m));
+    h += `<span class="an" title="${esc(statTip(k))}">${ST.NAME[k]}</span><span class="av">${b}</span><span class="ae ${e > b ? 'up' : e < b ? 'dn' : ''}">${e !== b ? `${e} with magic` : ''}</span>`
+      + `<button class="btn sm lk ${m}" data-a="slock" data-k="${k}" aria-label="${ST.NAME[k]} is set to ${ST.lockLabel(m)}. Activate to set ${nx}." title="${ST.lockLabel(m)} (tap for ${nx})">${ST.lockGlyph(m)}</button>`; }
+  return h + `<span class="tot">Natural total ${ST.total(P)} / ${ST.CAP} · each ${ST.MIN}–${ST.MAX} · ▲ may rise · ■ locked · ▼ gives a point when another must rise at ${ST.CAP}</span></div>`;
+}
 const btn = (a, label, data, cls) => `<button class="btn sm ${cls || ''}" data-a="${a}"${Object.entries(data || {}).map(([k, v]) => ` data-${k}="${esc(v)}"`).join('')}>${label}</button>`;
 const iname = it => (it.qty > 1 ? it.qty + ' × ' : '') + SF.itemName(it) + (it.q ? ` (grade ${it.q + 1})` : '') + (it.quality === 'exceptional' ? ' · exceptional' : '') + (it.maker ? ` · by ${it.maker}` : '') + (SF.WORK_TOOLS[it.id] && !SF.ITEMS[it.id].stack ? ` · ${SF.toolUses(it)} uses` : '') + (it.cond !== undefined && SF.WEARABLE(it.id) ? ` · ${Math.round(it.cond)}/${it.maxc || 100}${it.cond <= 0 ? ' broken' : it.cond < .2 * (it.maxc || 100) ? ' worn' : ''}` : '') + (it.venom ? ` · venom ×${it.venom.charges}` : '') + (SF.weaponOf(it) ? ` · ${SF.weaponSkillName(it)}` : '');
 function renderPanel(top) {
@@ -1912,13 +1962,15 @@ function bagActions(it) {
 }
 const PANELS = {
   bag: bagPanel,
-  gear: () => { const t = (k, n) => `<span>${n}</span><span>${P[k]}</span>`; let h = `<div class="kv">${t('str', 'Strength')}${t('dex', 'Dexterity')}${t('int', 'Intellect')}<span>Stat total</span><span>${P.str + P.dex + P.int} / 225</span><span>Health</span><span>${Math.floor(P.hp)} / ${SF.maxHp(P)}</span><span>Stamina</span><span>${Math.floor(P.stam)} / ${SF.maxStam(P)}</span><span>Mana</span><span>${Math.floor(P.mana)} / ${SF.maxMana(P)}</span><span>Armor rating</span><span>${armorVal()}</span><span>Carried</span><span>${fmtWt(carryWt())} / ${fmtWt(SF.carryCap(P))} · ${encumb().n}</span><span>Weapon</span><span>${wDef().fam} · ${wDef().dmg.join('–')} · reach ${wDef().reach} m · swing every ${SF.swingDelay(P.stam, wDef().speed).toFixed(2)} s</span><span>Bound shrine</span><span>${SHRINES.find(s => s.id === P.bound).n}</span><span>Skills</span><span>${f1(SF.totalSkill(P))} / 700.0</span></div><div class="sec">Equipped ${btn('eqwin', 'Paper doll (C)', {}, 'ac')}</div>`;
+  gear: () => { let h = `${attrsHtml()}<div class="kv"><span>Health</span><span>${Math.floor(P.hp)} / ${SF.maxHp(P)}</span><span>Stamina</span><span>${Math.floor(P.stam)} / ${SF.maxStam(P)}</span><span>Mana</span><span>${Math.floor(P.mana)} / ${SF.maxMana(P)}</span><span>Armor rating</span><span>${armorVal()}</span><span>Carried</span><span>${fmtWt(carryWt())} / ${fmtWt(SF.carryCap(P))} · ${encumb().n}</span><span>Weapon</span><span>${wDef().fam} · ${wDef().dmg.join('–')} · reach ${wDef().reach} m · swing every ${SF.swingDelay(P.stam, wDef().speed).toFixed(2)} s</span><span>Bound shrine</span><span>${SHRINES.find(s => s.id === P.bound).n}</span><span>Skills</span><span>${f1(SF.totalSkill(P))} / 700.0</span></div><div class="sec">Equipped ${btn('eqwin', 'Paper doll (C)', {}, 'ac')}</div>`;
     for (const s of SF.EQ.SLOT_IDS) { const it = P.equip[s]; if (!it && !['weapon', 'shield', 'chest'].includes(s)) continue; h += `<div class="row"><span class="v" style="width:5.5em">${SF.EQ.SLOT[s].n}</span>${it ? rowIcon(it) : ''}<span class="nm">${it ? esc(iname(it)) : '<span class="note">empty</span>'}</span>${it && SF.WEARABLE(it.id) && it.cond !== undefined && it.cond < (it.maxc || 100) ? btn('repair', 'Repair', { u: it.uid }) : ''}${it && SF.ITEMS[it.id].trade ? btn('uneq', 'Remove', { s }) : ''}</div>`; }
     return ['Character', h + '<p class="note">Stats do not grow by use. Buy points from Master Vey (up to 225 total).</p>']; },
   skills: () => { let h = `<div class="note">Total ${f1(SF.totalSkill(P))} / 700.0 · ▲ raise · ■ hold · ▼ lower (gives points when you hit the cap)</div>`;
     if (P.skillPool > 0) h += `<div class="sec">Combat reform</div><p class="note">${f1(P.skillPool)} trained points from skills that merged in the combat reform are waiting. Tap +1.0 on a skill to place them (never past 100.0 or the 700.0 total).</p>`;
-    for (const [k, n, g, live] of SF.SKILLS) { const s = P.skills[k]; const lk = s.lock === 'raise' ? '▲' : s.lock === 'hold' ? '■' : '▼'; const tip = SF.SKILL_TIP[k]; h += `<div class="row ${live ? '' : 'na'}"${tip ? ` title="${esc(tip)}"` : ''}><span class="nm">${n}${live ? '' : ' <span class="note">later milestone</span>'}${tip ? `<br><span class="note">${esc(tip)}</span>` : ''}</span><span class="v">${f1(s.v)}</span>${P.skillPool > 0 && s.v < SF.SKILL_MAX ? btn('pool', '+1.0', { k }) : ''}${btn('lock', lk, { k })}</div>`; }
+    for (const [k, n, g, live] of SF.SKILLS) { const s = P.skills[k]; const lk = s.lock === 'raise' ? '▲' : s.lock === 'hold' ? '■' : '▼'; const tip = SF.SKILL_TIP[k]; const sw = SF.STATS.weights(k), sa = sw ? Object.keys(sw).sort((x, y) => sw[y] - sw[x]).map(x => SF.STATS.ABBR[x]).join('·') : '';
+      h += `<div class="row ${live ? '' : 'na'}"${tip ? ` title="${esc(tip)}"` : ''}><span class="nm">${n}${sa ? ` <span class="note" title="Trains ${esc(sa)}">${sa}</span>` : ''}${live ? '' : ' <span class="note">later milestone</span>'}${tip ? `<br><span class="note">${esc(tip)}</span>` : ''}</span><span class="v">${f1(s.v)}</span>${P.skillPool > 0 && s.v < SF.SKILL_MAX ? btn('pool', '+1.0', { k }) : ''}${btn('lock', lk, { k })}</div>`; }
     h += '<div class="sec">Recent skill checks</div>' + (SKLOG.slice(-14).reverse().map(l => `<div class="note">${SF.SKILL[l.k].n}: ${esc(l.r)}</div>`).join('') || '<p class="note">None yet.</p>');
+    if (DEV.on) h += '<div class="sec">Attribute checks (developer)</div>' + (STATLOG.slice(-14).reverse().map(l => `<div class="note">${SF.SKILL[l.k] ? SF.SKILL[l.k].n : l.k}: ${esc(l.r)}${l.chance ? ' · ' + (l.chance * 100).toFixed(2) + '%' : ''}</div>`).join('') || '<p class="note">None yet.</p>');
     return ['Skills', h]; },
   spells: () => spellbookPanel(),
   abilities: () => ['Abilities', `<p class="note">Use now or put an action on a hotbar slot (two bars of four).</p>` + [['bandother', 'Bandage other (Healing: an ally or a player ghost)'], ['anatomy', 'Anatomy (judge a living target)'], ['hide', 'Hide (Concealment)'], ['track', 'Track (Tracking)'], ['meditate', 'Meditate'], ['brace', 'Braced Guard (Parrying 50)'], ['search', 'Search (finds hidden foes and snares)'], ['tame', 'Tame (Taming)'], ['vet', 'Treat pet (Veterinary)'], ['lullaby', 'Lullaby (needs a lute)'], ['discord', 'Discord (needs a lute)'], ['provoke', 'Provoke (needs a lute)'], ['pick', 'Pickpocket a smuggler'], ['coat', 'Coat weapon with venom (Venomcraft 30)'], ['trap', 'Set a snare (Trapcraft)']].map(([id, n]) => `<div class="row"><span class="nm">${n}</span>${ABIL[id] ? btn('abil', 'Use', { id }) : ''}${btn('assign', 'Slot', { k: 'act', id })}</div>`).join('')],
@@ -1939,13 +1991,14 @@ const PANELS = {
     return [n.name, h]; },
   trainer: () => { const tab = PTAB || 'skills'; let h = `<div class="tabs">${btn('tab', 'Lessons', { t: 'skills' }, tab === 'skills' ? 'ac' : '')}${btn('tab', 'Attributes', { t: 'stats' }, tab === 'stats' ? 'ac' : '')}<span class="note" style="margin-left:auto">${SF.count(P.pack, 'gold')} gold · ${P.freeLessons} free lessons</span></div>`;
     if (tab === 'skills') { h += '<p class="note">Lessons raise a skill to 30. Your first two are free. Skills set to Hold or Lower cannot be trained.</p>'; for (const [k, n, , live] of SF.SKILLS) { if (!live) continue; const v = P.skills[k].v / 10; if (v >= 30) continue; const cost = P.freeLessons > 0 ? 0 : SF.trainCost(v, 30); h += `<div class="row"><span class="nm">${n} <span class="note">${v.toFixed(1)} → 30</span></span><span class="v">${cost ? cost + ' gp' : 'free'}</span>${btn('train', 'Learn', { k })}</div>`; } }
-    else { h += `<p class="note">Attribute points cost ${SF.statTrainCost(1)} gold each. Total ${P.str + P.dex + P.int} / 225, each at most 100.</p>`; for (const [k, n] of [['str', 'Strength'], ['dex', 'Dexterity'], ['int', 'Intellect']]) h += `<div class="row"><span class="nm">${n}</span><span class="v">${P[k]}</span>${btn('stat', '+1', { k, n: 1 })}${btn('stat', '+5', { k, n: 5 })}</div>`; }
+    else { h += `<p class="note">“I teach skills, not strength. No one can sell you a stronger arm, a quicker hand or a sharper mind: they grow while you use your skills, a point at a time, up to 100 each and ${SF.STATS.CAP} together. At ${SF.STATS.CAP}, set one attribute to fall (▼) and another can still rise. You set the arrows on your Character page.”</p>`;
+      for (const k of SF.STATS.KEYS) h += `<div class="row"><span class="nm">${SF.STATS.NAME[k]} <span class="v">${P.base[k]}</span><br><span class="note">${esc(statTip(k))}</span></span></div>`; }
     return ['Master Vey, trainer', h]; },
   log: () => ['Combat and system log', LOG.slice(-150).reverse().map(l => `<div style="color:${l.c};padding:2px 0">${esc(l.t)}</div>`).join('')],
   picker: () => ['Which one?', PICK.map((e, i) => `<div class="row"><span class="nm">${esc(e.name)}</span><span class="v">${dist(e, P).toFixed(1)} m</span>${btn('pick', 'Select', { i })}</div>`).join('')],
   menu: () => ['Menu', `<div class="grid2">${btn('open', 'Abilities', { p: 'abilities' })}${btn('open', 'Log', { p: 'log' })}${btn('zoom', 'Zoom ×' + ZOOM)}${btn('mirror', SETTINGS.mirror ? 'Right-handed layout' : 'Left-handed layout')}${btn('sprintt', SETTINGS.stickSprint ? 'Stick sprint: on (push far)' : 'Stick sprint: off (button only)')}${btn('mute', muted ? 'Sound off' : 'Sound on')}${btn('music', SFXA.musicOn ? 'Music on' : 'Music off')}${btn('savenow', 'Save now')}${btn('open', 'How to play', { p: 'help' })}</div><p class="note" style="margin-top:12px">Shardfall web slice · offline M1. ${btn('wipe', 'Delete character', {}, 'on')}</p>`],
   quest: () => questPanel(), journal: () => journalPanel(),
-  help: () => ['How to play', `<p><b>Move</b> with the floating stick on the left. Press <b>Sprint</b> to run faster; it drains 7 stamina a second and switches off when you run out. Tapping the world never moves you.</p><p><b>Target</b> by tapping a creature, person, corpse or resource, or press <b>Target</b> to cycle nearby creatures. Tap your portrait to target yourself.</p><p><b>Attack</b> arms your basic attack on the selected creature; with nothing selected it picks the nearest creature you can see. Enemy spells do the same. You swing whenever it is in reach and your weapon is ready. It never chases, picks targets, casts or loots for you. <b>Cancel</b> disarms and stops actions.</p><p><b>Combat</b> follows the Second Age rules: your weapon skill against the defender's sets the hit chance; Tactics, Anatomy and Strength set the damage; armor absorbs part of each blow; a shield parries with half your Parrying as a percent. Swing speed comes from the weapon and your current stamina. Bows and crossbows reload while you move, but you must stand still to aim, and the shot lands a second later.</p><p><b>First Aid</b>: the bandage slot treats you (15 s; poison 18 s). Tap an ally or a ghost and press <b>Bandage</b> to treat them (5 s; poison 6 s; resurrection 10 s at 80 Healing and Anatomy). Being hit makes your fingers slip and the bandage heal less. Wren, a sellsword by the plaza, will follow you if asked.</p><p><b>Spells</b>: tap a spell slot to prepare (stand still), it is then held for 3 s; tap a target or tap the slot again to release. Ground spells need a tap on the ground. Casting stows your weapon.</p><p><b>Interact</b> gathers, opens bodies and chests, disarms revealed snares, talks and uses stations in reach. Stairs in the Sunken Bell ruin and the north Ashfen hatch lead down three levels to the Bellkeeper.</p><p><b>Menu → Abilities</b> holds Search, Tame, pet care, bard songs, pickpocketing, venom and snares. <b>Bar</b> cycles through three pages of three slots.</p><p><b>Death</b> in the wilderness leaves tradeable gear on your body for 12 minutes. On protected roads you keep your gear. Walk to a shrine or healer, or wait 12 s to return to your bound shrine. Bank what you cannot afford to lose.</p><p><b>Crafting</b>: Interact at the forge, anvil, bench, still or fire. Pick a category, then a recipe: the detail shows every input, the metal, your odds and what a failure costs before you commit. Mining and smithing mentors stand by the public forge.</p><p><b>Skills</b> rise 0.1 at a time from real use against suitable difficulty, to 100 each and 700 total.</p><p class="note">Keyboard: WASD/arrows move, Shift sprints, Space attack, E interact, B bandage self, 1–3 current bar slots, Tab target, Esc cancel.</p>`] };
+  help: () => ['How to play', `<p><b>Move</b> with the floating stick on the left. Press <b>Sprint</b> to run faster; it drains 7 stamina a second and switches off when you run out. Tapping the world never moves you.</p><p><b>Target</b> by tapping a creature, person, corpse or resource, or press <b>Target</b> to cycle nearby creatures. Tap your portrait to target yourself.</p><p><b>Attack</b> arms your basic attack on the selected creature; with nothing selected it picks the nearest creature you can see. Enemy spells do the same. You swing whenever it is in reach and your weapon is ready. It never chases, picks targets, casts or loots for you. <b>Cancel</b> disarms and stops actions.</p><p><b>Attributes</b>: Strength is your Health, Dexterity your Stamina, Intelligence your Mana. They grow slowly while you use your skills (never from gold, trainers or quests), up to 100 each and 225 together. On the Character page, ▲ lets one rise, ■ locks it and ▼ lets it give a point when another must rise at 225.</p><p><b>Combat</b> follows the Second Age rules: your weapon skill against the defender's sets the hit chance; Tactics, Anatomy and Strength set the damage; armor absorbs part of each blow; a shield parries with half your Parrying as a percent. Swing speed comes from the weapon and your current stamina. Bows and crossbows reload while you move, but you must stand still to aim, and the shot lands a second later.</p><p><b>First Aid</b>: the bandage slot treats you (15 s; poison 18 s). Tap an ally or a ghost and press <b>Bandage</b> to treat them (5 s; poison 6 s; resurrection 10 s at 80 Healing and Anatomy). Being hit makes your fingers slip and the bandage heal less. Wren, a sellsword by the plaza, will follow you if asked.</p><p><b>Spells</b>: tap a spell slot to prepare (stand still), it is then held for 3 s; tap a target or tap the slot again to release. Ground spells need a tap on the ground. Casting stows your weapon.</p><p><b>Interact</b> gathers, opens bodies and chests, disarms revealed snares, talks and uses stations in reach. Stairs in the Sunken Bell ruin and the north Ashfen hatch lead down three levels to the Bellkeeper.</p><p><b>Menu → Abilities</b> holds Search, Tame, pet care, bard songs, pickpocketing, venom and snares. <b>Bar</b> cycles through three pages of three slots.</p><p><b>Death</b> in the wilderness leaves tradeable gear on your body for 12 minutes. On protected roads you keep your gear. Walk to a shrine or healer, or wait 12 s to return to your bound shrine. Bank what you cannot afford to lose.</p><p><b>Crafting</b>: Interact at the forge, anvil, bench, still or fire. Pick a category, then a recipe: the detail shows every input, the metal, your odds and what a failure costs before you commit. Mining and smithing mentors stand by the public forge.</p><p><b>Skills</b> rise 0.1 at a time from real use against suitable difficulty, to 100 each and 700 total.</p><p class="note">Keyboard: WASD/arrows move, Shift sprints, Space attack, E interact, B bandage self, 1–3 current bar slots, Tab target, Esc cancel.</p>`] };
 let PICK = [];
 function uiOpen(k) { openPanel(k); snd('ui.open'); }   // deliberate panel changes only, never on re-render
 
@@ -1984,7 +2037,7 @@ const ACT = {
   buy: d => { const p = SF.PRICES[d.id] * +d.n; if (SF.count(P.pack, 'gold') < p) return log('Not enough gold.', '#ffb070'); const it = SF.EQ.isGear(d.id) || (SF.WEARABLE(d.id) && !SF.ITEMS[d.id].stack) ? SF.EQ.make(d.id, { origin: 'npc' }) : SF.newItem(d.id, +d.n, SF.ITEMS[d.id].stack ? null : { cond: 100 }); const r = SF.addItem(P.pack, it, cap()); if (!r.ok) return log(r.reason, '#ffb070'); SF.removeQty(P.pack, 'gold', p); snd('loot.coin'); renderPanel(); },
   sell: d => { const it = findU(P.pack, d.u); if (!it) return; const n = d.all ? it.qty : 1, g = Math.max(1, Math.floor((SF.PRICES[it.id] || 1) * .4 * (SF.WORK_TOOLS[it.id] && !SF.ITEMS[it.id].stack ? SF.toolUses(it) / SF.TOOL_USES : 1))) * n; it.qty -= n; if (it.qty <= 0) P.pack.items.splice(P.pack.items.indexOf(it), 1); P.pack.ver++; SF.addItem(P.pack, SF.newItem('gold', g)); snd('loot.coin'); renderPanel(); },
   train: d => { const s = P.skills[d.k]; if (s.lock !== 'raise') return log('Set that skill to Raise first.', '#ffb070'); const v = s.v / 10; const cost = P.freeLessons > 0 ? 0 : SF.trainCost(v, 30); const add = 300 - s.v; if (SF.totalSkill(P) + add > SF.SKILL_CAP) return log('That would pass the 700 cap.', '#ffb070'); if (cost && SF.count(P.pack, 'gold') < cost) return log('Not enough gold.', '#ffb070'); if (cost) SF.removeQty(P.pack, 'gold', cost); else P.freeLessons--; s.v = 300; log(`You train ${SF.SKILL[d.k].n} to 30.`, '#7fd4ff'); save(); renderPanel(); },
-  stat: d => { const n = +d.n, k = d.k; if (P.str + P.dex + P.int + n > SF.STAT_CAP) return log('Attribute total is capped at 225.', '#ffb070'); if (P[k] + n > SF.STAT_MAX) return log('Each attribute is capped at 100.', '#ffb070'); const c = SF.statTrainCost(n); if (SF.count(P.pack, 'gold') < c) return log('Not enough gold.', '#ffb070'); SF.removeQty(P.pack, 'gold', c); P[k] += n; save(); renderPanel(); },
+  slock: d => { const r = SF.STATS.cycleLock(P, d.k); if (!r.ok) return; snd('ui.page'); save(); renderPanel(); if (!$('#eqwin').hidden) renderEqWin(true); },   // the only attribute control: a lock
   craft: d => { startCraft(d.r, +(d.n || 1)); },
   pick: d => { P.sel = PICK[+d.i]; closePanel(); },
   petatk: () => petCommand('attack'),
@@ -2316,6 +2369,7 @@ function migrateSave(s, raw) {
   }
   if (s.v < 6) migrateV6(s, raw);
   if (s.v < 7) migrateV7(s, raw);
+  if (s.v < 8) migrateV8(s, raw);
   return s;
 }
 /* v0.23 world expansion: the grid grew from 2100 × 900 to W × H and Anniabreen was stretched (annStretch). Everything saved at
@@ -2352,6 +2406,15 @@ function migrateV7(s, raw) {
   for (const co of s.corpses || []) SF.EQ.expandList(co.items);
   s.uid = 0; s.v = 7;   // boot takes the id counter from SF (setUidBase keeps the larger value)
 }
+/* v0.30 attributes (src/stats.js): natural STR/DEX/INT become explicit (char.base), with stat locks and the gain state. The saved
+   str/dex/int have always been the natural values (save() wrote P.base over them), so nothing is reset, deducted or refunded and a
+   150-point character keeps every point. Malformed values are repaired deterministically and the repair is logged. Idempotent
+   (statMig); a snapshot of the old save is kept once. */
+function migrateV8(s, raw) {
+  try { if (raw && !localStorage.getItem(SAVEKEY + '.prev7')) localStorage.setItem(SAVEKEY + '.prev7', raw); } catch (e) { }
+  s.statReform = SF.STATS.migrateChar(s.char); s.v = 8;
+  if (s.statReform.repairs.length) console.warn('Shardfall: attribute repair on load:', s.statReform.repairs.join('; '));
+}
 function migrateV2(s, raw) {
   const walk = fn => { const c = s.char; for (const k of ['pack', 'bank']) if (c[k]) c[k].items.forEach(fn); for (const k in c.equip || {}) if (c.equip[k]) fn(c.equip[k]); for (const co of s.corpses || []) co.items.forEach(fn); };
   walk(it => {
@@ -2368,8 +2431,9 @@ function petCommand(c) {
   const pets = ents.filter(e => e.kind === 'pet' && !e.gone); if (!pets.length) return;
   if (c === 'dismiss') { const p = P.sel && P.sel.kind === 'pet' ? P.sel : pets[0]; rmEnt(p); P.sel = null; log(p.name + ' is released into the wild.'); return; }
   const tgt = c === 'attack' ? P.sel : null; if (c === 'attack' && (!tgt || tgt.kind !== 'mon')) return log('Select a creature for your pets to attack.');
+  const cact = actId('command');   // one command to several pets is one action: one stat roll at most
   for (const p of (P.sel && P.sel.kind === 'pet' ? [P.sel] : pets)) { if (!los(P, p)) { log(p.name + ' cannot see you.'); continue; }
-    const strong = (p.slots || 1) > 1, ch = p.type ? cl(.6 + sv('beasthandling') / 200 - (strong ? .2 : 0), .3, .98) : 1; if (p.type) gain('beasthandling', strong ? 55 : 30);
+    const strong = (p.slots || 1) > 1, ch = p.type ? cl(.6 + sv('beasthandling') / 200 - (strong ? .2 : 0), .3, .98) : 1; if (p.type) gain('beasthandling', strong ? 55 : 30, { act: cact, statTarget: 'pet:' + (p.actorId || p.id) });
     if (R() > ch) { log(p.name + ' ignores you.'); continue; } p.order = c; p.tgt = tgt; }
   say(P, c === 'attack' ? 'Attack!' : c === 'follow' ? 'Heel.' : 'Stay.'); }
 function unequipTo(s) { const r = SF.EQ.unequipItem(P, { slot: s }); if (!r.ok) return false; snd('item.equip'); if (s === 'weapon') weaponChanged(); eqChanged(); return true; }
@@ -2424,15 +2488,16 @@ let deletingSave = false;
 const SAVEKEY = 'shardfall.save.v1';
 function save() {
   if (!P || deletingSave) return false; try {
-    const c = {}; for (const k of ['name', 'x', 'y', 'str', 'dex', 'int', 'hp', 'stam', 'mana', 'skills', 'pack', 'bank', 'equip', 'look', 'bound', 'quest', 'freeLessons', 'hotbar', 'ghost', 'ghostAt', 'gainLog', 'recipeN', 'cx', 'skillPool', 'combatMig', 'eqMig', 'bandSeq', 'bandDone', 'lowerRank']) c[k] = P[k];
+    const c = {}; for (const k of ['name', 'x', 'y', 'str', 'dex', 'int', 'hp', 'stam', 'mana', 'skills', 'pack', 'bank', 'equip', 'look', 'bound', 'quest', 'freeLessons', 'hotbar', 'ghost', 'ghostAt', 'gainLog', 'recipeN', 'cx', 'skillPool', 'combatMig', 'eqMig', 'bandSeq', 'bandDone', 'lowerRank', 'statState', 'statMig']) c[k] = P[k];
+    c.base = Object.assign({}, P.base);                                    // natural attributes (src/stats.js); effective values are never saved
     c.bandage = bandageSave();
-    if (P.base) Object.assign(c, P.base); c.magery = { mig: (P.mg && P.mg.mig) || 0 };
+    Object.assign(c, P.base); c.magery = { mig: (P.mg && P.mg.mig) || 0 };
     const corpses = ents.filter(e => e.mine && !e.gone).map(e => ({ x: e.x, y: e.y, items: e.cont.items, left: e.expires - GT, diedAgo: GT - e.cont.diedAt }));
     let maxUid = 0; const scan = it => { if (it && it.uid > maxUid) maxUid = it.uid; }; P.pack.items.forEach(scan); P.bank.items.forEach(scan); Object.values(P.equip).forEach(scan); corpses.forEach(c2 => c2.items.forEach(scan));
     const pets = ents.filter(e => e.kind === 'pet' && e.type && !e.summon && !e.gone && e.hp > 0).map(e => ({ type: e.type, hp: e.hp, order: e.order === 'stay' ? 'stay' : 'follow', slots: e.slots, name: e.name, dx: e.x - P.x, dy: e.y - P.y }));
     const nodes = []; for (const [k, o] of RES) nodes.push([k, o.gen || 1, o.spec || 0, o.n, o.max || 0, Math.round(o.t * 10) / 10]);
     const ally = allySave(); if (ally) { Object.values(ally.equip || {}).forEach(scan); ally.pack.forEach(scan); if (ally.body) ally.body.items.forEach(scan); }
-    localStorage.setItem(SAVEKEY, JSON.stringify({ v: 7, char: c, corpses, pets, nodes, ally, sim: WS ? WS.save() : null, eco: ecoSave(), life: lifeSave(), uid: maxUid + 1, gt: GT, savedAt: Date.now() }));
+    localStorage.setItem(SAVEKEY, JSON.stringify({ v: 8, char: c, corpses, pets, nodes, ally, sim: WS ? WS.save() : null, eco: ecoSave(), life: lifeSave(), uid: maxUid + 1, gt: GT, savedAt: Date.now() }));
     DEV.lastSave = { ok: true, at: GT }; return true;
   } catch (e) { DEV.lastSave = { ok: false, at: GT }; return false; }
 }
@@ -2440,13 +2505,13 @@ function loadSave() { try { const s = localStorage.getItem(SAVEKEY); return s ? 
 
 /* ---------- boot & creation ---------- */
 const PROFILES = {
-  'Glaive hybrid': { s: [55, 45, 50], k: { swordsmanship: 50, spellcraft: 30, tactics: 20 }, ideal: 'Swordsmanship, Tactics, Spellcraft, Spell Focus, Wardcraft, Meditation, Wrestling' },
-  'Venom skirmisher': { s: [50, 60, 40], k: { fencing: 50, tactics: 30, healing: 20 }, ideal: 'Fencing, Tactics, Anatomy, Healing, Wardcraft, Venomcraft, Concealment' },
-  'Group healer': { s: [40, 40, 70], k: { spellcraft: 50, healing: 30, meditation: 20 }, ideal: 'Spellcraft, Spell Focus, Wardcraft, Meditation, Wrestling, Healing, Anatomy' },
-  'Archer scout': { s: [45, 65, 40], k: { archery: 50, tactics: 30, concealment: 20 }, ideal: 'Archery, Tactics, Anatomy, Healing, Tracking, Concealment, Shadowstep' },
-  'Mace dexer': { s: [60, 60, 30], k: { macefighting: 50, tactics: 30, healing: 20 }, ideal: 'Mace Fighting, Tactics, Anatomy, Healing, Parrying, Wardcraft, Wrestling' },
-  'Merchant smith': { s: [60, 50, 40], k: { mining: 40, smithing: 40, woodcutting: 20 }, ideal: 'Mining, Smithing, Engineering, Carpentry, Woodcutting, Appraisal, Tailoring' } };
-let CC = { name: '', prof: 'Glaive hybrid', s: [55, 45, 50], k: Object.entries(PROFILES['Glaive hybrid'].k), cloak: '' };
+  'Glaive hybrid': { s: [35, 20, 25], k: { swordsmanship: 50, spellcraft: 30, tactics: 20 }, ideal: 'Swordsmanship, Tactics, Spellcraft, Spell Focus, Wardcraft, Meditation, Wrestling' },
+  'Venom skirmisher': { s: [30, 40, 10], k: { fencing: 50, tactics: 30, healing: 20 }, ideal: 'Fencing, Tactics, Anatomy, Healing, Wardcraft, Venomcraft, Concealment' },
+  'Group healer': { s: [20, 10, 50], k: { spellcraft: 50, healing: 30, meditation: 20 }, ideal: 'Spellcraft, Spell Focus, Wardcraft, Meditation, Wrestling, Healing, Anatomy' },
+  'Archer scout': { s: [25, 45, 10], k: { archery: 50, tactics: 30, concealment: 20 }, ideal: 'Archery, Tactics, Anatomy, Healing, Tracking, Concealment, Shadowstep' },
+  'Mace dexer': { s: [35, 35, 10], k: { macefighting: 50, tactics: 30, healing: 20 }, ideal: 'Mace Fighting, Tactics, Anatomy, Healing, Parrying, Wardcraft, Wrestling' },
+  'Merchant smith': { s: [45, 25, 10], k: { mining: 40, smithing: 40, woodcutting: 20 }, ideal: 'Mining, Smithing, Engineering, Carpentry, Woodcutting, Appraisal, Tailoring' } };
+let CC = { name: '', prof: 'Glaive hybrid', s: PROFILES['Glaive hybrid'].s.slice(), k: Object.entries(PROFILES['Glaive hybrid'].k), cloak: '' };
 const CLOAKS = ['', '#8a2a2a', '#2a3a8a', '#5a2a6a', '#3a3a3a', '#8a6a2a'];
 function renderCC() {
   const sv0 = loadSave(), live = SF.SKILLS.filter(s => s[3]); const opts = sel => live.map(s => `<option value="${s[0]}"${s[0] === sel ? ' selected' : ''}>${esc(s[1])}</option>`).join('');
@@ -2457,15 +2522,15 @@ function renderCC() {
   <label>Starting idea <span class="note">(editable, no class is locked in)</span></label><div class="chips">${Object.keys(PROFILES).map(p => `<button class="btn sm ${CC.prof === p ? 'ac' : ''}" data-c="prof" data-p="${p}">${p}</button>`).join('')}</div>
   ${PROFILES[CC.prof] ? `<p class="note">At the cap: ${PROFILES[CC.prof].ideal}.</p>` : ''}
   <label>Cloak</label><div class="sw">${CLOAKS.map(c => `<button style="background:${c || '#2f5a5a'}" class="${CC.cloak === c ? 'on' : ''}" data-c="cloak" data-v="${c}" aria-label="cloak colour"></button>`).join('')}</div></div>
-  <div><label>Attributes <span class="note">(${tot} / 150, each 25–100)</span></label>${['Strength', 'Dexterity', 'Intellect'].map((n, i) => `<div class="stat"><span>${n}</span><button class="btn sm" data-c="st" data-i="${i}" data-d="-5">−</button><b>${CC.s[i]}</b><button class="btn sm" data-c="st" data-i="${i}" data-d="5">+</button></div>`).join('')}
-  <p class="note">HP ${50 + Math.floor(CC.s[0] / 2)} · stamina ${CC.s[1]} · mana ${CC.s[2]}</p>
+  <div><label>Attributes <span class="note">(${tot} / ${SF.CREATE_STATS}, each ${SF.CREATE_STAT_MIN}–${SF.CREATE_STAT_MAX} · they grow with the skills you use, up to 100 each and 225 in all)</span></label>${SF.STATS.KEYS.map((k, i) => { const n = SF.STATS.NAME[k], st = d => SF.STATS.createStep(CC.s, i, d) === null ? ' disabled' : ''; return `<div class="stat" title="${esc(statTip(k))}"><span>${n}</span><button class="btn sm"${st(-5)} data-c="st" data-i="${i}" data-d="-5" aria-label="${n} minus 5">−5</button><button class="btn sm"${st(-1)} data-c="st" data-i="${i}" data-d="-1" aria-label="${n} minus 1">−</button><b>${CC.s[i]}</b><button class="btn sm"${st(1)} data-c="st" data-i="${i}" data-d="1" aria-label="${n} plus 1">+</button><button class="btn sm"${st(5)} data-c="st" data-i="${i}" data-d="5" aria-label="${n} plus 5">+5</button></div>`; }).join('')}
+  <p class="note">Health ${Math.max(1, CC.s[0])} · stamina ${Math.max(1, CC.s[1])} · mana ${Math.max(1, CC.s[2])}${tot < SF.CREATE_STATS ? ` · ${SF.CREATE_STATS - tot} points left` : ''}</p>
   <label>Starting skills <span class="note">(${kt} / 100, at most 50 each)</span></label>${CC.k.map((k, i) => `<div class="skl"><select data-c="sk" data-i="${i}" aria-label="Skill ${i + 1}">${opts(k[0])}</select><select data-c="kv" data-i="${i}" aria-label="Skill ${i + 1} points">${[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50].map(v => `<option${v === k[1] ? ' selected' : ''}>${v}</option>`).join('')}</select></div>`).join('')}</div></div>
   <div id="ccerr" class="warn"></div><button class="btn ac big" data-c="go">Enter Saltmarsh Quay</button><p class="note" style="text-align:center">Saves in this browser. Your first two trainer lessons are free.</p>`;
 }
 $('#cc').addEventListener('click', ev => { const b = ev.target.closest('[data-c]'); if (!b || b.tagName === 'SELECT') return; const c = b.dataset.c; CC.name = $('#ccn')?.value ?? CC.name;
   if (c === 'cont') { const s = loadSave(); if (s) boot(s); return; }
   if (c === 'prof') { CC.prof = b.dataset.p; const p = PROFILES[CC.prof]; CC.s = p.s.slice(); CC.k = Object.entries(p.k); }
-  if (c === 'st') { const i = +b.dataset.i, d = +b.dataset.d, nv = CC.s[i] + d, tot = CC.s.reduce((a, x) => a + x, 0) + d; if (nv >= 25 && nv <= 100 && tot <= 150) CC.s[i] = nv; }
+  if (c === 'st') { const i = +b.dataset.i, nv = SF.STATS.createStep(CC.s, i, +b.dataset.d); if (nv !== null) { CC.s[i] = nv; CC.prof = 'Custom'; } }
   if (c === 'cloak') CC.cloak = b.dataset.v;
   if (c === 'go') { const err = $('#ccerr'); const name = CC.name.trim().replace(/[^\p{L}\p{N} '\-]/gu, '').slice(0, 16); if (name.length < 2) return err.textContent = 'Choose a name of at least 2 letters.'; const sk = {}; for (const [k, v] of CC.k) sk[k] = (sk[k] || 0) + v; const e = SF.validateCreation({ str: CC.s[0], dex: CC.s[1], int: CC.s[2], skills: sk }); if (e.length) return err.textContent = e.join(' '); if (CC.k.some(([k], i) => CC.k.findIndex(x => x[0] === k) !== i && CC.k[i][1] > 0)) return err.textContent = 'Pick different skills.'; boot(null, { name, str: CC.s[0], dex: CC.s[1], int: CC.s[2], skills: sk, look: { cloak: CC.cloak || null } }); return; }
   renderCC(); });
@@ -2475,6 +2540,7 @@ function boot(saved, fresh) {
   if (saved) { try { saved = migrateSave(saved, localStorage.getItem(SAVEKEY)); } catch (e) { console.error(e); } for (const [k, gen, spec, n, max, t] of saved.nodes || []) RES.set(k, { gen, spec: spec || undefined, n, max, t });
     const c = saved.char; P = newChar({ name: c.name, str: c.str, dex: c.dex, int: c.int, skills: {}, look: c.look }); Object.assign(P, c); P.equip = Object.assign(emptyEquip(), P.equip); delete P.equip.armor; SF.setUidBase(saved.uid || 1); GT = saved.gt || 0;
     for (const k of Object.keys(SF.newSkills())) if (!P.skills[k]) P.skills[k] = { v: 0, lock: 'raise' };
+    SF.STATS.migrateChar(P); delete P._eff;                               // idempotent: natural attributes and stat state in shape
     for (const co of saved.corpses || []) { const cont = SF.newContainer('corpse', 'p1'); cont.items = co.items; cont.diedAt = GT - (co.diedAgo ?? 999); cont.expires = GT + co.left; addEnt({ kind: 'corpse', mine: true, name: 'your body', x: co.x, y: co.y, cont, expires: GT + co.left }); }
     if (P.ghost && !Number.isFinite(c.ghostAt)) P.ghostAt = GT - 12; }
   else { P = newChar(fresh); starterKit(); }
@@ -2493,6 +2559,7 @@ function boot(saved, fresh) {
   log('Left stick moves; the Sprint button runs. Tap to target. Attack arms your swings. Interact gathers, loots and talks.', '#b6a68a');
   if (P.ghost) log('You are a ghost. Follow the golden arrow to a shrine or healer.', '#ff6a5a');
   if (saved && saved.combatReform && saved.combatReform.changed) { log('The combat skills now follow the Second Age: Swordsmanship, Mace Fighting, Fencing, Archery, Wrestling, Parrying and Healing. Your trained points moved with them.', '#ffe08a'); if (P.skillPool > 0) log(`${f1(P.skillPool)} points from merged skills wait on your Skills page.`, '#ffe08a'); }
+  if (saved && saved.statReform && saved.statReform.changed) log('Attributes now follow the Second Age: they grow while you use your skills (no more trainer purchases), Health equals Strength, and the arrows on your Character page decide which may rise or fall. Your attributes are kept as they were.', '#ffe08a');
   if (!saved) log('Wren, a quay sellsword, nurses a wound by the plaza. Tap her to bandage her or ask her to follow you.', '#b6a68a');
   if (VH > VW) $('#rot').hidden = false; save(); refreshHud();
 }
@@ -2504,4 +2571,4 @@ loadScout(SCOUT_SRC); renderCC(); resize(); requestAnimationFrame(loop);
 function spawnMon(type, dx = 3, dy = 0) { const d = MON[type]; if (!d) return null; let x = P.x + dx, y = P.y + dy;
   for (let r = 0; r < 6 && BLK[tAt(Math.floor(x), Math.floor(y))]; r += .5) for (let a = 0; a < 8; a++) { const nx = P.x + dx + Math.cos(a * Math.PI / 4) * r, ny = P.y + dy + Math.sin(a * Math.PI / 4) * r; if (!BLK[tAt(Math.floor(nx), Math.floor(ny))]) { x = nx; y = ny; break; } }
   return addEnt({ kind: 'mon', type, name: d.n, x, y, hp: d.hp, max: d.hp, state: 'idle', home: { x, y }, sect: 0, ward: 0 }); }
-window.__SF = { get WS() { return WS; }, dist, closePanel, lifeSave, LIFE, LIFE_SCHED, lifeTick, lifeResume, lifeInspect, lifeTownGeo, lifeTalk, talk, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
+window.__SF = { get WS() { return WS; }, statRoll, STATLOG, TASKS, meditate, hide, finishHide, recomputeStats, gain, actId, PROFILES, get CC() { return CC; }, starterKit, newChar, attrsHtml, dist, closePanel, lifeSave, LIFE, LIFE_SCHED, lifeTick, lifeResume, lifeInspect, lifeTownGeo, lifeTalk, talk, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };

@@ -18,7 +18,7 @@ with sync_playwright() as p:
   # ---- reload during treatment
   pg.goto('file://' + new); pg.wait_for_timeout(500); pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_timeout(500)
   pg.click('[data-c=prof][data-p="Glaive hybrid"]'); pg.fill('#ccn', 'Rel'); pg.click('[data-c=go]'); pg.wait_for_timeout(900)
-  r1 = pg.evaluate("""() => { const S = __SF, P = S.P; P.skills.healing.v = 1000; P.skills.anatomy.v = 1000; P.hp = 20; S.setRng(() => 0); S.useSlot(0); for (let i = 0; i < 100; i++) S.update(.05); S.save();
+  r1 = pg.evaluate("""() => { const S = __SF, P = S.P; P.base.str = 100; S.recomputeStats(); P.skills.healing.v = 1000; P.skills.anatomy.v = 1000; P.hp = 20;   /* v0.30: Health = STR; room for a 43-point heal */ S.setRng(() => 0); S.useSlot(0); for (let i = 0; i < 100; i++) S.update(.05); S.save();
     return { left: P.bandage.t1 - S.GT, bandages: S.SF.count(P.pack, 'bandage'), id: P.bandage.id }; }""")
   cont(pg, new)
   r2 = pg.evaluate("""() => { const S = __SF, P = S.P; const b = P.bandage; const o = { restored: !!b, self: b && b.self, left: b && Math.round((b.t1 - S.GT) * 10) / 10, bandages: S.SF.count(P.pack, 'bandage'), hp: Math.round(P.hp) };

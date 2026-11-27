@@ -17,7 +17,7 @@
   step(.5); const mana0 = P.mana, pearls0 = SF.count(P.pack, 'black_pearl'); S.castSlot('magery.05'); S.damagePlayer(1, null, 'phys'); out.interrupt = { manaLost: Math.round((mana0 - P.mana) * 100) / 100, pearlsBack: SF.count(P.pack, 'black_pearl') === pearls0, prep: !!P.prep };
   // learn Cinderball via scroll & cast; check hold expiry
   SF.addItem(P.pack, SF.newItem('scroll.18', 2)); const r = MG.learn(P.pack, 'scroll.18'); out.learn = r.ok;
-  P.skills.spellcraft.v = 1000; P.skills.focus.v = 1000; P.mana = 100; P.int = 100; P.base.int = 100;
+  P.skills.spellcraft.v = 1000; P.skills.focus.v = 1000; P.base.int = 100; S.recomputeStats(); P.mana = 100;
   step(.5); S.castSlot('magery.18'); step(1.05); out.held2 = P.held && P.held.sp.id; step(3.1); out.expired = !P.held;
   // Delayed Explosion + Aether Bolt timing
   SF.addItem(P.pack, SF.newItem('scroll.43', 1)); SF.addItem(P.pack, SF.newItem('scroll.42', 1)); MG.learn(P.pack, 'scroll.43'); MG.learn(P.pack, 'scroll.42');

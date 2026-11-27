@@ -32,7 +32,7 @@ with sync_playwright() as p:
     pg.wait_for_timeout(500)
   out['fight'] = ev("() => ({ slain: __SF.LOG.some(l => /You slay the dock rat/.test(l.t)), swung: __SF.P.sw.t > 0, hp: Math.round(__SF.P.hp), log: __SF.LOG.filter(l => /slay|miss|Swordsmanship|Tactics|absorbed/.test(l.t)).slice(-4).map(l => l.t) })")
   out['fight']['tapped'] = tapped; out['fight']['armedOn'] = sel
-  check('rat' in (tapped, sel) and out['fight']['swung'] and out['fight']['slain'], 'starter fight: tapped a rat (or Attack picked one), the glaive killed it (a halberd can one-shot a rat before we look)')
+  check('rat' in (tapped, sel) and out['fight']['swung'] and out['fight']['slain'], 'starter fight: tapped a rat (or Attack picked one), the starter weapon killed it')
   # self-bandage from the hotbar
   ev("() => { const P = __SF.P; P.armed = false; P.hp = Math.min(P.hp, 30); }"); pg.wait_for_timeout(200)
   hp0 = ev("() => __SF.P.hp"); b0 = ev("() => __SF.SF.count(__SF.P.pack, 'bandage')")
@@ -53,12 +53,12 @@ with sync_playwright() as p:
   tap_ent(rat); tap_sel('#b-atk'); pg.wait_for_timeout(600); shot('4-bow-aim.png'); pg.wait_for_timeout(4300); shot('5-bow-reload.png')
   out['bow']['after'] = ev("() => ({ arrows: __SF.SF.count(__SF.P.pack, 'arrow'), shotsLogged: __SF.LOG.filter(l => /Archery/.test(l.t)).length })")
   check(out['bow']['weapon'] == 'Bow' and out['bow']['arrows'] == 10 and 1 <= 10 - out['bow']['after']['arrows'] <= 3, 'bought a shortbow and 10 arrows, equipped from the pack, each release spends one arrow')
-  # swap to the glaive mid-fight from the pack
+  # swap back to the starter weapon mid-fight from the pack (v0.30: the 80-point Glaive hybrid, STR 35, starts with the sword; the halberd needs 45)
   tap_sel('[data-a=hudmenu]'); tap_sel('[data-a=mgo][data-p=bag]'); pg.wait_for_timeout(300)
-  pg.locator('.bagcell', has_text='glaive').first.tap(); pg.wait_for_timeout(200); pg.locator('#panel .bagcard [data-a=equip]').first.tap(); pg.wait_for_timeout(300); tap_sel('[data-a=close]')
+  pg.locator('.bagcell', has_text='sword').first.tap(); pg.wait_for_timeout(200); pg.locator('#panel .bagcard [data-a=equip]').first.tap(); pg.wait_for_timeout(300); tap_sel('[data-a=close]')
   out['swap'] = ev("() => ({ weapon: __SF.W.n, ready: __SF.P.sw.ready, armed: __SF.P.armed, arrowsKept: __SF.SF.count(__SF.P.pack, 'arrow') })")
-  pg.wait_for_timeout(3500); shot('6-swap-glaive.png')
-  check(out['swap']['weapon'] == 'Halberd', 'swapped back to the glaive mid-fight from the pack')
+  pg.wait_for_timeout(3500); shot('6-swap-sword.png')
+  check(out['swap']['weapon'] == 'Longsword', 'swapped back to the sword mid-fight from the pack')
   # treat another patient: Wren at the Quay
   ev("() => { const S = __SF, P = S.P, w = S.allyOf(); P.skills.healing.v = 900; P.skills.anatomy.v = 600; P.armed = false; P.sel = null; P.x = w.x - 1.2; P.y = w.y; w.hp = Math.min(w.hp, 40); }"); pg.wait_for_timeout(800)
   tap_ent("__SF.allyOf()"); pg.wait_for_timeout(300); shot('7-wren-target.png')

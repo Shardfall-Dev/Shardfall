@@ -12,7 +12,7 @@ def check(ok, msg, got=None):
     print(('ok   ' if ok else 'FAIL ') + msg + ('' if ok or got is None else f'  (got {got!r})'))
     if not ok: fails.append(msg)
 
-FILL = """() => { const S = __SF, P = S.P, SF = S.SF; P.pack.items.length = 0;
+FILL = """() => { const S = __SF, P = S.P, SF = S.SF; P.pack.items.length = 0; P.base.str = 60; S.recomputeStats();   // v0.30: the 80-point healer (STR 20) needs the Strength for the sword and mail
   for (const [id, q] of [['sword',1],['chain_tunic',1],['bandage',5],['draught',3],['cookedmeat',2],['reedash',12],['pine',4],['gold',40]]) SF.addItem(P.pack, SF.newItem(id, q));
   S.save(); }"""
 NAMES = "() => [...document.querySelectorAll('#panel .bagcell small')].map(e => e.textContent)"

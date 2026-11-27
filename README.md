@@ -6,9 +6,9 @@ A T2A-era Ultima Online-style 2.5D isometric sandbox RPG for phones, built as a 
 
 **Online:** every merge to `main` publishes the newest build on GitHub Pages (`.github/workflows/pages.yml`; one-time setup: Settings → Pages → Source: GitHub Actions. Pages on a private repository needs a paid GitHub plan, and the site itself is public): `https://shardfall-dev.github.io/Shardfall/`. On iPhone, Share → Add to Home Screen gives it an app icon.
 
-**On your computer:** run `python3 -m http.server` in this folder and open `http://localhost:8000/Shardfall_v0.28.1.html`. The game loads its sound and music from `assets/audio/web/`, so it needs to be served like this; opened straight from disk it plays silently. For a single file that plays from disk with sound effects, build `./build.sh 0.28.1 --offline`.
+**On your computer:** run `python3 -m http.server` in this folder and open `http://localhost:8000/Shardfall_v0.30.html`. The game loads its sound and music from `assets/audio/web/`, so it needs to be served like this; opened straight from disk it plays silently. For a single file that plays from disk with sound effects, build `./build.sh 0.30 --offline`.
 
-**Developer panel:** add `?dev` to the address (for example `http://localhost:8000/Shardfall_v0.28.1.html?dev`) and press the small DEV button. It shows the world's live numbers (creatures by faction, regions, camps and what the ecosystem has been doing), lets you set the time, pause or fast-forward the simulation, send test travellers anywhere and inspect any actor you tap (a creature shows its faction, activity, what it decided and why, its senses, pack, camp and sound). Without `?dev` it does not exist.
+**Developer panel:** add `?dev` to the address (for example `http://localhost:8000/Shardfall_v0.30.html?dev`) and press the small DEV button. It shows the world's live numbers (creatures by faction, regions, camps and what the ecosystem has been doing), lets you set the time, pause or fast-forward the simulation, send test travellers anywhere and inspect any actor you tap (a creature shows its faction, activity, what it decided and why, its senses, pack, camp and sound). Without `?dev` it does not exist.
 
 Progress saves to the browser's local storage.
 
@@ -17,6 +17,7 @@ Progress saves to the browser's local storage.
 - `src/head.html` — page markup and CSS (HUD, panels).
 - `src/rules.js` — the pure rules module (`SF`): items, skills, recipes, materials, crafting and repair math, and the Second Age combat and First Aid rules. No DOM.
 - `src/equipment.js` — the equipment rules module (`SF.EQ`): 18 equipment slots, armor families and pieces, material variants (metals, hides, cloth, bone, dragon scale), body-region armor, weight units and carrying capacity, encumbrance, effective attributes, durability and repair risk, the validated item commands (`equipItem`, `unequipItem`, `moveItem`, `dropItem`, `pickupItem`, `splitStack`, `mergeStacks`, `craftItem`, `repairItem`), appearance data and the v0.24 → v0.25 save conversion. No DOM.
+- `src/stats.js` — the attribute rules module (`SF.STATS`): natural STR/DEX/INT, creation, the 100 / 225 caps, stat locks (raise, hold, lower), the one-roll-per-action gain contract with its own seeded random stream, cooldown and repeat limits, the transfer at 225, the skill-to-attribute weights (and the planned canonical skill ids), the Strength-requirement policy and the save conversion. No DOM. Status and tuning: `docs/stats/STATUS.md`.
 - `src/magery.js` — the Magery rules module (`SF.MAGERY`): the 64 spells (data from `docs/magery/spells.json`), success, resistance, damage, statuses, save migration. No DOM.
 - `src/audio.js` — the Web Audio player for the sound pack (`SFXA`).
 - `assets/audio/` — sound pack v1.0.0: `manifest.json` and mono WAV takes (the masters).
@@ -36,31 +37,53 @@ Progress saves to the browser's local storage.
 - `src/game.js` — the game: world generation, rendering, input, NPCs, quests, crafting UI, save/load, and the one physical-combat resolver every swing goes through.
 - `src/equipment-ui.js` — the equipment UI: paper doll window, backpack (search, sorts, filters, split and merge, virtualized grid), item tooltips with comparison, drag and drop, context menu, the Armor crafting category.
 - `src/tail.html` — closes the game script block and the page.
-- `build.sh` — joins the parts into the game: `./build.sh 0.28.1` → `Shardfall_v0.28.1.html` (web build, 7.1 MB); `./build.sh 0.28.1 --offline` → `Shardfall_v0.28.1_offline.html` (22 MB, every sound inside, not committed). Needs `python3`.
-- `Shardfall_v0.28.1.html` — the current built game.
+- `build.sh` — joins the parts into the game: `./build.sh 0.30` → `Shardfall_v0.30.html` (web build, 7.2 MB); `./build.sh 0.30 --offline` → `Shardfall_v0.30_offline.html` (22 MB, every sound inside, not committed). Needs `python3`.
+- `Shardfall_v0.30.html` — the current built game.
 - `.github/workflows/pages.yml` — publishes the newest build to GitHub Pages as `index.html`, with the audio beside it.
 - `docs/WORLD_SIMULATION_MASTER.md` — the Living World master roadmap (the full specification). `docs/WORLD_SIMULATION_PROGRESS.md` — what is built, phase by phase, the audit matrix, asset gaps and the next task.
 - `docs/Shardfall_Audio.md` — what plays when, the audio pipeline and sound-release versioning.
 - `docs/Shardfall_Crafting_Guide.md` — the crafting design guide the build follows.
+- `docs/stats/` — the attribute rework: specification (`STAT_SYSTEM_REWORK_v1.0.md`) and `STATUS.md` (rules, every call site, tuning and measured gains per hour, saves, approximations).
 - `docs/equipment/STATUS.md` — equipment, paper doll, inventory and armor: the model, slots, families, materials, weight, UI, save conversion, approximations.
 - `assets/equipment-icons/missing-icons.json` — the 67 icons the equipment pieces and new materials still need (ids, file names, 64×64, descriptions).
 - `docs/combat/STATUS.md` — combat and First Aid: the rules, the weapon table, the save migration, sources and every approximation.
 - `docs/magery/` — the Magery kit: brief (`Magery_Brief.txt`), illustrated book (`Shardfall_Spellbook.html`, `Spellbook.md`), `spells.json`, reference math, and `STATUS.md` (what is in, what differs, what is left).
-- `tests/rules.test.js` — deterministic rules tests: `node tests/rules.test.js Shardfall_v0.28.1.html`
-- `tests/equipment.test.js` — equipment rules tests (slots, layering, carrying capacity, Mithril, exceptional, two-handed, requirements, encumbrance, crafting variants, durability, repair risk, atomic rollback, split/merge, death, migration): `node tests/equipment.test.js Shardfall_v0.28.1.html`
-- `tests/equipment-smoke/run.py` — paper doll in Chrome (C key, double-click, mouse and touch drag, drop validation, two-handed, context menu, tooltips and comparison, search/sort/filter, split/merge, 600 stacks, encumbrance and recovery, region mitigation, broken armor, meditation, window drag, Armor crafting, vendors, save/reload, v6 → v7 migration, phone): `python3 tests/equipment-smoke/run.py Shardfall_v0.28.1.html`
-- `tests/magery.test.js` — Magery rules tests: `node tests/magery.test.js Shardfall_v0.28.1.html`
-- `tests/combat.test.js` — combat and First Aid rules tests: `node tests/combat.test.js Shardfall_v0.28.1.html`
-- `tests/magery-smoke/run.py` — in-browser Magery scenarios (Playwright + Chrome): `python3 tests/magery-smoke/run.py Shardfall_v0.28.1.html`
-- `tests/combat-smoke/run.py` — in-browser combat, archery, First Aid, reload, old-save and phone play-test scenarios: `python3 tests/combat-smoke/run.py Shardfall_v0.28.1.html` (screenshots in `$COMBAT_SHOTS`, default `/tmp/combat-shots`)
-- `tests/backpack-smoke/run.py` — in-browser backpack checks (saved character, three sorts, desktop hover, phone tap, actions after sorting): `python3 tests/backpack-smoke/run.py Shardfall_v0.28.1.html`
-- `tests/backpack-smoke/panels.py` — the seven v1.0.1 icons everywhere items are listed (backpack tile, tooltip and tap card, Character, vendor buy and sell, loot, bank, crafting rows and inputs), weapon profiles unchanged, the wick still lights the Shore Beacon; desktop and two landscape phones: `python3 tests/backpack-smoke/panels.py Shardfall_v0.28.1.html`
-- `tests/backpack-smoke/icons.py` — backpack icon checks (all 161 ids resolve, slot / tooltip / tap card use the same tile, stack counts readable after every sort, desktop and two landscape phones): `python3 tests/backpack-smoke/icons.py Shardfall_v0.28.1.html`
-- `tests/sfx-smoke/run.py` — browser checks for sound, music, doors and footsteps (Playwright + Chrome; serves the web build on a local port): `python3 tests/sfx-smoke/run.py "$PWD/Shardfall_v0.28.1.html"`
-- `tests/anniabreen-smoke/run.py` — Anniabreen walk-through (Playwright + Chrome): a scripted walker drives the joystick through the real update loop and times the routes; mine/smelt/bank, ferries, boats, moongates, doors, touch and mouse over a bridge, reload, save migration, phone map: `python3 tests/anniabreen-smoke/run.py Shardfall_v0.28.1.html [--shots DIR]`
-- `tests/bestiary-smoke/run.py` — bestiary checks in the built game (sheets load, pixel-exact cells, 8 facings, walk / wind-up / impact against the player; preview screenshots when the pack is extracted): `python3 tests/bestiary-smoke/run.py Shardfall_v0.28.1.html [chrome] [screenshot-dir]`
-- `tests/world.test.js` — world simulation core tests: `node tests/world.test.js Shardfall_v0.28.1.html`
-- `tests/world-smoke/run.py` — Living World checks in the built game: phase 1 (actor ids, controllers, shared damage, death once, bounded events, save/load identity, v4 → v5 migration, seeded determinism), then `phase2.py` (clock, light, travel graph, journeys by road, boat, moongate and stairs, doors, stuck recovery, search budget, live step rate, developer panel) and `expansion.py` (towns unchanged tile for tile, sites and camps, causeway and islands, long journeys, v0.22 → v0.23 save migration) and `phase3.py` (species profiles and factions, regional populations, predator and prey, creature-against-creature fights, timid wildlife, perception at night and in hiding, graveyards rising at night, persistent camps through a reload, packs, pursuit limits, camp patrols, the spatial index, and a seeded three-day run) and `phase4.py` (homes, workplaces and schedules, a full accelerated day, shop hours, miners on real rock faces, guard patrols and the night watch, the travelling merchant, fear of creatures, crowds spreading out, resuming the day after a reload): `python3 tests/world-smoke/run.py Shardfall_v0.28.1.html`
+- `tests/rules.test.js` — deterministic rules tests: `node tests/rules.test.js Shardfall_v0.30.html`
+- `tests/equipment.test.js` — equipment rules tests (slots, layering, carrying capacity, Mithril, exceptional, two-handed, requirements, encumbrance, crafting variants, durability, repair risk, atomic rollback, split/merge, death, migration): `node tests/equipment.test.js Shardfall_v0.30.html`
+- `tests/equipment-smoke/run.py` — paper doll in Chrome (C key, double-click, mouse and touch drag, drop validation, two-handed, context menu, tooltips and comparison, search/sort/filter, split/merge, 600 stacks, encumbrance and recovery, region mitigation, broken armor, meditation, window drag, Armor crafting, vendors, save/reload, v6 → v7 migration, phone): `python3 tests/equipment-smoke/run.py Shardfall_v0.30.html`
+- `tests/magery.test.js` — Magery rules tests: `node tests/magery.test.js Shardfall_v0.30.html`
+- `tests/combat.test.js` — combat and First Aid rules tests: `node tests/combat.test.js Shardfall_v0.30.html`
+- `tests/magery-smoke/run.py` — in-browser Magery scenarios (Playwright + Chrome): `python3 tests/magery-smoke/run.py Shardfall_v0.30.html`
+- `tests/combat-smoke/run.py` — in-browser combat, archery, First Aid, reload, old-save and phone play-test scenarios: `python3 tests/combat-smoke/run.py Shardfall_v0.30.html` (screenshots in `$COMBAT_SHOTS`, default `/tmp/combat-shots`)
+- `tests/backpack-smoke/run.py` — in-browser backpack checks (saved character, three sorts, desktop hover, phone tap, actions after sorting): `python3 tests/backpack-smoke/run.py Shardfall_v0.30.html`
+- `tests/backpack-smoke/panels.py` — the seven v1.0.1 icons everywhere items are listed (backpack tile, tooltip and tap card, Character, vendor buy and sell, loot, bank, crafting rows and inputs), weapon profiles unchanged, the wick still lights the Shore Beacon; desktop and two landscape phones: `python3 tests/backpack-smoke/panels.py Shardfall_v0.30.html`
+- `tests/backpack-smoke/icons.py` — backpack icon checks (all 161 ids resolve, slot / tooltip / tap card use the same tile, stack counts readable after every sort, desktop and two landscape phones): `python3 tests/backpack-smoke/icons.py Shardfall_v0.30.html`
+- `tests/sfx-smoke/run.py` — browser checks for sound, music, doors and footsteps (Playwright + Chrome; serves the web build on a local port): `python3 tests/sfx-smoke/run.py "$PWD/Shardfall_v0.30.html"`
+- `tests/anniabreen-smoke/run.py` — Anniabreen walk-through (Playwright + Chrome): a scripted walker drives the joystick through the real update loop and times the routes; mine/smelt/bank, ferries, boats, moongates, doors, touch and mouse over a bridge, reload, save migration, phone map: `python3 tests/anniabreen-smoke/run.py Shardfall_v0.30.html [--shots DIR]`
+- `tests/bestiary-smoke/run.py` — bestiary checks in the built game (sheets load, pixel-exact cells, 8 facings, walk / wind-up / impact against the player; preview screenshots when the pack is extracted): `python3 tests/bestiary-smoke/run.py Shardfall_v0.30.html [chrome] [screenshot-dir]`
+- `tests/stats.test.js` — attribute rules tests (creation, caps, every lock permutation, transfer, eligibility, duplicates and cooldown across reloads, repeat limits, determinism, boons, pools, Strength policy, save conversion, skill map, gains per hour): `node tests/stats.test.js Shardfall_v0.30.html`
+- `tests/stats-smoke/run.py` — attributes in Chrome (creation controls and every preset, Character page and paper doll locks on desktop and phone, natural and effective values, save and reload, death, real gameplay paths through the one-roll contract, the cap transfer and Strength policy, the v7 → v8 conversion of a 150-point character): `python3 tests/stats-smoke/run.py Shardfall_v0.30.html`
+- `tests/world.test.js` — world simulation core tests: `node tests/world.test.js Shardfall_v0.30.html`
+- `tests/world-smoke/run.py` — Living World checks in the built game: phase 1 (actor ids, controllers, shared damage, death once, bounded events, save/load identity, v4 → v5 migration, seeded determinism), then `phase2.py` (clock, light, travel graph, journeys by road, boat, moongate and stairs, doors, stuck recovery, search budget, live step rate, developer panel) and `expansion.py` (towns unchanged tile for tile, sites and camps, causeway and islands, long journeys, v0.22 → v0.23 save migration) and `phase3.py` (species profiles and factions, regional populations, predator and prey, creature-against-creature fights, timid wildlife, perception at night and in hiding, graveyards rising at night, persistent camps through a reload, packs, pursuit limits, camp patrols, the spatial index, and a seeded three-day run) and `phase4.py` (homes, workplaces and schedules, a full accelerated day, shop hours, miners on real rock faces, guard patrols and the night watch, the travelling merchant, fear of creatures, crowds spreading out, resuming the day after a reload): `python3 tests/world-smoke/run.py Shardfall_v0.30.html`
+
+## v0.30 — Attributes grow with use (Second Age)
+
+- **No more buying attributes.** The trainer no longer sells Strength, Dexterity or Intelligence. Skill lessons to 30 (two free) are unchanged.
+- **Attributes grow while you use your skills**, a point at a time, up to 100 each and 225 together. Each skill trains the attributes it
+  relies on: Mining and Smithing Strength, Fencing and Archery Dexterity, Magery and Meditation Intelligence, and so on (hover an attribute
+  to see which). Fighting, casting, healing, gathering, crafting, hiding and playing music all count; one action can raise at most one
+  attribute, and a gain is followed by a short pause. Gold, trainers and quests never raise them, and there are no levels or experience.
+- **Health equals Strength, Stamina equals Dexterity, Mana equals Intelligence** (the Second Age rule). Carrying capacity is unchanged.
+- **New characters start with 80 points**, 10 to 60 each, set one point at a time (or five). The starting ideas are 35/20/25 (Glaive
+  hybrid), 30/40/10, 20/10/50, 25/45/10, 35/35/10 and 45/25/10. Every new character starts in plain leather, and the starter weapon always
+  fits your Strength.
+- **Raise, lock or lower each attribute** on the Character page or the paper doll (▲ / ■ / ▼). Once you reach 225, an attribute set to ▼
+  gives a point when another one rises; below 225 nothing decays. If that costs you the Strength a worn piece needs, the piece goes into
+  your backpack.
+- **Your character is kept.** Saves move to v8. Attributes from before stay exactly as they were (a 150-point character keeps 150), no gold
+  is taken or returned, and the old save is kept once as a backup. Health is now your Strength, so a character with 60 Strength has
+  60 Health instead of 80.
+- Details, tuning and measured gains per hour: `docs/stats/STATUS.md`.
 
 ## v0.28.1 — Life around Vespar (fix)
 
