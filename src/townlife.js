@@ -11,8 +11,9 @@
    NPCs are placed where their schedule says when the world loads, so a reload resumes the day instead of resetting it. */
 
 const LIFE = { npcs: [], towns: {}, stock: {}, fields: {}, trader: null, thinkMs: 0, events: { arrivals: 0, frights: 0, trades: 0, strokes: 0 } };
-const LIFE_TOWNS = { vespar: 1, mynoc: 1 };
-const LIFE_SHOP_ROLES = { tailor: 1, tinker: 1, provisioner: 1, fishmonger: 1, smith: 1, miner: 1 };
+const LIFE_TOWNS = { vespar: 1, mynoc: 1, skara: 1, moonglen: 1 };   // since v0.28 all four Anniabreen towns live
+const LIFE_SHOP_ROLES = { tailor: 1, tinker: 1, provisioner: 1, fishmonger: 1, smith: 1, miner: 1, innkeeper: 1, workshop: 1, fletcher: 1, mage: 1, reagents: 1 };
+const LIFE_ROLE_PROF = { smith: 'smith', innkeeper: 'innkeeper', scholar: 'scholar' };   // every other shop role keeps shop hours; scholars keep college hours
 /* [from, to, act, place]; places: home, work, hall (eat and meet), market (wander), field (gather), buyer (sell the haul) */
 const LIFE_SCHED = {
   shop:       [[22, 5.5, 'sleep', 'home'], [5.5, 6.5, 'home', 'home'], [6.5, 12, 'work', 'work'], [12, 13, 'eat', 'hall'], [13, 18, 'work', 'work'], [18, 20.5, 'social', 'hall'], [20.5, 22, 'home', 'home']],
@@ -22,16 +23,23 @@ const LIFE_SCHED = {
   dockhand:   [[22, 6, 'sleep', 'home'], [6, 7, 'home', 'home'], [7, 12, 'work', 'work'], [12, 13, 'eat', 'hall'], [13, 17, 'work', 'work'], [17, 20, 'social', 'hall'], [20, 22, 'home', 'home']],
   townsfolk:  [[22, 6.5, 'sleep', 'home'], [6.5, 8, 'home', 'home'], [8, 11, 'wander', 'market'], [11, 13, 'eat', 'hall'], [13, 16, 'wander', 'market'], [16, 19, 'social', 'hall'], [19, 22, 'home', 'home']] };
 LIFE_SCHED.woodcutter = LIFE_SCHED.miner;
-const LIFE_PROF_OF_ROLE = { smith: 'smith', miner: 'shop' };
+Object.assign(LIFE_SCHED, {
+  innkeeper:  [[1, 8.5, 'sleep', 'home'], [8.5, 9.5, 'home', 'home'], [9.5, 1, 'work', 'work']],                                   // the inn keeps late hours; the innkeeper lives in
+  scholar:    [[23, 7, 'sleep', 'home'], [7, 8, 'home', 'home'], [8, 12, 'work', 'work'], [12, 13, 'eat', 'hall'], [13, 18, 'work', 'work'], [18, 21, 'social', 'hall'], [21, 23, 'home', 'home']],
+  astronomer: [[6, 14, 'sleep', 'home'], [14, 15, 'home', 'home'], [15, 18, 'social', 'hall'], [18, 19, 'eat', 'hall'], [19, 6, 'work', 'work']],   // the stars are a night shift
+  student:    [[23, 7, 'sleep', 'home'], [7, 8, 'home', 'home'], [8, 12, 'study', 'study'], [12, 13, 'eat', 'hall'], [13, 17, 'study', 'study'], [17, 21, 'social', 'hall'], [21, 23, 'home', 'home']] });
+const LIFE_BUYERS = { ore: ['miner'], pine: ['miner', 'fletcher', 'workshop'], fish: ['fishmonger', 'innkeeper'] };
 /* new residents: name, profession, town (global positions come from the town's buildings at boot) */
 const LIFE_RESIDENTS = [
   ['Nell, fisherwoman', 'fisher', 'vespar'], ['Garrick, dockhand', 'dockhand', 'vespar'], ['Lise, weaver', 'townsfolk', 'vespar'], ['Old Tomas', 'townsfolk', 'vespar'], ['Corin, carter', 'townsfolk', 'vespar'],
-  ['Durn, miner', 'miner', 'mynoc'], ['Kessa, miner', 'miner', 'mynoc'], ['Fennick, woodcutter', 'woodcutter', 'mynoc'], ['Mabry, cook', 'townsfolk', 'mynoc']];
+  ['Durn, miner', 'miner', 'mynoc'], ['Kessa, miner', 'miner', 'mynoc'], ['Fennick, woodcutter', 'woodcutter', 'mynoc'], ['Mabry, cook', 'townsfolk', 'mynoc'],
+  ['Bryn, forester', 'woodcutter', 'skara'], ['Ysolde, herb gatherer', 'townsfolk', 'skara'],
+  ['Tibbet, student', 'student', 'moonglen'], ['Mira, student', 'student', 'moonglen']];
 const LIFE_LINES = {
   sleep: ['Zzz…'], home: ['Home at last.', 'Mind the door.'], work: ['Busy, busy.', 'Another day at it.'], eat: ['Smells good today.', 'Pass the bread.'],
   social: ['Did you hear about the wolves on the cart road?', 'Fine evening.', 'The college folk were in again.', 'Trade is slow this week.', 'Ore prices are up, they say.'],
-  wander: ['Just looking.', 'Fresh fish at Old Cray\'s.', 'Lovely day for it.'], gather: ['Hard work, this.', 'Good seam here.'], trade: ['Mind the scales.'], shelter: ['Get inside! Something is out there!'] };
-const LIFE_COL = { fisher: '#3a5a7a', dockhand: '#5a4a3a', townsfolk: '#6a5a4a', miner: '#4a4a52', woodcutter: '#3a5a32', trader: '#7a5a1a', weaver: '#6a3a5a' };
+  study: ['Shh, I\'m reading.', 'Exams on the conjunction next week.'], wander: ['Just looking.', 'Fresh fish at Old Cray\'s.', 'Lovely day for it.'], gather: ['Hard work, this.', 'Good seam here.'], trade: ['Mind the scales.'], shelter: ['Get inside! Something is out there!'] };
+const LIFE_COL = { student: '#4a3a6a', fisher: '#3a5a7a', dockhand: '#5a4a3a', townsfolk: '#6a5a4a', miner: '#4a4a52', woodcutter: '#3a5a32', trader: '#7a5a1a', weaver: '#6a3a5a' };
 const LIFE_ITEM = { miner: 'ore', woodcutter: 'pine', fisher: 'fish' };
 const LIFE_CARRY = 8;
 
@@ -69,7 +77,7 @@ function lifeField(e) {
   const want = L.prof === 'miner' ? T.RK : T.TR, from = L.prof === 'miner' ? (L.mineFrom || (L.mineFrom = lifeMineMouth(G))) : G.center;
   const key = L.town + ':' + L.prof, tiles = LIFE.fields[key] || (LIFE.fields[key] = (() => {   // every candidate node once: rock faces in the mine, trees beyond the houses
     const out = []; for (let y = Math.floor(from.y) - 70; y <= from.y + 70; y++) for (let x = Math.floor(from.x) - 70; x <= from.x + 70; x++) {
-      if (tAt(x, y) !== want) continue; if (L.prof === 'woodcutter' && protAt(x, y)) continue; if (L.prof === 'miner' && lifeZone(x, y) !== 'mine') continue;
+      if (tAt(x, y) !== want) continue; if (L.prof === 'woodcutter' && Math.hypot(x - from.x, y - from.y) < 18) continue; if (L.prof === 'miner' && lifeZone(x, y) !== 'mine') continue;   // woodcutters leave the trees in the heart of town alone (Skara Bryn stands in its woods)
       for (const [ox, oy] of [[0, 1.6], [1.6, 0], [-.6, .5], [.5, -.6], [0, -.6], [-.6, 0]]) { const sx = x + .5 + ox, sy = y + .5 + oy; if (canStand({ kind: 'npc' }, sx, sy)) { out.push({ x: sx, y: sy, nx: x, ny: y, d: Math.hypot(sx - from.x, sy - from.y) }); break; } } }
     return out.sort((a, b) => L.prof === 'miner' ? b.d - a.d : a.d - b.d); })());   // miners work the deep faces first, leaving the ones by the entrance to visitors; woodcutters the nearest trees
   const taken = new Set(LIFE.npcs.filter(o => o !== e && o.life.goal && o.life.goal.nx !== undefined).map(o => o.life.goal.ny * W + o.life.goal.nx));
@@ -78,8 +86,8 @@ function lifeField(e) {
 }
 function lifeMineMouth(G) { const t = ents.find(o => o.kind === 'npc' && o.role === 'miner' && o.town === 'mynoc'); return t ? { x: t.x + 14, y: t.y - 10 } : G.center; }
 function lifeBuyer(e) {
-  const L = e.life, role = L.prof === 'fisher' ? 'fishmonger' : 'miner', b = ents.find(o => o.kind === 'npc' && o.role === role && o.town === L.town);
-  return b ? lifeSpot(e, b.life ? b.life.work : b, 1.6) : lifeSpot(e, lifeTownGeo(L.town).center, 3);
+  const L = e.life, roles = LIFE_BUYERS[LIFE_ITEM[L.prof]] || ['miner'], b = ents.find(o => o.kind === 'npc' && roles.includes(o.role) && o.town === L.town);
+  if (!b) return lifeSpot(e, lifeTownGeo(L.town).center, 3); const p = lifeSpot(e, b.life ? b.life.work : b, 1.6); p.near = b; return p;   // trading happens across the counter: within reach of the buyer counts
 }
 function lifePlace(e, place) {
   const L = e.life, G = lifeTownGeo(L.town);
@@ -90,6 +98,7 @@ function lifePlace(e, place) {
     case 'market': return lifeSpot(e, G.market, G.market.r);
     case 'field': return lifeField(e);
     case 'buyer': return lifeBuyer(e);
+    case 'study': { const G = lifeTownGeo(L.town), lib = G.blds.find(b => b.role === 'moon_library') || G.hall.b; return lib ? lifeSpot(e, { x: lib.cx, y: lib.cy }, Math.max(1.2, Math.min(lib.w, lib.h) / 2 - .9)) : lifeSpot(e, G.center, 4); }
     case 'shelter': { const hd = Math.hypot(L.home.x - e.x, L.home.y - e.y); if (hd < 45) return L.home; let best = null, bd = 1e9; for (const b of G.blds) { const d = Math.hypot(b.cx - e.x, b.cy - e.y); if (d < bd) { bd = d; best = b; } } return best ? { x: best.cx, y: best.cy } : G.center; }
   }
   return L.home;
@@ -97,15 +106,18 @@ function lifePlace(e, place) {
 
 /* ---------- population: give the scheduled townsfolk a life, add the residents, place everyone where the clock says ---------- */
 function lifePopulate(npc) {
-  LIFE.npcs.length = 0; LIFE.towns = {}; LIFE.fields = {}; LIFE.stock = { vespar: { fish: 0 }, mynoc: { ore: 0, pine: 0 } };
+  LIFE.npcs.length = 0; LIFE.towns = {}; LIFE.fields = {}; LIFE.stock = { vespar: { fish: 0 }, mynoc: { ore: 0, pine: 0 }, skara: { pine: 0 }, moonglen: {} };
   for (const id in LIFE_TOWNS) lifeTownGeo(id);
   const homeUse = new Map();
-  const homeFor = (town, i) => { const G = LIFE.towns[town]; if (!G.homes.length) return { x: G.center.x, y: G.center.y }; const b = G.homes[i % G.homes.length]; const n = homeUse.get(b) || 0; homeUse.set(b, n + 1);
+  const homeFor = (town, i, live) => { const G = LIFE.towns[town]; const pool = G.homes.length ? G.homes : live ? [live] : G.hall.b ? [G.hall.b] : []; if (!pool.length) return { x: G.center.x, y: G.center.y };   // no houses (Skara Bryn, the college): they live in at their work or the hall
+    const b = pool[i % pool.length]; const n = homeUse.get(b) || 0; homeUse.set(b, n + 1);
     const p = { x: b.cx - 1.2 + (n % 3) * 1.2, y: b.cy - .6 + Math.floor(n / 3) * 1.1, b }; if (!canStand({ kind: 'npc' }, p.x, p.y)) { p.x = b.cx; p.y = b.cy; } return p; };
   let hi = 0;
-  for (const e of ents) if (e.kind === 'npc' && LIFE_TOWNS[e.town] && LIFE_SHOP_ROLES[e.role]) lifeAdopt(e, LIFE_PROF_OF_ROLE[e.role] || 'shop', e.town, homeFor(e.town, hi++), { x: e.x, y: e.y });
+  for (const e of ents) if (e.kind === 'npc' && LIFE_TOWNS[e.town] && (LIFE_SHOP_ROLES[e.role] || LIFE_ROLE_PROF[e.role])) {
+    const prof = /^Astronomer/.test(e.name) ? 'astronomer' : LIFE_ROLE_PROF[e.role] || 'shop', wb = insideBuild(e.x, e.y);
+    lifeAdopt(e, prof, e.town, homeFor(e.town, hi++, wb && wb.role !== 'house' && wb.role !== 'cottage' ? wb : null), { x: e.x, y: e.y }); }
   for (const [name, prof, town] of LIFE_RESIDENTS) {
-    const G = LIFE.towns[town], home = homeFor(town, hi++), e = npc('resident', name, home.x, home.y); e.town = town;
+    const G = LIFE.towns[town], home = homeFor(town, hi++, prof === 'student' ? G.blds.find(b => b.role === 'college_hall') : null), e = npc('resident', name, home.x, home.y); e.town = town;
     let work = null; if (prof === 'dockhand') { const wh = G.blds.filter(b => b.role === 'warehouse'); work = wh.length ? lifeOutside(wh[0]) : G.center; }
     lifeAdopt(e, prof, town, home, work || { x: G.center.x, y: G.center.y });
   }
@@ -139,7 +151,12 @@ function lifeTick(e, dt) {
   const L = e.life; if (!L || e.dev) return townTick(e, dt);
   L.needs = SIM.needsTick(L.needs, dt / WS.clock.secondsPerHour(), e.nav && e.nav.state === 'moving' ? 'walk' : L.doing);
   if (GT >= L.thinkAt) { const t0 = DEV.on ? performance.now() : 0; L.thinkAt = GT + .9 + (e.id % 10) * .02; if (L.prof === 'guard') guardThink(e); else if (L.prof === 'trader') traderThink(e); else lifeThink(e); if (DEV.on) LIFE.thinkMs += performance.now() - t0; }
-  if (e.nav && e.nav.state === 'moving') { navStep(e, dt * (L.hurry ? 1.35 : 1)); lifeSeparate(e); return; }
+  if (e.nav && e.nav.state === 'moving') {
+    const gd = L.goal ? Math.hypot(L.goal.x - e.x, L.goal.y - e.y) : 0;
+    if (!L.wd || gd < L.wd.d - .3 || (e.nav.job && e.nav.job.status === 'running')) L.wd = { d: gd, t: GT };   // a path still being searched is not a stall
+    else if (GT - L.wd.t > 6 && L.goal) {   // watchdog: a journey that has got no closer for 6 s ends here; close enough counts as there, otherwise try again
+      L.wd = null; e.nav = null; if (Math.hypot(L.goal.x - e.x, L.goal.y - e.y) < 4.5) { L.goal.x = e.x; L.goal.y = e.y; } else { L.retryAt = GT + 2; lifeGo(e, L.goal); } return; }
+    navStep(e, dt * (L.hurry ? 1.35 : 1)); lifeSeparate(e); return; }
   if (e.nav && e.nav.state === 'failed' && L.goal && GT > (L.retryAt || 0)) { L.retryAt = GT + 5; lifeGo(e, L.goal); }
   e.speed = 0; if (L.prof !== 'trader') lifeDo(e, dt); lifeSeparate(e);
 }
@@ -163,11 +180,11 @@ function lifeThink(e) {
   if (L.carry >= LIFE_CARRY && b && b.act === 'gather') opts.push({ act: 'trade@buyer', a: 'trade', place: 'buyer', score: .75, why: 'hands full (' + L.carry + ' ' + LIFE_ITEM[L.prof] + ')' });
   const pick1 = SIM.decide(L.mind, opts, GT, { commit: 20, margin: .15 }); if (!pick1) return;
   if (!L.goal || L.goal.key !== pick1.act || (pick1.a === 'shelter' && !L.goal)) {
-    const p = lifePlace(e, pick1.place); L.goal = { act: pick1.a, place: pick1.place, x: p.x, y: p.y, key: pick1.act, nx: p.nx, ny: p.ny }; L.doing = 'walk'; lifeGo(e, L.goal); }
+    const p = lifePlace(e, pick1.place); L.goal = { act: pick1.a, place: pick1.place, x: p.x, y: p.y, key: pick1.act, nx: p.nx, ny: p.ny, near: p.near }; L.doing = 'walk'; lifeGo(e, L.goal); }
 }
 /* doing the act once there */
 function lifeDo(e, dt) {
-  const L = e.life, g = L.goal; if (!g) return; const gd = Math.hypot(g.x - e.x, g.y - e.y), there = gd < 1.2 || (gd < 2.6 && e.nav && e.nav.state === 'done');   // a journey that ends a step short (behind a counter) still counts as arrived
+  const L = e.life, g = L.goal; if (!g) return; const gd = Math.hypot(g.x - e.x, g.y - e.y), there = gd < 1.2 || (gd < 2.6 && e.nav && e.nav.state === 'done') || (g.near && !g.near.gone && dist(e, g.near) < 3.2);   // a journey that ends a step short (behind a counter) still counts as arrived
   if (!there) { if (!e.nav || e.nav.state !== 'moving') { if (!e.nav || e.nav.state === 'done') lifeGo(e, g); } return; }
   L.doing = g.act;
   if (g.act === 'sleep') { if (P && dist(e, P) < 14 && GT > (L.zAt || 0)) { L.zAt = GT + 7; say(e, 'Zzz…'); } return; }
@@ -218,7 +235,7 @@ function traderThink(e) {
   L.doing = 'walk'; L.mind.why = 'on the road to ' + (L.dest === 'vespar' ? 'Vespar' : 'Mynoc');
   const th = lifeDanger(e, 14); L.hurry = !!th; if (th) { if (L.needs.safety < .5) { LIFE.events.frights++; L.mem.note(GT, 'hurried past', aidOf(th), { x: Math.round(e.x), y: Math.round(e.y) }, 120); } SIM.frighten(L.needs, 1); L.mind.why = 'hurrying past a ' + th.name; }
   if (e.nav && e.nav.state === 'failed' && GT > (L.retryAt || 0)) { L.retryAt = GT + 8; lifeGo(e, L.goal, { maxNodes: 400000, speed: SF.WALK * .6 }); }
-  if (Math.hypot(L.goal.x - e.x, L.goal.y - e.y) < 1.5) { L.phase = 'selling'; L.town = L.dest; e.town = L.dest; L.until = GT + WS.clock.secondsPerHour(); L.legs++; L.hurry = false; e.nav = null; L.goal = null; LIFE.events.arrivals++;
+  if (Math.hypot(L.goal.x - e.x, L.goal.y - e.y) < 1.5) { L.phase = 'selling'; L.town = L.dest; e.town = L.dest; L.until = GT + WS.clock.secondsPerHour(); L.legs++; L.hurry = false; e.nav = null; L.goal = null; L.needs.hunger = .1;   /* a meal at the market inn */ LIFE.events.arrivals++;
     L.mem.note(GT, 'arrived in ' + L.dest, null, null, 0); simEmit('MerchantArrived', { actor: aidOf(e), town: L.dest, x: e.x, y: e.y }); say(e, 'Fresh goods from the road!'); }
 }
 
@@ -228,10 +245,13 @@ function lifeTalk(n) {
   if (L.prof === 'trader') { if (L.phase === 'selling') return false; say(n, 'On the road to ' + (L.dest === 'vespar' ? 'Vespar' : 'Mynoc') + '. Find me at the market there.'); return true; }
   if (L.prof === 'guard') return false;
   if (L.doing === 'sleep' && L.goal && L.goal.act === 'sleep') { say(n, 'Zzz…'); log(n.name.split(',')[0] + ' is asleep.', '#b6a68a'); return true; }
-  if (LIFE_SHOP_ROLES[n.role]) { if (Math.hypot(n.x - L.work.x, n.y - L.work.y) < 3) return false;
-    const open = L.sched.find(bl => bl[2] === 'work'); say(n, `The shop is shut just now. I open at ${SIM.fmtHour(open[0])}.`); return true; }
-  const rec = L.mem.recent(3).reverse().find(r => r.what === 'fled from' || r.what === 'saw');
-  say(n, rec ? 'Careful out there. I saw something nasty earlier.' : pick(LIFE_LINES[L.doing] || LIFE_LINES.wander)); return true;
+  const met = L.mem.knows('talked with', aidOf(P)), first = (P.name || 'friend').split(' ')[0]; L.mem.note(GT, 'talked with', aidOf(P), null, 600);
+  const atWork = L.work && Math.hypot(n.x - L.work.x, n.y - L.work.y) < 3;
+  if (LIFE_SHOP_ROLES[n.role] || LIFE_ROLE_PROF[n.role]) { if (atWork) { if (met && GT > (L.greetAt || 0)) { L.greetAt = GT + 120; say(n, pick(['Back again, ' + first + '?', 'Good to see you, ' + first + '.', 'Ah, ' + first + '. What will it be?'])); } return false; }
+    if (!LIFE_SHOP_ROLES[n.role]) { say(n, (met ? first + '! ' : '') + pick(LIFE_LINES[L.doing] || LIFE_LINES.wander)); return true; }
+    const open = L.sched.find(bl => bl[2] === 'work'); say(n, `${met ? 'Sorry, ' + first + ', the' : 'The'} shop is shut just now. I open at ${SIM.fmtHour(open[0])}.`); return true; }
+  const rec = L.mem.recent(4).reverse().find(r => r.what === 'fled from' || r.what === 'saw');
+  say(n, (met ? pick(['Hello again, ', 'Oh, ', 'Good day, ']) + first + '. ' : '') + (rec ? 'Careful out there. I saw something nasty earlier.' : pick(LIFE_LINES[L.doing] || LIFE_LINES.wander))); return true;
 }
 function lifeInspect(e) {
   const L = e && e.life; if (!L) return {};
@@ -247,4 +267,17 @@ function lifeDev() {
   const t = LIFE.trader && LIFE.trader.life;
   return `town life: ${LIFE.npcs.length} with routines · ${Object.entries(by).map(([k, v]) => k + ' ' + v).join(', ')}<br>
   trader: ${t ? t.phase + (t.phase === 'travel' ? ' → ' + t.dest : ' at ' + t.town) + ', trips ' + t.legs : '—'} · stores: ${Object.entries(LIFE.stock).map(([k, s]) => k + ' ' + Object.entries(s).map(([i, q]) => q + ' ' + i).join('/')).join(', ')} · frights ${LIFE.events.frights} · strokes ${LIFE.events.strokes} · sales ${LIFE.events.trades}`;
+}
+
+/* ---------- save: what townsfolk carry with them (needs, memory, haul, purse), the stores, and the trader's road ----------
+   Positions are not saved: a load places everyone where the clock says (lifeResume). */
+function lifeSave() {
+  const npcs = {}; for (const e of LIFE.npcs) { if (!e.actorId || e.gone) continue; const L = e.life; npcs[e.actorId] = { needs: L.needs, mem: L.mem.save(), carry: L.carry || 0, gold: L.gold ?? null }; }
+  const t = LIFE.trader && LIFE.trader.life; return { v: 1, npcs, stock: LIFE.stock, trader: t ? { town: t.town, legs: t.legs, gold: t.gold } : null };
+}
+function lifeLoad(saved) {
+  if (!saved || !saved.npcs) return;
+  for (const e of LIFE.npcs) { const r = e.actorId && saved.npcs[e.actorId]; if (!r) continue; const L = e.life; L.needs = SIM.newNeeds(r.needs); L.mem = SIM.newMemory(8, r.mem); if (r.carry !== undefined) L.carry = r.carry; if (r.gold !== null && r.gold !== undefined) L.gold = r.gold; }
+  if (saved.stock) for (const k in saved.stock) LIFE.stock[k] = Object.assign(LIFE.stock[k] || {}, saved.stock[k]);
+  const t = LIFE.trader; if (t && saved.trader && LIFE.towns[saved.trader.town]) { const L = t.life, G = LIFE.towns[saved.trader.town], p = lifeSpot(t, G.market, 5); L.town = t.town = saved.trader.town; L.legs = saved.trader.legs || 0; L.gold = saved.trader.gold ?? L.gold; L.phase = 'selling'; L.until = 0; lifeTeleport(t, p); t.home = { x: p.x, y: p.y }; }
 }
