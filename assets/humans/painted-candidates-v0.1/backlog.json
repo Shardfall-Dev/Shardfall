@@ -1,0 +1,1130 @@
+{
+ "pack": "Shardfall_Painted_Candidates_v0.1",
+ "generatedBy": "tools/painted_backlog.py",
+ "statuses": {
+  "exists": "usable as delivered",
+  "partial": "some genuine art, not the full requirement",
+  "mirrored": "covered only by a mirror or duplicate",
+  "missing": "no art"
+ },
+ "summary": {
+  "frames": 192,
+  "accepted": 101,
+  "rejected": 91,
+  "mirroredOrDuplicatedInPack": 0,
+  "itemsExist": 0,
+  "itemsPartial": 4,
+  "itemsMirrored": 0,
+  "itemsMissing": 11
+ },
+ "mirrorCheck": {
+  "rule": "silhouette IoU >= 0.95 and mean RGB diff <= 8.0 after flipping (mirror) or as is (copy)",
+  "found": [],
+  "closestMirrorPerSheet": {
+   "male/Idle": {
+    "pair": "S/2 ~ flip(S/1)",
+    "iou": 0.951,
+    "diff": 11.67
+   },
+   "male/Walk": {
+    "pair": "S/0 ~ flip(S/2)",
+    "iou": 0.929,
+    "diff": 14.62
+   },
+   "male/Cast": {
+    "pair": "S/0 ~ flip(S/1)",
+    "iou": 0.912,
+    "diff": 14.55
+   },
+   "male/Unarmed_Attack": {
+    "pair": "N/1 ~ flip(N/0)",
+    "iou": 0.795,
+    "diff": 28.75
+   },
+   "female/Idle": {
+    "pair": "S/0 ~ flip(S/1)",
+    "iou": 0.954,
+    "diff": 15.43
+   },
+   "female/Walk": {
+    "pair": "S/0 ~ flip(S/1)",
+    "iou": 0.939,
+    "diff": 15.57
+   },
+   "female/Cast": {
+    "pair": "SW/0 ~ flip(NE/2)",
+    "iou": 0.811,
+    "diff": 17.14
+   },
+   "female/Unarmed_Attack": {
+    "pair": "S/2 ~ flip(S/0)",
+    "iou": 0.898,
+    "diff": 17.42
+   }
+  }
+ },
+ "styleV01": {
+  "male/Idle": {
+   "heightMedian": 65.0,
+   "heightRange": [
+    64,
+    66
+   ],
+   "softAlphaShare": 0.0,
+   "darkOutlineShare": 0.244
+  },
+  "male/Walk": {
+   "heightMedian": 60.0,
+   "heightRange": [
+    59,
+    61
+   ],
+   "softAlphaShare": 0.0,
+   "darkOutlineShare": 0.2
+  },
+  "male/Cast": {
+   "heightMedian": 62.0,
+   "heightRange": [
+    54,
+    64
+   ],
+   "softAlphaShare": 0.0,
+   "darkOutlineShare": 0.198
+  },
+  "male/Unarmed_Attack": {
+   "heightMedian": 59.0,
+   "heightRange": [
+    57,
+    63
+   ],
+   "softAlphaShare": 0.0,
+   "darkOutlineShare": 0.199
+  },
+  "female/Idle": {
+   "heightMedian": 63.0,
+   "heightRange": [
+    58,
+    64
+   ],
+   "softAlphaShare": 0.0,
+   "darkOutlineShare": 0.228
+  },
+  "female/Walk": {
+   "heightMedian": 62.0,
+   "heightRange": [
+    57,
+    64
+   ],
+   "softAlphaShare": 0.0,
+   "darkOutlineShare": 0.203
+  },
+  "female/Cast": {
+   "heightMedian": 64.0,
+   "heightRange": [
+    60,
+    66
+   ],
+   "softAlphaShare": 0.0,
+   "darkOutlineShare": 0.171
+  },
+  "female/Unarmed_Attack": {
+   "heightMedian": 56.0,
+   "heightRange": [
+    53,
+    60
+   ],
+   "softAlphaShare": 0.0,
+   "darkOutlineShare": 0.196
+  }
+ },
+ "crossPack": {
+  "source": "asset-packs/classic-humans-v2/Shardfall_Classic_Humans_Painted_v2.zip (main), SHA-256 7fcf0639c6c9ff58d7a13e2394b5ed4d00f96367c0560061ea31bc8cd1a9fed9",
+  "v2SWisMirrorOfSE": {
+   "frames": 32,
+   "minIoU": 1.0,
+   "maxDiff": 0.0,
+   "note": "every v2 SW walk/cast frame is exactly the flipped SE frame: the handedness swap reported in the v2.1 status. It also shows the mirror check catches a real mirror (IoU 1, diff 0)."
+  },
+  "v01CopiedFromV2": {
+   "bestIoU": 0.807,
+   "v01": "male/Cast/S/2",
+   "v2": "flip female/cast/SE/0",
+   "note": "no v0.1 walk/cast frame is a copy or mirror of v2 art (a copy scores 1.0; similar upright poses score about 0.8)"
+  },
+  "styleV2": {
+   "idleV1": {
+    "heightMedian": 69.0,
+    "heightRange": [
+     68,
+     71
+    ],
+    "softAlphaShare": 0.0,
+    "darkOutlineShare": 0.998
+   },
+   "walkCastSE": {
+    "heightMedian": 62.0,
+    "heightRange": [
+     59,
+     63
+    ],
+    "softAlphaShare": 0.933,
+    "darkOutlineShare": 0.972
+   },
+   "walkCastSWmirrored": {
+    "heightMedian": 62.0,
+    "heightRange": [
+     59,
+     63
+    ],
+    "softAlphaShare": 0.933,
+    "darkOutlineShare": 0.972
+   }
+  }
+ },
+ "backlog": [
+  {
+   "id": "walk-cast-other-directions",
+   "ask": "Walking and casting in the other 6 directions (S W NW N NE E)",
+   "status": "partial",
+   "detail": {
+    "male walk": {
+     "S": {
+      "status": "missing",
+      "acceptedCandidatePoses": 0,
+      "note": "all 3 candidates rejected"
+     },
+     "W": {
+      "status": "partial",
+      "acceptedCandidatePoses": 2,
+      "note": "2 accepted candidate pose(s), not a cycle"
+     },
+     "NW": {
+      "status": "missing",
+      "acceptedCandidatePoses": 0,
+      "note": "all 3 candidates rejected"
+     },
+     "N": {
+      "status": "missing",
+      "acceptedCandidatePoses": 0,
+      "note": "all 3 candidates rejected"
+     },
+     "NE": {
+      "status": "missing",
+      "acceptedCandidatePoses": 0,
+      "note": "all 3 candidates rejected"
+     },
+     "E": {
+      "status": "partial",
+      "acceptedCandidatePoses": 3,
+      "note": "3 accepted candidate pose(s), not a cycle"
+     }
+    },
+    "male cast": {
+     "S": {
+      "status": "missing",
+      "acceptedCandidatePoses": 0,
+      "note": "all 3 candidates rejected"
+     },
+     "W": {
+      "status": "partial",
+      "acceptedCandidatePoses": 3,
+      "note": "3 accepted candidate pose(s), not a cycle"
+     },
+     "NW": {
+      "status": "partial",
+      "acceptedCandidatePoses": 3,
+      "note": "3 accepted candidate pose(s), not a cycle"
+     },
+     "N": {
+      "status": "partial",
+      "acceptedCandidatePoses": 2,
+      "note": "2 accepted candidate pose(s), not a cycle"
+     },
+     "NE": {
+      "status": "missing",
+      "acceptedCandidatePoses": 0,
+      "note": "all 3 candidates rejected"
+     },
+     "E": {
+      "status": "partial",
+      "acceptedCandidatePoses": 1,
+      "note": "1 accepted candidate pose(s), not a cycle"
+     }
+    },
+    "female walk": {
+     "S": {
+      "status": "missing",
+      "acceptedCandidatePoses": 0,
+      "note": "all 3 candidates rejected"
+     },
+     "W": {
+      "status": "partial",
+      "acceptedCandidatePoses": 3,
+      "note": "3 accepted candidate pose(s), not a cycle"
+     },
+     "NW": {
+      "status": "partial",
+      "acceptedCandidatePoses": 3,
+      "note": "3 accepted candidate pose(s), not a cycle"
+     },
+     "N": {
+      "status": "partial",
+      "acceptedCandidatePoses": 1,
+      "note": "1 accepted candidate pose(s), not a cycle"
+     },
+     "NE": {
+      "status": "missing",
+      "acceptedCandidatePoses": 0,
+      "note": "all 3 candidates rejected"
+     },
+     "E": {
+      "status": "partial",
+      "acceptedCandidatePoses": 3,
+      "note": "3 accepted candidate pose(s), not a cycle"
+     }
+    },
+    "female cast": {
+     "S": {
+      "status": "missing",
+      "acceptedCandidatePoses": 0,
+      "note": "all 3 candidates rejected"
+     },
+     "W": {
+      "status": "partial",
+      "acceptedCandidatePoses": 3,
+      "note": "3 accepted candidate pose(s), not a cycle"
+     },
+     "NW": {
+      "status": "partial",
+      "acceptedCandidatePoses": 3,
+      "note": "3 accepted candidate pose(s), not a cycle"
+     },
+     "N": {
+      "status": "partial",
+      "acceptedCandidatePoses": 3,
+      "note": "3 accepted candidate pose(s), not a cycle"
+     },
+     "NE": {
+      "status": "missing",
+      "acceptedCandidatePoses": 0,
+      "note": "all 3 candidates rejected"
+     },
+     "E": {
+      "status": "partial",
+      "acceptedCandidatePoses": 3,
+      "note": "3 accepted candidate pose(s), not a cycle"
+     }
+    }
+   }
+  },
+  {
+   "id": "true-sw",
+   "ask": "A real south-west walk and cast (the v2 SW is a mirrored SE with swapped hands)",
+   "status": "partial",
+   "detail": {
+    "male walk": {
+     "status": "partial",
+     "acceptedCandidatePoses": 3,
+     "note": "painted separately in v0.1 (pixel test: not a flipped SE or any other frame); candidate poses, not the 8-frame cycle",
+     "mirror": false
+    },
+    "male cast": {
+     "status": "partial",
+     "acceptedCandidatePoses": 3,
+     "note": "painted separately in v0.1 (pixel test: not a flipped SE or any other frame); candidate poses, not the 8-frame cycle",
+     "mirror": false
+    },
+    "female walk": {
+     "status": "partial",
+     "acceptedCandidatePoses": 3,
+     "note": "painted separately in v0.1 (pixel test: not a flipped SE or any other frame); candidate poses, not the 8-frame cycle",
+     "mirror": false
+    },
+    "female cast": {
+     "status": "partial",
+     "acceptedCandidatePoses": 3,
+     "note": "painted separately in v0.1 (pixel test: not a flipped SE or any other frame); candidate poses, not the 8-frame cycle",
+     "mirror": false
+    }
+   }
+  },
+  {
+   "id": "run",
+   "ask": "Running",
+   "status": "missing",
+   "detail": {
+    "run": {
+     "status": "missing",
+     "directions": 8,
+     "bodies": [
+      "male",
+      "female"
+     ]
+    }
+   }
+  },
+  {
+   "id": "weapon-attacks",
+   "ask": "All 13 weapon attacks",
+   "status": "partial",
+   "note": "only unarmed has candidate art; the 12 weapon attacks have none",
+   "detail": {
+    "slash1h": {
+     "status": "missing",
+     "directions": 8,
+     "bodies": [
+      "male",
+      "female"
+     ]
+    },
+    "slash2h": {
+     "status": "missing",
+     "directions": 8,
+     "bodies": [
+      "male",
+      "female"
+     ]
+    },
+    "chop1h": {
+     "status": "missing",
+     "directions": 8,
+     "bodies": [
+      "male",
+      "female"
+     ]
+    },
+    "chop2h": {
+     "status": "missing",
+     "directions": 8,
+     "bodies": [
+      "male",
+      "female"
+     ]
+    },
+    "blunt1h": {
+     "status": "missing",
+     "directions": 8,
+     "bodies": [
+      "male",
+      "female"
+     ]
+    },
+    "blunt2h": {
+     "status": "missing",
+     "directions": 8,
+     "bodies": [
+      "male",
+      "female"
+     ]
+    },
+    "thrust1h": {
+     "status": "missing",
+     "directions": 8,
+     "bodies": [
+      "male",
+      "female"
+     ]
+    },
+    "thrust2h": {
+     "status": "missing",
+     "directions": 8,
+     "bodies": [
+      "male",
+      "female"
+     ]
+    },
+    "polearm": {
+     "status": "missing",
+     "directions": 8,
+     "bodies": [
+      "male",
+      "female"
+     ]
+    },
+    "staff": {
+     "status": "missing",
+     "directions": 8,
+     "bodies": [
+      "male",
+      "female"
+     ]
+    },
+    "bow": {
+     "status": "missing",
+     "directions": 8,
+     "bodies": [
+      "male",
+      "female"
+     ]
+    },
+    "crossbow": {
+     "status": "missing",
+     "directions": 8,
+     "bodies": [
+      "male",
+      "female"
+     ]
+    },
+    "unarmed": {
+     "status": "partial",
+     "note": "Unarmed_Attack candidates; see perDirection. Not an 8-frame strike.",
+     "perDirection": {
+      "male": {
+       "S": {
+        "status": "missing",
+        "acceptedCandidatePoses": 0,
+        "note": "all 3 candidates rejected"
+       },
+       "SW": {
+        "status": "partial",
+        "acceptedCandidatePoses": 3,
+        "note": "3 accepted candidate pose(s), not a cycle"
+       },
+       "W": {
+        "status": "partial",
+        "acceptedCandidatePoses": 3,
+        "note": "3 accepted candidate pose(s), not a cycle"
+       },
+       "NW": {
+        "status": "missing",
+        "acceptedCandidatePoses": 0,
+        "note": "all 3 candidates rejected"
+       },
+       "N": {
+        "status": "missing",
+        "acceptedCandidatePoses": 0,
+        "note": "all 3 candidates rejected"
+       },
+       "NE": {
+        "status": "missing",
+        "acceptedCandidatePoses": 0,
+        "note": "all 3 candidates rejected"
+       },
+       "E": {
+        "status": "partial",
+        "acceptedCandidatePoses": 3,
+        "note": "3 accepted candidate pose(s), not a cycle"
+       },
+       "SE": {
+        "status": "partial",
+        "acceptedCandidatePoses": 3,
+        "note": "3 accepted candidate pose(s), not a cycle"
+       }
+      },
+      "female": {
+       "S": {
+        "status": "missing",
+        "acceptedCandidatePoses": 0,
+        "note": "all 3 candidates rejected"
+       },
+       "SW": {
+        "status": "partial",
+        "acceptedCandidatePoses": 3,
+        "note": "3 accepted candidate pose(s), not a cycle"
+       },
+       "W": {
+        "status": "partial",
+        "acceptedCandidatePoses": 3,
+        "note": "3 accepted candidate pose(s), not a cycle"
+       },
+       "NW": {
+        "status": "missing",
+        "acceptedCandidatePoses": 0,
+        "note": "all 3 candidates rejected"
+       },
+       "N": {
+        "status": "partial",
+        "acceptedCandidatePoses": 2,
+        "note": "2 accepted candidate pose(s), not a cycle"
+       },
+       "NE": {
+        "status": "missing",
+        "acceptedCandidatePoses": 0,
+        "note": "all 3 candidates rejected"
+       },
+       "E": {
+        "status": "partial",
+        "acceptedCandidatePoses": 3,
+        "note": "3 accepted candidate pose(s), not a cycle"
+       },
+       "SE": {
+        "status": "partial",
+        "acceptedCandidatePoses": 3,
+        "note": "3 accepted candidate pose(s), not a cycle"
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "id": "two-handed-staff-casting",
+   "ask": "Two-handed and staff casting",
+   "status": "missing",
+   "detail": {
+    "cast2h": {
+     "status": "missing",
+     "directions": 8,
+     "bodies": [
+      "male",
+      "female"
+     ]
+    },
+    "caststaff": {
+     "status": "missing",
+     "directions": 8,
+     "bodies": [
+      "male",
+      "female"
+     ]
+    }
+   },
+   "note": "Cast is one unsplit candidate pose set; not CastPrepare/Hold/Release and not two-handed or staff"
+  },
+  {
+   "id": "block-hit-death-corpse",
+   "ask": "Block, hit, death, corpse",
+   "status": "missing",
+   "detail": {
+    "block": {
+     "status": "missing",
+     "directions": 8,
+     "bodies": [
+      "male",
+      "female"
+     ]
+    },
+    "hit": {
+     "status": "missing",
+     "directions": 8,
+     "bodies": [
+      "male",
+      "female"
+     ]
+    },
+    "death": {
+     "status": "missing",
+     "directions": 8,
+     "bodies": [
+      "male",
+      "female"
+     ]
+    },
+    "corpse": {
+     "status": "missing",
+     "directions": 8,
+     "bodies": [
+      "male",
+      "female"
+     ]
+    }
+   }
+  },
+  {
+   "id": "gathering-crafting",
+   "ask": "Gathering and crafting actions",
+   "status": "missing",
+   "detail": {
+    "mine": {
+     "status": "missing",
+     "directions": 8,
+     "bodies": [
+      "male",
+      "female"
+     ]
+    },
+    "chopwood": {
+     "status": "missing",
+     "directions": 8,
+     "bodies": [
+      "male",
+      "female"
+     ]
+    },
+    "smith": {
+     "status": "missing",
+     "directions": 8,
+     "bodies": [
+      "male",
+      "female"
+     ]
+    },
+    "fish": {
+     "status": "missing",
+     "directions": 8,
+     "bodies": [
+      "male",
+      "female"
+     ]
+    },
+    "bandage": {
+     "status": "missing",
+     "directions": 8,
+     "bodies": [
+      "male",
+      "female"
+     ]
+    }
+   }
+  },
+  {
+   "id": "base-bodies",
+   "ask": "Base bodies without painted-in clothes or hair, plus skin colour masks",
+   "status": "partial",
+   "detail": {
+    "clothes": {
+     "status": "partial",
+     "note": "v0.1 bodies wear only a loincloth (and a bandeau on the female); no shirt, trousers or shoes are painted in"
+    },
+    "hair": {
+     "status": "missing",
+     "note": "hair is painted into every v0.1 frame"
+    },
+    "skinMasks": {
+     "status": "missing"
+    }
+   }
+  },
+  {
+   "id": "hair",
+   "ask": "8 hairstyles (front and back)",
+   "status": "missing",
+   "detail": {
+    "short": {
+     "status": "missing",
+     "note": "front and back layers, every frame"
+    },
+    "long": {
+     "status": "missing",
+     "note": "front and back layers, every frame"
+    },
+    "ponytail": {
+     "status": "missing",
+     "note": "front and back layers, every frame"
+    },
+    "pageboy": {
+     "status": "missing",
+     "note": "front and back layers, every frame"
+    },
+    "receding": {
+     "status": "missing",
+     "note": "front and back layers, every frame"
+    },
+    "mohawk": {
+     "status": "missing",
+     "note": "front and back layers, every frame"
+    },
+    "buns": {
+     "status": "missing",
+     "note": "front and back layers, every frame"
+    },
+    "pigtails": {
+     "status": "missing",
+     "note": "front and back layers, every frame"
+    }
+   }
+  },
+  {
+   "id": "beards",
+   "ask": "4 beards",
+   "status": "missing",
+   "detail": {
+    "stubble": {
+     "status": "missing",
+     "note": "every frame"
+    },
+    "goatee": {
+     "status": "missing",
+     "note": "every frame"
+    },
+    "short": {
+     "status": "missing",
+     "note": "every frame"
+    },
+    "full": {
+     "status": "missing",
+     "note": "every frame"
+    }
+   }
+  },
+  {
+   "id": "clothing",
+   "ask": "Clothing layers with colour masks",
+   "status": "missing",
+   "detail": {
+    "shirt": {
+     "status": "missing",
+     "note": "layer + dye mask"
+    },
+    "trousers": {
+     "status": "missing",
+     "note": "layer + dye mask"
+    },
+    "shoes": {
+     "status": "missing",
+     "note": "layer + dye mask"
+    },
+    "boots": {
+     "status": "missing",
+     "note": "layer + dye mask"
+    },
+    "belt": {
+     "status": "missing",
+     "note": "layer + dye mask"
+    },
+    "robe": {
+     "status": "missing",
+     "note": "layer + dye mask"
+    },
+    "tabard": {
+     "status": "missing",
+     "note": "layer + dye mask"
+    },
+    "cloak (front and back)": {
+     "status": "missing",
+     "note": "layer + dye mask"
+    },
+    "cloth_cap": {
+     "status": "missing",
+     "note": "layer + dye mask"
+    },
+    "cloth_gloves": {
+     "status": "missing",
+     "note": "layer + dye mask"
+    }
+   }
+  },
+  {
+   "id": "equipment",
+   "ask": "A separate layer for each of the 56 equipment pieces plus the buckler, with material masks",
+   "status": "missing",
+   "detail": {
+    "cloth_cap": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "shirt": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "trousers": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "robe": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "cloak": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "cloth_gloves": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "tabard": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "leather_cap": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "leather_gorget": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "leather_tunic": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "leather_sleeves": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "leather_gloves": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "leather_leggings": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "boots": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "shoes": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "belt": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "studded_gorget": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "studded_tunic": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "studded_sleeves": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "studded_gloves": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "studded_leggings": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "bone_helm": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "bone_chest": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "bone_arms": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "bone_gloves": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "bone_legs": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "ringmail_tunic": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "ringmail_sleeves": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "ringmail_gloves": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "ringmail_leggings": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "chain_coif": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "chain_tunic": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "chain_leggings": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "plate_gorget": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "plate_chest": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "plate_arms": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "plate_gauntlets": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "plate_leggings": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "bascinet": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "open_helm": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "norse_helm": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "closed_helm": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "plate_helm": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "great_helm": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "dragon_helm": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "dragon_chest": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "dragon_arms": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "dragon_gloves": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "dragon_legs": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "wooden_shield": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "metal_shield": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "kite_shield": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "heater_shield": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "ring": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "bracelet": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "necklace": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    },
+    "buckler": {
+     "status": "missing",
+     "note": "layer + material mask, every frame"
+    }
+   }
+  },
+  {
+   "id": "weapons",
+   "ask": "15 weapon shapes with hand positions for every frame",
+   "status": "missing",
+   "detail": {
+    "hatchet": {
+     "status": "missing",
+     "note": "shape + per-frame hand socket"
+    },
+    "pickaxe": {
+     "status": "missing",
+     "note": "shape + per-frame hand socket"
+    },
+    "knife": {
+     "status": "missing",
+     "note": "shape + per-frame hand socket"
+    },
+    "dagger": {
+     "status": "missing",
+     "note": "shape + per-frame hand socket"
+    },
+    "sword": {
+     "status": "missing",
+     "note": "shape + per-frame hand socket"
+    },
+    "hammer": {
+     "status": "missing",
+     "note": "shape + per-frame hand socket"
+    },
+    "glaive": {
+     "status": "missing",
+     "note": "shape + per-frame hand socket"
+    },
+    "shortbow": {
+     "status": "missing",
+     "note": "shape + per-frame hand socket"
+    },
+    "crossbow": {
+     "status": "missing",
+     "note": "shape + per-frame hand socket"
+    },
+    "heavycrossbow": {
+     "status": "missing",
+     "note": "shape + per-frame hand socket"
+    },
+    "battleaxe": {
+     "status": "missing",
+     "note": "shape + per-frame hand socket"
+    },
+    "mace": {
+     "status": "missing",
+     "note": "shape + per-frame hand socket"
+    },
+    "waraxe": {
+     "status": "missing",
+     "note": "shape + per-frame hand socket"
+    },
+    "kryss": {
+     "status": "missing",
+     "note": "shape + per-frame hand socket"
+    },
+    "spear": {
+     "status": "missing",
+     "note": "shape + per-frame hand socket"
+    }
+   }
+  },
+  {
+   "id": "paperdoll",
+   "ask": "Paperdoll portrait layers",
+   "status": "missing",
+   "note": "no portrait art for these bodies; the paper doll keeps its current art"
+  },
+  {
+   "id": "one-style",
+   "ask": "Repaint to one matching style",
+   "status": "missing",
+   "note": "v0.1 is a third style: hard alpha and no dark outline in every sheet, so it matches neither v2 idle (dark outline) nor v2 walk/cast (soft edges). Its own figure heights also differ between actions (male idle 65 px vs walk 60 px; female unarmed 56 px vs cast 64 px), and hair is drawn differently from the v2 sets."
+  }
+ ],
+ "fallbacks": [
+  {
+   "what": "every state, direction and body with no accepted v0.1 frame",
+   "uses": "the existing renderer",
+   "where": "src/painted-render.js drawPaintedActor returns false"
+  },
+  {
+   "what": "Cast for cast2h / caststaff",
+   "uses": "the unsplit v0.1 Cast candidates (same as cast1h)",
+   "temporary": true,
+   "note": "not two-handed or staff art"
+  },
+  {
+   "what": "any worn item",
+   "uses": "the existing renderer (strict mode)",
+   "note": "no overlays exist for these bodies"
+  }
+ ]
+}

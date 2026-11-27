@@ -2404,9 +2404,14 @@ PT.ROWS = ['S', 'SW', 'W', 'NW', 'N', 'NE', 'E', 'SE'];
 /* rig action → painted action. Anything not listed (run, ready, hit, death, corpse, weapon attacks, block, tools) has no painted art. */
 PT.ACTION_OF = { idle: 'Idle', walk: 'Walk', unarmed: 'Unarmed_Attack', cast1h: 'Cast', cast2h: 'Cast', caststaff: 'Cast' };
 PT.RIG_FRAMES = { idle: 4, walk: 8, unarmed: 8, cast1h: 8, cast2h: 8, caststaff: 8 };
+/* temporary fallbacks: rig actions drawn with candidate art made for another action. Listed in the inspector and in
+   assets/humans/painted-candidates-v0.1/backlog.json; remove an entry when its own art arrives. In strict mode they are
+   unreachable (a two-handed weapon or staff is a worn item); they show only in the bodies QA view. */
+PT.TEMP_FALLBACKS = { cast2h: 'Cast', caststaff: 'Cast' };
 /* what the painted bodies cannot represent: reported, never hidden */
 PT.LIMITS = ['hair is baked in (hair style and colour from character creation are not shown)', 'skin tone is baked in', 'no beards',
-  'no clothing, armour, weapon or shield overlays', 'Cast is one unsplit set (no separate prepare / hold / release)', 'three candidate poses per direction, not full cycles'];
+  'no clothing, armour, weapon or shield overlays', 'Cast is one unsplit set (no separate prepare / hold / release)', 'three candidate poses per direction, not full cycles',
+  'two-handed and staff casting borrow the one-handed Cast candidates (temporary fallback)'];
 
 /* accepted frame indices for body / painted action / direction index (0..7), [] when none */
 PT.accepted = (body, action, dir) => {
