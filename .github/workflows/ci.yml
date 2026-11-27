@@ -45,7 +45,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install Playwright (uses the runner's Google Chrome)
-        run: pip install playwright
+        run: pip install playwright pillow
       - name: Browser suites
         run: |
           GAME=$(ls Shardfall_v*.html | grep -v _offline | sort -V | tail -n 1); G="$PWD/$GAME"; fail=0
