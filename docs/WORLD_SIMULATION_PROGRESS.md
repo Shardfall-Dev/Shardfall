@@ -451,6 +451,21 @@ Requested on 2026-11-26: bigger distances, more camps, and places for dungeons. 
 - **Creatures respawn on load as before; camp clearance is the one thing saved now.** Saving every creature is phase 6 (§26).
 - **The quarter-rate tier for distant idle creatures** is a stopgap so the larger population costs less than the old one did. Phase 6 replaces it with the spec's tiers A/B/C.
 
+### Integration (v0.26)
+
+v0.26 merges phase 3 with the equipment and paper doll work (#19, which already contains the missing icons, #18). Both branches had been numbered v0.25.
+
+- **Conflicts resolved:** `build.sh` (both new modules in the build order), `src/game.js` (the equipment v7 save carries the `eco` block, and `__SF` exposes both sets of hooks) and the README.
+- **Fixed while re-testing the merged build:**
+  - A patrol whose leader died left its camp unable to send another.
+  - A camp whose members were all busy hunting waited 200 s before trying again; it now retries after 30 s.
+  - Risen skeletons that could not reach their grave never sank at dawn; they now sink after 45 s, still out of sight.
+  - Patrol legs now have time limits.
+- **Every suite on v0.26:**
+  - Node: rules, equipment, magery, combat and world all pass.
+  - Browser: equipment-smoke 67/67, backpack panels 97/97, backpack 32/32, icons 32/32, bestiary 123/123, magery-smoke, anniabreen-smoke, sfx 48/48, and world-smoke 113/113 (phase 3 three more times).
+  - Combat-smoke: as before, its old-save step needs `main:Shardfall_v0.16.html`, which a shallow clone does not have.
+
 ## Implementation matrix (audit of v0.20 against the spec)
 
 | Spec § | Area | What exists in v0.20 | Status (latest phase) | Next |

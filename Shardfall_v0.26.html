@@ -3835,6 +3835,7 @@ function ecoHurt(m, src) {
   if (m.target === src) ecoCall(m, src);
 }
 function ecoDied(m, src) {
+  if (m.sortie) ecoSortieEnd(m);   // a patrol leader killed on the road ends the patrol (the camp may send another)
   if (m.sp) { const s = m.sp; if (s.camp) { const ev = s.camp.died(GT); if (ev === 'cleared') ecoCampCleared(s.camp); } }
   if (m.packId) { const g = ECOS.packs.get(m.packId); if (g) { g.splice(g.indexOf(m), 1); if (!g.length) ECOS.packs.delete(m.packId); else if (m.leader === m || !m.leader) for (const o of g) o.leader = g[0]; } }
   ECOS.kills++;
@@ -3868,6 +3869,8 @@ function ecoIdle(m, dt, step) {
 /* a sortie leader walks out to its goal on the navigator, waits there a while (bandits lie in ambush), and walks home; the rest follow it */
 function ecoSortieStep(m, dt) {
   const s = m.sortie, d = MON[m.type];
+  if (s.t0 === undefined || s.tp !== s.phase) { s.t0 = GT; s.tp = s.phase; }
+  if ((s.phase === 'out' && GT - s.t0 > 150) || (s.phase === 'back' && GT - s.t0 > 200)) { if (s.phase === 'out') { s.phase = 'wait'; s.until = GT + (s.wait || 8); m.nav = null; return; } ecoSortieEnd(m); m.state = 'return'; return; }   // a leg that cannot be finished never strands the patrol
   if (s.phase === 'out' || s.phase === 'back') {
     if (!m.nav || m.nav.goal.name !== s.phase) ecoNav(m, s.phase === 'out' ? s.gx : m.home.x, s.phase === 'out' ? s.gy : m.home.y, { doors: false, avoidProt: true, speed: d.speed * .55, name: s.phase });
     if (m.nav.state === 'moving') { navStep(m, dt); m.act = s.kind + (s.phase === 'out' ? ' (out)' : ' (home)'); m.anchor = { x: m.x, y: m.y }; return; }
@@ -3970,21 +3973,23 @@ function ecoSinkTick() {
   if (ecoNight()) return;
   for (const s of SPAWNS) { if (!s.nightMax || s.n <= s.max) continue;
     const m = ents.find(e => e.kind === 'mon' && e.sp === s && e.state === 'idle' && !e.target && !e.gone && (!P || dist(e, P) > 18)); if (!m) continue;
-    if (Math.hypot(m.x - m.home.x, m.y - m.home.y) > 2) { m.wx = m.home.x; m.wy = m.home.y; m.wt = GT + 20; continue; }
+    m.sinkT = m.sinkT || GT; if (Math.hypot(m.x - m.home.x, m.y - m.home.y) > 2.5 && GT - m.sinkT < 45) { m.wx = m.home.x; m.wy = m.home.y; m.wt = GT + 20; continue; }   // walks back to its grave; one that cannot get there within 45 s sinks where it stands (still out of sight)
     rmEnt(m); ECOS.sunk++; }   // rmEnt settles the spawner and camp counts (ecoLeft)
 }
 /* camps send members out: orc patrols down the trail to the road, bandits to watch the road, wolf packs on hunting trips */
 function ecoCampTick() {
   for (const c of ECOS.camps.values()) {
+    if (c.sortie && (c.sortie.gone || c.sortie.dead || !c.sortie.sortie)) c.sortie = null;   // a leader that died, sank or was tamed
     if (c.sortie || GT < c.sortieAt) continue; const s = c.site; c.sortieAt = GT + 200;
     const mem = ents.filter(e => e.kind === 'mon' && e.sp && e.sp.camp === c && e.state === 'idle' && !e.sortie && !e.gone && !(e.pacified > GT));
-    if (!mem.length) continue; const pr = ecoP(mem[0].type), so = pr.sortie || (pr.social === 'pack' ? { kind: 'hunt', every: [240, 420], size: 3 } : null); if (!so) continue;
+    if (!mem.length) { c.sortieAt = GT + 30; continue; } const pr = ecoP(mem[0].type), so = pr.sortie || (pr.social === 'pack' ? { kind: 'hunt', every: [240, 420], size: 3 } : null); if (!so) continue;
     c.sortieAt = GT + so.every[0] + R() * (so.every[1] - so.every[0]);
     if (so.kind === 'hunt' && ecoActivity(mem[0]) !== 'active') continue;
     let gx, gy; if (so.kind === 'hunt') { let ok = false; for (let k = 0; k < 8 && !ok; k++) { const a = R() * 6.283, r = 30 + R() * 30; gx = s.x + Math.cos(a) * r; gy = s.y + Math.sin(a) * r; ok = canStand({ kind: 'mon' }, gx, gy) && !protAt(gx, gy); } if (!ok) continue; }
     else { if (!s.join) continue; let jx = s.join[0] + .5, jy = s.join[1] + .5, dj = Math.hypot(jx - s.x, jy - s.y); if (dj < 1) { const a = R() * 6.283; jx = s.x + Math.cos(a); jy = s.y + Math.sin(a); dj = 1; }
-      const want = so.kind === 'scout' ? Math.min(dj, 50) : 45, k = want / dj, sp = navSnap(Math.floor(s.x + (jx - s.x) * k), Math.floor(s.y + (jy - s.y) * k), 5);   // down the trail toward the road (patrols carry on past it); sorties stay short trips: no continent-wide paths
-      gx = sp[0] + .5; gy = sp[1] + .5; if (protAt(gx, gy) || !canStand({ kind: 'mon' }, gx, gy)) continue; }
+      let ok = false; for (let want = so.kind === 'scout' ? Math.min(dj, 50) : 45; want >= 15 && !ok; want -= 5) {   // down the trail toward the road (patrols carry on past it); the nearest valid point if the first is not; short trips only
+        const k = want / dj, sp = navSnap(Math.floor(s.x + (jx - s.x) * k), Math.floor(s.y + (jy - s.y) * k), 5); gx = sp[0] + .5; gy = sp[1] + .5; ok = !protAt(gx, gy) && canStand({ kind: 'mon' }, gx, gy); }
+      if (!ok) { c.sortieAt = GT + 30; continue; } }
     const L = mem[0], grp = mem.slice(0, so.size); L.sortie = { kind: so.kind, gx, gy, phase: 'out', wait: so.wait || 10, camp: c }; c.sortie = L; ECOS.sorties++;
     for (const o of grp) if (o !== L) o.leader = L;
   }
