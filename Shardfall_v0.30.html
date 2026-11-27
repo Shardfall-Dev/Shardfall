@@ -5,7 +5,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="screen-orientation" content="landscape">
-<title>Shardfall v0.29.2</title>
+<title>Shardfall v0.30</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=Alegreya+Sans:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -3778,7 +3778,7 @@ function devRender() {
   paths: queue ${NAV.jobs.length} · cache ${NAV.cache.size} · searched ${NAV.searches} · failed ${NAV.failed} · cache hits ${NAV.hits}<br>
   AI ${DEV.aiMs.toFixed(3)} ms/step · audio voices ${SFXA.stats.voices} · save ${saveKB} · last save ${ls ? (ls.ok ? 'ok' : 'FAILED') + ' at ' + Math.round(ls.at) + ' s' : '—'}<br>
   ${devEco()}<br>
-  ${lifeDev()}
+  ${lifeDev()}<br>${npcFightDev()}
   <hr style="border-color:#334">
   ${B('hour', 'Dawn', 'data-h="5.5"')}${B('hour', 'Noon', 'data-h="12"')}${B('hour', 'Dusk', 'data-h="17.8"')}${B('hour', 'Midnight', 'data-h="0"')}${B('shift', '−1 h', 'data-h="-1"')}${B('shift', '+1 h', 'data-h="1"')}${B('daynight', 'Day/night')}<br>
   ${B('pause', SIMPAUSE ? 'Resume' : 'Pause')}${B('step', 'Step')}${B('adv', 'Run +1 min', 'data-s="60"')}${B('adv', 'Run +10 min', 'data-s="600"')}${DEV.advance ? ' running… ' + Math.ceil(DEV.advance) + ' s' : ''}${B('save', 'Save now')}<br>
@@ -3894,7 +3894,7 @@ function factionOf(e) {
 }
 /* rough fighting strength, for courage: health times damage per second */
 function ecoPower(e) {
-  if (e === P) return Math.max(1, P.hp) * 9; if (isAlly(e)) return Math.max(1, e.hp) * 8;
+  if (e === P) return Math.max(1, P.hp) * 9; if (isAlly(e) || npcCombatant(e)) return Math.max(1, e.hp) * 8;
   const d = e.type && MON[e.type]; if (!d) return 100; return Math.max(1, e.hp) * (d.dmg[0] + d.dmg[1]) / 2 / Math.max(.8, d.tele + d.rec);
 }
 function ecoActivity(m) { const pr = ecoP(m.type); return SIM.activityOf(pr.hours, ECOS.period); }
@@ -3915,7 +3915,7 @@ function ecoSeesPlayer(m) {
   if (!ecoEnemy(m, P)) return false; const dd = dist(m, P); const r = SIM.senseRange(ecoSenseOf(m), ecoSenseCtx(m));
   return dd < r.sight && los(m, P);
 }
-const ecoTargetable = (m, c) => c && c !== m && !c.gone && !c.dead && !c.ghost && c.kind !== 'corpse' && c.kind !== 'npc' && !(c === P && (P.ghost || P.hidden)) && !(protAt(c.x, c.y) && !m.quest) && (c.kind !== 'mon' || c.hp > 0);
+const ecoTargetable = (m, c) => c && c !== m && !c.gone && !c.dead && !c.ghost && c.kind !== 'corpse' && (c.kind !== 'npc' || npcUp(c)) && !(c === P && (P.ghost || P.hidden)) && !(protAt(c.x, c.y) && !m.quest) && (c.kind !== 'mon' || c.hp > 0);
 
 /* ---------- think: look, listen, score, commit (§12, §13) ---------- */
 function ecoThink(m) {
@@ -4321,7 +4321,7 @@ function lifePopulate(npc) {
   if (!SHOPS.trader) SHOPS.trader = ['bandage', 'cookedmeat', 'lanternoil', 'arrow', 'bolt', 'cloth', 'vial', 'pine', 'ironbar', 'hatchet', 'pickaxe', 'rod'].filter(id => SF.ITEMS[id] && SF.PRICES[id] !== undefined);
   { const G = LIFE.towns.mynoc, p = lifeSpot({ id: 77 }, G.market, 5), e = npc('trader', 'Tobin, travelling merchant', p.x, p.y); e.town = 'mynoc';
     e.life = { prof: 'trader', town: 'mynoc', needs: SIM.newNeeds(), mem: SIM.newMemory(8), mind: {}, goal: null, thinkAt: 0, phase: 'selling', until: 0, route: ['mynoc', 'vespar'], legs: 0, gold: 120 }; e.home = { x: p.x, y: p.y }; LIFE.trader = e; LIFE.npcs.push(e); }
-  for (const e of LIFE.npcs) lifeResume(e);
+  for (const e of LIFE.npcs) { npcArm(e); lifeResume(e); }   // phase 5: everyone with a life can be hurt and (guards) fight back
 }
 function lifeAdopt(e, prof, town, home, work) {
   e.life = { prof, town, home, work, sched: LIFE_SCHED[prof], needs: SIM.newNeeds(), mem: SIM.newMemory(8), mind: {}, goal: null, thinkAt: 0, carry: 0, gold: 20 + (e.id % 7) * 5, doing: 'idle' };
@@ -4341,6 +4341,7 @@ const lifeNight = () => { const h = hourOfDay(); return h >= 19 || h < 6; };
 /* ---------- the controller: civilians, merchants and guards with a life (others keep the phase 2 behaviour) ---------- */
 function lifeTick(e, dt) {
   const L = e.life; if (!L || e.dev) return townTick(e, dt);
+  if (npcCombatTick(e, dt)) return;   // knocked down, or a guard in a fight (src/npcfight.js)
   L.needs = SIM.needsTick(L.needs, dt / WS.clock.secondsPerHour(), e.nav && e.nav.state === 'moving' ? 'walk' : L.doing);
   if (GT >= L.thinkAt) { const t0 = DEV.on ? performance.now() : 0; L.thinkAt = GT + .9 + (e.id % 10) * .02; if (L.prof === 'guard') guardThink(e); else if (L.prof === 'trader') traderThink(e); else lifeThink(e); if (DEV.on) LIFE.thinkMs += performance.now() - t0; }
   if (e.nav && e.nav.state === 'moving') {
@@ -4434,6 +4435,7 @@ function traderThink(e) {
 /* ---------- talking to someone with a life ---------- */
 function lifeTalk(n) {
   const L = n.life; if (!L || P.ghost) return false;
+  if (n.downed) { log(n.name.split(',')[0] + ' lies wounded and cannot talk.', '#b6a68a'); return true; }
   if (L.prof === 'trader') { if (L.phase === 'selling') return false; say(n, 'On the road to ' + (L.dest === 'vespar' ? 'Vespar' : 'Mynoc') + '. Find me at the market there.'); return true; }
   if (L.prof === 'guard') return false;
   if (L.doing === 'sleep' && L.goal && L.goal.act === 'sleep') { say(n, 'Zzz…'); log(n.name.split(',')[0] + ' is asleep.', '#b6a68a'); return true; }
@@ -4464,15 +4466,165 @@ function lifeDev() {
 /* ---------- save: what townsfolk carry with them (needs, memory, haul, purse), the stores, and the trader's road ----------
    Positions are not saved: a load places everyone where the clock says (lifeResume). */
 function lifeSave() {
-  const npcs = {}; for (const e of LIFE.npcs) { if (!e.actorId || e.gone) continue; const L = e.life; npcs[e.actorId] = { needs: L.needs, mem: L.mem.save(), carry: L.carry || 0, gold: L.gold ?? null }; }
+  const npcs = {}; for (const e of LIFE.npcs) { if (!e.actorId || e.gone) continue; const L = e.life; npcs[e.actorId] = { needs: L.needs, mem: L.mem.save(), carry: L.carry || 0, gold: L.gold ?? null }; const f = npcSave(e); if (f) npcs[e.actorId].fight = f; }
   const t = LIFE.trader && LIFE.trader.life; return { v: 1, npcs, stock: LIFE.stock, trader: t ? { town: t.town, legs: t.legs, gold: t.gold } : null };
 }
 function lifeLoad(saved) {
   if (!saved || !saved.npcs) return;
-  for (const e of LIFE.npcs) { const r = e.actorId && saved.npcs[e.actorId]; if (!r) continue; const L = e.life; L.needs = SIM.newNeeds(r.needs); L.mem = SIM.newMemory(8, r.mem); if (r.carry !== undefined) L.carry = r.carry; if (r.gold !== null && r.gold !== undefined) L.gold = r.gold; }
+  for (const e of LIFE.npcs) { const r = e.actorId && saved.npcs[e.actorId]; if (!r) continue; const L = e.life; L.needs = SIM.newNeeds(r.needs); L.mem = SIM.newMemory(8, r.mem); if (r.carry !== undefined) L.carry = r.carry; if (r.gold !== null && r.gold !== undefined) L.gold = r.gold; if (r.fight) npcLoad(e, r.fight); }
   if (saved.stock) for (const k in saved.stock) LIFE.stock[k] = Object.assign(LIFE.stock[k] || {}, saved.stock[k]);
   const t = LIFE.trader; if (t && saved.trader && LIFE.towns[saved.trader.town]) { const L = t.life, G = LIFE.towns[saved.trader.town], p = lifeSpot(t, G.market, 5); L.town = t.town = saved.trader.town; L.legs = saved.trader.legs || 0; L.gold = saved.trader.gold ?? L.gold; L.phase = 'selling'; L.until = 0; lifeTeleport(t, p); t.home = { x: p.x, y: p.y }; }
 }
+/* ================= NPC COMBAT (Living World phase 5, step 1, v0.30; master spec §18) =================
+   Townsfolk, the travelling merchant and the town guards become real combatants:
+     · Creatures may pick a townsperson as a target outside protected ground, by the same faction rules they use for the player
+       (predators, vermin, undead … are hostile to citizens, merchants and guards). Inside protected ground nobody is targetable, as before.
+     · Every blow goes through the one shared resolver (swingAt / strikeOne → applyBlow → damageActor). NPCs fight with
+       weapons, skills and armor like Wren, so the numbers are the existing Second Age rules, unchanged.
+     · Guards of the four Anniabreen towns fight back: a creature attacking a person (townsfolk, the merchant, you or Wren)
+       within a guard's sight and the town's jurisdiction draws the nearest guards, who leave their patrol, fight it with
+       their halberds, give up when it leaves the jurisdiction, and go back to patrolling. They also answer a cry for help.
+     · Everyone else runs: a hit townsperson drops what they are doing and shelters (phase 4's danger response), shouting for
+       the guards; the merchant hurries on.
+     · At 0 health an NPC is knocked down, not killed: creatures lose interest, and after NPC_DOWN_TIME they get up with a
+       third of their health and go home to recover. Real NPC death, corpses and looting are phase 5 step 4.
+     · You cannot hurt townsfolk yet: unlawful aggression, criminal flags and murder counts are phase 5 step 2.
+   Pure numbers live here as data; the game's existing functions call in through npcFighter / damageNpc / npcCombatTick. */
+
+const NPC_DOWN_TIME = 60;          // seconds lying wounded before getting up
+const NPC_GUARD_SIGHT = 16;        // a guard notices a fight this far away (and in line of sight)
+const NPC_JURISDICTION = 60;       // guards defend this far from their town's centre; a creature beyond JUR + 12 is let go
+const NPC_CALL_RANGE = 30;         // a cry for help reaches guards this far away
+/* fighting profiles by profession; skills are UO values (0–100) */
+const NPC_FIGHT = {
+  guard:      { str: 85, dex: 70, int: 40, hp: 1.6, weapon: 'glaive', skills: { swordsmanship: 90, tactics: 90, anatomy: 70, parrying: 60, wrestling: 60 }, wear: ['chain_coif', 'chain_tunic', 'chain_leggings', 'boots'], fights: true },
+  trader:     { str: 50, dex: 50, int: 40, hp: 1, weapon: 'dagger', skills: { fencing: 35, tactics: 30, wrestling: 30 }, wear: ['shirt', 'trousers', 'boots'] },
+  miner:      { str: 60, dex: 40, int: 30, hp: 1, weapon: 'pickaxe', skills: { swordsmanship: 30, tactics: 20, wrestling: 25 }, wear: ['shirt', 'trousers', 'boots'] },
+  woodcutter: { str: 60, dex: 45, int: 30, hp: 1, weapon: 'hatchet', skills: { swordsmanship: 30, tactics: 20, wrestling: 25 }, wear: ['shirt', 'trousers', 'boots'] },
+  civilian:   { str: 35, dex: 40, int: 40, hp: 1, weapon: null, skills: { wrestling: 20 }, wear: ['shirt', 'trousers'] } };
+const NPCF = { downs: 0, rises: 0, guardFights: 0, guardKills: 0, calls: 0, hitsTaken: 0 };
+let NPC_UID = 0;
+/* gear for an NPC: never saved, never in a player container, so it takes negative uids and leaves the player's uid counter alone */
+function npcItem(id) {
+  const d = SF.ITEMS[id]; if (!d) return null;
+  const f = d.fam ? SF.EQ.fields(id, { origin: 'npc' }) : {};
+  return Object.assign({ uid: -(++NPC_UID), id, qty: 1 }, f, SF.WEARABLE(id) || d.wpn ? { cond: 100, maxc: 100, omax: 100, origin: 'npc' } : {});
+}
+/* make a townsperson a combatant (lifePopulate calls this for everyone with a life) */
+function npcArm(e) {
+  const prof = e.life && e.life.prof, F = NPC_FIGHT[prof] || NPC_FIGHT.civilian;
+  e.npcFight = F; e.str = F.str; e.dex = F.dex; e.int = F.int; e.skills = SF.newSkills();
+  for (const k in F.skills) if (e.skills[k]) e.skills[k].v = F.skills[k] * 10;
+  e.equip = emptyEquip(); if (F.weapon) e.equip.weapon = npcItem(F.weapon);
+  for (const id of F.wear) { const it = npcItem(id); if (it && SF.ITEMS[id].slot && e.equip[SF.ITEMS[id].slot] === null) e.equip[SF.ITEMS[id].slot] = it; }
+  e.eqMig = SF.EQ.MIGRATION; e.max = Math.round(SF.maxHp(e) * F.hp); e.hp = e.max; e.stam = e.dex; e.sw = SF.newSwing(); e.downed = false; e.downAt = 0; e.foe = null;
+}
+const npcCombatant = e => !!e && e.kind === 'npc' && !!e.npcFight;
+const npcUp = e => npcCombatant(e) && !e.gone && !e.downed;
+
+/* ---------- taking a blow (damageActor routes every NPC here) ---------- */
+function damageNpc(e, amt, kind, src, hx) {
+  if (!npcUp(e) || !(amt > 0)) return;
+  if (src && (src === P || src.kind === 'ally' || src.kind === 'pet' || src.summon || (src.owner && src.owner === P))) return;   // the law comes in phase 5 step 2: until then you cannot harm townsfolk
+  e.hp -= amt; e.lastHit = GT; e.lastCombat = GT; NPCF.hitsTaken++;
+  simEmit('ActorDamaged', { actor: aidOf(e), source: aidOf(src), amount: amt, kind: kind || 'phys', x: e.x, y: e.y });
+  floater(e.x, e.y, '-' + Math.round(amt), kind === 'poison' ? '#7be07b' : '#ff8a6a'); hitSound(e, kind, src, hx, e.hp <= 0);
+  if (src && src.kind === 'mon' && alive(src)) {
+    if (e.npcFight.fights) { if (!e.foe || !alive(e.foe)) npcEngage(e, src, 'attacked by ' + src.name); }
+    else npcFlee(e, src);
+    npcCallGuards(e, src);
+  }
+  if (e.hp <= 0) npcDown(e, src);
+}
+/* a townsperson under attack runs for shelter at once and remembers why */
+function npcFlee(e, src) {
+  const L = e.life; if (!L) return; SIM.frighten(L.needs, 1); L.needs.safety = 1;
+  if (L.prof === 'trader') { L.hurry = true; L.mind.why = 'attacked by a ' + src.name + ' on the road'; }
+  else { L.mind.act = null; L.thinkAt = 0; L.goal = null; }
+  if (!L.mem.knows('attacked by', aidOf(src))) L.mem.note(GT, 'attacked by', aidOf(src), { x: Math.round(e.x), y: Math.round(e.y) }, 300);
+  if (GT > (e.helpAt || 0)) { e.helpAt = GT + 6; say(e, pick(['Help! Guards!', 'Guards! Guards!', 'Get it off me!'])); }
+}
+/* guards near the victim (and of the victim's town) hear the cry */
+function npcCallGuards(victim, foe) {
+  if (!foe || foe.kind !== 'mon' || !alive(foe)) return; let n = 0;
+  const near = LIFE.npcs.filter(g => npcUp(g) && g.npcFight.fights && g !== victim).sort((a, b) => dist(a, victim) - dist(b, victim));   // the nearest answer first
+  for (const g of near) {
+    if (g.foe && alive(g.foe) && dist(g, g.foe) < 8) continue;   // already busy close by
+    const d = dist(g, victim); if (d > NPC_CALL_RANGE && !(victim.life && victim.life.town === g.life.town && d < NPC_CALL_RANGE * 1.6)) continue;
+    if (!npcInJurisdiction(g, foe, 0)) continue;
+    if (npcEngage(g, foe, 'answered ' + (victim === P ? 'your' : (victim.name || 'a').split(',')[0] + '\'s') + ' cry for help')) n++; if (n >= 2) break; }
+  if (n) NPCF.calls++;
+}
+/* knocked down: out of the fight, lying where they fell, until NPC_DOWN_TIME has passed */
+function npcDown(e, src) {
+  if (e.downed) return; e.downed = true; e.downAt = GT; e.hp = 0; e.poison = null; e.nav = null; e.speed = 0; e.foe = null; NPCF.downs++;
+  if (e.life) { e.life.goal = null; e.life.mind.act = null; e.life.mind.why = 'knocked down'; e.life.hurry = false; if (src) e.life.mem.note(GT, 'knocked down by', aidOf(src), { x: Math.round(e.x), y: Math.round(e.y) }, 600); }
+  simEmit('CombatEnded', { actor: aidOf(e), source: aidOf(src), x: e.x, y: e.y, detail: { outcome: 'downed' } });
+  for (const o of ents) if (o.target === e) { o.target = null; if (o.kind === 'mon' && o.state !== 'flee') o.state = 'return'; if (o.mind) o.mind.act = null; }
+  for (const g of LIFE.npcs) if (g.foe === e) g.foe = null;
+  if (P && dist(e, P) < 24) log(`${(e.name || 'A townsperson').split(',')[0]} is knocked down${src && src.name ? ' by a ' + src.name : ''}!`, '#ff8a6a');
+  sndAt('player.death', e, { gain: .5 });
+}
+function npcRise(e) {
+  e.downed = false; e.downAt = 0; e.hp = Math.max(1, Math.round(e.max / 3)); e.stam = e.dex; NPCF.rises++;
+  const L = e.life; if (L) { L.needs.safety = Math.max(L.needs.safety, .6); L.mind.act = null; L.thinkAt = 0; L.wd = null; L.retryAt = 0;
+    if (L.prof === 'trader' && L.phase === 'travel') lifeGo(e, L.goal, { maxNodes: 400000, speed: SF.WALK * .6 }); else L.goal = null; }
+  say(e, pick(['Ugh… I\'m still alive.', 'Oof. Home, I think.', 'That was too close.']));
+}
+
+/* ---------- each step, before the routine (lifeTick calls this; true = this step is spoken for) ---------- */
+function npcCombatTick(e, dt) {
+  if (!npcCombatant(e)) return false;
+  if (e.lunge) { e.lunge += dt / .2; if (e.lunge >= 1) e.lunge = 0; }
+  if (e.downed) { e.speed = 0; e.nav = null; if (GT - e.downAt >= NPC_DOWN_TIME) npcRise(e); return true; }
+  const fight = GT - (e.lastCombat || -99) < 6;
+  if (GT - (e.lastHit || -99) > .75) e.stam = Math.min(e.dex, e.stam + (fight ? SF.STAM_REGEN_COMBAT : SF.STAM_REGEN) * dt);
+  if (!fight && e.hp < e.max) e.hp = Math.min(e.max, e.hp + e.max * .004 * dt);   // about four minutes from a third back to full
+  if (e.poison && GT >= e.poison.next) { e.poison.next = GT + SF.POISON_GAP; damageNpc(e, SF.POISON[e.poison.tier], null, 'poison'); if (e.poison && --e.poison.ticks <= 0) e.poison = null; if (e.downed) return true; }
+  SF.swingTick(e.sw, GT, e.stam, weaponOfActor(e));
+  if (!e.npcFight.fights) return false;
+  return guardFightTick(e, dt);
+}
+/* is the creature inside the guard's town's jurisdiction? (slack: extra metres before letting it go) */
+function npcInJurisdiction(g, c, slack) { const G = lifeTownGeo(g.life.town); return Math.hypot(c.x - G.center.x, c.y - G.center.y) < NPC_JURISDICTION + (slack || 0); }
+/* a creature is a threat a guard acts on when it is fighting a person, or when it is hostile to townsfolk and right beside the guard */
+function npcThreat(g, c) {
+  if (c.kind !== 'mon' || !alive(c) || c.hidden || c.pacified > GT) return false;
+  const t = c.target; if (t && (t === P || isAlly(t) || npcCombatant(t)) && (c.state === 'chase' || c.state === 'tele' || c.state === 'strike' || c.state === 'rec')) return true;
+  return dist(g, c) < 5 && (ecoEnemy(c, g) || c.target === g);
+}
+function npcEngage(g, c, why) {
+  if (!npcUp(g) || !g.npcFight.fights || !c || !alive(c)) return false;
+  if (g.foe !== c) { NPCF.guardFights++; simEmit('CombatStarted', { actor: aidOf(g), target: aidOf(c), x: g.x, y: g.y, detail: { why } }); if (P && dist(g, P) < 22) say(g, pick(['Halt, beast!', 'For the town!', 'Stand back, I have it!'])); }
+  g.foe = c; g.foeSeen = GT; g.nav = null; if (g.life) { g.life.mind.why = why; g.life.doing = 'fight'; }
+  return true;
+}
+function guardFightTick(g, dt) {
+  const L = g.life;
+  if (!g.foe && GT > (g.scanAt || 0)) {   // look for a fight to step into, twice a second
+    g.scanAt = GT + .5; let best = null, bd = NPC_GUARD_SIGHT;
+    ECOS.grid.query(g.x, g.y, NPC_GUARD_SIGHT, c => { if (!npcThreat(g, c)) return; const d = dist(g, c); if (d < bd && npcInJurisdiction(g, c, 0) && los(g, c)) { bd = d; best = c; } });
+    if (best) npcEngage(g, best, 'defending ' + (best.target === P ? 'you' : best.target && best.target.name ? best.target.name.split(',')[0] : 'the town') + ' from a ' + best.name);
+  }
+  const c = g.foe; if (!c) return false;
+  const lost = !alive(c) || c.hidden || c.pacified > GT || !npcInJurisdiction(g, c, 12) || dist(g, c) > NPC_GUARD_SIGHT * 1.5;
+  if (!lost && los(g, c)) g.foeSeen = GT;
+  if (lost || GT - g.foeSeen > 6 || g.hp < g.max * .2) {   // won, lost it, or too hurt: back to the patrol
+    if (c && !alive(c)) NPCF.guardKills++;
+    simEmit('CombatEnded', { actor: aidOf(g), target: aidOf(c), x: g.x, y: g.y, detail: { outcome: !alive(c) ? 'won' : g.hp < g.max * .2 ? 'withdrew' : 'lost sight' } });
+    g.foe = null; g.nav = null; if (L) { L.goal = null; L.mind.why = 'back to the patrol'; L.thinkAt = 0; } return false; }
+  const w = weaponOfActor(g), d = dist(g, c);
+  if (d > w.reach * .9 || !los(g, c)) { allyStep(g, c.x, c.y, dt); return true; }
+  g.speed = 0; faceToward(g, c.x, c.y); swingAt(g, c);
+  if (c.kind === 'mon' && alive(c) && c.target !== g && dist(c, g) < 3 && GT - (c.hitT ?? -99) < 1 && R() < .5) { c.target = g; c.chaseKind = 'attack'; if (c.state === 'idle' || c.state === 'return') c.state = 'chase'; }   // a creature struck by a guard often turns on him
+  return true;
+}
+
+/* ---------- save: health and the knock-down timer by actor id (life save carries it) ---------- */
+function npcSave(e) { if (!npcCombatant(e)) return null; if (e.hp >= e.max && !e.downed) return null; return { hp: Math.round(e.hp), down: e.downed ? Math.max(1e-3, NPC_DOWN_TIME - (GT - e.downAt)) : 0 }; }
+function npcLoad(e, r) { if (!npcCombatant(e) || !r) return; e.hp = cl(Math.round(r.hp) || 0, 0, e.max); if (r.down > 0) { e.downed = true; e.downAt = GT - (NPC_DOWN_TIME - r.down); e.hp = 0; e.nav = null; } else if (e.hp <= 0) e.hp = 1; }
+function npcFightDev() { const up = LIFE.npcs.filter(npcUp), dn = LIFE.npcs.filter(e => e.downed).length, fighting = LIFE.npcs.filter(e => e.foe && alive(e.foe)).length, hurt = up.filter(e => e.hp < e.max).length;
+  return `npc combat: ${fighting} guards fighting · ${dn} knocked down · ${hurt} hurt · hits taken ${NPCF.hitsTaken}, downs ${NPCF.downs}, rises ${NPCF.rises}, guard fights ${NPCF.guardFights}, guard kills ${NPCF.guardKills}, calls ${NPCF.calls}`; }
 /* ================= GAME: actors, intents, combat, magic, gathering, crafting, death ================= */
 const MON = {
   rat:   { n: 'dock rat',    col: '#7a6a62', size: .7,  h: 34, hp: 20, atk: 22, def: 20, dmg: [3, 6],  reach: 1.15, tele: .45, rec: 1.3,  speed: 3.6, aggro: 6,   leash: 16, armor: 4,  diff: 15, loot: { gold: [2, 9] }, skin: { hide: [1, 1] } },
@@ -4774,7 +4926,7 @@ function resurrect(where) {
    The rules (hit chance, dice, damage stages, swing timer, archery) live in src/rules.js; this block adapts them to actors. */
 const isAlly = e => !!e && e.kind === 'ally';
 const isPlayerLike = e => e === P || isAlly(e);
-const fighterAlive = e => !!e && (e === P ? !P.ghost : isAlly(e) ? !e.ghost && !e.gone : alive(e));
+const fighterAlive = e => !!e && (e === P ? !P.ghost : isAlly(e) ? !e.ghost && !e.gone : e.kind === 'npc' ? npcUp(e) : alive(e));   // townsfolk fight only with a profile (phase 5) and not while knocked down
 const skOf = (a, k) => a === P ? sv(k) : a.skills && a.skills[k] ? a.skills[k].v / 10 : 0;
 let SHOTID = 0;
 /* creature numbers the T2A rules need: natural armor rating, strength and dexterity (tuning, see docs/combat/STATUS.md) */
@@ -4788,7 +4940,7 @@ const wDef = () => weaponOfActor(P);
 const weaponLabel = a => { const w = weaponOfActor(a), it = a.equip && a.equip.weapon; return w === SF.WEAPONS.unarmed ? (it ? SF.itemName(it) + ' (broken)' : 'Fists') : SF.itemName(it); };
 /* everything a blow needs from one side, read fresh for every swing */
 function fighter(a) {
-  if (isPlayerLike(a)) {
+  if (isPlayerLike(a) || npcCombatant(a)) {   // townsfolk fight like Wren: weapon, skills and worn armor (src/npcfight.js)
     const w = weaponOfActor(a), it = w === SF.WEAPONS.unarmed ? null : a.equip.weapon, sh = a.equip.shield;
     // armor is resolved per blow on the struck body region (applyBlow → regionHit); armorAR here is the expected summary for display
     return { a, player: true, w, it, atk: skOf(a, w.skill), def: skOf(a, w.skill), tactics: skOf(a, 'tactics'), anatomy: skOf(a, 'anatomy'), str: a.str,
@@ -4823,7 +4975,7 @@ function swingSound(a, w) {
 function noHarmSound(t, parried) { const ev = parried ? 'block.shield' : 'hit.armor'; if (t === P) snd(ev, { gain: .5, key: 'impP' }); else sndAt(ev, t, { gain: .5, key: 'imp' + t.id }); }
 const wardSound = t => { if (sndOnce('veil' + (t.id || 'P'), .6)) { if (t === P) snd('magic.ward', { gain: .6 }); else sndAt('magic.ward', t, { gain: .6 }); } };
 /* the shared damage entry: a swing, a shot, a spell or a creature's blow reaches any actor (player, hireling, creature, pet) through here */
-function damageActor(t, amt, kind, src, hx) { if (t === P) return damagePlayer(amt, src === P ? null : src, kind, hx); if (isAlly(t)) return damageAlly(t, amt, src, kind, hx); return damageMon(t, amt, kind, src, hx); }
+function damageActor(t, amt, kind, src, hx) { if (t === P) return damagePlayer(amt, src === P ? null : src, kind, hx); if (isAlly(t)) return damageAlly(t, amt, src, kind, hx); if (t && t.kind === 'npc') return damageNpc(t, amt, kind, src, hx); return damageMon(t, amt, kind, src, hx); }
 /* one landed blow. A = attacker view (taken at the swing or the release), t = recipient. Returns the stage record. */
 function applyBlow(A, t, opt) {
   opt = opt || {}; if (!fighterAlive(t)) return null; const a = A.a, D = fighter(t);
@@ -4935,13 +5087,14 @@ function killMon(m, src) {
   for (const e of ents) if (e.target === m) { e.target = null; if (e.kind === 'mon') e.state = 'return'; }
   if (P.sel === m) { P.sel = mine ? null : corpse; P.armed = false; }
   if (mine) { log((d.boss ? 'You have felled ' : 'You slay the ') + d.n + '.', '#ffe08a'); if (d.boss) { say(P, d.fallLine || 'The bell falls silent.'); } }
-  else if (src && src.kind === 'mon' && dist(m, P) < 22) log(`A ${MON[src.type].n} kills a ${d.n}.`, '#b6a68a');   // creatures fight each other (Living World phase 3)
+  else if (src && src.kind === 'mon' && dist(m, P) < 22) log(`A ${MON[src.type].n} kills a ${d.n}.`, '#b6a68a');
+  else if (src && src.kind === 'npc' && dist(m, P) < 22) log(`${(src.name || 'A guard').split(',')[0]} kills the ${d.n}.`, '#b6a68a');   // guards fight back (phase 5)   // creatures fight each other (Living World phase 3)
 }
 
 /* ---------- monsters: telegraph → committed strike → recovery ---------- */
 function aiMon(m, dt) {
   const d = MON[m.type], pr = ecoP(m.type); m.speed = 0; let t = m.target;
-  if (t && (t.gone || t.dead || t.ghost || (t === P && (P.ghost || P.hidden)) || (m.provoked && GT > m.provoked && t.kind === 'mon' && !ecoEnemy(m, t)))) { m.target = t = null; m.provoked = 0; if (m.state !== 'idle' && m.state !== 'flee') m.state = 'return'; }
+  if (t && (t.gone || t.dead || t.ghost || (t === P && (P.ghost || P.hidden)) || (t.kind === 'npc' && !ecoTargetable(m, t)) || (m.provoked && GT > m.provoked && t.kind === 'mon' && !ecoEnemy(m, t)))) { m.target = t = null; m.provoked = 0; if (m.state !== 'idle' && m.state !== 'flee') m.state = 'return'; }
   const seeP = () => !(m.pacified > GT) && ecoSeesPlayer(m);   // perception (Living World phase 3): night, sleep and Hiding count; only enemies and territorial creatures
   let anchor, home, hunting, pursuit; const frame = () => { anchor = m.anchor || m.home; home = Math.hypot(m.x - anchor.x, m.y - anchor.y); hunting = m.chaseKind === 'hunt'; pursuit = (pr.pur || d.leash) * (hunting ? 2 : 1); }; frame();   // a hunt may run further than a territorial chase
   const step = (tx, ty, spd, away) => { if (m.rooted > GT) return; let dx = tx - m.x, dy = ty - m.y; if (away) { dx = -dx; dy = -dy; } const l = Math.hypot(dx, dy); if (l < .05) return; const s = Math.min(l, spd * MOVE_SCALE * (m.slowUntil > GT ? .75 : 1) * dt); const mv = moveBy(m, dx / l * s, dy / l * s); if (mv < s * .3) moveBy(m, -dy / l * s, dx / l * s); m.speed = mv / dt; updateFacing(m, dx, dy); };
@@ -6143,6 +6296,7 @@ function drawEnt(e) {
   if (e.kind === 'player' && drawForm(g, e, x, y)) { }
   else if (e.kind === 'player') drawScout(g, e, x, y, P.ghost ? 'ghost' : (P.look.cloak || null));
   else if (e.kind === 'ally') { if (e.ghost) g.globalAlpha = .75; drawScout(g, e, x, y, e.ghost ? 'ghost' : '#2f7a46'); }
+  else if (e.kind === 'npc' && e.downed) { g.save(); g.globalAlpha = .85; g.translate(x, y - 4); g.rotate(-1.4); g.translate(-x, -y); drawScout(g, e, x, y, NPC_COL[e.role] || (e.life && LIFE_COL[e.life.prof]) || '#5a5a5a'); g.restore(); }   // knocked down (phase 5)
   else if (e.kind === 'npc') drawScout(g, e, x, y, NPC_COL[e.role] || (e.life && LIFE_COL[e.life.prof]) || '#5a5a5a');
   // creature art, best first: a decoded bestiary sheet, a legacy MON_SHEETS sheet, the scout tint, then procedural art.
   // A sheet that is still decoding (or failed to load) falls through, so a creature is never drawn invisible.
@@ -7049,7 +7203,7 @@ function spawnMon(type, dx = 3, dy = 0) { const d = MON[type]; if (!d) return nu
   return addEnt({ kind: 'mon', type, name: d.n, x, y, hp: d.hp, max: d.hp, state: 'idle', home: { x, y }, sect: 0, ward: 0 }); }
 /* __SF is a development and test hook (the browser suites drive the game through it). It is not a security boundary: anything
    here is reachable from the console in an offline single-player game, and a multiplayer server must not trust the client. */
-window.__SF = { FRAME_ERR, readSave, validateSave, get WS() { return WS; }, dist, closePanel, lifeSave, LIFE, LIFE_SCHED, lifeTick, lifeResume, lifeInspect, lifeTownGeo, lifeTalk, talk, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
+window.__SF = { FRAME_ERR, los, NPCF, NPC_FIGHT, NPC_DOWN_TIME, npcArm, damageNpc, npcEngage, npcCombatant, npcUp, npcSave, ecoTargetable, readSave, validateSave, get WS() { return WS; }, dist, closePanel, lifeSave, LIFE, LIFE_SCHED, lifeTick, lifeResume, lifeInspect, lifeTownGeo, lifeTalk, talk, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
 
 /* ================= EQUIPMENT UI (v0.25): paper doll window, backpack, item tooltips, drag and drop, armor crafting =================
    Every change to items goes through the validated commands in SF.EQ (equipItem, unequipItem, dropItem, pickupItem, splitStack,
@@ -7647,7 +7801,7 @@ function tfModel(t) {
     if (ents.some(e => e.kind === 'pet' && !e.gone)) m.acts += btn('petcmd', 'Pets attack', { c: 'attack' }, 'on');
     if (d.tame && !d.boss) m.more += btn('abil', 'Tame', { id: 'tame' }); if (SF.count(P.pack, 'lute') && !d.boss) m.more += btn('abil', 'Lullaby', { id: 'lullaby' }) + btn('abil', 'Discord', { id: 'discord' }) + btn('abil', 'Provoke', { id: 'provoke' });
     if (d.purse && t.target !== P) m.more += btn('abil', 'Pickpocket', { id: 'pick' }); m.more += btn('abil', 'Anatomy', { id: 'anatomy' }); }
-  else if (t.kind === 'npc') { const [nm, role] = npcLabel(t), q = questObjective(); m.dot = t.role === 'outlaw' ? 'red' : 'blue'; m.name = nm; m.sub.push(role); m.sub.push(dm); if (q && q.at === t) m.chips.push(['! Quest', 'quest']);
+  else if (t.kind === 'npc') { const [nm, role] = npcLabel(t), q = questObjective(); m.dot = t.role === 'outlaw' ? 'red' : 'blue'; m.name = nm; m.sub.push(role); m.sub.push(dm); if (q && q.at === t) m.chips.push(['! Quest', 'quest']); if (t.downed) m.chips.push(['Knocked down', 'warn']); else if (t.npcFight && t.hp < t.max) m.bar = hpBar(t.hp / t.max); if (t.foe && alive(t.foe)) m.chips.push(['⚔ Fighting', 'atk']);
     m.acts = `<button class="btn sm ac" data-a="interact">${npcAction(t)}</button>`; }
   else if (t.kind === 'corpse') { m.dot = 'item'; m.name = t.name; const ls = t.cont && Number.isFinite(t.cont.diedAt) ? SF.lootStatus(t.cont, P.id, GT) : null;   // loot rights exist only on bodies that carry them (player bodies today) if (t.cont) m.sub.push(t.cont.items.length ? t.cont.items.length + ' stack' + (t.cont.items.length === 1 ? '' : 's') : 'empty'); m.sub.push(dm);
     if (ls && (t.mine || !ls.lawful)) m.chips.push([cap1(ls.label), ls.lawful ? '' : 'warn']);

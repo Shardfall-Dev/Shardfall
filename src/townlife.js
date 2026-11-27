@@ -129,7 +129,7 @@ function lifePopulate(npc) {
   if (!SHOPS.trader) SHOPS.trader = ['bandage', 'cookedmeat', 'lanternoil', 'arrow', 'bolt', 'cloth', 'vial', 'pine', 'ironbar', 'hatchet', 'pickaxe', 'rod'].filter(id => SF.ITEMS[id] && SF.PRICES[id] !== undefined);
   { const G = LIFE.towns.mynoc, p = lifeSpot({ id: 77 }, G.market, 5), e = npc('trader', 'Tobin, travelling merchant', p.x, p.y); e.town = 'mynoc';
     e.life = { prof: 'trader', town: 'mynoc', needs: SIM.newNeeds(), mem: SIM.newMemory(8), mind: {}, goal: null, thinkAt: 0, phase: 'selling', until: 0, route: ['mynoc', 'vespar'], legs: 0, gold: 120 }; e.home = { x: p.x, y: p.y }; LIFE.trader = e; LIFE.npcs.push(e); }
-  for (const e of LIFE.npcs) lifeResume(e);
+  for (const e of LIFE.npcs) { npcArm(e); lifeResume(e); }   // phase 5: everyone with a life can be hurt and (guards) fight back
 }
 function lifeAdopt(e, prof, town, home, work) {
   e.life = { prof, town, home, work, sched: LIFE_SCHED[prof], needs: SIM.newNeeds(), mem: SIM.newMemory(8), mind: {}, goal: null, thinkAt: 0, carry: 0, gold: 20 + (e.id % 7) * 5, doing: 'idle' };
@@ -149,6 +149,7 @@ const lifeNight = () => { const h = hourOfDay(); return h >= 19 || h < 6; };
 /* ---------- the controller: civilians, merchants and guards with a life (others keep the phase 2 behaviour) ---------- */
 function lifeTick(e, dt) {
   const L = e.life; if (!L || e.dev) return townTick(e, dt);
+  if (npcCombatTick(e, dt)) return;   // knocked down, or a guard in a fight (src/npcfight.js)
   L.needs = SIM.needsTick(L.needs, dt / WS.clock.secondsPerHour(), e.nav && e.nav.state === 'moving' ? 'walk' : L.doing);
   if (GT >= L.thinkAt) { const t0 = DEV.on ? performance.now() : 0; L.thinkAt = GT + .9 + (e.id % 10) * .02; if (L.prof === 'guard') guardThink(e); else if (L.prof === 'trader') traderThink(e); else lifeThink(e); if (DEV.on) LIFE.thinkMs += performance.now() - t0; }
   if (e.nav && e.nav.state === 'moving') {
@@ -242,6 +243,7 @@ function traderThink(e) {
 /* ---------- talking to someone with a life ---------- */
 function lifeTalk(n) {
   const L = n.life; if (!L || P.ghost) return false;
+  if (n.downed) { log(n.name.split(',')[0] + ' lies wounded and cannot talk.', '#b6a68a'); return true; }
   if (L.prof === 'trader') { if (L.phase === 'selling') return false; say(n, 'On the road to ' + (L.dest === 'vespar' ? 'Vespar' : 'Mynoc') + '. Find me at the market there.'); return true; }
   if (L.prof === 'guard') return false;
   if (L.doing === 'sleep' && L.goal && L.goal.act === 'sleep') { say(n, 'Zzz…'); log(n.name.split(',')[0] + ' is asleep.', '#b6a68a'); return true; }
@@ -272,12 +274,12 @@ function lifeDev() {
 /* ---------- save: what townsfolk carry with them (needs, memory, haul, purse), the stores, and the trader's road ----------
    Positions are not saved: a load places everyone where the clock says (lifeResume). */
 function lifeSave() {
-  const npcs = {}; for (const e of LIFE.npcs) { if (!e.actorId || e.gone) continue; const L = e.life; npcs[e.actorId] = { needs: L.needs, mem: L.mem.save(), carry: L.carry || 0, gold: L.gold ?? null }; }
+  const npcs = {}; for (const e of LIFE.npcs) { if (!e.actorId || e.gone) continue; const L = e.life; npcs[e.actorId] = { needs: L.needs, mem: L.mem.save(), carry: L.carry || 0, gold: L.gold ?? null }; const f = npcSave(e); if (f) npcs[e.actorId].fight = f; }
   const t = LIFE.trader && LIFE.trader.life; return { v: 1, npcs, stock: LIFE.stock, trader: t ? { town: t.town, legs: t.legs, gold: t.gold } : null };
 }
 function lifeLoad(saved) {
   if (!saved || !saved.npcs) return;
-  for (const e of LIFE.npcs) { const r = e.actorId && saved.npcs[e.actorId]; if (!r) continue; const L = e.life; L.needs = SIM.newNeeds(r.needs); L.mem = SIM.newMemory(8, r.mem); if (r.carry !== undefined) L.carry = r.carry; if (r.gold !== null && r.gold !== undefined) L.gold = r.gold; }
+  for (const e of LIFE.npcs) { const r = e.actorId && saved.npcs[e.actorId]; if (!r) continue; const L = e.life; L.needs = SIM.newNeeds(r.needs); L.mem = SIM.newMemory(8, r.mem); if (r.carry !== undefined) L.carry = r.carry; if (r.gold !== null && r.gold !== undefined) L.gold = r.gold; if (r.fight) npcLoad(e, r.fight); }
   if (saved.stock) for (const k in saved.stock) LIFE.stock[k] = Object.assign(LIFE.stock[k] || {}, saved.stock[k]);
   const t = LIFE.trader; if (t && saved.trader && LIFE.towns[saved.trader.town]) { const L = t.life, G = LIFE.towns[saved.trader.town], p = lifeSpot(t, G.market, 5); L.town = t.town = saved.trader.town; L.legs = saved.trader.legs || 0; L.gold = saved.trader.gold ?? L.gold; L.phase = 'selling'; L.until = 0; lifeTeleport(t, p); t.home = { x: p.x, y: p.y }; }
 }

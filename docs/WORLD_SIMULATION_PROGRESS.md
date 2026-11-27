@@ -4,7 +4,7 @@ The roadmap is `docs/WORLD_SIMULATION_MASTER.md` (the full specification, unchan
 
 **Status words:** **Tested** — implemented and covered by an automated test that passes. **Implemented** — in the build, checked by hand only. **Partial** — some of the item is in; the rest is listed. **Planned** — not started. **Blocked** — waiting on something named.
 
-**Current build:** v0.28 (`Shardfall_v0.28.html`), branch `feature/living-world-phase4b`, from `main` at v0.27 (#22). Phase 4, part 2: all four towns, townsfolk memory of the player, and saved NPC state.
+**Current build:** v0.30 (`Shardfall_v0.30.html`), branch `feature/living-world-phase5a`, from `integration/v0.29.2` (every open branch merged: stabilization #27, backpack popups and target frame #25, wildlife sheets #26). Phase 5, step 1: NPCs as combatants.
 
 ---
 
@@ -19,7 +19,7 @@ The spec's development sequence (§29, phases A–G) is numbered 1–7 here. Eac
 | 2½ | — | **World expansion** (asked for between phases 2 and 3): Anniabreen stretched ×1.35 between rigid towns, the Southern Reach, 8 camps, 5 sealed dungeon mouths, world 2620 × 1520 | 2 | **Tested** (v0.23) |
 | 3 | C | Population and monster ecosystem: regions and habitats, species profiles as data, roaming, territories, predator/prey, monster-vs-monster factions, creature audio | 1, 2 | **Tested** (v0.25) |
 | 4 | D | Living NPCs: named townsfolk with homes, workplaces and schedules; guards patrolling; merchants travelling; resource workers; basic adventurers | 1, 2, 3 (factions) | **Tested** (v0.27); adventurers moved to phase 5, which gives NPCs combat |
-| 5 | E | Shared combat and law: NPC-vs-NPC and NPC-vs-monster combat, NPC spellcasting through Magery, actor death and looting, criminal flags, murder counts, guards, witnesses | 1, 3, 4 | Planned |
+| 5 | E | Shared combat and law: NPC-vs-NPC and NPC-vs-monster combat, NPC spellcasting through Magery, actor death and looting, criminal flags, murder counts, guards, witnesses | 1, 3, 4 | **Partial**: step 1 (NPCs as combatants, guards fight creatures) **Tested** (v0.30); law, adventurers, NPC death and looting planned |
 | 6 | F | Persistence and optimisation: world-state save (regions, camps, corpses, cargo), simulation tiers A/B/C, spatial index, mobile profiling, regression tests | 1–5 | Planned |
 | 7 | G | Emergent gameplay: merchant ambushes, dungeon expeditions, camp patrols, NPC healing and recovery, basic economy, encounters | 1–6 | Planned |
 
@@ -451,6 +451,48 @@ Requested on 2026-11-26: bigger distances, more camps, and places for dungeons. 
 - **Creatures respawn on load as before; camp clearance is the one thing saved now.** Saving every creature is phase 6 (§26).
 - **The quarter-rate tier for distant idle creatures** is a stopgap so the larger population costs less than the old one did. Phase 6 replaces it with the spec's tiers A/B/C.
 
+## Phase 5, step 1 — NPCs as combatants (v0.30) — **Tested**
+
+### What was built
+
+- **`src/npcfight.js`** (new, built between town life and the game). Everyone with a life (37 townsfolk: shopkeepers, residents, students, the travelling merchant and 9 guards) gets a fighting profile when the towns are populated (`npcArm`):
+  - Profiles are data (`NPC_FIGHT`): guards have Strength 85, Swordsmanship and Tactics 90, a halberd and chainmail (coif, tunic, leggings), 1.6× normal health (147); miners carry a pickaxe, woodcutters a hatchet, the merchant a dagger; everyone else fights bare-handed in shirt and trousers (67 health).
+  - NPCs fight like Wren: `fighter()` treats them as player-like, so weapon dice, skills, body-region armor, parrying, swing timer and stamina are the existing Second Age rules, unchanged.
+  - NPC gear takes negative uids (`npcItem`), so it never touches the player's uid counter and is never in a player container. It is rebuilt at load and not saved.
+- **Creatures may target townsfolk** (`ecoTargetable`): outside protected ground, an NPC that is up is a target under the same faction rules the player is (predators, vermin, arachnids, undead … are hostile to citizens, merchants and guards; wildlife stays neutral). Inside protected ground nobody is a target, as before; a creature after an NPC who reaches protected ground gives up (`aiMon`).
+- **One damage entry.** `damageActor` sends NPCs to `damageNpc`: health, the `ActorDamaged` event with source id, floater, impact sound. Creature venom poisons NPCs and ticks like Wren's.
+- **Townsfolk run.** A hit townsperson drops the routine at once and shelters (phase 4's danger response), shouts for the guards, and remembers "attacked by" the creature; the merchant hurries on.
+- **Guards fight back** (`guardFightTick`):
+  - Twice a second each guard looks for a creature that is fighting a person (a townsperson, the merchant, you or Wren) within 16 m, in sight and within 60 m of the town centre (the jurisdiction), or a hostile creature right beside him.
+  - A cry for help reaches the two nearest free guards within 30 m (48 m for the victim's own town).
+  - He leaves the patrol, walks up, swings his halberd through `swingAt`, and gives up when the creature leaves the jurisdiction (+12 m slack), has been out of sight for 6 s, or he is below 20 % health. Then he returns to the patrol.
+  - `CombatStarted` and `CombatEnded` (`won`, `withdrew`, `lost sight`) are emitted with actor ids.
+- **Knocked down, not killed.** At 0 health an NPC falls (drawn lying down), exactly once; `CombatEnded` with outcome `downed`, no `ActorKilled`. Creatures lose interest. After 60 s (`NPC_DOWN_TIME`) they get up with a third of their health and go home to recover; health then comes back over about four minutes. Real NPC death, corpses and looting are step 4.
+- **You cannot hurt townsfolk yet.** Blows and spells from you, Wren, pets and summons do nothing to NPCs until the law (criminal flags, murder counts, guards against you) exists in step 2. The Attack button still only arms on creatures.
+- **Saved:** an NPC's health and the time left on a knock-down, by actor id, in the `life` block (additive; save version unchanged).
+- **UI:** the target frame shows a hurt NPC's health bar, *Knocked down* and *⚔ Fighting*. Talking to a knocked-down NPC says they cannot talk. The developer panel has a line of NPC combat counters (`NPCF`).
+
+### Tests
+
+`tests/world-smoke/phase5.py` (also run by `world-smoke/run.py`), 16 checks in Chrome at phone size:
+
+0. A townsperson knocked down at simulation time 0 stays down (found while testing: the knock-down time was the flag, so a fall at second 0 read as "not down"; the flag and the time are now separate).
+1. All 37 townsfolk with a life have a profile at full health; 9 guards with halberds and chainmail (147 hp against 67 for a townsperson, weapon skill 90); NPC gear has unique negative uids, none in the player's containers; actor ids unchanged.
+2. Inside protected ground a townsperson is not a target. Just outside Vespar a marsh hound targets a townsperson and its blows land through the shared entry; she is frightened, remembers the attacker and shouts for the guards.
+3. A Vespar guard 7 m away steps in within 0.5 s of a marsh hound attacking Old Tomas, kills it with his halberd through the shared resolver (one `ActorKilled`, killer = the guard), reports `won` and returns to the patrol.
+4. You cannot hurt a townsperson. At 0 health he is knocked down exactly once (two killing blows: one `downed`, no `ActorKilled`), the creature loses interest, he stays down for the down time and gets up with a third of his health.
+5. Through a reload, a hurt townsperson keeps her health and a knocked-down one stays down for the time left.
+6. A seeded accelerated game day with the ecosystem awake: nobody stays down past the down time, health always valid, no page or console errors.
+
+Regression on v0.30: every node suite, `check-build.py` and every browser suite pass (world-smoke 158 ok, including phase 3's seeded three-day run; magery-smoke and sfx-smoke each failed once in the first full run on their known intermittent checks — a random fizzle and the door-close debounce — and passed on two reruns). Step cost rose about 0.1 ms (townsfolk are now in creature perception and guards scan twice a second).
+
+### Decisions
+
+- **Knock-down instead of death** for now: killing named shopkeepers, bankers' neighbours or the merchant needs a decision about permanent loss, replacements and corpse looting (step 4).
+- **The player cannot harm NPCs** until step 2 adds unlawful aggression; otherwise a stray area spell would hurt townsfolk with no consequence.
+- **Guards fight with the shared rules, not UO's instant-kill guards.** A guard is a strong fighter, not invulnerable; town protection still comes from protected ground.
+- **Natural fights near towns are rare.** Hostile spawns stand 28 m back from protected ground and most townsfolk stay inside it, so in a seeded day a townsperson is attacked only now and then, mostly the merchant on the cart road and workers at the edges. Making the edges more dangerous is a balance choice left for later.
+
 ## Phase 4, part 2 (v0.28) — **Tested**
 
 ### What was built
@@ -669,6 +711,7 @@ v0.26 merges phase 3 with the equipment and paper doll work (#19, which already 
 | v0.26 (556 entities, measured again for phase 4) | 0.54 ms | 4.0 ms | 4.7 ms |
 | v0.27 (564 entities, 25 with routines) | 0.67 ms | 3.8 ms | 5.0 ms |
 | v0.28.1 (≈1,020 entities, ≈945 creatures; update only, one run of 1,000 steps after boot, v0.28 in the same run: 1.04 ms) | 1.84 ms | — | — |
+| v0.30 (≈1,050 entities; update only, 3 runs of 2,000 steps after 400 warm-up steps; v0.29.2 in the same run: 1.28 ms) | 1.39 ms | — | — |
 
 - Each figure is the average of 3 runs of 4,000 updates and 200 renders.
 - **v0.23 update cost.** It rose from 0.80 to 1.20 ms per step. This is the creature push-apart in `aiMon`, which compares every entity with every other: with 256 entities instead of 212 that is 1.46× the pairs, which matches the measurement. It is still far inside the 50 ms step, but it is the first sign of the quadratic cost the audit flagged. The phase 3 spatial index removes it.
@@ -680,11 +723,13 @@ v0.26 merges phase 3 with the equipment and paper doll work (#19, which already 
 - **v0.25 start-up:** 1.92 s to enter the world (v0.24 measured again: 1.65 s). The habitat survey and the larger first population add about 0.3 s. Heap after start: about 52 MB (v0.24: about 49 MB in the same run).
 - **Phones are not measured yet.** That is phase 6, but the night pass and the graph build are the two numbers to watch.
 
-## Next task (phase 5, first step)
+## Next task (phase 5, step 2)
 
-Shared combat and law (§18–20), now that creatures and townsfolk both live in the world:
+Criminality and murder (§19), now that NPCs can be hurt and guards can fight:
 
-1. NPCs as combatants: creatures may target townsfolk and the travelling merchant outside protected ground; guards fight back with the shared resolver; townsfolk flee (they already seek shelter).
-2. Criminal flags and murder counts for the player (§19): unlawful aggression, guards responding inside their jurisdiction, witnesses.
-3. The first NPC adventurers (§8) on the existing skills: buy gear in town, walk to a camp, fight, bandage, return.
-4. NPC death and looting under the same rules as the player.
+1. Notoriety (blue innocent, grey criminal, red murderer) on names and the target frame, for the player and humanoid NPCs.
+2. Aggression records (attacker, victim, time, region, lawful or not, self-defence, expiry) and the criminal flag (120 s of simulation time, configurable).
+3. Let the player attack townsfolk: an unlawful attack makes you a criminal; guards inside their jurisdiction respond to you with the same `guardFightTick`; witnesses who see it call them.
+4. Short- and long-term murder counts with decay, saved; five make you red.
+
+Then step 3 (the first NPC adventurers) and step 4 (NPC death, corpses and looting under the player's rules).

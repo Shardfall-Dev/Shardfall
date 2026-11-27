@@ -75,7 +75,7 @@ function factionOf(e) {
 }
 /* rough fighting strength, for courage: health times damage per second */
 function ecoPower(e) {
-  if (e === P) return Math.max(1, P.hp) * 9; if (isAlly(e)) return Math.max(1, e.hp) * 8;
+  if (e === P) return Math.max(1, P.hp) * 9; if (isAlly(e) || npcCombatant(e)) return Math.max(1, e.hp) * 8;
   const d = e.type && MON[e.type]; if (!d) return 100; return Math.max(1, e.hp) * (d.dmg[0] + d.dmg[1]) / 2 / Math.max(.8, d.tele + d.rec);
 }
 function ecoActivity(m) { const pr = ecoP(m.type); return SIM.activityOf(pr.hours, ECOS.period); }
@@ -96,7 +96,7 @@ function ecoSeesPlayer(m) {
   if (!ecoEnemy(m, P)) return false; const dd = dist(m, P); const r = SIM.senseRange(ecoSenseOf(m), ecoSenseCtx(m));
   return dd < r.sight && los(m, P);
 }
-const ecoTargetable = (m, c) => c && c !== m && !c.gone && !c.dead && !c.ghost && c.kind !== 'corpse' && c.kind !== 'npc' && !(c === P && (P.ghost || P.hidden)) && !(protAt(c.x, c.y) && !m.quest) && (c.kind !== 'mon' || c.hp > 0);
+const ecoTargetable = (m, c) => c && c !== m && !c.gone && !c.dead && !c.ghost && c.kind !== 'corpse' && (c.kind !== 'npc' || npcUp(c)) && !(c === P && (P.ghost || P.hidden)) && !(protAt(c.x, c.y) && !m.quest) && (c.kind !== 'mon' || c.hp > 0);
 
 /* ---------- think: look, listen, score, commit (§12, §13) ---------- */
 function ecoThink(m) {
