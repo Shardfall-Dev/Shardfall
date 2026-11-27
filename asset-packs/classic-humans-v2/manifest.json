@@ -1,0 +1,311 @@
+{
+  "version": "2.0.0",
+  "status": "procedural prototype, not final painted art",
+  "cell": {
+    "width": 112,
+    "height": 100,
+    "anchorX": 56,
+    "anchorY": 86
+  },
+  "directions": [
+    "S",
+    "SW",
+    "W",
+    "NW",
+    "N",
+    "NE",
+    "E",
+    "SE"
+  ],
+  "atlas": "columns=time frames; rows=male directions then female directions",
+  "animations": {
+    "idle": 4,
+    "walk": 8,
+    "run": 8,
+    "ready": 4,
+    "unarmed": 8,
+    "slash1h": 8,
+    "slash2h": 8,
+    "chop1h": 8,
+    "chop2h": 8,
+    "blunt1h": 8,
+    "blunt2h": 8,
+    "thrust1h": 8,
+    "thrust2h": 8,
+    "polearm": 8,
+    "staff": 8,
+    "bow": 8,
+    "crossbow": 8,
+    "cast1h": 8,
+    "cast2h": 8,
+    "caststaff": 8,
+    "block": 6,
+    "hit": 4,
+    "death": 8,
+    "corpse": 1,
+    "mine": 8,
+    "chopwood": 8,
+    "smith": 8,
+    "bandage": 8,
+    "fish": 8
+  },
+  "weaponMap": {
+    "unarmed": [
+      "unarmed",
+      "fist"
+    ],
+    "sword": [
+      "slash1h",
+      "sword"
+    ],
+    "glaive": [
+      "polearm",
+      "halberd"
+    ],
+    "battleaxe": [
+      "chop2h",
+      "battleaxe"
+    ],
+    "hatchet": [
+      "chop2h",
+      "hatchet"
+    ],
+    "knife": [
+      "slash1h",
+      "dagger"
+    ],
+    "pickaxe": [
+      "chop1h",
+      "pickaxe"
+    ],
+    "hammer": [
+      "blunt2h",
+      "warhammer"
+    ],
+    "mace": [
+      "blunt1h",
+      "mace"
+    ],
+    "waraxe": [
+      "chop1h",
+      "axe"
+    ],
+    "dagger": [
+      "thrust1h",
+      "dagger"
+    ],
+    "kryss": [
+      "thrust1h",
+      "kryss"
+    ],
+    "spear": [
+      "thrust2h",
+      "spear"
+    ],
+    "shortbow": [
+      "bow",
+      "bow"
+    ],
+    "crossbow": [
+      "crossbow",
+      "crossbow"
+    ],
+    "heavycrossbow": [
+      "crossbow",
+      "heavycrossbow"
+    ],
+    "broadsword": [
+      "slash1h",
+      "broadsword"
+    ],
+    "katana": [
+      "slash1h",
+      "katana"
+    ],
+    "rapier": [
+      "thrust1h",
+      "rapier"
+    ],
+    "greatsword": [
+      "slash2h",
+      "greatsword"
+    ],
+    "axe": [
+      "chop1h",
+      "axe"
+    ],
+    "doubleaxe": [
+      "chop2h",
+      "doubleaxe"
+    ],
+    "warhammer": [
+      "blunt2h",
+      "warhammer"
+    ],
+    "maul": [
+      "blunt2h",
+      "maul"
+    ],
+    "club": [
+      "blunt1h",
+      "club"
+    ],
+    "shortspear": [
+      "thrust1h",
+      "shortspear"
+    ],
+    "halberd": [
+      "polearm",
+      "halberd"
+    ],
+    "bardiche": [
+      "polearm",
+      "bardiche"
+    ],
+    "staff": [
+      "staff",
+      "staff"
+    ],
+    "quarterstaff": [
+      "staff",
+      "quarterstaff"
+    ],
+    "bow": [
+      "bow",
+      "bow"
+    ],
+    "longbow": [
+      "bow",
+      "longbow"
+    ],
+    "wand": [
+      "cast1h",
+      "wand"
+    ],
+    "smithhammer": [
+      "smith",
+      "smithhammer"
+    ],
+    "fishingpole": [
+      "fish",
+      "fishingpole"
+    ]
+  },
+  "cloth": {
+    "linen": "#ac9776",
+    "brown": "#78513a",
+    "charcoal": "#50504b",
+    "navy": "#3b5676",
+    "forest": "#4d6845",
+    "burgundy": "#823e38",
+    "purple": "#6d5279",
+    "ochre": "#a17b39",
+    "cream": "#c6bda5",
+    "black": "#393a39",
+    "teal": "#436b69",
+    "rust": "#95573c"
+  },
+  "hair": {
+    "black": "#302a25",
+    "brown": "#65452e",
+    "darkBrown": "#493327",
+    "blond": "#b69a58",
+    "auburn": "#914a32",
+    "grey": "#8b8981",
+    "white": "#c5c1b6"
+  },
+  "skin": {
+    "fair": "#ca9a72",
+    "tan": "#ac7854",
+    "olive": "#937450",
+    "brown": "#815338",
+    "deep": "#684333"
+  },
+  "hairstyles": [
+    "bald",
+    "cropped",
+    "short",
+    "parted",
+    "long",
+    "ponytail",
+    "bun",
+    "braid"
+  ],
+  "beards": [
+    "none",
+    "stubble",
+    "goatee",
+    "short",
+    "full"
+  ],
+  "npcPresets": {
+    "guard": {
+      "cloth": "navy",
+      "outfit": "guard",
+      "weapon": "glaive"
+    },
+    "blacksmith": {
+      "cloth": "brown",
+      "outfit": "apron",
+      "weapon": "smithhammer"
+    },
+    "miner": {
+      "cloth": "charcoal",
+      "outfit": "apron",
+      "weapon": "pickaxe"
+    },
+    "lumberjack": {
+      "cloth": "forest",
+      "weapon": "hatchet"
+    },
+    "merchant": {
+      "cloth": "burgundy",
+      "style": "parted"
+    },
+    "mage": {
+      "cloth": "purple",
+      "outfit": "robe",
+      "weapon": "staff"
+    },
+    "healer": {
+      "cloth": "cream",
+      "outfit": "robe"
+    },
+    "sailor": {
+      "cloth": "linen"
+    },
+    "farmer": {
+      "cloth": "ochre"
+    },
+    "villager": {
+      "cloth": "linen"
+    },
+    "bandit": {
+      "cloth": "charcoal",
+      "outfit": "leather",
+      "weapon": "dagger"
+    },
+    "ranger": {
+      "cloth": "forest",
+      "outfit": "leather",
+      "weapon": "shortbow"
+    },
+    "innkeeper": {
+      "cloth": "brown",
+      "outfit": "apron"
+    },
+    "priest": {
+      "cloth": "cream",
+      "outfit": "robe"
+    },
+    "scribe": {
+      "cloth": "teal",
+      "outfit": "robe"
+    }
+  },
+  "validation": {
+    "generatedFrameStrings": 7856,
+    "gameIntegration": false,
+    "visualQA": false
+  }
+}
