@@ -54,7 +54,11 @@ async def register_and_create(page, email, char_name, tag):
     await shot(page, f'{tag}_02_register')
     await page.click('form[data-f=register] button[type=submit]'); await page.wait_for_selector('text=Check your email')
     link = email_link(email)
-    await page.goto(link); await page.wait_for_selector('text=Your characters', timeout=15000)
+    await page.goto(link)
+    try: await page.wait_for_selector('text=Your characters', timeout=15000)
+    except Exception:
+        print('DEBUG url', page.url, 'cookies', [c['name'] for c in await page.context.cookies()], flush=True)
+        print('DEBUG screen', (await page.inner_text('#ccin'))[:600], flush=True); await shot(page, f'{tag}_fail'); raise
     check(await page.locator('text=Your email address is confirmed').count() == 1, f'{tag}: email confirmed, signed in, roster shown')
     check('online=' not in page.url, f'{tag}: address bar cleaned after the callback')
     await shot(page, f'{tag}_03_roster_empty')
