@@ -195,7 +195,7 @@ function ccSetStat(i, v) { if (!Number.isFinite(v)) return; v = Math.round(v); c
 function ccSetSkill(i, v) { const r = CCD.skills[i]; if (!r || !r[0] || !Number.isFinite(v)) return; v = Math.round(v); const room = SF.CREATE_SKILLS - (ccSkillTotal() - r[1]); r[1] = cl(v, 0, Math.min(SF.CREATE_SKILL_MAX, Math.max(0, room))); ccMarkEdited(); }
 function ccGoStep(s) { CCD.step = cl(s, 0, 3); CCD.err = ''; ccRender(); const m = $('#ccmain'); if (m) { m.scrollTop = 0; const h = m.querySelector('h2'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); } } }
 function ccExport() {
-  const raw = localStorage.getItem(SAVEKEY); if (!raw) return; const s = ccSaved(); const name = (s && s.char.name || 'character').replace(/[^\p{L}\p{N}_-]+/gu, '_');
+  let raw = null; try { raw = localStorage.getItem(SAVEKEY); } catch (e) { } if (!raw) return; const s = ccSaved(); const name = (s && s.char.name || 'character').replace(/[^\p{L}\p{N}_-]+/gu, '_');
   try { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([raw], { type: 'application/json' })); a.download = `Shardfall_${name}_save.json`; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); } catch (e) { console.error(e); }
 }
 /* commit: the one path from the creator into the game (also __CC.quick for tests). Validates, keeps a copy of a replaced save,
@@ -205,7 +205,9 @@ function ccCommit() {
   if (!v.ok) { CCD.err = ''; if (CCD.step !== 3) ccGoStep(3); else ccRenderStep(); const e = $('#ccerrs'); if (e) e.focus(); return false; }
   let old = null; try { old = localStorage.getItem(SAVEKEY); } catch (e) { } if (old && ccSaved() && !CCD.replace) { CCD.err = 'Tick “Replace” to start a new character.'; ccRenderStep(); return false; }
   CCD.creating = true; ccRefreshNav();
-  let ok = false; try { if (old) backupRaw(readSave().problem ? '.damaged' : '.replaced', old); ok = boot(null, ccPayload()); } catch (e) { console.error(e); ok = false; }
+  // v0.33.1: the save being replaced is copied aside first; if that copy cannot be written (storage full or blocked) nothing changes
+  if (old && !backupRaw(readSave().problem ? '.damaged' : '.replaced', old)) { CCD.creating = false; CCD.err = 'Your current save could not be copied aside (browser storage is full or blocked), so nothing was changed. Export it first or free some space, then try again.'; ccRender(); return false; }
+  let ok = false; try { ok = boot(null, ccPayload()); } catch (e) { console.error(e); ok = false; }
   if (!ok) { CCD.creating = false; if (!P) { CCD.err = 'The character could not be created. Nothing was changed.'; ccRender(); } return false; }
   cancelAnimationFrame(CC_RAF); CC_RAF = 0; return true;
 }

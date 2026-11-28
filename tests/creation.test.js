@@ -1,5 +1,5 @@
-// usage: node tests/creation.test.js Shardfall_v0.33.html — character creation rules (SF.CREATION) with no browser
-const fs = require('fs'); const html = fs.readFileSync(process.argv[2] || 'Shardfall_v0.33.html', 'utf8');
+// usage: node tests/creation.test.js Shardfall_v0.33.1.html — character creation rules (SF.CREATION) with no browser
+const fs = require('fs'); const html = fs.readFileSync(process.argv[2] || 'Shardfall_v0.33.1.html', 'utf8');
 const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
 const g = {}; const m = { exports: {} };
 new Function('module', 'globalThis', scripts.find(t => t.includes('SF.METALS')))(m, g); g.SF = m.exports;

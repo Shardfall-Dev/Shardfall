@@ -121,7 +121,9 @@ with sync_playwright() as pw:
     n_moves = J(page, "(() => { const P = __SF.P; return [P.x, P.y]; })()")
     tp(page, door['x'] + 2.5, door['y'] + .5); page.wait_for_timeout(200); stick(page, *MINUS_Y, 500); clear(page)
     p0 = J(page, "[__SF.P.x, __SF.P.y]"); stick(page, *MINUS_Y, 900); p1 = J(page, "[__SF.P.x, __SF.P.y]")
-    check('holding against a wall: no footsteps', abs(p1[1] - p0[1]) < .05 and not played(page), [p0, p1, played(page)])
+    # v0.33.1: only footsteps count here; a creature nearby may make its own sound meanwhile (CI once heard a rat's alert)
+    steps = [s for s in played(page) if s.startswith('step.')]
+    check('holding against a wall: no footsteps', abs(p1[1] - p0[1]) < .05 and not steps, [p0, p1, played(page)])
     clear(page); page.wait_for_timeout(700)
     check('standing idle: no footsteps', not [e for e in played(page) if e.startswith('step')], played(page))
 

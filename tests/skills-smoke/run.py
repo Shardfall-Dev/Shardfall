@@ -1,17 +1,23 @@
 # Browser checks for the Second Age skill system (v0.30): creation, the Skills page, trainers, natural stat gain, a real v0.28.1 save
 # migrating to the 49 skills, and (scenarios.js) each skill's action in the live game.
 # usage: python3 tests/skills-smoke/run.py Shardfall_v0.30.0.html [chrome] [OLD_v0.28.1.html]
-# Without OLD the v0.28.1 build is read from git (main or the commit that added it).
+# Without OLD the v0.28.1 build is read from git: the pinned historical commit OLD_COMMIT (fetched with --depth=1 when it is not
+# present; CI fetches it beforehand). The migration check is required: when no v0.28.1 build can be found it FAILS, never skips.
 import sys, json, os, subprocess, tempfile
+OLD_COMMIT = 'b362b46b440634b797b49f65d8ec07ca1acbede7'   # holds Shardfall_v0.28.1.html (design/t2a-skill-parity-v1)
 from playwright.sync_api import sync_playwright
 here = os.path.dirname(os.path.abspath(__file__)); repo = os.path.dirname(os.path.dirname(here))
 new = os.path.abspath(sys.argv[1]); chrome = sys.argv[2] if len(sys.argv) > 2 else '/usr/bin/google-chrome'
 old = sys.argv[3] if len(sys.argv) > 3 else None
 if not old:
   old = os.path.join(tempfile.mkdtemp(), 'Shardfall_v0.28.1.html')
-  for ref in ['main', 'HEAD~1', 'b362b46']:
-    r = subprocess.run(['git', '-C', repo, 'show', ref + ':Shardfall_v0.28.1.html'], capture_output=True)
-    if r.returncode == 0: open(old, 'wb').write(r.stdout); break
+  show = lambda ref: subprocess.run(['git', '-C', repo, 'show', ref + ':Shardfall_v0.28.1.html'], capture_output=True)
+  r = show(OLD_COMMIT)
+  if r.returncode != 0:
+    subprocess.run(['git', '-C', repo, 'fetch', '--depth=1', 'origin', OLD_COMMIT], capture_output=True)
+    r = show(OLD_COMMIT)
+  if r.returncode == 0: open(old, 'wb').write(r.stdout)
+  else: print('note: could not read Shardfall_v0.28.1.html from commit ' + OLD_COMMIT + ': ' + r.stderr.decode(errors='replace').strip()[:200])
 fails = 0
 def check(cond, msg, extra=None):
   global fails
@@ -89,7 +95,7 @@ with sync_playwright() as p:
     J("() => __SF.save()"); pg.reload(); pg.wait_for_timeout(700); pg.click('[data-c=cont]'); pg.wait_for_timeout(900)
     again = J("() => ({ n: Object.keys(__SF.P.skills).length, magery: __SF.P.skills.magery.v, sum: __SF.SF.totalSkill(__SF.P), pool: __SF.P.skillPool })")
     check(again['n'] == 49 and again['magery'] == 452 and again['sum'] + again['pool'] == n['sum'] + n['pool'], 'saving and loading again changes nothing', again)
-  else: print('skip v0.28.1 save migration (no old build found)')
+  else: check(False, f'v0.28.1 save migration: no v0.28.1 build found ({old}); fetch {OLD_COMMIT} or pass the old build as the third argument')
   # ---------- each skill's action in the live game ----------
   if os.path.exists(SCEN):
     pg.goto('file://' + new); pg.wait_for_timeout(500); J('localStorage.clear()'); pg.reload(); pg.wait_for_timeout(600)
