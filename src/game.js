@@ -34,6 +34,7 @@ const SPAWNS = [
   { type: 'hound', x: 420, y: 330, r: 34, max: 7, pack: 2 }, { type: 'hound', x: 440, y: 250, r: 34, max: 7, pack: 2 }, { type: 'hound', x: 520, y: 320, r: 30, max: 5, pack: 3 }];
 for (const s of SPAWNS) { s.n = 0; s.next = 0; }
 const $ = s => document.querySelector(s);
+let ONW = null;   /* online world session (src/online.js): set while playing online; the offline game never sets it */
 let R = Math.random; const rnd = (a, b) => a + Math.floor(R() * (b - a + 1)), pick = a => a[Math.floor(R() * a.length)];
 const cl = (v, a, b) => v < a ? a : v > b ? b : v;
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -243,11 +244,15 @@ function canStand(e, x, y) { const r = .26; if (colBlocked(x, y, r)) return fals
   if (e.kind === 'mon' && !e.quest && protAt(x, y)) return false; return true; }
 function moveBy(e, dx, dy) { let moved = 0; if (canStand(e, e.x + dx, e.y)) { e.x += dx; moved += Math.abs(dx); } if (canStand(e, e.x, e.y + dy)) { e.y += dy; moved += Math.abs(dy); } return moved; }
 function los(a, b) { const d = Math.hypot(b.x - a.x, b.y - a.y), n = Math.ceil(d / .25); for (let i = 1; i < n; i++) { const x = a.x + (b.x - a.x) * i / n, y = a.y + (b.y - a.y) * i / n; if (LOSB[tAt(Math.floor(x), Math.floor(y))]) return false; if (FIELDS.length && fieldBlocksSight(x, y)) return false; for (const f of EFX) if (f.k === 'cloud' && Math.hypot(x - f.x, y - f.y) < f.r && !(Math.hypot(a.x - f.x, a.y - f.y) < f.r && Math.hypot(b.x - f.x, b.y - f.y) < f.r)) return false; } return true; }
-function playerMove(dt) {
+function moveIntent() {
   let vx = 0, vy = 0, want = 0;
   if (JOY.on && !P.dead) { const jx = JOY.x - JOY.x0, jy = JOY.y - JOY.y0, m = Math.hypot(jx, jy); if (m > 10) { const tx = jx / HW + jy / HH, ty = jy / HH - jx / HW, tm = Math.hypot(tx, ty); vx = tx / tm; vy = ty / tm; want = Math.min(1, m / 56); JOY.sprint = !!P.sprintOn || (SETTINGS.stickSprint && m > 70); } }
   else if (KEYS.any) { const sx = (KEYS.r ? 1 : 0) - (KEYS.l ? 1 : 0), sy = (KEYS.d ? 1 : 0) - (KEYS.u ? 1 : 0); if (sx || sy) { const tx = sx / HW + sy / HH, ty = sy / HH - sx / HW, tm = Math.hypot(tx, ty); vx = tx / tm; vy = ty / tm; want = 1; JOY.sprint = !!KEYS.shift || !!P.sprintOn; } }
-  let sprint = JOY.sprint && want > 0 && !P.ghost;
+  return { vx, vy, want, sprint: JOY.sprint && want > 0 && !P.ghost };
+}
+function playerMove(dt) {
+  const mi = moveIntent(), vx = mi.vx, vy = mi.vy, want = mi.want;
+  let sprint = mi.sprint;
   const enc = encumb(); if (sprint && (P.stam <= 0 || !enc.run || P.prep)) sprint = false;
   if (enc.speed <= 0 && want > 0 && GT - (P.immobileMsg || -99) > 4) { P.immobileMsg = GT; log('You carry too much to move. Drop something.', '#ffb070'); }
   if (P.hidden && sprint) reveal('You sprint and are revealed.');
@@ -864,6 +869,7 @@ SF.SK.addInscription();   // one Inscription recipe per Magery spell (needs src/
 /* ---------- main tick ---------- */
 let spawnT = 0, saveT = 0;
 function update(dt) {
+  if (ONW) return onlineStep(dt);
   GT += dt;
   for (let i = TIMERS.length - 1; i >= 0; i--) if (GT >= TIMERS[i].t) { const t = TIMERS.splice(i, 1)[0]; try { t.fn(); } catch (e) { console.error(e); } }
   for (let i = EFX.length - 1; i >= 0; i--) { const f = EFX[i]; if (f.at && GT >= f.at) { f.at = 0; try { f.fn && f.fn(); } catch (e) { console.error(e); } if (f.k !== 'flask') { EFX.splice(i, 1); continue; } } if (f.until && GT > f.until) EFX.splice(i, 1); else if (f.k === 'proj' && GT > f.t1 + .05) EFX.splice(i, 1); }
@@ -2099,6 +2105,7 @@ function drawEnt(e) {
   if (e.kind === 'player' && drawForm(g, e, x, y)) { }
   else if (drawPaintedActor(g, e, x, y)) { }                                         // Painted Human Candidates v0.1, developer flag only (src/painted-render.js)
   else if (drawGearActor(g, e, x, y)) { }                                            // layered equipment renderer (src/gear-render.js), when on
+  else if (e.kind === 'remote') drawRemote(g, e, x, y);                              // another player, online (src/online.js)
   else if (e.kind === 'player') drawScout(g, e, x, y, P.ghost ? 'ghost' : P.look);
   else if (e.kind === 'ally') { if (e.ghost) g.globalAlpha = .75; drawScout(g, e, x, y, e.ghost ? 'ghost' : '#2f7a46'); }
   else if (e.kind === 'npc' && e.downed) { g.save(); g.globalAlpha = .85; g.translate(x, y - 4); g.rotate(-1.4); g.translate(-x, -y); drawScout(g, e, x, y, NPC_COL[e.role] || (e.life && LIFE_COL[e.life.prof]) || '#5a5a5a'); g.restore(); }   // knocked down (phase 5)
@@ -2180,7 +2187,7 @@ function drawOverlay(camX, camY) {
     if (e.gone || e === P || e.hidden) continue; const isC = e.kind === 'corpse';
     const hgt = isC ? 18 : e.type && MON[e.type] ? MON[e.type].h : 74; const [x, top] = S(e.x, e.y); const yy = top - hgt / CAM.f * 1 - 6;
     if (x < -150 || x > VW + 150 || yy < -40 || yy > VH + 40) continue;
-    const show = e === P.sel || (e.kind === 'npc' || e.kind === 'ally') && Math.hypot(e.x - P.x, e.y - P.y) < 7 || (isC && (e.mine || e.allyBody));
+    const show = e === P.sel || (e.kind === 'npc' || e.kind === 'ally') && Math.hypot(e.x - P.x, e.y - P.y) < 7 || (isC && (e.mine || e.allyBody)) || e.kind === 'remote';
     if ((e.kind === 'mon' || e.kind === 'pet' || (e.kind === 'ally' && !e.ghost)) && e.hp < e.max) { const w = 34, f = cl(e.hp / e.max, 0, 1); g.fillStyle = '#000'; g.fillRect(x - w / 2 - 1, yy - 1, w + 2, 6); g.fillStyle = f > .5 ? '#5fd068' : f > .25 ? '#f0c040' : '#f04848'; g.fillRect(x - w / 2, yy, w * f, 4); }
     if (e.kind === 'mon' && e.state === 'tele') { g.font = `bold 18px ${PXF}`; g.lineWidth = 3; g.strokeStyle = '#000'; g.strokeText('!', x, yy - 8); g.fillStyle = '#ff5040'; g.fillText('!', x, yy - 8); }
     if (show) { g.font = `13px ${PXF}`; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,10,.9)'; const nm = e.name; g.strokeText(nm, x, yy - (e.kind === 'mon' && e.state === 'tele' ? 26 : 6)); g.fillStyle = isC ? '#d8d0c0' : relColor(e); g.fillText(nm, x, yy - (e.kind === 'mon' && e.state === 'tele' ? 26 : 6)); }
@@ -2917,7 +2924,7 @@ function screenToWorld(sx, sy) { const wx = sx * CAM.f + CAM.x, wy = sy * CAM.f 
 function hitEnts(wx, wy) { const out = []; for (const e of ents) { if (e === P || e.gone || e.hidden) continue; const X = SX(e.x, e.y), Y = SY(e.x, e.y); const h = e.kind === 'corpse' ? 0 : e.type && MON[e.type] ? MON[e.type].h : 66; const cy = Y - h * .5, r = e.kind === 'corpse' ? 16 : Math.max(18, h * .55); const d = Math.hypot(wx - X, wy - cy); if (d < r) out.push({ e, d: d + (e.kind === 'corpse' ? 12 : 0) }); } return out.sort((a, b) => a.d - b.d).map(o => o.e); }
 function tallAt(wx, wy) { const fx = (wx / HW + wy / HH) / 2, fy = (wy / HH - wx / HW) / 2; for (let k = 3; k >= 0; k--) { const x0 = Math.floor(fx) + k, y0 = Math.floor(fy) + k; for (const [ax, ay] of [[x0, y0], [x0 + 1, y0], [x0, y0 + 1]]) { const t = tAt(ax, ay); const hh = { [T.TR]: 80, [T.RK]: 46, [T.RB]: 30 }[t]; if (!hh) continue; const cx = SX(ax + .5, ay + .5), cy = SY(ax + .5, ay + .5); if (Math.abs(wx - cx) < HW * .8 && wy > cy - hh && wy < cy + HH * .7) return { x: ax, y: ay }; } } return null; }
 function tapWorld(sx, sy) {
-  if (!P) return; const w = screenToWorld(sx, sy);
+  if (!P || ONW) return; const w = screenToWorld(sx, sy);
   if (AIM) { const pt = { x: w.x, y: w.y }; if (Math.hypot(pt.x - P.x, pt.y - P.y) > AIM.range) return log('Out of range.', '#ffb070'); return AIM.fn(pt); }
   if (P.ghost) return;
   const hits = hitEnts(w.wx, w.wy);
@@ -2959,7 +2966,7 @@ addEventListener('resize', () => { resize(); if (SCREEN === 'map') { sizeMap(); 
 let deletingSave = false, saveLocked = false, saveFailShown = false;
 const SAVEKEY = 'shardfall.save.v1', SAVE_VERSION = 9, TAB_ID = Math.random().toString(36).slice(2);
 function save() {
-  if (!P || deletingSave || saveLocked) return false; try {
+  if (!P || deletingSave || saveLocked || ONW) return false; try {
     const c = {}; for (const k of ['name', 'x', 'y', 'str', 'dex', 'int', 'hp', 'stam', 'mana', 'skills', 'pack', 'bank', 'equip', 'look', 'bound', 'quest', 'freeLessons', 'hotbar', 'ghost', 'ghostAt', 'gainLog', 'recipeN', 'cx', 'skillPool', 'combatMig', 't2aMig', 'camp', 'eqMig', 'bandSeq', 'bandDone', 'lowerRank', 'statLocks', 'charId', 'created']) c[k] = P[k];
     c.bandage = bandageSave();
     c.prepEscrow = P.prep ? { id: P.prep.sp.id, items: P.prep.escrow.items.slice(), mana: P.prep.escrow.mana } : null;

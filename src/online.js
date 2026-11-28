@@ -102,19 +102,22 @@ function onConnect() {
   ws.onmessage = ev => {
     if (ON.lobby !== L) return; const r = ONP.parseServer(ev.data); if (!r.ok) return; const m = r.msg;
     if (typeof m.seq === 'number') { if (L.seq && m.seq !== L.seq + 1 && L.character) ws.send(JSON.stringify({ v: ONP.PROTOCOL_VERSION, type: 'resync', p: {} })); L.seq = m.seq; }
-    if (m.type === 'welcome' || m.type === 'snapshot') { L.character = m.p.character; L.tick = m.p.tick; L.presence = new Map((m.p.presence || []).map(x => [x.characterId, x])); L.status = 'connected'; L.tries = 0; L.note = m.p.notice || L.note; if (m.type === 'welcome') L.joinedAt = Date.now(); }
+    if (m.type === 'welcome' || m.type === 'snapshot') { L.character = m.p.character; L.tick = m.p.tick; L.presence = new Map((m.p.presence || []).map(x => [x.characterId, x])); L.status = 'connected'; L.tries = 0; L.note = m.p.notice || L.note; if (m.type === 'welcome') { L.joinedAt = Date.now(); if (ONW) owResume(m.p); else if (m.p.world && !owEnter(L, m.p)) { L.stop = true; L.status = 'ended'; try { ws.close(1000, 'world mismatch'); } catch (e) { } } } }
+    else if (m.type === 'state' || m.type === 'actor.enter' || m.type === 'actor.leave') { if (ONW) owMessage(m); return; }
     else if (m.type === 'presence.join') L.presence.set(m.p.character.characterId, Object.assign({ connected: true }, m.p.character));
     else if (m.type === 'presence.leave') L.presence.delete(m.p.characterId);
     else if (m.type === 'pong') { if (typeof m.p.t === 'number') L.rtt = Math.round(performance.now() - m.p.t); L.tick = m.p.tick; }
     else if (m.type === 'kicked') { L.stop = true; L.status = 'ended'; L.note = ({ taken_over: 'This character was opened in another window or device.', another_character: 'Another of your characters joined this realm.', session_ended: 'You were signed out.', character_deleted: 'This character was deleted.', account_closed: 'This account was closed.', server_restart: 'The server is restarting. Try again in a moment.' })[m.p.reason] || 'Disconnected by the server.'; if (m.p.reason === 'server_restart') L.stop = false; }
     else if (m.type === 'error' && m.id === 'hello') { L.stop = true; L.status = 'ended'; L.note = m.p.message; }
+    if (ONW) { if (L.status === 'ended') owEnded(L.note); else owBar(); return; }
     onLobbyPaint();
   };
   ws.onclose = ev => {
     if (ON.lobby !== L) return; L.ws = null;
     if (ev.code === ONP.CLOSE.UNAUTHORIZED || ev.code === 1006 && !L.character && L.tries > 2) { L.stop = true; L.status = 'ended'; L.note = L.note || 'Could not connect. Your session may have ended.'; }
     if ([ONP.CLOSE.FORBIDDEN, ONP.CLOSE.TAKEN_OVER, ONP.CLOSE.SESSION_ENDED, ONP.CLOSE.PROTOCOL].includes(ev.code)) L.stop = true;
-    if (L.stop) { L.status = 'ended'; onLobbyPaint(); return; }
+    if (L.stop) { L.status = 'ended'; if (ONW) owEnded(L.note || 'Disconnected.'); else onLobbyPaint(); return; }
+    if (ONW) { ONW.pending = []; ONW.batch = []; owBar(); }
     onRetry();
   };
   clearInterval(L.pingT); L.pingT = setInterval(() => { if (L.ws && L.ws.readyState === 1 && L.character) L.ws.send(JSON.stringify({ v: ONP.PROTOCOL_VERSION, type: 'ping', p: { t: performance.now() } })); }, 5000);
@@ -166,7 +169,7 @@ function onRosterHtml() {
     return `<article class="oncard"><canvas class="onport" width="60" height="120" data-look="${onEsc(JSON.stringify(c.appearance))}" role="img" aria-label="Portrait of ${onEsc(c.name)}"></canvas>
       <div class="oninfo"><b>${onEsc(c.name)}</b><span class="ccnote">${onEsc(c.title)} · ${onEsc(c.startingTownName)}</span><span class="cctk">STR ${c.stats.str} · DEX ${c.stats.dex} · INT ${c.stats.int}</span>
       ${del ? `<form class="ondel" data-f="delete" data-id="${c.id}"><label class="cclab" for="on-delname">Type <b>${onEsc(c.name)}</b> to delete. It can be restored for ${ON_PURGE} days.</label><input id="on-delname" autocomplete="off" maxlength="40"><div class="ccrow"><button class="ccb sm" type="submit">Delete</button>${ccBtn('on-delno', 'Keep', {}, 'sm')}</div></form>`
-        : `<div class="ccrow">${ccBtn('on-play', 'Enter lobby', { id: c.id }, 'pri')}${ccBtn('on-del', 'Delete…', { id: c.id }, 'sm')}</div>`}</div></article>`; }).join('');
+        : `<div class="ccrow">${ccBtn('on-play', 'Play', { id: c.id }, 'pri')}${ccBtn('on-del', 'Delete…', { id: c.id }, 'sm')}</div>`}</div></article>`; }).join('');
   const free = R.slots.max - R.slots.used;
   const empty = free > 0 ? `<button type="button" class="oncard onnew" data-c="on-new"${R.realm.status !== 'open' ? ' disabled' : ''}><b>+ New character</b><span class="ccnote">${free} of ${R.slots.max} slots free</span></button>` : `<p class="ccnote">All ${R.slots.max} slots are in use.</p>`;
   const gone = R.deleted.length ? `<details class="ccguide"><summary>Recently deleted (${R.deleted.length})</summary>${R.deleted.map(c => `<div class="ccgi"><b>${onEsc(c.name)}</b> <span class="ccnote">restorable until ${onEsc(new Date(c.purgeAfter).toLocaleDateString())}</span> ${ccBtn('on-restore', 'Restore', { id: c.id }, 'sm')}</div>`).join('')}</details>` : '';
@@ -256,6 +259,115 @@ function onWorldSource() {
     gameStand: (x, y) => canStand({ kind: 'player' }, x, y),
     townSpawns: () => Object.fromEntries(CR.TOWNS.map(t => [t.id, CR.townReady(t.id, { shrines: SHRINES, npcs: ANN.npcs, stand: (x, y) => canStand({ kind: 'player' }, x, y) })])) };
 }
+/* ---------- the online world (Server Movement v1) ----------
+   "Play" connects, and on the server's welcome the game's own world and renderer start with the server's character. Walking
+   is server-authoritative: each 50 ms step the stick or keys become an intent, the client predicts its result with the very
+   rules the server uses (shared/movement.js on shared/collision.js) and sends the intents; the server's state messages carry
+   the authoritative position and the last intent applied, and the client replays the intents not yet applied on top of it
+   (reconciliation). Other players arrive with actor.enter, move with state, leave with actor.leave, and are drawn 120 ms in the
+   past between two server positions (interpolation). Nothing else from the offline game runs: no creatures, NPCs, combat,
+   gathering, crafting or trading, and no local save. */
+const OW_INTERP_MS = 120, OW_MAX_PENDING = 40;
+const OW_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', 'W', 'A', 'S', 'D', 'Shift', 'Escape']);
+const OW_ACTIONS = new Set(['sprint', 'map', 'mapfit', 'mapall', 'scrclose', 'rotok']);
+function owEnter(L, w) {
+  if (P) { L.note = 'An offline game is open in this tab. Reload the page to play online.'; return false; }
+  genWorld(); buildTiles(); buildMini(); resize();
+  const world = SF_COLLISION.makeWorld(onWorldSource());
+  if (SF_COLLISION.hash(world) !== w.world.hash) { L.note = 'This copy of the game is out of date for the server (the world differs). Reload the page to update.'; return false; }
+  const ch = w.character, you = w.you;
+  P = newChar({ name: ch.name, str: ch.stats.str, dex: ch.stats.dex, int: ch.stats.int, skills: {}, look: ch.appearance });
+  P.skills = JSON.parse(JSON.stringify(ch.skills)); P.statLocks = Object.assign({}, ch.statLocks); P.look = Object.assign({}, ch.appearance);
+  P.equip = emptyEquip(); P.pack = SF.newContainer('pack', 'p1'); P.bank = SF.newContainer('bank', 'p1');
+  for (const it of ch.items || []) { const o = Object.assign(SF.newItem(it.itemDef, it.qty), it.props || {}, { sid: it.id }); if (it.container === 'equip' && it.slot) P.equip[it.slot] = o; else if (it.container === 'bank') P.bank.items.push(o); else P.pack.items.push(o); }
+  P.hp = ch.vitals.hp; P.mana = ch.vitals.mana; P.stam = you.stam; P.x = you.x; P.y = you.y; P.sect = you.sect || 0;
+  P.charId = ch.id; P.online = true; P.created = { v: SF.CREATION.VERSION, template: ch.template, town: ch.startingTown }; P.bound = ch.boundShrine;
+  P.cx = { survey: {}, pins: [], track: null, mark: false, doors: {} }; P.batch = null; while (P.hotbar.length < 9) P.hotbar.push(null);
+  WS = SIM.create({ clock: () => GT, onError: e => console.error(e) }); simAdopt(P);
+  ents.unshift(P); P.sw = SF.newSwing(); P.movedAt = -99; P.drawn = false;
+  ONW = { L, world, ctx: SF_MOVEMENT.ctxFor(SF, P), ps: { x: you.x, y: you.y, stam: you.stam, sect: you.sect || 0, t: you.t || 0, lastDrain: you.ld ?? -99 }, seq: 0, pending: [], batch: [], wasMoving: false,
+    remotes: new Map(), corrections: 0, lastErr: 0, acked: you.ack, notice: w.notice, viewRadius: w.world.viewRadius };
+  $('#cc').hidden = true; document.body.classList.add('online'); owBar(); STEPPER.reset();
+  log('Welcome to Anniabreen, online. Walking is decided by the server; creatures, combat, items and trading are not online yet.', '#ffe08a');
+  log('Left stick or WASD moves; Sprint runs. Leave from the online bar.', '#b6a68a');
+  refreshHud(); return true;
+}
+function owResume(w) {   // a reconnect: the server's position replaces the prediction; others are re-announced
+  const W = ONW; for (const e of W.remotes.values()) rmEnt(e); W.remotes.clear(); W.pending = []; W.batch = []; W.wasMoving = false;
+  const y = w.you; W.ps = { x: y.x, y: y.y, stam: y.stam, sect: y.sect || 0, t: y.t || 0, lastDrain: y.ld ?? -99 }; P.x = y.x; P.y = y.y; P.stam = y.stam; W.acked = y.ack;
+  owBar();
+}
+function owSend(type, p) { const L = ONW && ONW.L; if (L && L.ws && L.ws.readyState === 1) { L.ws.send(JSON.stringify({ v: ONP.PROTOCOL_VERSION, type, p })); return true; } return false; }
+/* one 50 ms step of the online world (called by the game's fixed-step loop instead of the offline update) */
+function onlineStep(dt) {
+  GT += dt;
+  for (let i = TIMERS.length - 1; i >= 0; i--) if (GT >= TIMERS[i].t) { const t = TIMERS.splice(i, 1)[0]; try { t.fn(); } catch (e) { console.error(e); } }
+  for (let i = FX.length - 1; i >= 0; i--) if (GT - FX[i].t0 > FX[i].dur) FX.splice(i, 1);
+  if (!P || !ONW) return; const W = ONW;
+  const live = W.L && W.L.ws && W.L.ws.readyState === 1 && W.L.status === 'connected';
+  const mi = moveIntent(); let moving = live && mi.want > 0 && (mi.vx || mi.vy) && W.pending.length < OW_MAX_PENDING;
+  if (P.stam <= 0 && P.sprintOn) { P.sprintOn = false; log('Out of stamina. Sprint off.', '#ffb070'); }
+  let r;
+  if (moving || (live && W.wasMoving)) {
+    const inp = moving ? { s: W.seq++, x: mi.vx, y: mi.vy, w: mi.want, r: !!mi.sprint } : { s: W.seq++, x: 0, y: 0, w: 0, r: false };
+    W.pending.push(inp); W.batch.push(inp);
+    r = SF_MOVEMENT.step(W.world, W.ps, { x: inp.x, y: inp.y, want: inp.w, sprint: inp.r }, W.ctx, SF_COLLISION);
+  } else r = SF_MOVEMENT.step(W.world, W.ps, { x: 0, y: 0, want: 0 }, W.ctx, SF_COLLISION);
+  W.wasMoving = !!moving;
+  if (W.batch.length >= 2 || (W.batch.length && !moving)) { owSend('move', { inputs: W.batch }); W.batch = []; }
+  P.x = W.ps.x; P.y = W.ps.y; P.sect = W.ps.sect; P.stam = W.ps.stam; P.speed = r.speed;
+  if (r.moved > 0) { P.movedAt = GT; try { stepSound(r.moved); } catch (e) { } }
+  const rt = performance.now() - OW_INTERP_MS; for (const e of W.remotes.values()) owInterp(e, rt);
+}
+function owInterp(e, rt) {
+  const b = e.buf; while (b.length > 2 && b[1][0] <= rt) b.shift();
+  let a = b[0], c = b[1] || b[0]; if (rt <= a[0] || a === c) c = a;
+  const k = c === a ? 1 : Math.min(1, Math.max(0, (rt - a[0]) / (c[0] - a[0])));
+  e.x = a[1] + (c[1] - a[1]) * k; e.y = a[2] + (c[2] - a[2]) * k; e.sect = c[3]; e.speed = rt - b[b.length - 1][0] > 150 ? 0 : c[4];
+}
+function owMessage(m) {
+  const W = ONW, p = m.p, now = performance.now();
+  if (m.type === 'state') {
+    const y = p.you; W.acked = y.ack;
+    W.pending = W.pending.filter(i => i.s > y.ack);
+    const ps = { x: y.x, y: y.y, stam: y.stam, sect: y.sect, t: y.t, lastDrain: y.ld };
+    for (const i of W.pending) SF_MOVEMENT.step(W.world, ps, { x: i.x, y: i.y, want: i.w, sprint: i.r }, W.ctx, SF_COLLISION);
+    const err = Math.hypot(ps.x - W.ps.x, ps.y - W.ps.y); if (err > 1e-6) { W.corrections++; W.lastErr = err; }
+    W.ps = ps; P.x = ps.x; P.y = ps.y; P.stam = ps.stam;
+    for (const mv of p.moves) { const e = W.remotes.get(mv[0]); if (e) e.buf.push([now, mv[1], mv[2], mv[3], mv[4]]); }
+  } else if (m.type === 'actor.enter') {
+    if (W.remotes.has(p.nid)) return;
+    const e = { kind: 'remote', id: 'r' + p.nid, nid: p.nid, characterId: p.characterId, name: p.name, title: p.title, look: CR.normalizeLook(p.appearance || {}), equip: Object.assign(emptyEquip(), p.equip || {}),
+      x: p.x, y: p.y, sect: p.sect, speed: p.speed, hp: 1, max: 1, buf: [[now, p.x, p.y, p.sect, p.speed]] };
+    W.remotes.set(p.nid, e); ents.push(e); owBar();
+  } else if (m.type === 'actor.leave') { const e = W.remotes.get(p.nid); if (e) { W.remotes.delete(p.nid); rmEnt(e); owBar(); } }
+}
+function drawRemote(g, e, x, y) {
+  const mv = e.speed > .3, k = mv ? 'Walk' : 'Idle', im = tinted(animSheet(k), e.look, k);
+  if (!im) { drawScout(g, e, x, y, e.look); return true; }
+  const f = mv ? Math.floor(GT * 12 * Math.min(1.4, Math.max(.7, e.speed / 5))) % 8 : 0;
+  g.imageSmoothingEnabled = false; g.drawImage(im, f * 128, (e.sect || 0) * 128, 128, 128, Math.round(x - 64), Math.round(y - 106), 128, 128); return true;
+}
+/* the online bar: where you are, who is near, the connection, and the way out */
+function owBar() {
+  if (!ONW) return; let el = $('#owbar');
+  if (!el) { el = document.createElement('div'); el.id = 'owbar'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
+  const L = ONW.L, st = L.status === 'connected' ? 'Online' : L.status === 'ended' ? 'Disconnected' : 'Reconnecting…';
+  el.innerHTML = `<span class="ondot ${onEsc(L.status)}"></span><b>${st}</b><span class="owalpha">Alpha</span><span>${ONW.remotes.size} nearby</span>${L.rtt != null ? `<span>${L.rtt} ms</span>` : ''}<button type="button" class="ccb sm" data-ow="leave">Leave world</button>`;
+}
+function owEnded(note) {
+  if (!ONW) return; owBar(); let el = $('#owend');
+  if (!el) { el = document.createElement('div'); el.id = 'owend'; document.body.appendChild(el); }
+  el.innerHTML = `<div class="owendbox"><h2>Disconnected</h2><p>${onEsc(note || 'The connection to the server ended.')}</p><button type="button" class="ccb pri big" data-ow="leave">Back to your characters</button></div>`;
+}
+function owLeave() { const L = ONW && ONW.L; if (L) { L.stop = true; try { if (L.ws) L.ws.close(1000, 'leave'); } catch (e) { } } location.assign('/?online=roster'); }
+/* online, only walking is live: other keys and HUD actions are held back here, before the offline handlers see them */
+addEventListener('keydown', e => { if (!ONW || e.target.matches('input,select,textarea')) return; if (!OW_KEYS.has(e.key)) { e.stopImmediatePropagation(); } }, true);
+document.addEventListener('click', e => {
+  if (!ONW) return; const ow = e.target.closest('[data-ow]'); if (ow) { e.preventDefault(); e.stopImmediatePropagation(); if (ow.dataset.ow === 'leave') owLeave(); return; }
+  const b = e.target.closest('[data-a]'); if (b && !OW_ACTIONS.has(b.dataset.a)) { e.preventDefault(); e.stopImmediatePropagation(); if (GT - (ONW.heldMsg || -99) > 3) { ONW.heldMsg = GT; log('Not available online yet: only walking is live on the server.', '#ffb070'); } }
+}, true);
+
 const ONLINE = { worldSource: onWorldSource, open: onOpen, html: onHtml, click: onClick, submit: onSubmit, bootFromUrl: onBootFromUrl, create: onCreateFromWizard, leaveWizard: onLeaveWizard, paintLobby: onLobbyPaint, drawPortraits: onDrawPortraits,
-  realm: id => { ON.realm = id; onLoadRoster(); }, get state() { return ON; } };
+  realm: id => { ON.realm = id; onLoadRoster(); }, get state() { return ON; }, get world() { return ONW; } };
 window.__ONLINE = ONLINE;   // test hook (the browser flow suite); not a security boundary — the server checks everything

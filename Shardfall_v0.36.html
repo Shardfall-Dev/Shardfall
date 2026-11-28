@@ -200,6 +200,15 @@ a.ccb{display:flex;align-items:center;justify-content:center;text-decoration:non
 #cc .cckv .ccbadge{color:#f3e6c8;font:700 11px var(--px);padding:1px 8px;vertical-align:middle}
 @media (max-width:620px){.onpage{margin:6px;padding:12px}.onlobby{grid-template-columns:1fr}.ontop{gap:6px;padding:6px 8px}.ontop .ccmark{display:none}}
 @media (max-height:500px){.onpage{margin:6px}.oncard{min-height:110px}.onport{width:48px;height:96px}}
+/* ---- the online world (src/online.js): only walking is live; actions that would change the world are hidden ---- */
+body.online #b-atk, body.online .slot, body.online #b-page, body.online #b-int, body.online #b-cancel, body.online #b-menu, body.online #obj { display: none !important; }
+#owbar{position:fixed;left:50%;top:max(8px,env(safe-area-inset-top));transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:10px;padding:6px 10px 6px 12px;border:1px solid var(--brass);border-radius:8px;
+  background:linear-gradient(rgba(58,40,24,.94),rgba(23,13,7,.94));color:#f3e6c8;font:13px var(--px);box-shadow:0 4px 14px rgba(0,0,0,.5);white-space:nowrap}
+#owbar .owalpha{padding:1px 6px;border-radius:4px;background:#4a2e12;color:#f0c94a;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+#owend{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(5,4,2,.6)}
+#owend .owendbox{max-width:420px;margin:16px;padding:18px 20px;border:2px solid #6a4a26;border-radius:8px;color:var(--inkp);background:linear-gradient(var(--parch),var(--parch2));text-align:center}
+#owend h2{margin:0 0 8px;font:700 22px var(--gothic);color:#4a2e12}
+@media (max-width:620px){#owbar{top:auto;bottom:max(14px,env(safe-area-inset-bottom));left:auto;right:10px;transform:none;gap:6px;font-size:12px;padding:4px 6px 4px 8px}#owbar .owalpha{display:none}}
 /* attribute lock buttons (Character page and paper doll) */
 .lk{min-width:30px;min-height:30px;padding:0 4px;border-radius:5px;border:1px solid var(--edge);background:#14203a;color:var(--ink);font:12px var(--px);vertical-align:middle;cursor:pointer}
 .lk-hold{color:#f0c040}.lk-lower{color:#ff8a6a}
@@ -6389,6 +6398,7 @@ const SPAWNS = [
   { type: 'hound', x: 420, y: 330, r: 34, max: 7, pack: 2 }, { type: 'hound', x: 440, y: 250, r: 34, max: 7, pack: 2 }, { type: 'hound', x: 520, y: 320, r: 30, max: 5, pack: 3 }];
 for (const s of SPAWNS) { s.n = 0; s.next = 0; }
 const $ = s => document.querySelector(s);
+let ONW = null;   /* online world session (src/online.js): set while playing online; the offline game never sets it */
 let R = Math.random; const rnd = (a, b) => a + Math.floor(R() * (b - a + 1)), pick = a => a[Math.floor(R() * a.length)];
 const cl = (v, a, b) => v < a ? a : v > b ? b : v;
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -6598,11 +6608,15 @@ function canStand(e, x, y) { const r = .26; if (colBlocked(x, y, r)) return fals
   if (e.kind === 'mon' && !e.quest && protAt(x, y)) return false; return true; }
 function moveBy(e, dx, dy) { let moved = 0; if (canStand(e, e.x + dx, e.y)) { e.x += dx; moved += Math.abs(dx); } if (canStand(e, e.x, e.y + dy)) { e.y += dy; moved += Math.abs(dy); } return moved; }
 function los(a, b) { const d = Math.hypot(b.x - a.x, b.y - a.y), n = Math.ceil(d / .25); for (let i = 1; i < n; i++) { const x = a.x + (b.x - a.x) * i / n, y = a.y + (b.y - a.y) * i / n; if (LOSB[tAt(Math.floor(x), Math.floor(y))]) return false; if (FIELDS.length && fieldBlocksSight(x, y)) return false; for (const f of EFX) if (f.k === 'cloud' && Math.hypot(x - f.x, y - f.y) < f.r && !(Math.hypot(a.x - f.x, a.y - f.y) < f.r && Math.hypot(b.x - f.x, b.y - f.y) < f.r)) return false; } return true; }
-function playerMove(dt) {
+function moveIntent() {
   let vx = 0, vy = 0, want = 0;
   if (JOY.on && !P.dead) { const jx = JOY.x - JOY.x0, jy = JOY.y - JOY.y0, m = Math.hypot(jx, jy); if (m > 10) { const tx = jx / HW + jy / HH, ty = jy / HH - jx / HW, tm = Math.hypot(tx, ty); vx = tx / tm; vy = ty / tm; want = Math.min(1, m / 56); JOY.sprint = !!P.sprintOn || (SETTINGS.stickSprint && m > 70); } }
   else if (KEYS.any) { const sx = (KEYS.r ? 1 : 0) - (KEYS.l ? 1 : 0), sy = (KEYS.d ? 1 : 0) - (KEYS.u ? 1 : 0); if (sx || sy) { const tx = sx / HW + sy / HH, ty = sy / HH - sx / HW, tm = Math.hypot(tx, ty); vx = tx / tm; vy = ty / tm; want = 1; JOY.sprint = !!KEYS.shift || !!P.sprintOn; } }
-  let sprint = JOY.sprint && want > 0 && !P.ghost;
+  return { vx, vy, want, sprint: JOY.sprint && want > 0 && !P.ghost };
+}
+function playerMove(dt) {
+  const mi = moveIntent(), vx = mi.vx, vy = mi.vy, want = mi.want;
+  let sprint = mi.sprint;
   const enc = encumb(); if (sprint && (P.stam <= 0 || !enc.run || P.prep)) sprint = false;
   if (enc.speed <= 0 && want > 0 && GT - (P.immobileMsg || -99) > 4) { P.immobileMsg = GT; log('You carry too much to move. Drop something.', '#ffb070'); }
   if (P.hidden && sprint) reveal('You sprint and are revealed.');
@@ -7219,6 +7233,7 @@ SF.SK.addInscription();   // one Inscription recipe per Magery spell (needs src/
 /* ---------- main tick ---------- */
 let spawnT = 0, saveT = 0;
 function update(dt) {
+  if (ONW) return onlineStep(dt);
   GT += dt;
   for (let i = TIMERS.length - 1; i >= 0; i--) if (GT >= TIMERS[i].t) { const t = TIMERS.splice(i, 1)[0]; try { t.fn(); } catch (e) { console.error(e); } }
   for (let i = EFX.length - 1; i >= 0; i--) { const f = EFX[i]; if (f.at && GT >= f.at) { f.at = 0; try { f.fn && f.fn(); } catch (e) { console.error(e); } if (f.k !== 'flask') { EFX.splice(i, 1); continue; } } if (f.until && GT > f.until) EFX.splice(i, 1); else if (f.k === 'proj' && GT > f.t1 + .05) EFX.splice(i, 1); }
@@ -8454,6 +8469,7 @@ function drawEnt(e) {
   if (e.kind === 'player' && drawForm(g, e, x, y)) { }
   else if (drawPaintedActor(g, e, x, y)) { }                                         // Painted Human Candidates v0.1, developer flag only (src/painted-render.js)
   else if (drawGearActor(g, e, x, y)) { }                                            // layered equipment renderer (src/gear-render.js), when on
+  else if (e.kind === 'remote') drawRemote(g, e, x, y);                              // another player, online (src/online.js)
   else if (e.kind === 'player') drawScout(g, e, x, y, P.ghost ? 'ghost' : P.look);
   else if (e.kind === 'ally') { if (e.ghost) g.globalAlpha = .75; drawScout(g, e, x, y, e.ghost ? 'ghost' : '#2f7a46'); }
   else if (e.kind === 'npc' && e.downed) { g.save(); g.globalAlpha = .85; g.translate(x, y - 4); g.rotate(-1.4); g.translate(-x, -y); drawScout(g, e, x, y, NPC_COL[e.role] || (e.life && LIFE_COL[e.life.prof]) || '#5a5a5a'); g.restore(); }   // knocked down (phase 5)
@@ -8535,7 +8551,7 @@ function drawOverlay(camX, camY) {
     if (e.gone || e === P || e.hidden) continue; const isC = e.kind === 'corpse';
     const hgt = isC ? 18 : e.type && MON[e.type] ? MON[e.type].h : 74; const [x, top] = S(e.x, e.y); const yy = top - hgt / CAM.f * 1 - 6;
     if (x < -150 || x > VW + 150 || yy < -40 || yy > VH + 40) continue;
-    const show = e === P.sel || (e.kind === 'npc' || e.kind === 'ally') && Math.hypot(e.x - P.x, e.y - P.y) < 7 || (isC && (e.mine || e.allyBody));
+    const show = e === P.sel || (e.kind === 'npc' || e.kind === 'ally') && Math.hypot(e.x - P.x, e.y - P.y) < 7 || (isC && (e.mine || e.allyBody)) || e.kind === 'remote';
     if ((e.kind === 'mon' || e.kind === 'pet' || (e.kind === 'ally' && !e.ghost)) && e.hp < e.max) { const w = 34, f = cl(e.hp / e.max, 0, 1); g.fillStyle = '#000'; g.fillRect(x - w / 2 - 1, yy - 1, w + 2, 6); g.fillStyle = f > .5 ? '#5fd068' : f > .25 ? '#f0c040' : '#f04848'; g.fillRect(x - w / 2, yy, w * f, 4); }
     if (e.kind === 'mon' && e.state === 'tele') { g.font = `bold 18px ${PXF}`; g.lineWidth = 3; g.strokeStyle = '#000'; g.strokeText('!', x, yy - 8); g.fillStyle = '#ff5040'; g.fillText('!', x, yy - 8); }
     if (show) { g.font = `13px ${PXF}`; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,10,.9)'; const nm = e.name; g.strokeText(nm, x, yy - (e.kind === 'mon' && e.state === 'tele' ? 26 : 6)); g.fillStyle = isC ? '#d8d0c0' : relColor(e); g.fillText(nm, x, yy - (e.kind === 'mon' && e.state === 'tele' ? 26 : 6)); }
@@ -9272,7 +9288,7 @@ function screenToWorld(sx, sy) { const wx = sx * CAM.f + CAM.x, wy = sy * CAM.f 
 function hitEnts(wx, wy) { const out = []; for (const e of ents) { if (e === P || e.gone || e.hidden) continue; const X = SX(e.x, e.y), Y = SY(e.x, e.y); const h = e.kind === 'corpse' ? 0 : e.type && MON[e.type] ? MON[e.type].h : 66; const cy = Y - h * .5, r = e.kind === 'corpse' ? 16 : Math.max(18, h * .55); const d = Math.hypot(wx - X, wy - cy); if (d < r) out.push({ e, d: d + (e.kind === 'corpse' ? 12 : 0) }); } return out.sort((a, b) => a.d - b.d).map(o => o.e); }
 function tallAt(wx, wy) { const fx = (wx / HW + wy / HH) / 2, fy = (wy / HH - wx / HW) / 2; for (let k = 3; k >= 0; k--) { const x0 = Math.floor(fx) + k, y0 = Math.floor(fy) + k; for (const [ax, ay] of [[x0, y0], [x0 + 1, y0], [x0, y0 + 1]]) { const t = tAt(ax, ay); const hh = { [T.TR]: 80, [T.RK]: 46, [T.RB]: 30 }[t]; if (!hh) continue; const cx = SX(ax + .5, ay + .5), cy = SY(ax + .5, ay + .5); if (Math.abs(wx - cx) < HW * .8 && wy > cy - hh && wy < cy + HH * .7) return { x: ax, y: ay }; } } return null; }
 function tapWorld(sx, sy) {
-  if (!P) return; const w = screenToWorld(sx, sy);
+  if (!P || ONW) return; const w = screenToWorld(sx, sy);
   if (AIM) { const pt = { x: w.x, y: w.y }; if (Math.hypot(pt.x - P.x, pt.y - P.y) > AIM.range) return log('Out of range.', '#ffb070'); return AIM.fn(pt); }
   if (P.ghost) return;
   const hits = hitEnts(w.wx, w.wy);
@@ -9314,7 +9330,7 @@ addEventListener('resize', () => { resize(); if (SCREEN === 'map') { sizeMap(); 
 let deletingSave = false, saveLocked = false, saveFailShown = false;
 const SAVEKEY = 'shardfall.save.v1', SAVE_VERSION = 9, TAB_ID = Math.random().toString(36).slice(2);
 function save() {
-  if (!P || deletingSave || saveLocked) return false; try {
+  if (!P || deletingSave || saveLocked || ONW) return false; try {
     const c = {}; for (const k of ['name', 'x', 'y', 'str', 'dex', 'int', 'hp', 'stam', 'mana', 'skills', 'pack', 'bank', 'equip', 'look', 'bound', 'quest', 'freeLessons', 'hotbar', 'ghost', 'ghostAt', 'gainLog', 'recipeN', 'cx', 'skillPool', 'combatMig', 't2aMig', 'camp', 'eqMig', 'bandSeq', 'bandDone', 'lowerRank', 'statLocks', 'charId', 'created']) c[k] = P[k];
     c.bandage = bandageSave();
     c.prepEscrow = P.prep ? { id: P.prep.sp.id, items: P.prep.escrow.items.slice(), mana: P.prep.escrow.mana } : null;
@@ -10321,9 +10337,9 @@ function wdAppearance(e) {
 }
 function gearOfActor(e) {
   const ghost = !!((e === P && P.ghost) || (e.kind === 'ally' && e.ghost));
-  if (e.kind === 'player' || (e.kind === 'ally' && e.equip)) {
+  if (e.kind === 'player' || e.kind === 'remote' || (e.kind === 'ally' && e.equip)) {
     if (e.kind === 'ally' && !e._gLook) e._gLook = GEAR.npcLook(e.aid || e.name, { body: 'female', cloth: 'forest' });
-    const look = e.kind === 'player' ? e.look : e._gLook, sig = EQ.signature(e) + '|' + (SF.CREATION ? SF.CREATION.lookKey(look) : '');
+    const look = e.kind === 'player' || e.kind === 'remote' ? e.look : e._gLook, sig = EQ.signature(e) + '|' + (SF.CREATION ? SF.CREATION.lookKey(look) : '');
     if (e._gSig !== sig) { e._gSig = sig; e._gA = { R: GEAR.resolve(e.equip, look), rl: rigLook(look) }; }
     return Object.assign(e._gA, { ghost });
   }
@@ -10351,7 +10367,7 @@ function grDraw(g, strip, f, x, y, ox, oy) { const S = GR.S, W = RIG.CELL.width,
 /* draw a human actor with the layered renderer; false → the caller draws the previous sprite (flag off, or the strip is not ready) */
 function drawGearActor(g, e, x, y) {
   if (!gearOn() || !RIG) return false;
-  if (!(e.kind === 'player' || e.kind === 'ally' || e.kind === 'npc' || (e.kind === 'mon' && MON[e.type] && MON[e.type].scout))) return false;
+  if (!(e.kind === 'player' || e.kind === 'remote' || e.kind === 'ally' || e.kind === 'npc' || (e.kind === 'mon' && MON[e.type] && MON[e.type].scout))) return false;
   const A = gearOfActor(e), [act, f] = gearPose(e, A), dir = e.sect || 0;
   let strip = grStrip(A, act, dir, A.ghost, e === P), fr = f;
   if (!strip) { strip = GR.strips.get(A.R.key + '#idle#' + dir + (A.ghost ? '#g' : '')); fr = 0; }
@@ -10653,6 +10669,67 @@ globalThis.__PAINTED = { state: PNT, why: paintedWhy, set: setPaintedMode, atlas
   };
   return C;
 });
+/* Shardfall movement step — what one 50 ms step of a walking player does, as a pure function shared by the game server
+   (authoritative) and the online client (prediction). It is src/game.js playerMove for the online subset: walk and sprint
+   speeds from the rules (SF.WALK, SF.SPRINT × the game's MOVE_SCALE), the slower pace below a quarter stick, armour speed
+   and encumbrance (SF.EQ), shallows slowing to 80 %, the axis-separated slide on shared/collision.js, sprint stamina drain and
+   regeneration, and the game's 8-way facing with its hysteresis. UMD: CommonJS in node, SF_MOVEMENT in the browser.
+   What the client may send is only an intent — a direction, how far the stick is pushed, sprint on or off. Where the character
+   ends up, how fast it went and what it cost is computed here, on the server, from the server's own state. */
+(function (root, factory) {
+  const M = factory(root);
+  if (typeof module !== 'undefined' && module.exports) module.exports = M; else root.SF_MOVEMENT = M;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (root) {
+  'use strict';
+  const M = {};
+  M.STEP = 0.05;              // seconds: the game's fixed simulation step (src/living.js STEPPER) and the server tick
+  M.MOVE_SCALE = 1.5;         // src/game.js MOVE_SCALE: rules speeds (m/s) onto the tile scale
+  M.SHALLOWS = 9;             // T.SH
+  M.SECT_ANG = [90, 135, 180, 225, 270, 315, 0, 45];   // atlas order S, SW, W, NW, N, NE, E, SE (game.js)
+  const angDiff = (a, b) => Math.abs(((a - b) % 360 + 540) % 360 - 180);
+
+  /* input normalisation: anything a client sends becomes a legal intent (a unit direction or none, want 0–1, a boolean) */
+  M.cleanInput = function (i) {
+    const num = v => v === undefined || v === null ? 0 : typeof v === 'number' ? v : NaN;
+    let x = num(i && i.x), y = num(i && i.y), want = num(i && i.want);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(want)) return { x: 0, y: 0, want: 0, sprint: false };
+    const l = Math.hypot(x, y); if (l < 1e-6 || want <= 0) return { x: 0, y: 0, want: 0, sprint: false };
+    return { x: x / l, y: y / l, want: Math.min(1, want), sprint: !!(i && i.sprint) };
+  };
+
+  /* facing (game.js updateFacing): the 8-way sector for a velocity, kept while within 27.5° of the current one */
+  M.facing = function (sect, vx, vy) {
+    if (Math.hypot(vx, vy) < .35) return sect;
+    const sx = vx - vy, sy = (vx + vy) * .5; let ang = Math.atan2(sy, sx) * 180 / Math.PI; if (ang < 0) ang += 360;
+    if (sect !== undefined && sect !== null && angDiff(ang, M.SECT_ANG[sect]) <= 27.5) return sect;
+    return ((Math.round((ang - 90) / 45) % 8) + 8) % 8;
+  };
+
+  /* step(world, s, input, ctx, COL) → { moved, speed, sprinting }. Mutates s = { x, y, stam, lastDrain, sect, t }.
+     ctx (from the rules, computed by the caller from the character): { walk, sprint, drain, regen, delay, stamMax, armourSpd, enc: { speed, stam, run }, ghost }
+     COL: shared/collision.js. dt is always M.STEP. */
+  M.step = function (world, s, input, ctx, COL) {
+    const dt = M.STEP; s.t = (s.t || 0) + dt;
+    const i = M.cleanInput(input);
+    let sprint = i.sprint && i.want > 0 && !ctx.ghost && s.stam > 0 && ctx.enc.run;
+    let sp = (sprint ? ctx.sprint : ctx.walk) * (i.want > .25 ? 1 : .6) * M.MOVE_SCALE;
+    sp *= (1 - (ctx.armourSpd || 0)) * ctx.enc.speed;
+    if (COL.tileAt(world, Math.floor(s.x), Math.floor(s.y)) === M.SHALLOWS) sp *= .8;
+    const dx = i.x * sp * dt, dy = i.y * sp * dt;
+    const moved = (dx || dy) ? COL.moveBy(world, s, dx, dy) : 0;
+    s.sect = M.facing(s.sect, i.x * i.want, i.y * i.want);
+    if (sprint && moved > 0) { s.stam = Math.max(0, s.stam - ctx.drain * ctx.enc.stam * dt); s.lastDrain = s.t; }
+    else if (s.t - (s.lastDrain ?? -99) > ctx.delay) s.stam = Math.min(ctx.stamMax, s.stam + ctx.regen * dt);
+    return { moved, speed: moved / dt, sprinting: sprint && moved > 0 };
+  };
+
+  /* ctxFor(SF, ch) — the movement context for a character from the shared rules (src/rules.js, src/equipment.js) */
+  M.ctxFor = function (SF, ch) {
+    return { walk: SF.WALK, sprint: SF.SPRINT, drain: SF.SPRINT_DRAIN, regen: SF.STAM_REGEN, delay: SF.STAM_DELAY, stamMax: SF.maxStam(ch),
+      armourSpd: SF.EQ.effective(ch).spd || 0, enc: SF.EQ.encumbrance(ch), ghost: !!ch.ghost };
+  };
+  return M;
+});
 /* ---------- online play (Server Foundation v1): accounts, the online roster and the alpha presence lobby ----------
    The title screen offers Play Offline (the single-player game, saved in this browser, exactly as before) and Play Online.
    Online talks to the Shardfall server on the same origin (server/; docs/server/). It never reads or writes the offline save
@@ -10757,19 +10834,22 @@ function onConnect() {
   ws.onmessage = ev => {
     if (ON.lobby !== L) return; const r = ONP.parseServer(ev.data); if (!r.ok) return; const m = r.msg;
     if (typeof m.seq === 'number') { if (L.seq && m.seq !== L.seq + 1 && L.character) ws.send(JSON.stringify({ v: ONP.PROTOCOL_VERSION, type: 'resync', p: {} })); L.seq = m.seq; }
-    if (m.type === 'welcome' || m.type === 'snapshot') { L.character = m.p.character; L.tick = m.p.tick; L.presence = new Map((m.p.presence || []).map(x => [x.characterId, x])); L.status = 'connected'; L.tries = 0; L.note = m.p.notice || L.note; if (m.type === 'welcome') L.joinedAt = Date.now(); }
+    if (m.type === 'welcome' || m.type === 'snapshot') { L.character = m.p.character; L.tick = m.p.tick; L.presence = new Map((m.p.presence || []).map(x => [x.characterId, x])); L.status = 'connected'; L.tries = 0; L.note = m.p.notice || L.note; if (m.type === 'welcome') { L.joinedAt = Date.now(); if (ONW) owResume(m.p); else if (m.p.world && !owEnter(L, m.p)) { L.stop = true; L.status = 'ended'; try { ws.close(1000, 'world mismatch'); } catch (e) { } } } }
+    else if (m.type === 'state' || m.type === 'actor.enter' || m.type === 'actor.leave') { if (ONW) owMessage(m); return; }
     else if (m.type === 'presence.join') L.presence.set(m.p.character.characterId, Object.assign({ connected: true }, m.p.character));
     else if (m.type === 'presence.leave') L.presence.delete(m.p.characterId);
     else if (m.type === 'pong') { if (typeof m.p.t === 'number') L.rtt = Math.round(performance.now() - m.p.t); L.tick = m.p.tick; }
     else if (m.type === 'kicked') { L.stop = true; L.status = 'ended'; L.note = ({ taken_over: 'This character was opened in another window or device.', another_character: 'Another of your characters joined this realm.', session_ended: 'You were signed out.', character_deleted: 'This character was deleted.', account_closed: 'This account was closed.', server_restart: 'The server is restarting. Try again in a moment.' })[m.p.reason] || 'Disconnected by the server.'; if (m.p.reason === 'server_restart') L.stop = false; }
     else if (m.type === 'error' && m.id === 'hello') { L.stop = true; L.status = 'ended'; L.note = m.p.message; }
+    if (ONW) { if (L.status === 'ended') owEnded(L.note); else owBar(); return; }
     onLobbyPaint();
   };
   ws.onclose = ev => {
     if (ON.lobby !== L) return; L.ws = null;
     if (ev.code === ONP.CLOSE.UNAUTHORIZED || ev.code === 1006 && !L.character && L.tries > 2) { L.stop = true; L.status = 'ended'; L.note = L.note || 'Could not connect. Your session may have ended.'; }
     if ([ONP.CLOSE.FORBIDDEN, ONP.CLOSE.TAKEN_OVER, ONP.CLOSE.SESSION_ENDED, ONP.CLOSE.PROTOCOL].includes(ev.code)) L.stop = true;
-    if (L.stop) { L.status = 'ended'; onLobbyPaint(); return; }
+    if (L.stop) { L.status = 'ended'; if (ONW) owEnded(L.note || 'Disconnected.'); else onLobbyPaint(); return; }
+    if (ONW) { ONW.pending = []; ONW.batch = []; owBar(); }
     onRetry();
   };
   clearInterval(L.pingT); L.pingT = setInterval(() => { if (L.ws && L.ws.readyState === 1 && L.character) L.ws.send(JSON.stringify({ v: ONP.PROTOCOL_VERSION, type: 'ping', p: { t: performance.now() } })); }, 5000);
@@ -10821,7 +10901,7 @@ function onRosterHtml() {
     return `<article class="oncard"><canvas class="onport" width="60" height="120" data-look="${onEsc(JSON.stringify(c.appearance))}" role="img" aria-label="Portrait of ${onEsc(c.name)}"></canvas>
       <div class="oninfo"><b>${onEsc(c.name)}</b><span class="ccnote">${onEsc(c.title)} · ${onEsc(c.startingTownName)}</span><span class="cctk">STR ${c.stats.str} · DEX ${c.stats.dex} · INT ${c.stats.int}</span>
       ${del ? `<form class="ondel" data-f="delete" data-id="${c.id}"><label class="cclab" for="on-delname">Type <b>${onEsc(c.name)}</b> to delete. It can be restored for ${ON_PURGE} days.</label><input id="on-delname" autocomplete="off" maxlength="40"><div class="ccrow"><button class="ccb sm" type="submit">Delete</button>${ccBtn('on-delno', 'Keep', {}, 'sm')}</div></form>`
-        : `<div class="ccrow">${ccBtn('on-play', 'Enter lobby', { id: c.id }, 'pri')}${ccBtn('on-del', 'Delete…', { id: c.id }, 'sm')}</div>`}</div></article>`; }).join('');
+        : `<div class="ccrow">${ccBtn('on-play', 'Play', { id: c.id }, 'pri')}${ccBtn('on-del', 'Delete…', { id: c.id }, 'sm')}</div>`}</div></article>`; }).join('');
   const free = R.slots.max - R.slots.used;
   const empty = free > 0 ? `<button type="button" class="oncard onnew" data-c="on-new"${R.realm.status !== 'open' ? ' disabled' : ''}><b>+ New character</b><span class="ccnote">${free} of ${R.slots.max} slots free</span></button>` : `<p class="ccnote">All ${R.slots.max} slots are in use.</p>`;
   const gone = R.deleted.length ? `<details class="ccguide"><summary>Recently deleted (${R.deleted.length})</summary>${R.deleted.map(c => `<div class="ccgi"><b>${onEsc(c.name)}</b> <span class="ccnote">restorable until ${onEsc(new Date(c.purgeAfter).toLocaleDateString())}</span> ${ccBtn('on-restore', 'Restore', { id: c.id }, 'sm')}</div>`).join('')}</details>` : '';
@@ -10911,8 +10991,117 @@ function onWorldSource() {
     gameStand: (x, y) => canStand({ kind: 'player' }, x, y),
     townSpawns: () => Object.fromEntries(CR.TOWNS.map(t => [t.id, CR.townReady(t.id, { shrines: SHRINES, npcs: ANN.npcs, stand: (x, y) => canStand({ kind: 'player' }, x, y) })])) };
 }
+/* ---------- the online world (Server Movement v1) ----------
+   "Play" connects, and on the server's welcome the game's own world and renderer start with the server's character. Walking
+   is server-authoritative: each 50 ms step the stick or keys become an intent, the client predicts its result with the very
+   rules the server uses (shared/movement.js on shared/collision.js) and sends the intents; the server's state messages carry
+   the authoritative position and the last intent applied, and the client replays the intents not yet applied on top of it
+   (reconciliation). Other players arrive with actor.enter, move with state, leave with actor.leave, and are drawn 120 ms in the
+   past between two server positions (interpolation). Nothing else from the offline game runs: no creatures, NPCs, combat,
+   gathering, crafting or trading, and no local save. */
+const OW_INTERP_MS = 120, OW_MAX_PENDING = 40;
+const OW_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', 'W', 'A', 'S', 'D', 'Shift', 'Escape']);
+const OW_ACTIONS = new Set(['sprint', 'map', 'mapfit', 'mapall', 'scrclose', 'rotok']);
+function owEnter(L, w) {
+  if (P) { L.note = 'An offline game is open in this tab. Reload the page to play online.'; return false; }
+  genWorld(); buildTiles(); buildMini(); resize();
+  const world = SF_COLLISION.makeWorld(onWorldSource());
+  if (SF_COLLISION.hash(world) !== w.world.hash) { L.note = 'This copy of the game is out of date for the server (the world differs). Reload the page to update.'; return false; }
+  const ch = w.character, you = w.you;
+  P = newChar({ name: ch.name, str: ch.stats.str, dex: ch.stats.dex, int: ch.stats.int, skills: {}, look: ch.appearance });
+  P.skills = JSON.parse(JSON.stringify(ch.skills)); P.statLocks = Object.assign({}, ch.statLocks); P.look = Object.assign({}, ch.appearance);
+  P.equip = emptyEquip(); P.pack = SF.newContainer('pack', 'p1'); P.bank = SF.newContainer('bank', 'p1');
+  for (const it of ch.items || []) { const o = Object.assign(SF.newItem(it.itemDef, it.qty), it.props || {}, { sid: it.id }); if (it.container === 'equip' && it.slot) P.equip[it.slot] = o; else if (it.container === 'bank') P.bank.items.push(o); else P.pack.items.push(o); }
+  P.hp = ch.vitals.hp; P.mana = ch.vitals.mana; P.stam = you.stam; P.x = you.x; P.y = you.y; P.sect = you.sect || 0;
+  P.charId = ch.id; P.online = true; P.created = { v: SF.CREATION.VERSION, template: ch.template, town: ch.startingTown }; P.bound = ch.boundShrine;
+  P.cx = { survey: {}, pins: [], track: null, mark: false, doors: {} }; P.batch = null; while (P.hotbar.length < 9) P.hotbar.push(null);
+  WS = SIM.create({ clock: () => GT, onError: e => console.error(e) }); simAdopt(P);
+  ents.unshift(P); P.sw = SF.newSwing(); P.movedAt = -99; P.drawn = false;
+  ONW = { L, world, ctx: SF_MOVEMENT.ctxFor(SF, P), ps: { x: you.x, y: you.y, stam: you.stam, sect: you.sect || 0, t: you.t || 0, lastDrain: you.ld ?? -99 }, seq: 0, pending: [], batch: [], wasMoving: false,
+    remotes: new Map(), corrections: 0, lastErr: 0, acked: you.ack, notice: w.notice, viewRadius: w.world.viewRadius };
+  $('#cc').hidden = true; document.body.classList.add('online'); owBar(); STEPPER.reset();
+  log('Welcome to Anniabreen, online. Walking is decided by the server; creatures, combat, items and trading are not online yet.', '#ffe08a');
+  log('Left stick or WASD moves; Sprint runs. Leave from the online bar.', '#b6a68a');
+  refreshHud(); return true;
+}
+function owResume(w) {   // a reconnect: the server's position replaces the prediction; others are re-announced
+  const W = ONW; for (const e of W.remotes.values()) rmEnt(e); W.remotes.clear(); W.pending = []; W.batch = []; W.wasMoving = false;
+  const y = w.you; W.ps = { x: y.x, y: y.y, stam: y.stam, sect: y.sect || 0, t: y.t || 0, lastDrain: y.ld ?? -99 }; P.x = y.x; P.y = y.y; P.stam = y.stam; W.acked = y.ack;
+  owBar();
+}
+function owSend(type, p) { const L = ONW && ONW.L; if (L && L.ws && L.ws.readyState === 1) { L.ws.send(JSON.stringify({ v: ONP.PROTOCOL_VERSION, type, p })); return true; } return false; }
+/* one 50 ms step of the online world (called by the game's fixed-step loop instead of the offline update) */
+function onlineStep(dt) {
+  GT += dt;
+  for (let i = TIMERS.length - 1; i >= 0; i--) if (GT >= TIMERS[i].t) { const t = TIMERS.splice(i, 1)[0]; try { t.fn(); } catch (e) { console.error(e); } }
+  for (let i = FX.length - 1; i >= 0; i--) if (GT - FX[i].t0 > FX[i].dur) FX.splice(i, 1);
+  if (!P || !ONW) return; const W = ONW;
+  const live = W.L && W.L.ws && W.L.ws.readyState === 1 && W.L.status === 'connected';
+  const mi = moveIntent(); let moving = live && mi.want > 0 && (mi.vx || mi.vy) && W.pending.length < OW_MAX_PENDING;
+  if (P.stam <= 0 && P.sprintOn) { P.sprintOn = false; log('Out of stamina. Sprint off.', '#ffb070'); }
+  let r;
+  if (moving || (live && W.wasMoving)) {
+    const inp = moving ? { s: W.seq++, x: mi.vx, y: mi.vy, w: mi.want, r: !!mi.sprint } : { s: W.seq++, x: 0, y: 0, w: 0, r: false };
+    W.pending.push(inp); W.batch.push(inp);
+    r = SF_MOVEMENT.step(W.world, W.ps, { x: inp.x, y: inp.y, want: inp.w, sprint: inp.r }, W.ctx, SF_COLLISION);
+  } else r = SF_MOVEMENT.step(W.world, W.ps, { x: 0, y: 0, want: 0 }, W.ctx, SF_COLLISION);
+  W.wasMoving = !!moving;
+  if (W.batch.length >= 2 || (W.batch.length && !moving)) { owSend('move', { inputs: W.batch }); W.batch = []; }
+  P.x = W.ps.x; P.y = W.ps.y; P.sect = W.ps.sect; P.stam = W.ps.stam; P.speed = r.speed;
+  if (r.moved > 0) { P.movedAt = GT; try { stepSound(r.moved); } catch (e) { } }
+  const rt = performance.now() - OW_INTERP_MS; for (const e of W.remotes.values()) owInterp(e, rt);
+}
+function owInterp(e, rt) {
+  const b = e.buf; while (b.length > 2 && b[1][0] <= rt) b.shift();
+  let a = b[0], c = b[1] || b[0]; if (rt <= a[0] || a === c) c = a;
+  const k = c === a ? 1 : Math.min(1, Math.max(0, (rt - a[0]) / (c[0] - a[0])));
+  e.x = a[1] + (c[1] - a[1]) * k; e.y = a[2] + (c[2] - a[2]) * k; e.sect = c[3]; e.speed = rt - b[b.length - 1][0] > 150 ? 0 : c[4];
+}
+function owMessage(m) {
+  const W = ONW, p = m.p, now = performance.now();
+  if (m.type === 'state') {
+    const y = p.you; W.acked = y.ack;
+    W.pending = W.pending.filter(i => i.s > y.ack);
+    const ps = { x: y.x, y: y.y, stam: y.stam, sect: y.sect, t: y.t, lastDrain: y.ld };
+    for (const i of W.pending) SF_MOVEMENT.step(W.world, ps, { x: i.x, y: i.y, want: i.w, sprint: i.r }, W.ctx, SF_COLLISION);
+    const err = Math.hypot(ps.x - W.ps.x, ps.y - W.ps.y); if (err > 1e-6) { W.corrections++; W.lastErr = err; }
+    W.ps = ps; P.x = ps.x; P.y = ps.y; P.stam = ps.stam;
+    for (const mv of p.moves) { const e = W.remotes.get(mv[0]); if (e) e.buf.push([now, mv[1], mv[2], mv[3], mv[4]]); }
+  } else if (m.type === 'actor.enter') {
+    if (W.remotes.has(p.nid)) return;
+    const e = { kind: 'remote', id: 'r' + p.nid, nid: p.nid, characterId: p.characterId, name: p.name, title: p.title, look: CR.normalizeLook(p.appearance || {}), equip: Object.assign(emptyEquip(), p.equip || {}),
+      x: p.x, y: p.y, sect: p.sect, speed: p.speed, hp: 1, max: 1, buf: [[now, p.x, p.y, p.sect, p.speed]] };
+    W.remotes.set(p.nid, e); ents.push(e); owBar();
+  } else if (m.type === 'actor.leave') { const e = W.remotes.get(p.nid); if (e) { W.remotes.delete(p.nid); rmEnt(e); owBar(); } }
+}
+function drawRemote(g, e, x, y) {
+  const mv = e.speed > .3, k = mv ? 'Walk' : 'Idle', im = tinted(animSheet(k), e.look, k);
+  if (!im) { drawScout(g, e, x, y, e.look); return true; }
+  const f = mv ? Math.floor(GT * 12 * Math.min(1.4, Math.max(.7, e.speed / 5))) % 8 : 0;
+  g.imageSmoothingEnabled = false; g.drawImage(im, f * 128, (e.sect || 0) * 128, 128, 128, Math.round(x - 64), Math.round(y - 106), 128, 128); return true;
+}
+/* the online bar: where you are, who is near, the connection, and the way out */
+function owBar() {
+  if (!ONW) return; let el = $('#owbar');
+  if (!el) { el = document.createElement('div'); el.id = 'owbar'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
+  const L = ONW.L, st = L.status === 'connected' ? 'Online' : L.status === 'ended' ? 'Disconnected' : 'Reconnecting…';
+  el.innerHTML = `<span class="ondot ${onEsc(L.status)}"></span><b>${st}</b><span class="owalpha">Alpha</span><span>${ONW.remotes.size} nearby</span>${L.rtt != null ? `<span>${L.rtt} ms</span>` : ''}<button type="button" class="ccb sm" data-ow="leave">Leave world</button>`;
+}
+function owEnded(note) {
+  if (!ONW) return; owBar(); let el = $('#owend');
+  if (!el) { el = document.createElement('div'); el.id = 'owend'; document.body.appendChild(el); }
+  el.innerHTML = `<div class="owendbox"><h2>Disconnected</h2><p>${onEsc(note || 'The connection to the server ended.')}</p><button type="button" class="ccb pri big" data-ow="leave">Back to your characters</button></div>`;
+}
+function owLeave() { const L = ONW && ONW.L; if (L) { L.stop = true; try { if (L.ws) L.ws.close(1000, 'leave'); } catch (e) { } } location.assign('/?online=roster'); }
+/* online, only walking is live: other keys and HUD actions are held back here, before the offline handlers see them */
+addEventListener('keydown', e => { if (!ONW || e.target.matches('input,select,textarea')) return; if (!OW_KEYS.has(e.key)) { e.stopImmediatePropagation(); } }, true);
+document.addEventListener('click', e => {
+  if (!ONW) return; const ow = e.target.closest('[data-ow]'); if (ow) { e.preventDefault(); e.stopImmediatePropagation(); if (ow.dataset.ow === 'leave') owLeave(); return; }
+  const b = e.target.closest('[data-a]'); if (b && !OW_ACTIONS.has(b.dataset.a)) { e.preventDefault(); e.stopImmediatePropagation(); if (GT - (ONW.heldMsg || -99) > 3) { ONW.heldMsg = GT; log('Not available online yet: only walking is live on the server.', '#ffb070'); } }
+}, true);
+
 const ONLINE = { worldSource: onWorldSource, open: onOpen, html: onHtml, click: onClick, submit: onSubmit, bootFromUrl: onBootFromUrl, create: onCreateFromWizard, leaveWizard: onLeaveWizard, paintLobby: onLobbyPaint, drawPortraits: onDrawPortraits,
-  realm: id => { ON.realm = id; onLoadRoster(); }, get state() { return ON; } };
+  realm: id => { ON.realm = id; onLoadRoster(); }, get state() { return ON; }, get world() { return ONW; } };
 window.__ONLINE = ONLINE;   // test hook (the browser flow suite); not a security boundary — the server checks everything
 /* ---------- character creation v2.0 (docs/design/character-creation-v2.md) ----------
    The title screen and the four-step creator: Identity & Appearance → Starting Profession → Stats & Skills → Starting Town &

@@ -50,7 +50,7 @@ test('a character of another account cannot be played (closes 4003)', async () =
 test('client-authoritative messages are refused and change nothing', async () => {
   const a = await player('Cheat'); const { w } = await join(a);
   for (const type of ['teleport', 'position', 'attack', 'gold', 'inventory', 'skill', 'stat', 'damage']) { const id = w.send(type, { gold: 1e9, x: 5, y: 5 }); const e = await w.wait(m => m.type === 'error' && m.id === id); assert.equal(e.p.code, 'not_authoritative'); }
-  w.send('', {}, '{"v":1,"type":"hello","p":{"characterId":"' + a.ch.id + '","gold":5}}'); await w.wait(m => m.type === 'error' && m.p.code === 'bad_payload');
+  w.send('', {}, '{"v":' + P.PROTOCOL_VERSION + ',"type":"hello","p":{"characterId":"' + a.ch.id + '","gold":5}}'); await w.wait(m => m.type === 'error' && m.p.code === 'bad_payload');
   const id2 = w.send('hello', { characterId: a.ch.id }); assert.equal((await w.wait(m => m.id === id2)).p.code, 'already_joined');
   const fresh = (await a.c.get('/api/characters/' + a.ch.id)).json.character; assert.deepEqual(fresh.items, a.ch.items); assert.deepEqual(fresh.stats, a.ch.stats);
   assert.equal(w.closed, null, 'refusals alone do not drop the player');

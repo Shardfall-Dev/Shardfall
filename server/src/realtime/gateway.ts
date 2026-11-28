@@ -27,6 +27,8 @@ interface Conn {
 }
 interface Entry { characterId: string; accountId: string; realmId: string; conn: Conn | null; info: ReturnType<typeof P.presenceOf>; graceTimer: NodeJS.Timeout | null }
 
+/* what a character visibly wears (item ids and their look-relevant fields), for others to draw it */
+const wornOf = (ch: any) => { const o: Record<string, any> = {}; for (const i of ch.items || []) if (i.container === 'equip' && i.slot) o[i.slot] = Object.assign({}, i.props, { id: i.itemDef }); return o; };
 const BUCKET = 40, REFILL_PER_S = 20, MAX_OUTBOX = 512, MAX_BUFFERED = 1 << 20, SESSION_CHECK_MS = 30_000, SAVE_MS = 30_000;
 const NOTICE = 'Walking is server-authoritative: the server decides where everyone is. Creatures, combat, items and trading are not online yet.';
 
@@ -121,7 +123,7 @@ export class Gateway {
     c.characterId = characterId; c.realmId = ch.realmId;
     const rc = this.chars.rulesCharacter(ch); const ctx = MV.ctxFor(this.chars.SF, rc);
     const { actor, resumed: inWorld } = this.world.add({ characterId, accountId: c.accountId, realmId: ch.realmId, ctx, stam: ch.vitals.stam,
-      position: ch.position, info: { characterId, name: ch.name, body: ch.body, appearance: ch.appearance, title: ch.title, town: ch.startingTown } });
+      position: ch.position, info: { characterId, name: ch.name, body: ch.body, appearance: ch.appearance, title: ch.title, town: ch.startingTown, equip: wornOf(ch) } });
     const t = this.world.terrain!;
     this.send(c, 'welcome', { protocol: P.PROTOCOL_VERSION, tick: this.world.tick, tickMs: P.TICK_MS, serverAuthoritative: false, authoritative: { movement: true, combat: false, items: false },
       notice: NOTICE, resumed: resumed || inWorld, character: ch, presence: this.others(c),

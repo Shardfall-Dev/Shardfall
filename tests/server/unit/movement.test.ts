@@ -73,7 +73,7 @@ test('facing follows the game: 8 sectors, kept within 27.5°', () => {
 });
 
 function world(radius = 40) { const w = new World(T, { viewRadius: radius }); const out: [Actor, string, any][] = []; w.setSink((a, t, p) => out.push([a, t, p])); return { w, out }; }
-const info = (n: string) => ({ characterId: n, name: n, body: 'male', appearance: {}, title: null, town: 'quay' });
+const info = (n: string) => ({ characterId: n, name: n, body: 'male', appearance: {}, title: null, town: 'quay', equip: {} });
 const add = (w: World, id: string, x: number, y: number) => w.add({ characterId: id, accountId: 'acc-' + id, realmId: 'anniabreen', info: info(id), position: { x, y }, stam: 50, ctx }).actor;
 
 test('at most one intent per tick on average; a short stall may catch up three; a flood is dropped', () => {

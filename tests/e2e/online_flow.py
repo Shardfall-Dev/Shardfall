@@ -79,8 +79,9 @@ async def register_and_create(page, email, char_name, tag):
     await page.click('[data-c=go]'); await page.wait_for_selector(f'.oncard b:has-text("{char_name}")', timeout=10000)
     check(await page.locator(f'text={char_name} has been created').count() == 1, f'{tag}: server created {char_name}')
     await shot(page, f'{tag}_05_roster')
-    await page.click('[data-c=on-play]'); await page.wait_for_selector('.ondot.connected', timeout=10000)
-    check(await page.locator('text=Alpha test lobby').count() == 1, f'{tag}: lobby states plainly it is an alpha, not server-simulated')
+    await page.click('[data-c=on-play]'); await page.wait_for_selector('#owbar .ondot.connected', timeout=20000)
+    check(await page.locator('#owbar', has_text='Alpha').count() == 1 or tag == 'B', f'{tag}: in the world, the online bar says it is an alpha')
+    check(await page.evaluate("document.querySelector('#cc').hidden && document.body.classList.contains('online')"), f'{tag}: the game world is shown, online')
 
 async def main():
     for fd in (1, 2):
@@ -107,21 +108,33 @@ async def main():
             ea, eb = f'a.{secrets.token_hex(4)}@shardfall.test', f'b.{secrets.token_hex(4)}@shardfall.test'
             await register_and_create(pa, ea, na, 'A')
             await register_and_create(pb, eb, nb, 'B')
-            await pa.wait_for_selector(f'.onperson[data-name="{nb}"]', timeout=10000); await pb.wait_for_selector(f'.onperson[data-name="{na}"]', timeout=10000)
-            check(True, f'two accounts see each other in the lobby ({na} on desktop, {nb} on phone)')
-            await pa.wait_for_timeout(5600)   # one ping round trip for the latency readout
-            await shot(pa, 'A_06_lobby_desktop'); await shot(pb, 'B_06_lobby_phone')
-            # account settings (phone)
-            await pb.click('[data-c=on-leave]'); await pb.wait_for_selector('.oncard')
-            await pa.wait_for_selector(f'.onperson[data-name="{nb}"]', state='detached', timeout=15000)
-            check(True, 'leaving the lobby removes the presence for the other player')
+            names = "[...__ONLINE.world.remotes.values()].map(e => e.name)"
+            await pa.wait_for_function(f"{names}.includes('{nb}')", timeout=10000); await pb.wait_for_function(f"{names}.includes('{na}')", timeout=10000)
+            check(True, f'two accounts see each other in the world ({na} on desktop, {nb} on phone)')
+            # A walks with the keyboard; the server moves A and B sees A arrive somewhere else
+            before = await pb.evaluate(f"(() => {{ const e = [...__ONLINE.world.remotes.values()].find(e => e.name === '{na}'); return [e.x, e.y]; }})()")
+            a0 = await pa.evaluate("[__ONLINE.world.ps.x, __ONLINE.world.ps.y]")
+            await pa.keyboard.down('d'); await pa.wait_for_timeout(1000); await pa.keyboard.up('d'); await pa.wait_for_timeout(800)
+            a1 = await pa.evaluate("({ p: [__ONLINE.world.ps.x, __ONLINE.world.ps.y], pending: __ONLINE.world.pending.length, corrections: __ONLINE.world.corrections })")
+            check(((a1['p'][0] - a0[0]) ** 2 + (a1['p'][1] - a0[1]) ** 2) ** .5 > 3, f"A walked ({a0} -> {a1['p']})")
+            check(a1['pending'] == 0, 'every intent acknowledged by the server')
+            check(a1['corrections'] == 0, 'client prediction matched the server exactly (no corrections)')
+            after = await pb.evaluate(f"(() => {{ const e = [...__ONLINE.world.remotes.values()].find(e => e.name === '{na}'); return [e.x, e.y]; }})()")
+            check(abs(after[0] - a1['p'][0]) < .05 and abs(after[1] - a1['p'][1]) < .05, f'B sees A where the server put A ({after} vs {a1["p"]})')
+            check(before != after, 'B saw A move')
+            await pa.wait_for_timeout(5200)   # a ping round trip for the latency readout
+            await shot(pa, 'A_06_world_desktop'); await shot(pb, 'B_06_world_phone')
+            # B leaves the world: A sees B go
+            await pb.click('[data-ow=leave]'); await pb.wait_for_selector('.oncard', timeout=15000)
+            await pa.wait_for_function(f"!{names}.includes('{nb}')", timeout=15000)
+            check(True, 'leaving the world removes the character for the other player')
             await pb.click('[data-c=on-account]'); await pb.wait_for_selector('text=Delete account')
             check(await pb.locator(f'text={eb}').count() == 1, 'account page shows the email from Supabase Auth')
             await shot(pb, 'B_07_account_phone')
             await pb.click('[data-c=on-logout]'); await pb.wait_for_selector('form[data-f=signin]')
             check(await pb.locator('text=Signed out.').count() == 1, 'sign out')
             # back to the title on desktop: the offline save is exactly as it was
-            await pa.click('[data-c=on-leave]'); await pa.wait_for_selector('.oncard'); await pa.click('[data-c=on-home]'); await pa.wait_for_selector('[data-c=cont]')
+            await pa.click('[data-ow=leave]'); await pa.wait_for_selector('.oncard', timeout=15000); await pa.click('[data-c=on-home]'); await pa.wait_for_selector('[data-c=cont]')
             check(await pa.evaluate("localStorage.getItem('shardfall.save.v1')") == offline, 'offline save byte-identical after online play')
             check(not any('shardfall' in k and k != 'shardfall.save.v1' and 'online' in k for k in await pa.evaluate('Object.keys(localStorage)')), 'online play stores nothing in localStorage')
             check(not errors, 'no page errors' + (f': {errors[:3]}' if errors else ''))

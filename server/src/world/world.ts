@@ -16,7 +16,7 @@ import MV = require('../../../shared/movement');
 import type { Terrain } from './terrain';
 
 export interface Input { s: number; x: number; y: number; w: number; r?: boolean }
-export interface ActorInfo { characterId: string; name: string; body: string; appearance: any; title: string | null; town: string }
+export interface ActorInfo { characterId: string; name: string; body: string; appearance: any; title: string | null; town: string; equip: Record<string, any> }
 export interface Actor {
   nid: number; characterId: string; accountId: string; realmId: string; info: ActorInfo;
   s: MV.MoveState; ctx: MV.MoveCtx; speed: number; changed: boolean;
@@ -97,8 +97,8 @@ export class World {
   }
   setCtx(characterId: string, ctx: MV.MoveCtx) { const a = this.actors.get(characterId); if (a) { a.ctx = ctx; a.s.stam = Math.min(a.s.stam, ctx.stamMax); } }
   /* the public face of an actor for actor.enter */
-  enterPayload(a: Actor) { return { nid: a.nid, characterId: a.characterId, name: a.info.name, body: a.info.body, appearance: a.info.appearance, title: a.info.title, town: a.info.town, x: r3(a.s.x), y: r3(a.s.y), sect: a.s.sect ?? 0, speed: r3(a.speed) }; }
-  selfPayload(a: Actor) { return { nid: a.nid, x: a.s.x, y: a.s.y, sect: a.s.sect ?? 0, stam: r3(a.s.stam), stamMax: a.ctx.stamMax, ack: a.acked }; }
+  enterPayload(a: Actor) { return { nid: a.nid, characterId: a.characterId, name: a.info.name, body: a.info.body, appearance: a.info.appearance, title: a.info.title, town: a.info.town, equip: a.info.equip, x: r3(a.s.x), y: r3(a.s.y), sect: a.s.sect ?? 0, speed: r3(a.speed) }; }
+  selfPayload(a: Actor) { return { nid: a.nid, x: a.s.x, y: a.s.y, sect: a.s.sect ?? 0, stam: a.s.stam, stamMax: a.ctx.stamMax, ack: a.acked, t: a.s.t, ld: a.s.lastDrain }; }
 
   step() {
     this.tick++; this.stats.ticks++;
@@ -134,7 +134,7 @@ export class World {
           }
         }
         for (const nid of [...v.known]) if (!near.has(nid)) { v.known.delete(nid); this.sink(v, 'actor.leave', { nid }); }
-        const self = this.selfPayload(v); const sig = `${self.x},${self.y},${self.sect},${self.stam},${self.ack}`;
+        const self = this.selfPayload(v); const sig = `${self.x},${self.y},${self.sect},${Math.round(self.stam * 10)},${self.ack}`;
         if (moves.length || sig !== v.lastSentSelf || this.tick % SELF_KEEPALIVE_TICKS === 0) { v.lastSentSelf = sig; this.sink(v, 'state', { tick: this.tick, you: self, moves }); }
       }
     }
