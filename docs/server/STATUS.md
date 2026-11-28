@@ -15,6 +15,7 @@ sends intents and predicts, and the server moves everyone with the shared rules 
 | Persistence | Every 30 s, on leaving the world, and on shutdown |
 | Load | 150 bots, half crowded in one town: about 3 ms average tick, 0 overruns, about 14 KB/s per bot, 157 MB (CI runner) |
 | Phone | CI's phone player runs in WebKit (Safari's engine) with the iPhone 13 profile |
+| Screenshots | [shots-movement/](shots-movement/) (from the CI run) |
 
 Not online yet: creatures, NPCs, combat, gathering, crafting, items, trading, doors (always open online), chat.
 
