@@ -36,12 +36,19 @@ jobs:
         run: npm run migrate && npm run migrate
       - name: Integration tests (auth, characters, realtime)
         run: npm run test:server
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Browser flow (desktop and phone)
         env:
           E2E_SHOTS: ${{ runner.temp }}/e2e-shots
         run: |
-          pip install playwright==1.49.1
+          pip install playwright
           python3 tests/e2e/online_flow.py
+      - name: Production image builds and loads the game rules
+        run: |
+          docker build -f server/Dockerfile -t shardfall-server .
+          docker run --rm shardfall-server node -e "const r=require('./shared/game-rules-adapter').load(); console.log('rules ok', Object.keys(r.RULES_VERSION).join(','))"
       - name: Screenshots
         if: always()
         uses: actions/upload-artifact@v4
