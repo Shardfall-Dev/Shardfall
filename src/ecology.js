@@ -66,11 +66,11 @@ const ECO_FACTIONS = SIM.newFactions(SIM.FACTION_RULES);
 
 /* ---------- state ---------- */
 const ECOS = { grid: SIM.newGrid(8), camps: new Map(), packs: new Map(), regions: new Map(), dark: 0, period: 'day', stepN: 0, idleAt: 0, howlAt: 0, packN: 0, rng: null, kills: 0, mvm: 0, hunts: 0, flees: 0, cleared: 0, replenished: 0, sunk: 0, sorties: 0, thinkMs: 0 };
-const ECO_SPAWN_GAP = 22, ECO_FAR = 80;   // no spawning within 22 m of the player (out of view, no pop-in); creatures beyond 80 m that are idle think at a quarter rate
+const ECO_SPAWN_GAP = 22;   // no spawning within 22 m of the player (out of view, no pop-in). How often a creature thinks by distance: the simulation tiers (src/tiers.js)
 
 function factionOf(e) {
   if (!e) return null; if (e === P || e.kind === 'ally' || e.kind === 'pet') return 'adventurers';
-  if (e.kind === 'npc') return e.role === 'guard' ? 'guards' : MERCHANT_ROLES[e.role] || SHOPS[e.role] ? 'merchants' : e.role === 'outlaw' ? 'criminals' : 'citizens';
+  if (e.kind === 'npc') return e.role === 'guard' ? 'guards' : e.role === 'adventurer' ? 'adventurers' : MERCHANT_ROLES[e.role] || SHOPS[e.role] ? 'merchants' : e.role === 'outlaw' ? 'criminals' : 'citizens';
   if (e.kind === 'mon') return ecoP(e.type).f; return null;
 }
 /* rough fighting strength, for courage: health times damage per second */
@@ -336,12 +336,6 @@ function ecoTick() {
   if (ECOS.stepN % 10 === 1) { const L = lightNow(); ECOS.dark = levelAt(Math.floor(P.x), Math.floor(P.y)) ? .8 : L.dark; ECOS.period = WS ? WS.clock.periodAt(GT) : 'day'; }
   if (ECOS.stepN % 20 === 7) { ecoCampTick(); ecoSinkTick(); }
 }
-/* distant idle creatures think and move at a quarter rate (a first simulation tier; phase 6 formalises tiers A/B/C) */
-function ecoSkip(e, dt) {
-  if (e.state !== 'idle' || e.target || e.sortie || (e.leader && e.leader.sortie) || !P) { if (e._acc) { const a = e._acc; e._acc = 0; return a + dt; } return dt; }
-  const far = Math.abs(e.x - P.x) + Math.abs(e.y - P.y) > ECO_FAR; if (!far) { const a = (e._acc || 0) + dt; e._acc = 0; return a; }
-  e._acc = (e._acc || 0) + dt; if ((ECOS.stepN + e.id) % 4) return 0; const a = e._acc; e._acc = 0; return a;
-}
 /* push-apart through the index (was every entity against every other) */
 function ecoSeparate(m) { ECOS.grid.query(m.x, m.y, .7, o => { if (o === m || (o.kind !== 'mon' && o.kind !== 'pet') || o.gone) return; const dx = m.x - o.x, dy = m.y - o.y, l = Math.hypot(dx, dy); if (l > 0 && l < .7) moveBy(m, dx / l * .02, dy / l * .02); }); }
 /* sound (§23): detection on the first sight of a target, rare idle calls nearby, night howls in the distance. Audio randomness
@@ -358,11 +352,50 @@ function ecoSoundTick(m) {
   if (dd < 18 && m.act !== 'asleep' && SFXA.has(sp + '.alert')) { ECOS.idleAt = GT + 4; sndAt(sp + '.alert', m, { gain: .3, prio: 1 }); }
 }
 
-/* ---------- save: camp clearance (creatures themselves respawn on load until world-state persistence, phase 6) ---------- */
-function ecoSave() { const camps = {}; for (const [k, c] of ECOS.camps) camps[k] = c.save(); return { v: 1, camps }; }
+/* ---------- save: camp clearance and, since v0.34 (phase 6), every spawned creature ----------
+   Each creature a spawner made is saved as one compact row (SIM.packCreatures): id, species, spawner, position, health, home,
+   pack, purse and when it last ate. On load the rows are validated (SIM.unpackCreatures) and the creatures come back with
+   their ids instead of a fresh boot fill, so a region the player thinned out stays thin; the empty places refill at each
+   spawner's own pace, out of sight, as always. A save without rows (older builds) fills the world fresh, as before. Creatures
+   in a fight are saved where they stand, calm: a reload ends fights, as it always has. Pets, summons and quest creatures are
+   saved by their own systems. Older builds ignore the rows (the block stays additive; the save version is unchanged). */
+const ECO_POP = { pending: null, restored: 0, dropped: 0, why: {} };
+function ecoSpawnKeys() {
+  if (SPAWNS._keyed === SPAWNS.length) return; const seen = new Map();
+  for (const s of SPAWNS) { const b = s.type + '@' + Math.round(s.x) + ',' + Math.round(s.y), k = (seen.get(b) || 0) + 1; seen.set(b, k); s.key = k > 1 ? b + '#' + k : b; }
+  SPAWNS._keyed = SPAWNS.length;
+}
+const ecoSaveable = e => e.kind === 'mon' && e.sp && !e.gone && !e.dead && !e.quest && e.hp > 0 && e.actorId;
+function ecoSave() {
+  const camps = {}; for (const [k, c] of ECOS.camps) camps[k] = c.save(); ecoSpawnKeys();
+  const list = []; for (const e of ents) if (ecoSaveable(e)) list.push({ id: e.actorId, type: e.type, sp: e.sp.key, x: e.x, y: e.y, hp: e.hp, hx: e.home ? e.home.x : e.x, hy: e.home ? e.home.y : e.y, pack: e.packId || 0, lead: e.packId && e.leader === e, hidden: e.hidden, purse: e.purse, fedAgo: GT - (e.fedAt ?? GT) });
+  return { v: 2, camps, pop: { v: SIM.POP_VERSION, mons: SIM.packCreatures(list) } };
+}
 function ecoLoad(saved) {
+  ECO_POP.pending = saved && saved.pop && saved.pop.v === SIM.POP_VERSION && Array.isArray(saved.pop.mons) ? saved.pop.mons : null;
   const camps = saved && saved.camps; if (!camps) return;
   for (const [k, c] of ECOS.camps) if (camps[k]) { const nc = SIM.newCamp({ id: c.id, cap: c.cap, recover: c.recover, trickle: c.trickle }, camps[k]); for (const f of ['name', 'x', 'y', 'site', 'kind', 'sortieAt']) nc[f] = c[f]; ECOS.camps.set(k, nc); for (const s of SPAWNS) if (s.camp === c) s.camp = nc; }
+}
+/* called by populate() instead of the boot fill: true when the save brought its creatures back */
+function ecoRestore() {
+  const rows = ECO_POP.pending; ECO_POP.pending = null; if (!rows) return false;
+  ecoSpawnKeys(); const byKey = new Map(SPAWNS.map(s => [s.key, s]));
+  const capOf = k => { const s = byKey.get(k); return s ? Math.max(s.max, s.nightMax || 0) : 0; };
+  const r = SIM.unpackCreatures(rows, { validType: t => !!MON[t], capOf, maxHp: t => MON[t].hp });
+  ECO_POP.dropped = r.dropped; ECO_POP.why = r.why; if (r.dropped) console.warn('creatures dropped on load', r.why);
+  const packs = new Map();
+  for (const c of r.list) {
+    const s = byKey.get(c.sp), d = MON[c.type]; let x = c.x, y = c.y;
+    if (!canStand({ kind: 'mon' }, x, y)) { const at = ecoSpot(s, true); if (!at) { ECO_POP.dropped++; continue; } [x, y] = at; }   // the ground changed under it: back to its spawner
+    const m = addEnt({ kind: 'mon', type: c.type, name: d.n, x, y, hp: c.hp, max: d.hp, state: 'idle', home: { x: c.hx, y: c.hy }, sp: s, sect: rnd(0, 7), ward: d.ward && !d.wardEvery ? d.ward : 0, hidden: c.hidden, purse: c.purse, restoreId: c.id });
+    delete m.restoreId; m.fedAt = GT - c.fedAgo; s.n++; ECOS.grid.add(m);
+    if (s.camp) { s.camp.alive++; s.camp.ever = true; }   // counted back in, not a replenishment (the camp's own record came with the save)
+    if (c.pack) { let g = packs.get(c.pack); if (!g) packs.set(c.pack, g = []); if (c.lead) g.unshift(m); else g.push(m); }
+  }
+  for (const g of packs.values()) { const pk = ++ECOS.packN; ECOS.packs.set(pk, g); for (const m of g) { m.packId = pk; m.leader = g[0]; m.ownLeader = g[0]; } }
+  for (const s of SPAWNS) { const cap = ecoNight() && s.nightMax ? s.nightMax : s.max; s.next = s.n < cap ? GT + (s.delay || (s.eco || s.camp ? ecoP(s.type).resp : 9)) * (.3 + R() * .7) : 0; }   // vacancies refill at the spawner's pace, not all at once
+  ECO_POP.restored = r.list.length - (ECO_POP.dropped - r.dropped);
+  return true;
 }
 function ecoInspect(e) {
   if (!e || e.kind !== 'mon') return {}; const pr = ecoP(e.type), r = SIM.senseRange(ecoSenseOf(e), ecoSenseCtx(e));

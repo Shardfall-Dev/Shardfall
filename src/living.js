@@ -56,7 +56,7 @@ function drawLight(LW, LH, camX, camY) {
 }
 
 /* ---------- navigation (§14): walkable tiles, A* in budgeted slices, a travel graph for long journeys ---------- */
-const NAV = { walk: null, graph: null, jobs: [], cache: SIM.newLRU(256), epoch: 0, budget: 3000, spent: 0, searches: 0, failed: 0, hits: 0 };
+const NAV = { walk: null, graph: null, jobs: [], low: [], lowBudget: 800, cache: SIM.newLRU(256), epoch: 0, budget: 3000, spent: 0, searches: 0, failed: 0, hits: 0 };
 const NAV_R = .26;   // the same body radius canStand uses
 function staticCol(x, y, r) { const a = ECOL.get(Math.floor(y) * W + Math.floor(x)); if (a) for (const c of a) if (x + r > c[0] && x - r < c[2] && y + r > c[1] && y - r < c[3]) return true; return false; }
 /* can an actor stand at this tile's centre, ignoring doors (they change) — cached per tile */
@@ -101,18 +101,21 @@ function navRequest(sx, sy, gx, gy, o, fresh) {
   if (hit) { NAV.hits++; job.status = 'found'; job.path = hit; return job; }
   const pad = 40, b = [Math.max(0, Math.min(sx, gx) - pad), Math.max(0, Math.min(sy, gy) - pad), Math.min(W - 1, Math.max(sx, gx) + pad), Math.min(H - 1, Math.max(sy, gy) + pad)];
   const pass = navPass(o); job.o = o; job.search = SIM.newSearch({ sx, sy, gx, gy, passable: pass, canStep: navCanStep(o), cost: navCost, minCost: .7, maxNodes: o.maxNodes || 30000, goalR: o.goalR || 1.5, bounds: b }); job.pass = pass;
-  NAV.jobs.push(job); NAV.searches++; return job;
+  (o.low ? NAV.low : NAV.jobs).push(job); NAV.searches++; return job;   // low: a background lane (NPC adventurers' long walks, v0.36)
 }
-/* run queued searches within this step's budget, oldest first (§14: stagger and limit expensive searches) */
+/* run queued searches within this step's budget, oldest first (§14: stagger and limit expensive searches). The background lane
+   (o.low) runs after the main queue with whatever is left, at most NAV.lowBudget nodes a step, so a long walk never holds up
+   townsfolk, guards or creatures */
 function navTick() {
   let left = NAV.budget; NAV.spent = 0;
-  while (left > 0 && NAV.jobs.length) {
-    const j = NAV.jobs[0], before = j.search.expanded, st = j.search.step(left); const used = j.search.expanded - before; left -= Math.max(1, used); NAV.spent += used;
+  const run = (Q, cap) => { let room = cap; while (room > 0 && Q.length) {
+    const j = Q[0], before = j.search.expanded, st = j.search.step(room); const used = j.search.expanded - before; room -= Math.max(1, used); NAV.spent += used;
     if (st === 'running') continue;
-    NAV.jobs.shift(); j.status = st;
+    Q.shift(); j.status = st;
     if (st === 'found') { j.path = SIM.smoothPath(j.search.path, navClear(j.pass, j.o)); NAV.cache.set(j.key, j.path); } else { j.reason = j.search.reason; NAV.failed++; }
     j.search = null;
-  }
+  } return cap - room; };
+  left -= run(NAV.jobs, left); if (left > 0 && NAV.low.length) run(NAV.low, Math.min(left, NAV.lowBudget));
 }
 
 /* the travel graph: road points (merged where roads meet), towns, landmarks, piers, moongates and dungeon stairs */
@@ -260,13 +263,13 @@ function devRender() {
   const prevSel = document.getElementById('devdest') ? document.getElementById('devdest').value : null;
   const B = (a, l, extra) => `<button data-dev="${a}" ${extra || ''} style="font:10px monospace;margin:1px;padding:2px 4px">${l}</button>`;
   p.innerHTML = `<b>${esc(document.title)}</b> · sim ${Math.round(1 / STEPPER.step)} Hz (${DEV.stepRate.toFixed(0)}/s) · ${DEV.fps.toFixed(0)} fps${SIMPAUSE ? ' · <b style="color:#f88">PAUSED</b>' : ''}<br>
-  actors ${acts.length} · visible ${visible} · regional — · distant — <span style="color:#889">(tiers: phase 6)</span><br>
+  actors ${acts.length} · visible ${visible} · tiers ${TIER.on ? `local ${TIER.last.A} (busy ${TIER.last.busy}) · regional ${TIER.last.B} · distant ${TIER.last.C} · A ≤ ${TIER.radii.a.toFixed(0)} m, B ≤ ${TIER.radii.b.toFixed(0)} m · woke ${TIER.woke} (placed ${TIER.placed}, walked ${TIER.walked})` : 'off (?tiers=off)'}<br>
   NPCs ${npcs} · creatures ${mons} · ${Object.entries(by).map(([k, v]) => k + ' ' + v).join(', ')}<br>
   time ${SIM.fmtHour(h)} · day ${C.dayAt(GT)} · ${PERIOD_NAME[C.periodAt(GT)]} · ${C.dayMinutes} min/day · light ${lightNow().dark.toFixed(2)}<br>
-  paths: queue ${NAV.jobs.length} · cache ${NAV.cache.size} · searched ${NAV.searches} · failed ${NAV.failed} · cache hits ${NAV.hits}<br>
+  paths: queue ${NAV.jobs.length} (+${NAV.low.length} background) · cache ${NAV.cache.size} · searched ${NAV.searches} · failed ${NAV.failed} · cache hits ${NAV.hits}<br>
   AI ${DEV.aiMs.toFixed(3)} ms/step · audio voices ${SFXA.stats.voices} · save ${saveKB} · last save ${ls ? (ls.ok ? 'ok' : 'FAILED') + ' at ' + Math.round(ls.at) + ' s' : '—'}<br>
   ${devEco()}<br>
-  ${lifeDev()}<br>${npcFightDev()}
+  ${lifeDev()}<br>${npcFightDev()}<br>${lawDev()}<br>${advDev()}
   <hr style="border-color:#334">
   ${B('hour', 'Dawn', 'data-h="5.5"')}${B('hour', 'Noon', 'data-h="12"')}${B('hour', 'Dusk', 'data-h="17.8"')}${B('hour', 'Midnight', 'data-h="0"')}${B('shift', '−1 h', 'data-h="-1"')}${B('shift', '+1 h', 'data-h="1"')}${B('daynight', 'Day/night')}<br>
   ${B('pause', SIMPAUSE ? 'Resume' : 'Pause')}${B('step', 'Step')}${B('adv', 'Run +1 min', 'data-s="60"')}${B('adv', 'Run +10 min', 'data-s="600"')}${DEV.advance ? ' running… ' + Math.ceil(DEV.advance) + ' s' : ''}${B('save', 'Save now')}<br>
@@ -292,7 +295,7 @@ function devInspect(e) {
   return SIM.inspect(e, Object.assign({ goal: n ? (n.goal.name || Math.round(n.goal.x) + ',' + Math.round(n.goal.y)) + ' · ' + n.state + (n.reason ? ' (' + n.reason + ')' : '') : null,
     destination: n && n.legs && n.legs[n.li] ? Math.round(n.legs[n.li].x) + ',' + Math.round(n.legs[n.li].y) + ' leg ' + (n.li + 1) + '/' + n.legs.length : null,
     territory: d ? 'territory ' + ecoP(e.type).terr + ' m, pursuit ' + (ecoP(e.type).pur || d.leash) + ' m, aggro ' + d.aggro + ' m' : null, reason: e.state ? 'state ' + e.state + (e.target ? ' → ' + aidOf(e.target) : '') : null,
-    criminal: SIM.hasComponent(e.archetype, 'notoriety') ? 'innocent (law: phase 5)' : null }, ecoInspect(e), lifeInspect(e), e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null));
+    notoriety: notoOf(e), murderCounts: lawHuman(e) ? LAW.counts(aidOf(e), GT) : null }, ecoInspect(e), lifeInspect(e), advInspect(e), e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null));
 }
 /* world-space debug overlays, drawn after the light so they read at night */
 function devDraw(camX, camY) {
