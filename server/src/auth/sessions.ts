@@ -77,7 +77,9 @@ export class Sessions {
   async recheck(s: SessionRow, force = false): Promise<'ok' | 'revoked' | 'unavailable'> {
     const age = Date.now() - new Date(s.provider_checked_at).getTime();
     if (!force && age < this.cfg.providerRecheckMs) return 'ok';
-    const claim = await this.db.query(`update game.sessions set provider_checked_at = now() where id = $1 and provider_checked_at = $2 and revoked_at is null returning provider_tokens`, [s.id, s.provider_checked_at]);
+    // claim the check: only one request wins (timestamps compare in the database, which keeps microseconds)
+    const claim = await this.db.query(`update game.sessions set provider_checked_at = now() where id = $1 and revoked_at is null
+      and provider_checked_at <= now() - ($2 || ' milliseconds')::interval returning provider_tokens`, [s.id, String(force ? 0 : this.cfg.providerRecheckMs)]);
     if (!claim.rowCount) return 'ok';                                     // another request is checking right now
     let tok: ProviderTokens; try { tok = this.decTokens(claim.rows[0].provider_tokens); } catch { await this.revoke(s.id, 'token_decrypt_failed'); return 'revoked'; }
     try {

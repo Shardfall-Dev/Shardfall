@@ -3,6 +3,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { makeGuards } from '../auth/guard';
 import { fail } from '../auth/guard';
+import { sha256 } from '../auth/crypto';
 import type { Characters } from './service';
 import type { RulesApi } from '../../../shared/game-rules-adapter';
 import P = require('../../../shared/protocol');
@@ -17,6 +18,9 @@ const CREATE = { type: 'object', additionalProperties: false, required: ['name',
   skills: { type: 'array', maxItems: 8, items: { type: 'array', minItems: 2, maxItems: 2, items: [{ type: ['string', 'null'], maxLength: 40 }, { type: 'integer' }] } },
   town: { type: 'string', maxLength: 24 } } } as const;
 
+// per signed-in browser rather than per IP (players behind one address do not share a budget); unauthenticated: per IP
+const perSession = (req: any) => { const c = req.cookies || {}; const t = c['__Host-sf_session'] || c.sf_session; return t ? 'sess:' + sha256(String(t)).toString('hex').slice(0, 32) : 'ip:' + req.ip; };
+
 export function registerCharacterRoutes(app: FastifyInstance, chars: Characters, rules: RulesApi, guards: ReturnType<typeof makeGuards>, onCharacterGone: (id: string) => void) {
   app.get('/api/creation-options', async () => rules.creationOptions());
 
@@ -25,7 +29,7 @@ export function registerCharacterRoutes(app: FastifyInstance, chars: Characters,
   app.get<{ Params: { realmId: string } }>('/api/realms/:realmId/characters', { preHandler: guards.requireSession(), schema: { params: { type: 'object', properties: { realmId: REALM } } } },
     async (req) => chars.roster(req.sess!.account_id, req.params.realmId));
 
-  app.post<{ Params: { realmId: string }; Body: unknown }>('/api/realms/:realmId/characters', { preHandler: guards.requireSession(), config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+  app.post<{ Params: { realmId: string }; Body: unknown }>('/api/realms/:realmId/characters', { preHandler: guards.requireSession(), config: { rateLimit: { max: 30, timeWindow: '1 minute', keyGenerator: perSession } },
     schema: { params: { type: 'object', properties: { realmId: REALM } }, body: CREATE, headers: { type: 'object', properties: { 'idempotency-key': UUID } } } },
     async (req, reply) => {
       const key = req.headers['idempotency-key']; const creationKey = typeof key === 'string' && P.isUuid(key) ? key : null;
