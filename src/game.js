@@ -64,7 +64,9 @@ function idKey(e, a) {
   if (a === 'player') return { id: 'player:' + (e.id || 'p1') };
   if (a === 'hireling') return { prefix: 'npc', name: e.aid || e.name };
   if (e.kind === 'npc') return { prefix: 'npc', name: e.name };
-  return { prefix: (e.kind === 'pet' ? (a === 'summon' ? 'summon' : 'pet') : 'mon') + ':' + (e.type || 'x') };
+  const prefix = (e.kind === 'pet' ? (a === 'summon' ? 'summon' : 'pet') : 'mon') + ':' + (e.type || 'x');
+  if (e.kind === 'pet' && e.savedAid) { const id = e.savedAid; delete e.savedAid; return { id, prefix }; }   // a loaded pet keeps its actor id (v0.33.1); a taken id falls back to a new one
+  return { prefix };
 }
 /* give an entity its id and controller; re-derive the controller when it changes kind (a tamed creature keeps its id) */
 function simAdopt(e) {
@@ -2480,7 +2482,8 @@ const ACT = {
   zoom: () => { ZOOM = ZOOMS[(ZOOMS.indexOf(ZOOM) + 1) % ZOOMS.length]; resize(); renderPanel(); }, mirror: () => { SETTINGS.mirror = !SETTINGS.mirror; document.body.classList.toggle('mirror', SETTINGS.mirror); saveSettings(); renderPanel(); },
   sprintt: () => { SETTINGS.stickSprint = !SETTINGS.stickSprint; saveSettings(); renderPanel(); }, sprint: () => { if (P.ghost) return; if (!P.sprintOn && P.stam < 5) return log('Too tired to sprint.', '#ffb070'); P.sprintOn = !P.sprintOn; }, mute: () => { muted = !muted; SETTINGS.muted = muted; saveSettings(); SFXA.setMuted(muted); renderPanel(); }, music: () => { SFXA.musicOn = !SFXA.musicOn; SETTINGS.music = SFXA.musicOn; saveSettings(); renderPanel(); }, savenow: () => { log(save() ? 'Saved.' : 'Save failed. Check browser storage.'); },
   wipe: () => { const el = $('#panel .pb'); if (!el.querySelector('[data-a=wipe2]')) el.insertAdjacentHTML('beforeend', '<p>Delete this character for good? ' + btn('wipe2', 'Yes, delete', {}, 'on') + '</p>'); }, wipe2: () => { try { localStorage.removeItem(SAVEKEY); deletingSave = true; } catch (e) { return log('Could not delete the saved character.'); } location.reload(); },
-  rotok: () => { $('#rot').hidden = true; ROTOK = true; } };
+  rotok: () => { $('#rot').hidden = true; ROTOK = true; },
+  saveretry: () => { saveFailShown = false; if (!save() && !saveLocked) log('Still not saved: browser storage is full or blocked.', '#ff6a5a'); }, saveexport: () => saveExportNow() };
 let ROTOK = false;
 /* counter actions re-check the live situation, not just that a button was drawn: alive, the right panel still open, the same
    keeper still there and within reach, and for a purchase a whole quantity of something this keeper sells. */
@@ -2958,8 +2961,29 @@ addEventListener('resize', () => { resize(); if (SCREEN === 'map') { sizeMap(); 
    statuses (boons, hexes, wards, fields, summons) are not saved: see docs/magery/STATUS.md. */
 let deletingSave = false, saveLocked = false, saveFailShown = false;
 const SAVEKEY = 'shardfall.save.v1', SAVE_VERSION = 9, TAB_ID = Math.random().toString(36).slice(2);
+/* v0.33.1: SAVE.expect is the stored save this tab last read or wrote (undefined until the game runs). Before each write the stored
+   value is compared with it: if another tab replaced or deleted the save meanwhile, this tab stops saving instead of bringing back a
+   character that was deleted or replaced. SAVE.unsaved: the last write failed (storage full or blocked), shown by #unsaved. */
+const SAVE = { expect: undefined, unsaved: false };
 function save() {
   if (!P || deletingSave || saveLocked) return false; try {
+    let cur; try { cur = localStorage.getItem(SAVEKEY); } catch (x) { cur = undefined; }   // storage unreadable: the write below fails and says so
+    if (cur !== undefined && SAVE.expect !== undefined && cur !== SAVE.expect) { saveLock(cur === null ? 'deleted' : 'replaced'); return false; }
+    const raw = JSON.stringify(saveData()); localStorage.setItem(SAVEKEY, raw); SAVE.expect = raw;
+    DEV.lastSave = { ok: true, at: GT }; if (SAVE.unsaved && typeof log === 'function') log('Your game is saved again.', '#7ee08a'); saveFailShown = false; saveState(false); return true;
+  } catch (e) { DEV.lastSave = { ok: false, at: GT, err: String(e && e.name || e) }; saveState(true); if (!saveFailShown) { saveFailShown = true; console.warn('save failed', e); if (typeof log === 'function') log('Your game could not be saved (browser storage is full or blocked). Free some space or export your save.', '#ff6a5a'); } return false; }
+}
+/* the unsaved notice: shown while the last write failed, with Export (the current game as a file) and Retry */
+function saveState(failed) { SAVE.unsaved = failed; const el = typeof document !== 'undefined' && document.getElementById('unsaved'); if (el) el.hidden = !failed || saveLocked; }
+function saveLock(why) {
+  if (saveLocked) return; saveLocked = true; saveState(SAVE.unsaved);
+  log(why === 'deleted' ? 'This character was deleted in another tab. This tab has stopped saving so it cannot bring it back; reload to continue.'
+    : why === 'replaced' ? 'The saved game was replaced in another tab. This tab has stopped saving so it cannot overwrite it; reload to continue.'
+    : 'Shardfall was opened in another tab. This tab has stopped saving; close it or reload it to continue here.', '#ff6a5a');
+}
+function saveExportNow() { if (!P) return; try { exportSave(JSON.stringify(saveData()), 'Shardfall_' + String(P.name || 'character').replace(/[^\p{L}\p{N}_-]+/gu, '_') + '_unsaved.json'); } catch (e) { console.warn(e); } }
+function saveData() {
+  {
     const c = {}; for (const k of ['name', 'x', 'y', 'str', 'dex', 'int', 'hp', 'stam', 'mana', 'skills', 'pack', 'bank', 'equip', 'look', 'bound', 'quest', 'freeLessons', 'hotbar', 'ghost', 'ghostAt', 'gainLog', 'recipeN', 'cx', 'skillPool', 'combatMig', 't2aMig', 'camp', 'eqMig', 'bandSeq', 'bandDone', 'lowerRank', 'statLocks', 'charId', 'created']) c[k] = P[k];
     c.bandage = bandageSave();
     c.prepEscrow = P.prep ? { id: P.prep.sp.id, items: P.prep.escrow.items.slice(), mana: P.prep.escrow.mana } : null;
@@ -2969,16 +2993,18 @@ function save() {
     const piles = ents.filter(e => e.kind === 'corpse' && e.pile && !e.gone && e.cont.items.length && e.expires > GT).map(e => ({ x: e.x, y: e.y, items: e.cont.items, left: Math.round((e.expires - GT) * 10) / 10 }));
     const chests = []; for (const [k, ch] of CHESTS) if (ch.open && ch.refill > GT) chests.push([k, Math.round((ch.refill - GT) * 10) / 10, ch.cont ? ch.cont.items : []]);
     let maxUid = 0; const scan = it => { if (it && it.uid > maxUid) maxUid = it.uid; if (it && Array.isArray(it.items)) it.items.forEach(scan); }; P.pack.items.forEach(scan); P.bank.items.forEach(scan); Object.values(P.equip).forEach(scan); corpses.forEach(c2 => c2.items.forEach(scan)); piles.forEach(c2 => c2.items.forEach(scan)); chests.forEach(c2 => c2[2].forEach(scan));
-    const pets = ents.filter(e => e.kind === 'pet' && e.type && !e.summon && !e.gone && e.hp > 0).map(e => ({ type: e.type, hp: e.hp, order: e.order === 'stay' ? 'stay' : 'follow', slots: e.slots, name: e.name, dx: e.x - P.x, dy: e.y - P.y, loyal: e.loyal, fedAgo: GT - (e.fedAt || GT) }));
+    const pets = ents.filter(e => e.kind === 'pet' && e.type && !e.summon && !e.gone && e.hp > 0).map(e => ({ type: e.type, hp: e.hp, order: e.order === 'stay' ? 'stay' : 'follow', slots: e.slots, name: e.name, dx: e.x - P.x, dy: e.y - P.y, x: e.x, y: e.y, aid: e.actorId || null, owner: e.owner || P.charId || null, loyal: e.loyal, fedAgo: GT - (e.fedAt || GT) }));   // v0.33.1: x/y (where a staying pet waits), aid (its actor id) and owner; dx/dy stay for older builds
     const nodes = []; for (const [k, o] of RES) nodes.push([k, o.gen || 1, o.spec || 0, o.n, o.max || 0, Math.round(o.t * 10) / 10]);
     const ally = allySave(); if (ally) { Object.values(ally.equip || {}).forEach(scan); ally.pack.forEach(scan); if (ally.body) ally.body.items.forEach(scan); }
-    localStorage.setItem(SAVEKEY, JSON.stringify({ v: SAVE_VERSION, char: c, corpses, piles, chests, pets, nodes, ally, sim: WS ? WS.save() : null, eco: ecoSave(), life: lifeSave(), uid: maxUid + 1, gt: GT, savedAt: Date.now(), tab: TAB_ID }));
-    DEV.lastSave = { ok: true, at: GT }; saveFailShown = false; return true;
-  } catch (e) { DEV.lastSave = { ok: false, at: GT, err: String(e && e.name || e) }; if (!saveFailShown) { saveFailShown = true; console.warn('save failed', e); if (typeof log === 'function') log('Your game could not be saved (browser storage is full or blocked). Free some space or export your save.', '#ff6a5a'); } return false; }
+    return { v: SAVE_VERSION, char: c, corpses, piles, chests, pets, nodes, ally, sim: WS ? WS.save() : null, eco: ecoSave(), life: lifeSave(), uid: maxUid + 1, gt: GT, savedAt: Date.now(), tab: TAB_ID };
+  }
 }
 /* another tab of the same game wrote the save: stop saving here so the two never overwrite each other's progress */
-addEventListener('storage', e => { if (e.key !== SAVEKEY || !P || saveLocked) return; let o = null; try { o = e.newValue && JSON.parse(e.newValue); } catch (x) { }
-  if (o && o.tab && o.tab !== TAB_ID) { saveLocked = true; log('Shardfall was opened in another tab. This tab has stopped saving; close it or reload it to continue here.', '#ff6a5a'); } });
+/* v0.33.1: also when another tab deletes the save or clears storage (key null), so a stale tab never recreates a deleted character */
+addEventListener('storage', e => { if ((e.key !== SAVEKEY && e.key !== null) || !P || saveLocked || deletingSave) return;
+  if (e.key === null || e.newValue === null) return saveLock('deleted');
+  let o = null; try { o = JSON.parse(e.newValue); } catch (x) { }
+  if (!o || !o.tab || o.tab !== TAB_ID) saveLock('tab'); });
 /* validateSave: '' when the parsed save is safe to boot, else a plain reason. post: after migration, the full current shape */
 function validateSave(s, post) {
   if (!s || typeof s !== 'object' || Array.isArray(s)) return 'it is not a Shardfall save';
@@ -3033,9 +3059,19 @@ function bootSaved(rs) {
   let s;
   try { s = migrateSave(JSON.parse(rs.raw), rs.raw); const bad = validateSave(s, true); if (bad) throw new Error(bad); }
   catch (e) { console.error('save could not be loaded', e); try { if (localStorage.getItem(SAVEKEY) !== rs.raw) localStorage.setItem(SAVEKEY, rs.raw); } catch (x) { } CC.bootErr = String(e && e.message || e); showRecovery(); return false; }
-  backupRaw('.lastgood', rs.raw); CC.bootErr = ''; boot(s); return true;
+  backupRaw('.lastgood', rs.raw); CC.bootErr = ''; SAVE.expect = rs.raw; boot(s); return true;
 }
 function showRecovery() { CCD.screen = 'home'; ccRender(); }
+/* where a saved pet appears (v0.33.1). A pet told to stay waits where it was left: the saved x/y, or for saves from before v0.33.1
+   the character's saved position plus the saved offset (the same point). It is checked to be on the map and on standable ground;
+   otherwise, and for a following pet, it appears beside you as before (offset kept when it was near, else one step east). */
+function petLoadPos(pt, c) {
+  const fin = Number.isFinite, near = Math.hypot(pt.dx || 0, pt.dy || 0) < 12, beside = { x: P.x + (near && fin(pt.dx) ? pt.dx : 1), y: P.y + (near && fin(pt.dy) ? pt.dy : 0) };
+  if (pt.order !== 'stay') return beside;
+  const x = fin(pt.x) ? pt.x : c && fin(c.x) && fin(pt.dx) ? c.x + pt.dx : NaN, y = fin(pt.y) ? pt.y : c && fin(c.y) && fin(pt.dy) ? c.y + pt.dy : NaN;
+  if (fin(x) && fin(y) && x >= 0 && y >= 0 && x < W && y < H && canStand({ kind: 'pet', type: pt.type }, x, y)) return { x, y };
+  return beside;
+}
 /* ---------- boot ---------- (the character creator is src/creation-ui.js) */
 /* boot(saved) continues a saved character; boot(null, payload) creates one from a creation payload, which is validated here
    again with the same SF.CREATION.validate the creator uses. Returns true once the game runs. A failed creation leaves the
@@ -3068,7 +3104,8 @@ function boot(saved, fresh) {
   ents.unshift(P); P.sect = P.sect || 0; P.drawn = false; P.sw = SF.newSwing(); P.movedAt = -99; while (P.hotbar.length < 9) P.hotbar.push(null); Q(); ecoLoad(saved && saved.eco); populate(); lifeLoad(saved && saved.life); seedTraps();
   { const al = makeAlly(saved && saved.ally); const bd = saved && saved.ally && saved.ally.body; if (bd && bd.left > 0) { const cont = SF.newContainer('corpse', al.aid); cont.items = bd.items; cont.diedAt = GT - (bd.diedAgo ?? 999); cont.expires = GT + bd.left; addEnt({ kind: 'corpse', allyBody: al.aid, name: al.name + "'s body", x: bd.x, y: bd.y, cont, expires: GT + bd.left }); } }
   P.bandage = null; if (saved) bandageLoad(saved.char.bandage); P.prep = null; P.held = null; if (saved) statusLoad(saved.char);          // an application in flight resumes once, never twice
-  if (saved) for (const pt of saved.pets || []) { const d = MON[pt.type]; if (!d) continue; const near = Math.hypot(pt.dx || 0, pt.dy || 0) < 12; addEnt({ kind: 'pet', type: pt.type, name: pt.name || 'your ' + d.n, x: P.x + (near ? pt.dx : 1), y: P.y + (near ? pt.dy : 0), hp: Math.min(pt.hp, d.hp), max: d.hp, state: '', home: { x: P.x, y: P.y }, sect: 0, ward: 0, order: pt.order, slots: pt.slots || 1, target: null, loyal: pt.loyal === undefined ? SF.SK.LOYALTY.max : pt.loyal, fedAt: GT - (pt.fedAgo || 0) }); }
+  if (saved) for (const pt of saved.pets || []) { if (!pt) continue; const d = MON[pt.type]; if (!d) continue; const at = petLoadPos(pt, saved.char);
+    addEnt({ kind: 'pet', type: pt.type, name: pt.name || 'your ' + d.n, x: at.x, y: at.y, hp: Math.min(pt.hp, d.hp), max: d.hp, state: '', home: { x: at.x, y: at.y }, sect: 0, ward: 0, order: pt.order === 'stay' ? 'stay' : 'follow', slots: pt.slots || 1, target: null, loyal: pt.loyal === undefined ? SF.SK.LOYALTY.max : pt.loyal, fedAt: GT - (pt.fedAgo || 0), savedAid: typeof pt.aid === 'string' ? pt.aid : null, owner: pt.owner || P.charId || null }); }
   mageryBoot(saved);
   $('#cc').hidden = true; document.body.classList.toggle('mirror', SETTINGS.mirror);
   const startTown = !saved && P.created && P.created.town !== 'quay' ? SF.CREATION.TOWN[P.created.town].n : null;
@@ -3081,7 +3118,9 @@ function boot(saved, fresh) {
   if (!saved && !startTown) log('Wren, a quay sellsword, nurses a wound by the plaza. Tap her to bandage her or ask her to follow you.', '#b6a68a');
   if (!saved) log('Your attributes and skills grow as you use them. No trainer sells attributes.', '#b6a68a');
   if (saved && saved.statRepair) log('Some saved attribute values were out of range and have been repaired: ' + saved.statRepair.join(', ') + '.', '#ffb070');
-  if (VH > VW) $('#rot').hidden = false; save(); refreshHud(); return true;
+  if (VH > VW) $('#rot').hidden = false; const stored = save(); refreshHud();
+  if (!saved && !stored && !saveLocked) log(P.name + ' has not been saved: browser storage is full or blocked. Your previous save, if any, is unchanged. Use Export to keep this character, or Retry once there is space.', '#ff6a5a');   // v0.33.1: a new character is never shown as saved when it is not
+  return true;
 }
 let last = performance.now(), hudT = 0;
 /* frame errors: each stage (simulation, drawing, HUD) is isolated so one failing stage does not stop the others; each distinct
@@ -3107,6 +3146,6 @@ function spawnMon(type, dx = 3, dy = 0) { const d = MON[type]; if (!d) return nu
   return addEnt({ kind: 'mon', type, name: d.n, x, y, hp: d.hp, max: d.hp, state: 'idle', home: { x, y }, sect: 0, ward: 0 }); }
 /* __SF is a development and test hook (the browser suites drive the game through it). It is not a security boundary: anything
    here is reachable from the console in an offline single-player game, and a multiplayer server must not trust the client. */
-window.__SF = { FRAME_ERR, SHRINES, los, NPCF, NPC_FIGHT, NPC_DOWN_TIME, npcArm, damageNpc, npcEngage, npcCombatant, npcUp, npcSave, ecoTargetable, readSave, validateSave, get WS() { return WS; }, dist, closePanel, lifeSave, LIFE, LIFE_SCHED, lifeTick, lifeResume, lifeInspect, lifeTownGeo, lifeTalk, talk, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
+window.__SF = { FRAME_ERR, SHRINES, los, NPCF, NPC_FIGHT, NPC_DOWN_TIME, npcArm, damageNpc, npcEngage, npcCombatant, npcUp, npcSave, ecoTargetable, readSave, validateSave, SAVE, saveData, get saveLocked() { return saveLocked; }, get WS() { return WS; }, dist, closePanel, lifeSave, LIFE, LIFE_SCHED, lifeTick, lifeResume, lifeInspect, lifeTownGeo, lifeTalk, talk, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
 Object.defineProperties(window.__SF, { PICKT: { get: () => PICKT }, TRACKS: { get: () => TRACKS }, TRACKUI: { get: () => TRACKUI } });   // live views (Object.assign would copy a getter's value)
 Object.assign(window.__SF, { skillCheck, skillUse, noteLearn, SKUI, SKLOG, useAbility, ABIL, TASKS, pickTap, tameStart, loreUse, vetStart, feedPet, peaceUse, enticeUse, provokeStart, provokeUse, stealStart, npcPack, poisonApply, lockUse, untrapUse, stealthUse, hide, finishHide, reveal, trackStart, trackFollow, magicStrike, petLoyaltyTick, petCommand, evalUse, meditate, playMusic, tamedPets, chestTrapRoll, itemSkill, eat, CHESTS, cdLeft, onPlayerMoved, begUse, campUse, lightKindling, makeCamp, forensicUse, herdPick, herdUse, snoopUse, spiritUse, digUse, treasureUp, newTreasureMap, magicLoot, CAMPS, ITEM_SKILL, ghostSpeech, killMon, MG: SF.MAGERY });

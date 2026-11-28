@@ -1,4 +1,4 @@
-# Publish the game on GitHub Pages every time main changes, after every check in ci.yml has passed.
+# Publish the game on GitHub Pages every time main changes, after every check in ci.yml has passed (browser suites included).
 # The newest Shardfall_vX.Y.Z.html becomes the site's front page (index.html); the sound and music it loads go beside it.
 # One-time setup by the repository owner: Settings → Pages → Source: "GitHub Actions". On a private repository owned by a
 # personal account this needs a paid plan (GitHub Pro), and the published site itself is public. Until Pages is enabled the
@@ -20,10 +20,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  checks:
+  checks:   # every check, browser suites and soak included, must pass before a deploy (v0.33.1: no advisory smoke)
     uses: ./.github/workflows/ci.yml
-    with:
-      smoke_advisory: true
 
   deploy:
     needs: checks
@@ -39,7 +37,7 @@ jobs:
         run: |
           if gh api "repos/${{ github.repository }}/pages" --silent 2>/dev/null; then echo "enabled=true" >> "$GITHUB_OUTPUT"
           else echo "enabled=false" >> "$GITHUB_OUTPUT"; echo "::warning::GitHub Pages is not enabled for this repository (Settings → Pages → Source: GitHub Actions). The checks passed; nothing was published."; fi
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         if: steps.pages.outputs.enabled == 'true'
       - name: Assemble the site
         if: steps.pages.outputs.enabled == 'true'
