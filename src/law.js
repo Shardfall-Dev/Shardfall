@@ -62,7 +62,7 @@ function lawCrimeDone(off, victim, what, before) {
   simEmit('CrimeCommitted', { actor: aidOf(off), victim: aidOf(victim), crime: what, x: off.x, y: off.y, detail: { region: lawRegion(off.x, off.y) } });
   if (off === P) {
     const nm = victim && victim.name ? victim.name.split(',')[0] : 'someone';
-    if (before === 'innocent') log(what === 'theft' ? `You are caught stealing from ${nm}. You are a criminal for two minutes.` : `You attack ${nm}, an innocent. You are a criminal for two minutes.`, '#ff8a6a');
+    if (before === 'innocent') log(what === 'theft' ? `You are caught stealing from ${nm}. You are a criminal for two minutes.` : what === 'looting' ? `You loot ${nm}'s body. You are a criminal for two minutes.` : `You attack ${nm}, an innocent. You are a criminal for two minutes.`, '#ff8a6a');
     else if (before === 'criminal') log('Your criminal flag is renewed.', '#ff8a6a');
   }
   lawWitness(off, victim, what); lawNotoCheck();
@@ -76,7 +76,7 @@ function lawWitness(off, victim, what) {
     seen.push(w); const L = w.life;
     if (L && !L.mem.knows('saw a crime by', id)) { LAWF.witnessed++; simEmit('CrimeWitnessed', { actor: aidOf(w), target: id, victim: aidOf(victim), crime: what, x: w.x, y: w.y }); }
     if (L) L.mem.note(GT, 'saw a crime by', id, { x: Math.round(off.x), y: Math.round(off.y) }, 120);
-    if (w.npcFight.fights) { if ((!w.foe || !fighterAlive(w.foe)) && lawGuardTarget(w, off) && npcInJurisdiction(w, off, 0)) npcEngage(w, off, 'saw ' + (off === P ? 'you' : off.name) + (what === 'theft' ? ' steal' : ' attack ' + (w === victim ? 'him' : (victim.name || 'someone').split(',')[0]))); }
+    if (w.npcFight.fights) { if ((!w.foe || !fighterAlive(w.foe)) && lawGuardTarget(w, off) && npcInJurisdiction(w, off, 0)) npcEngage(w, off, 'saw ' + (off === P ? 'you' : off.name) + (what === 'theft' ? ' steal' : what === 'looting' ? ' loot a body' : ' attack ' + (w === victim ? 'him' : (victim.name || 'someone').split(',')[0]))); }
     else if (w === victim || d < LAW_WITNESS * .7) npcFlee(w, off, what);
   }
   for (const w of seen) if (!w.npcFight.fights) { npcCallGuards(w, off); break; }   // one cry is enough to bring the nearest guards

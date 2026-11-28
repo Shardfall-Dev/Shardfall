@@ -4,7 +4,7 @@ The roadmap is `docs/WORLD_SIMULATION_MASTER.md` (the full specification, unchan
 
 **Status words:** **Tested** — implemented and covered by an automated test that passes. **Implemented** — in the build, checked by hand only. **Partial** — some of the item is in; the rest is listed. **Planned** — not started. **Blocked** — waiting on something named.
 
-**Current build:** v0.35 (`Shardfall_v0.35.html`), branch `feature/living-world-phase6a`: phase 6, step 1 (simulation tiers, the population saved, phone profiling) merged onto v0.34 (`feature/living-world-phase5b`, phase 5 step 2: criminality and murder).
+**Current build:** v0.36 (`Shardfall_v0.36.html`), branch `feature/living-world-phase5c`, on top of v0.35 (`feature/living-world-phase6a`, phase 6 step 1, itself on v0.34 `feature/living-world-phase5b`): phase 5, step 3 — NPC adventurers and NPC spellcasting.
 
 ---
 
@@ -451,6 +451,67 @@ Requested on 2026-11-26: bigger distances, more camps, and places for dungeons. 
 - **Creatures respawn on load as before; camp clearance is the one thing saved now.** Saving every creature is phase 6 (§26).
 - **The quarter-rate tier for distant idle creatures** is a stopgap so the larger population costs less than the old one did. Phase 6 replaces it with the spec's tiers A/B/C.
 
+## Phase 5, step 3 — NPC adventurers and NPC spellcasting (v0.36) — **Tested**
+
+Built on `feature/living-world-phase6a` (v0.35, which already carries v0.34's law), so it uses the tiers and the law as they are. Master spec §8 (NPC adventurers — simulated players), §18 (NPC weapon attacks, archery, spellcasting, bandaging, potions, retreat, target changes, group assistance) and §20 for the adventurers' own deaths.
+
+### What was built
+
+- **Pure decisions in `src/world.js`** (tested in node, `tests/adventurers.test.js`):
+  - `SIM.ADV_STYLES`: six archetypes from the spec's list (swordsman, mace fighter, fencer, archer, mage, healer) mapped onto the existing 49-skill registry, existing weapons and armour, a kit, a cloth colour and (casters) a spell list. No parallel skill system: every value is a UO skill on `SF.newSkills()`, inside the 700 skill and 225 stat caps.
+  - `SIM.ADV_ROSTER`: Aldric (sellsword, Vespar), Brenna (mace fighter, Mynoc), Corvin (fencer, Mynoc), Dara (archer, Moonglen), Elsbeth (mage, Moonglen), Fenwick (healer, Vespar), each with a courage from 0.45 to 0.85.
+  - `SIM.advChoose`: the strategic layer, about once a second. It returns `fight`, `flee` (hurt below `fleeAt × (1.6 − courage)`, or outmatched by `1.4 + 2.2 × courage`), `return` (out of bandages, arrows or reagents, hurt with nothing to heal with, a pack worth 300 gold, gear below 55 %, nightfall for the cautious), `town` (rest, sell, repair, restock; the cautious wait for daylight) or `hunt`. Errands it cannot pay for are skipped instead of waited on forever (`skip`).
+  - `SIM.advTarget`: which creature, by threat (attacking it, attacking someone else), distance, vulnerability (wounded) and faction; it never starts a fight it expects to lose but always defends itself; ties break by id.
+  - `SIM.advSpell`: Cure when poisoned; in a fight a mage keeps attacking (Energy Bolt → Lightning → Fireball → Magic Arrow, the strongest it will likely cast) and heals only below 40 %, a healer heals below 60 %, wards itself with Protection and keeps 25 mana for healing; between fights both top up with Heal or Greater Heal.
+  - `SIM.advShopping` (what to buy within the purse, in priority order) and `SIM.advAfterDeath` (the resurrection policy).
+  - Three event types: `SpellCast`, `ActorResurrected`, `CorpseLooted`.
+- **`src/adventurers.js`** (new, built after `src/law.js`): the `AdventurerAI` controller.
+  - **Actors.** Adventurers are people (`kind: 'npc'`, role `adventurer`, archetype `adventurer`), so everything built for people applies: the shared resolver, notoriety, witnesses, guards defending them, creatures targeting them by faction (`adventurers`, like you). Ids come from their names (`npc:aldric-sellsword`). Their items are real items with real uids (`SF.newItem` / `SF.EQ.fields`), so they can end up on a body and in your pack.
+  - **Fighting.** Melee walks in and swings (`swingAt`); the archer stops to aim, uses arrows from its pack and gives ground when a creature closes in; the mage keeps 2–8 m away and wrestles only when cornered. They help you only when you are below 60 % health (your fights are yours) and never claim a creature you have hit. Ten seconds without a blow either way ends a fight it cannot reach (water, a wall, a creature that fled); it leaves that creature alone for a minute.
+  - **Learning.** Every swing teaches its weapon skill by the player's rule (the hit chance is the challenge, `SF.SK.use`), each landed blow Tactics and Anatomy, parries Parrying, bandages Healing and Anatomy, casts Magery (in the circle's window) and Evaluating Intelligence, resisted spells Resisting Spells. Stats rise with them.
+  - **First Aid and draughts.** Below 70 % (or poisoned, with 60/60) it applies a bandage with `SF.firstAidCheck` / `SF.firstAidResolve`: the same delays (15 s on yourself at these skills), slips when struck, the bandage spent at the start, the treatment re-checked at the end. Below 40 % it drinks a healing draught, then waits out its 16 s cooldown.
+  - **Magery.** The book chance (`SF.MAGERY.bookChance`), the spell's mana and one of each reagent from the pack are reserved at the start of the cast; the cast time is the spell's; a blow interrupts it (reagents back, half the mana spent, `SF.MAGERY.interruptCost`, as for you). Direct spells fly with the spell's delivery delay and roll `SF.MAGERY.resolveHit` against the recipient's Resisting Spells with the caster's Evaluating Intelligence; heals, Cure and Protection use the same rolls as yours. A failed roll fizzles. Mana regenerates with Meditation (`SF.SK.manaRegen`), faster resting in town.
+  - **The day.** Hunt → fight → loot → return → town → hunt. Hunting grounds are picked from living, non-boss creatures 30–180 m from its town that it can handle (creature difficulty ≤ its best skill + 5), preferring game that fights back, away from grounds other adventurers work, and never within 50 m of you (§17: off-screen adventurers must not strip the world). It searches each ground for 40 s, tries up to four, and remembers places it could not find a way to for half an hour. Twice without game in ten minutes, or every third trip with even odds, it moves on to another town (§8: travelling between cities).
+  - **Looting.** Only its own kills (lawful): gold, its supplies and small goods worth at least 2 gold, within 60 kg. Bodies of creatures you damaged are never claimed.
+  - **In town.** One errand every 2.5 s at the market: sell loot at half price, repair worn pieces (40 % of the price for the missing durability), buy back missing kit pieces, restock (`SIM.advShopping`), bank everything above 60 gold in the pocket. It rests until healed. The cautious sleep at the hall until 06:00.
+  - **Death (§8, §20).** `SF.deathTransaction` moves everything tradeable onto one body (the snapshot of its look is taken first); creatures let go; the ghost cannot be targeted. Policy `ADV.cfg.res`:
+    - `healer` (default): the ghost walks to the nearest healer and returns at 25 % health (after 240 s a healer finds it), walks back to its body and takes everything back. A body that is gone (decayed or looted) or out of reach for 150 s means the gear is lost: it buys a new kit from the bank.
+    - `replace`: the ghost leaves the world; 600 s later a successor of the same calling (Garet, Hild, …) arrives in town.
+    - `none`: death is final.
+    Items only move, so resurrection never duplicates equipment.
+  - **The law.** Adventurers are innocent. Attacking one is a crime (a swing that misses counts); it fights back while the law gives it the right, and the guards come for you. Killing one reports a murder. Taking from its body inside the loot-rights window (`SF.lootStatus`, 90 s) is a crime, logged as looting.
+  - **Talking** gives a line about what it is doing; criminals and murderers get turned away.
+  - **Saving.** The save's new `adv` block (additive; the save version is unchanged) holds every adventurer by id: position, vitals, stats, skills, equipment, pack, bank, record, poison, ghost state and its body with what is on it, plus the successors on their way and the ids gone for good. Their item uids count towards the save's uid counter. A save from before v0.36 starts with the six fresh. Positions are kept (they are individuals, not schedules).
+  - **Cost and navigation.** Their journeys are single local searches sliced over steps, like the travelling merchant's, never the continent travel graph (its first build stalled the live loop for 3.5 s in this container). Tiers: never below B, like the guards. Measured on a fresh world in this container: 0.75 ms per step with them against 0.48 without (tiers on), 2.83 against 2.38 (tiers off). `?adv=off` leaves them out.
+  - **Developer panel and inspector** show their mode and reasons, ground, vitals, top skills, purse, bank, supplies, record, what they are casting or tending; the panel adds a line of totals. The target frame shows their calling and what they are doing (and Ghost).
+- **Small fixes in shared code:**
+  - **Law core:** a record of someone fighting back in self-defence no longer gives the aggressor a right over them (`SIM.newLaw().rights`). Before, an innocent who defended itself became lawful prey for the one who attacked it. This is the UO rule and what the v0.34 doc describes ("they attacked you first").
+  - **Wear messages:** only your own gear reports "badly worn" or "broken" in your log (`wear(it, amt, quiet)`); guards' and adventurers' armour used to write to it.
+
+### Tests
+
+- `node tests/adventurers.test.js Shardfall_v0.36.html` (new, in CI): roster and archetypes on the real skill registry and caps; every `advChoose` branch (fight, flee by courage, outmatched, each reason to go home, each town errand, waiting for daylight, unaffordable errands skipped); target choice (nearest, attacker first, wounded, helping, never a losing fight, self-defence, deterministic ties); spell choice (strongest likely spell, mana, chance, reagents, heal thresholds, Cure, range, the healer's ward and mana reserve); shopping; policies.
+- `python3 tests/world-smoke/phase5_adv.py Shardfall_v0.36.html` (new; `world-smoke/run.py` runs it), 40 checks in Chrome: the roster at boot; 150 s of hunting (kills, both directions through the shared damage entry, lawful looting, skill gains); a bandage with a slip and a draught; the mage's casts, reservation and interruption; the healer healing itself; flight; the town errands; a death with one body and nothing left on the ghost, the ghost finding a healer and the body reclaimed with the same item uids; a lost body and a new kit from the bank; the law (crime, self-defence, murder, looting); save and reload of everything including a ghost and its body; an older save; the replace and none policies across a reload; `?adv=off`; tiers.
+- Existing tests updated for the new rules: `phase6.py` exempts adventurers (never below B) from the distant-tier check, as it already did for the guards and the merchant. `phase3.py` and `phase4.py` (the ecosystem and town life on their own, with `?tiers=off`) now also open with `adv=off`: adventurers hunt those creatures and would change what they measure.
+- `tests/soak/run.py --days 1` with adventurers: all checks pass (heap, actors, path queue and cache, logs bounded; no errors).
+- **Regression in this container.** Every node suite and `check-build.py` pass, and every browser suite in the CI list passes except two timing checks with `?tiers=off`: phase 3's three-day "under 3 ms per step" (3.5 ms) and phase 4's "under 3 ms with town life" (3.7 ms). Both fail the same way on the unchanged v0.35 build in the same container (3.51 ms and 3.02 ms), so the machine is slower today than when v0.35 was measured; they now run with `adv=off`, so adventurers are not in those numbers.
+- **Navigation:** adventurers' searches use a new background lane in `navTick` (`o.low`): it runs after the main queue with what is left of the step's budget, at most 800 nodes. Without it, a long adventurer search held up the creatures' and townsfolk's paths (phase 3's predator, return-home and leash scenarios failed); with it they pass.
+
+### Decisions
+
+- **Adventurers die like you, townsfolk are still knocked down.** The spec asks for adventurers to "lose appropriate equipment under the same death and loot rules that apply to the player", and those rules exist (Wren uses them). Townsfolk death, their corpses and looting stay in step 4.
+- **Lawful only.** The thief and murderer archetypes need NPC crime (an NPC attacking you or a townsperson unlawfully, theft); that is step 4 / phase 7. Adventurers never start a fight with a person.
+- **No dungeons yet.** The dungeon mouths are sealed until their interiors are built; adventurers hunt the wilds.
+- **Economy as a ledger.** They buy and sell at shop prices without changing shop stock, like the townsfolk's hauls; prices and supply are phase 7.
+- **Nobody starts in Skara Bryn**: few grounds around it can be walked to through its woods. They may still move there, and leave again if they find nothing.
+
+### Not done yet
+
+- Gathering resources, training at trainers, crafting and treasure hunting (archetypes from the spec's list that need those loops for NPCs).
+- Pets for the animal tamer, songs for the bard.
+- Recall and gates for long trips; boats.
+- Adventurers fighting each other or grouping up.
+
 ## Phase 6, step 1 — Simulation tiers, the population saved, phone profiling (v0.35) — **Tested**
 
 Built on a branch of its own (`feature/living-world-phase6a`) while phase 5 step 2 (criminality, v0.34) was being built elsewhere, then merged onto it. It touches neither law nor combat, adds its save data inside the existing `eco` block (the save version is unchanged), and leaves corpses, merchant cargo and NPC adventurers to phase 5 steps 3–4.
@@ -757,7 +818,7 @@ v0.26 merges phase 3 with the equipment and paper doll work (#19, which already 
 | 5 | World clock | `hourOfDay()` = `(GT/60 + 9) % 24`: a 24-minute day, starting at 09:00. `GT` is saved, so time already persists. HUD clock exists. | **Tested** (phase 2): 120-minute day, periods, saved, HUD | Offline progression stays off (spec) |
 | 6 | Day/night visuals | `darkness()` overlay with radial holes for the player, `LIGHTS` and blasts. Night Sight sets darkness to 0. Dungeons fixed at 0.8. | **Tested** (phase 2): tinted periods, local lights and glow, partial Night Sight, dungeons apart | Torch items and spell light radii when those exist; night gameplay in phase 3 |
 | 7 | NPC life | 58 static NPCs (Saltmarsh + Anniabreen towns), roles, shops, dialogue lines; no movement or schedules | **Tested** (phase 4; all four towns since v0.28, with memory of the player and saved state): homes, workplaces, schedules, needs, memory, nine residents, resource workers on real nodes, shop hours, shelter from danger; guard patrols in all four towns; a travelling merchant | Saltmarsh Quay residents; the economy behind the stores (phase 7) |
-| 8 | NPC adventurers | Wren: one hireling with skills, equipment, bandaging, ghost/resurrection, follow/wait | Classified (hireling) | Phase 5 (they need NPC combat) |
+| 8 | NPC adventurers | Wren: one hireling with skills, equipment, bandaging, ghost/resurrection, follow/wait | **Tested** (v0.36): six persistent adventurers (swordsman, mace fighter, fencer, archer, mage, healer) that hunt, fight, loot, bank, repair, restock, flee, travel between towns, die by the player's rules and come back | Gathering, training, crafting, tamers, bards, thieves and murderers |
 | 9–10 | Monster ecosystem | `MON` table (23 types) with aggro, leash, speed, loot, skin; `SPAWNS` point spawners with caps and respawn timers; `aiMon` idle/chase/telegraph/strike/recover/return | **Tested** (phase 3): 27 species profiles as data, temperaments, hours, prey, packs and herds, retreat, feeding; deer, hares and bears added | Goblins, zombies, dragons when art exists; orc roles and lich commands with NPC Magery (phase 5) |
 | 11 | Factions | None; creatures target only the player, pets or Wren (or a provoked creature) | **Tested** (phase 3): 20 factions, five levels, symmetric table; creatures fight creatures; hostility is not a crime | Law and notoriety: phase 5 |
 | 12 | Utility AI + state machines | `aiMon` state machine; no utility scoring, personality or hysteresis | **Tested** (phase 3) for creatures: scored options, commitment, hysteresis, forced retreat, reasons in the inspector | Townsfolk and adventurers: phase 4 |
@@ -851,18 +912,16 @@ v0.26 merges phase 3 with the equipment and paper doll work (#19, which already 
   - Next step for phones: choose DP from a budget of back-buffer pixels instead of from the pixel ratio alone, then measure on a real device. The night tint and the light pass are the next numbers to watch.
   - Heap: 61–76 MB with tiers, 69–105 MB without. The save is about 86 KB.
 
-## Next task (phase 5, step 3)
+## Next task (phase 5, step 4)
 
-The first NPC adventurers (§18, §21), now that NPCs can fight and the law can judge them:
+NPC death, corpses and looting under the player's rules, for townsfolk and guards (§20), now that adventurers already die that way:
 
-1. An `AdventurerAI` archetype with a profile (weapons or Magery, skills, armour, a purse) that leaves town for a camp or a hunting ground, fights creatures with the shared resolver and comes back to bank and rest.
-2. NPC spellcasting through the Magery rules (heal self, a direct-damage spell), shared with Wren later.
-3. Notoriety for adventurers (innocent by default); the law already judges NPC attackers, so a grey or red adventurer is fought by guards.
-
-Then step 4: NPC death, corpses and looting under the player's rules (`lawDowned` moves to the death transaction; illegal looting becomes a crime).
+1. `lawDowned` moves into a death transaction for townsfolk; knock-downs become deaths where the spec wants them (outside protected ground), with bodies, decay and looting rights.
+2. Illegal looting by NPCs (an outlaw or a thief archetype) as a crime the law already knows (`lawCrime(…, 'looting')`).
+3. The first NPC criminals (thief, murderer) using the adventurer controller with unlawful targets, so guards and witnesses react to NPC crime.
 
 ## Next in phase 6 (step 2, after phase 5 steps 3–4)
 
-1. Save NPC corpses with their contents and remaining lifetime, merchant cargo and NPC adventurers' state through the same validated-rows path as the creatures (no duplicates on load).
+1. Save NPC corpses with their contents and remaining lifetime and merchant cargo through the same validated-rows path as the creatures (no duplicates on load). NPC adventurers are already saved whole (v0.36, the `adv` block).
 2. Phone drawing: pick the back-buffer divisor from a pixel budget (see Performance), then profile on a real phone.
 3. A seeded long-run check with tiers on (the soak), added to the browser suites with the spec's long-running checks: no population explosion or extinction, no infinite loot or gold, no stuck NPCs, a bounded event log and memory.

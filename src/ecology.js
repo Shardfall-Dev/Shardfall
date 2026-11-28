@@ -70,7 +70,7 @@ const ECO_SPAWN_GAP = 22;   // no spawning within 22 m of the player (out of vie
 
 function factionOf(e) {
   if (!e) return null; if (e === P || e.kind === 'ally' || e.kind === 'pet') return 'adventurers';
-  if (e.kind === 'npc') return e.role === 'guard' ? 'guards' : MERCHANT_ROLES[e.role] || SHOPS[e.role] ? 'merchants' : e.role === 'outlaw' ? 'criminals' : 'citizens';
+  if (e.kind === 'npc') return e.role === 'guard' ? 'guards' : e.role === 'adventurer' ? 'adventurers' : MERCHANT_ROLES[e.role] || SHOPS[e.role] ? 'merchants' : e.role === 'outlaw' ? 'criminals' : 'citizens';
   if (e.kind === 'mon') return ecoP(e.type).f; return null;
 }
 /* rough fighting strength, for courage: health times damage per second */

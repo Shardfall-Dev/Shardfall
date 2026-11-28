@@ -53,7 +53,7 @@ const MERCHANT_ROLES = { banker: 1, campbank: 1 };
 function archetypeOf(e) {
   if (e === P) return 'player';
   switch (e.kind) {
-    case 'npc': return e.role === 'guard' ? 'guard' : MERCHANT_ROLES[e.role] || SHOPS[e.role] ? 'merchant' : 'civilian';
+    case 'npc': return e.role === 'guard' ? 'guard' : e.role === 'adventurer' ? 'adventurer' : MERCHANT_ROLES[e.role] || SHOPS[e.role] ? 'merchant' : 'civilian';
     case 'ally': return 'hireling';
     case 'pet': return e.summon || !e.type ? 'summon' : 'pet';
     case 'mon': return SPECIES_CLASS[e.type] || 'monster';
@@ -232,7 +232,7 @@ const metalTorso = a => { const it = a.equip && (a.equip.chest || a.equip.robe);
 const fmtWt = v => (Math.round(v * 10) / 10).toFixed(1);
 /* the one carried-weight line every panel shows: everything carried and worn against the carrying limit, in weight units */
 const carriedText = () => { const en = encumb(); return `${fmtWt(en.wt)} / ${fmtWt(en.cap)} weight`; };
-function wear(it, amt) { if (!it || !SF.WEARABLE(it.id)) return; if (it.cond === undefined) { it.cond = 100; it.maxc = 100; } const before = it.cond; it.cond = Math.max(0, it.cond - amt); const lim = .2 * (it.maxc || 100); if (before >= lim && it.cond < lim) log(SF.itemName(it) + ' is badly worn (−15%). Repair it soon.', '#ffb070'); if (before > 0 && it.cond <= 0) log(SF.itemName(it) + ' has broken and gives no benefit.', '#ff6a5a'); }
+function wear(it, amt, quiet) { if (!it || !SF.WEARABLE(it.id)) return; if (it.cond === undefined) { it.cond = 100; it.maxc = 100; } const before = it.cond; it.cond = Math.max(0, it.cond - amt); if (quiet) return; const lim = .2 * (it.maxc || 100); if (before >= lim && it.cond < lim) log(SF.itemName(it) + ' is badly worn (−15%). Repair it soon.', '#ffb070'); if (before > 0 && it.cond <= 0) log(SF.itemName(it) + ' has broken and gives no benefit.', '#ff6a5a'); }
 const inCombat = () => GT - (P.lastCombat || -99) < 6;
 function give(id, q, extra) { const r = SF.addItem(P.pack, SF.newItem(id, q, extra), cap()); if (!r.ok) { log('Your pack is full: ' + r.reason + '. ' + SF.ITEMS[id].n + ' left on the ground.', '#ffb070'); dropPile(SF.newItem(id, q, extra)); } return r.ok; }
 function dropPile(it) { let c = ents.find(e => e.kind === 'corpse' && e.pile && Math.hypot(e.x - P.x, e.y - P.y) < 1); if (!c) { const cont = SF.newContainer('pile'); c = addEnt({ kind: 'corpse', pile: true, name: 'dropped items', x: P.x, y: P.y, cont, expires: GT + 600 }); } c.cont.items.push(it); }
@@ -375,9 +375,10 @@ function applyBlow(A, t, opt) {
   if (D.regions) { const rg = SF.EQ.regionArmor(t, SF.EQ.pickRegion(R)); D.armorAR = rg.ar + magicArmor(t); D.armorItem = rg.item; D.region = rg.region; }   // one body region per blow; unprotected regions take it bare
   const m = SF.mitigate(v, { parry: D.parry, braced: D.braced, shieldAR: D.shieldAR, armorAR: D.armorAR, player: D.player, mace: !!(A.w && A.w.mace) }, R); m.region = D.region;
   // side effects, each once: parry check and shield wear, armor wear (mace: half what it absorbed), weapon wear, stamina drain, gains
-  if (D.shieldAR > 0) { if (t === P) skillUse('parrying', m.parryChance, m.parried); if (m.parried) { wear(D.shieldItem, .3); floater(t.x, t.y, 'parry', '#cfe8ff'); } }
-  if (D.armorItem) { if (A.w && A.w.mace) { if (m.armorWear > 0) wear(D.armorItem, m.armorWear); } else wear(D.armorItem, .2); }
+  if (D.shieldAR > 0) { if (t === P) skillUse('parrying', m.parryChance, m.parried); else if (t.adv) advLearn(t, 'parrying', m.parryChance, m.parried); if (m.parried) { wear(D.shieldItem, .3, t !== P); floater(t.x, t.y, 'parry', '#cfe8ff'); } }
+  if (D.armorItem) { if (A.w && A.w.mace) { if (m.armorWear > 0) wear(D.armorItem, m.armorWear, t !== P); } else wear(D.armorItem, .2, t !== P); }   // quiet: only your own gear reports wear in the log
   if (A.w && A.w.mace) drainStam(t, rnd(SF.MACE_STAM[0], SF.MACE_STAM[1]));
+  if (a.adv) { advCheck(a, 'tactics'); advCheck(a, 'anatomy'); if (A.it && A.w.hp) wear(A.it, 25 / A.w.hp, true); }
   if (a === P) { skillCheck('tactics', 0, 100); skillCheck('anatomy', 0, 100); if (A.it && A.w.hp) wear(A.it, 25 / A.w.hp);
     const it = A.it; if (it && it.venom && it.venom.charges > 0 && !A.w.ammo) { it.venom.charges--; applyPoison(t, it.venom.tier); if (!it.venom.charges) { delete it.venom; log('The venom on your weapon is spent.'); } } }
   m.raw = raw;
@@ -397,12 +398,14 @@ function swingAt(a, t) {
     SF.removeQty(pack, w.ammo, 1);                                                     // exactly one projectile per release, hit or miss
   }
   if (lawHuman(t)) lawAggress(a, t);                                                   // every swing at a person is an aggression record (src/law.js)
+  if (t.adv) advProvoked(t, a);                                                         // an adventurer answers the swing, hit or miss (src/adventurers.js)
   if (a === P && P.hidden) reveal('You attack and are revealed.');
   if (a === P && !P.drawn && !w.ammo && w.fam !== 'Unarmed') snd('weapon.draw', { key: 'Pdraw', gain: .7 });
   SF.swingSpend(a.sw, GT); a.lastCombat = GT; if (a === P) { P.lastCombat = GT; P.drawn = true; P.drawing = 0; }
   faceToward(a, t.x, t.y); const A = fighter(a), D = fighter(t);
   const chance = SF.hitChance(A.atk, D.def), hit = R() < chance;
   if (a === P) skillUse(w.skill, chance, hit);                                            // the hit chance is the challenge: a sure hit teaches nothing
+  else if (a.adv) advLearn(a, w.skill, chance, hit);                                     // NPC adventurers learn by the same rule (src/adventurers.js)
   if (a === P) { playOnce((w.fam || 'Unarmed') + '_Attack', 0); P.lunge = .001; } else a.lunge = .001;
   provoke(t, a); swingSound(a, w);
   if (w.ammo) { const s = { id: ++SHOTID, a, t, w, A, hit, x0: a.x, y0: a.y, at: GT + SF.ARCHERY.flight }; a.shots = (a.shots || 0) + 1;
@@ -457,7 +460,7 @@ function damageMon(m, amt, kind, src, hx) {
   if (isAlly(m)) return damageAlly(m, amt, src, kind, hx);
   if (!alive(m)) return; src = src || P; m.hitT = GT; m.lastHurt = GT; if (m.pacified > GT && src === P) m.pacified = 0;   // an attack breaks Peacemaking and Enticement
   if (m.ward > 0 && kind !== 'poison') { const a = Math.min(m.ward, amt); m.ward -= a; amt -= a; floater(m.x, m.y, 'ward ' + a, '#e8d090'); if (m.ward <= 0) floater(m.x, m.y, 'ward broken', '#e8d090'); if (amt <= 0) { if (sndOnce('ward' + m.id, .6)) sndAt('magic.ward', m, { gain: .6 }); return; } }
-  m.hp -= amt; simEmit('ActorDamaged', { actor: aidOf(m), source: aidOf(src), amount: amt, kind: kind || 'phys', x: m.x, y: m.y }); floater(m.x, m.y, String(amt), kind === 'spell' ? '#c8a0ff' : kind === 'poison' ? '#7be07b' : '#ffd27a'); hitSound(m, kind, src, hx, m.hp <= 0); if (src === P || (src && (src.kind === 'pet' || src.kind === 'ally'))) P.lastCombat = GT;
+  m.hp -= amt; simEmit('ActorDamaged', { actor: aidOf(m), source: aidOf(src), amount: amt, kind: kind || 'phys', x: m.x, y: m.y }); floater(m.x, m.y, String(amt), kind === 'spell' ? '#c8a0ff' : kind === 'poison' ? '#7be07b' : '#ffd27a'); hitSound(m, kind, src, hx, m.hp <= 0); if (src === P || (src && (src.kind === 'pet' || src.kind === 'ally'))) { P.lastCombat = GT; m.pHit = GT; }   // pHit: you had a hand in it, so no adventurer claims the body
   m.pacified = 0; if (m.rooted > GT) m.rooted = 0;
   if (m.hidden) m.hidden = false;
   if (!m.target || m.target === P && src && (src.kind === 'pet' || src.kind === 'ally') && R() < .3 || (m.provoked && m.provoked < GT)) { m.target = src.kind ? src : P; m.chaseKind = 'attack'; m.provoked = 0; m.state = m.state === 'idle' || m.state === 'return' ? 'chase' : m.state; }
@@ -477,6 +480,7 @@ function killMon(m, src) {
   if ((d.boss || d.diff >= 75) && R() < (d.boss ? 1 : .15)) cont.items.push(newTreasureMap(d.boss ? 4 + (R() < .5 ? 1 : 0) : 1 + Math.floor(R() * 3)));   // treasure maps from strong foes
   if (m.purse) cont.items.push(SF.newItem('gold', m.purse));
   const corpse = addEnt({ kind: 'corpse', mon: m.type, sect: m.sect || 0, t0: GT, killer: src ? (src === P ? P.name : src.name || (MON[src.type] || {}).n || null) : null, killKind: src && src.kind, name: d.n + ' remains', x: m.x, y: m.y, cont, expires: GT + (d.boss ? 600 : 240), skinned: !d.skin, gear: d.scout ? gearSnapOf(m) : null });
+  if (corpse && src && src.adv && !m.pHit) { corpse.advKill = src.actorId; src.adv.rec.kills++; ADV.stats.kills++; }   // its own kill: it may loot it (src/adventurers.js)
   if (corpse && (P.sel === m || src === P) && mine) { P.sel = corpse; if (!P.lootHinted) { P.lootHinted = true; log('Tap the bones (or press Interact) beside them to loot.', '#ffe08a'); } }
   for (const e of ents) if (e.target === m) { e.target = null; if (e.kind === 'mon') e.state = 'return'; }
   if (P.sel === m) { P.sel = mine ? null : corpse; P.armed = false; }
@@ -844,7 +848,7 @@ function openCorpse(c) {
   if (P.ghost) return; if (dist(c, P) > 2) return log('Move within 2 m.'); if (!los(P, c)) return log('No line of sight.');
   P.opening = GT + .35; at(.35, () => { P.opening = 0; if (!c.gone && dist(c, P) <= 3) { P.lootOpen = c; openPanel('loot'); sndAt('loot.rummage', c); } });
 }
-function talk(n) { if (lawRefuses(n)) return; if (n.dev) return say(n, n.nav && n.nav.state === 'moving' ? 'On my way to ' + (n.nav.goal.name || 'somewhere') + '.' : 'Just passing through.'); if (!P.ghost && teachesHere(n)) { P.talkTo = n; return openPanel('trainer'); } if (lifeTalk(n)) return; if (annTalk(n)) return; if (n.role === 'assay' || n.role === 'qsmith') { if (P.ghost) return; P.talkTo = n; return openPanel('guild'); } if (n.role === 'quaywarden') { if (P.ghost) return resurrect(); P.talkTo = n; return openPanel('quest'); } if (n.role === 'healer' || n.role === 'guard') { if (P.ghost) return resurrect(); say(n, n.role === 'guard' ? 'Keep the peace inside the Quay.' : 'Rest easy. Bind at the shrine if you travel.'); return; } P.talkTo = n; openPanel(n.role === 'banker' || n.role === 'campbank' ? 'bank' : n.role === 'trainer' ? 'trainer' : 'shop'); }
+function talk(n) { if (lawRefuses(n)) return; if (advTalk(n)) return; if (n.dev) return say(n, n.nav && n.nav.state === 'moving' ? 'On my way to ' + (n.nav.goal.name || 'somewhere') + '.' : 'Just passing through.'); if (!P.ghost && teachesHere(n)) { P.talkTo = n; return openPanel('trainer'); } if (lifeTalk(n)) return; if (annTalk(n)) return; if (n.role === 'assay' || n.role === 'qsmith') { if (P.ghost) return; P.talkTo = n; return openPanel('guild'); } if (n.role === 'quaywarden') { if (P.ghost) return resurrect(); P.talkTo = n; return openPanel('quest'); } if (n.role === 'healer' || n.role === 'guard') { if (P.ghost) return resurrect(); say(n, n.role === 'guard' ? 'Keep the peace inside the Quay.' : 'Rest easy. Bind at the shrine if you travel.'); return; } P.talkTo = n; openPanel(n.role === 'banker' || n.role === 'campbank' ? 'bank' : n.role === 'trainer' ? 'trainer' : 'shop'); }
 
 /* ---------- world population ---------- */
 function populate() {
@@ -858,7 +862,7 @@ function populate() {
   for (const [x, y] of [[129.5, 297.5], [129.5, 303.5], [116.5, 260.5], [116.5, 340.5], [55.5, 285.5]]) npc('guard', 'Quay warden', x, y);
   const c = ZONES.camp; npc('healer', 'Old Fenna, camp healer', c.cx + 2.5, c.cy + 1.5); npc('campbank', 'Crow, camp strongbox', c.cx - 3.5, c.cy - 3.5); npc('outlaw', 'Mags, fence', c.cx + 3.5, c.cy - 3.5);
   annPopulate(npc);
-  lifePopulate(npc);   // Living World phase 4: homes, workplaces, routines, residents, guard patrols, the travelling merchant (src/townlife.js)
+  lifePopulate(npc); advPopulate(npc);   // advPopulate: the NPC adventurers (v0.36, src/adventurers.js)   // Living World phase 4: homes, workplaces, routines, residents, guard patrols, the travelling merchant (src/townlife.js)
   if (!ecoRestore()) for (let i = 0; i < 12; i++) { for (const s of SPAWNS) s.next = 0; spawnTick(true); }   // a save with its creatures brings them back (phase 6); otherwise the world fills fresh
 }
 const SHOPS = { provisioner: ['hatchet', 'pickaxe', 'knife', 'rod', 'tongs', 'sewkit', 'cloth', 'vial', 'bandage', 'lanternoil', 'cookedmeat', 'shirt', 'trousers', 'shoes', 'cloak', 'lute', 'lockpick', 'repairkit'], smith: ['dagger', 'kryss', 'spear', 'sword', 'battleaxe', 'glaive', 'mace', 'waraxe', 'hammer', 'ironbar', 'ringmail_tunic', 'ringmail_sleeves', 'ringmail_gloves', 'ringmail_leggings', 'chain_coif', 'chain_tunic', 'chain_leggings', 'plate_gorget', 'plate_chest', 'plate_arms', 'plate_gauntlets', 'plate_leggings', 'bascinet', 'open_helm', 'closed_helm', 'plate_helm', 'buckler', 'metal_shield', 'kite_shield'], workshop: ['shortbow', 'crossbow', 'heavycrossbow', 'arrow', 'bolt', 'pine', 'buckler', 'wooden_shield', 'strap', 'trapkit', 'repairkit'], apothecary: ['reedash', 'shelldust', 'marshroot', 'lanternoil', 'blacksalt', 'vial', 'draught', 'antidote', 'manatonic', 'stamtonic', 'cinder'], outlaw: ['bandage', 'draught', 'arrow', 'cookedmeat', 'cloth', 'vial', 'reedash', 'marshroot', 'knife', 'dagger', 'lockpick', 'venom', 'trapkit'] };
@@ -892,7 +896,7 @@ function update(dt) {
     if (!inCombat() && !P.poison) P.hp = Math.min(SF.maxHp(P), P.hp + (P.fed > GT ? 1 : .1) * dt);
     if (P.poison && GT >= P.poison.next) { P.poison.next = GT + SF.POISON_GAP; damagePlayer(SF.POISON[P.poison.tier], null, 'poison'); if (P.poison && --P.poison.ticks <= 0) P.poison = null; }
   }
-  lawTick(); navTick(); ecoTick(); const aiT0 = DEV.on ? performance.now() : 0;
+  lawTick(); advWorldTick(); navTick(); ecoTick(); const aiT0 = DEV.on ? performance.now() : 0;
   for (const e of ents.slice()) {                                    // every actor is driven by its controller; corpses are objects that decay
     if (e.gone || e === P) continue;
     if (e.kind === 'corpse') { if (GT > e.expires) { if (e.mine) log('Your body has crumbled to dust, and everything on it is gone.', '#ff6a5a'); rmEnt(e); if (P.lootOpen === e) { closePanel(); P.lootOpen = null; } } continue; }
@@ -909,7 +913,7 @@ function monsterTick(e, dt) {
   if (e.stam !== undefined && GT - (e.hitT || -9) > .75) e.stam = Math.min(monT2A(MON[e.type]).dex, e.stam + 3 * dt); const s0 = e.state; aiMon(e, dt); if (e.state !== s0) monSound(e, s0); ecoSoundTick(e);
   if (e.poison && GT >= e.poison.next) { e.poison.next = GT + SF.POISON_GAP; damageMon(e, SF.POISON[e.poison.tier], 'poison'); if (e.poison && --e.poison.ticks <= 0) e.poison = null; }
 }
-const CONTROL = { CivilianAI: (e, dt) => lifeTick(e, dt), MerchantAI: (e, dt) => lifeTick(e, dt), GuardAI: (e, dt) => lifeTick(e, dt), MonsterAI: monsterTick, AnimalAI: monsterTick, CriminalAI: monsterTick, PetAI: (e, dt) => petTick(e, dt), SummonAI: (e, dt) => petTick(e, dt), HirelingAI: (e, dt) => allyTick(e, dt) };
+const CONTROL = { CivilianAI: (e, dt) => lifeTick(e, dt), MerchantAI: (e, dt) => lifeTick(e, dt), GuardAI: (e, dt) => lifeTick(e, dt), MonsterAI: monsterTick, AnimalAI: monsterTick, CriminalAI: monsterTick, PetAI: (e, dt) => petTick(e, dt), SummonAI: (e, dt) => petTick(e, dt), HirelingAI: (e, dt) => allyTick(e, dt), AdventurerAI: (e, dt) => advTick(e, dt) };   // AdventurerAI: v0.36 (src/adventurers.js)
 function petTick(p, dt) {
   if (p.summon) return summonTick(p, dt);
   if (p.until && GT > p.until) { rmEnt(p); log('The Reedling sinks back into the reeds.'); return; }
@@ -2064,6 +2068,7 @@ function beastSprite(e) {
   const c = document.createElement('canvas'); c.width = dm[0]; c.height = dm[1]; const g = c.getContext('2d'); g.translate(dm[2], dm[3]); g.scale(face * 1.25, 1.25); if (e.type === 'deer' || e.type === 'hare' || e.type === 'bear') wildArt(g, e.type, fr, atk); else beastArt(g, e.type, fr, atk);
   s = outlined(pixelize(c)); s.ox = dm[2] + 1; s.oy = dm[3] + 1; SPR.set(k, s); return s;
 }
+const ADV_COL = { navy: '#2a3a6a', wine: '#6a2a32', forest: '#2f5a32', plum: '#5a2a6a', oatmeal: '#8a7a5a' };
 const NPC_COL = { traveller: '#3a6a5a', assay: '#4a6a7a', qsmith: '#7a3a22', banker: '#2a3a8a', smith: '#6a4a2a', trainer: '#8a2a2a', workshop: '#6a6a2a', apothecary: '#5a2a6a', provisioner: '#8a6a2a', guard: '#5a5a62', healer: '#d8d0c0', outlaw: '#3a2a22' };
 /* ---- 8-direction creature sheets: rows S,SW,W,NW,N,NE,E,SE; cols 0-3 walk, 4 wind-up, 5 strike, 6 hit, 7 dead ---- */
 const MSI = {}; for (const k in MON_SHEETS) { const im = new Image(); im.onload = () => { MSI[k] = im; }; im.src = MON_SHEETS[k].src; }
@@ -2107,6 +2112,7 @@ function drawEnt(e) {
   else if (e.kind === 'player') drawScout(g, e, x, y, P.ghost ? 'ghost' : P.look);
   else if (e.kind === 'ally') { if (e.ghost) g.globalAlpha = .75; drawScout(g, e, x, y, e.ghost ? 'ghost' : '#2f7a46'); }
   else if (e.kind === 'npc' && e.downed) { g.save(); g.globalAlpha = .85; g.translate(x, y - 4); g.rotate(-1.4); g.translate(-x, -y); drawScout(g, e, x, y, NPC_COL[e.role] || (e.life && LIFE_COL[e.life.prof]) || '#5a5a5a'); g.restore(); }   // knocked down (phase 5)
+  else if (e.kind === 'npc' && e.adv) { if (e.ghost) g.globalAlpha = .75; drawScout(g, e, x, y, e.ghost ? 'ghost' : ADV_COL[e.adv.D.cloth] || '#5a5a5a'); }   // NPC adventurers (v0.36)
   else if (e.kind === 'npc') drawScout(g, e, x, y, NPC_COL[e.role] || (e.life && LIFE_COL[e.life.prof]) || '#5a5a5a');
   // creature art, best first: a decoded bestiary sheet, a legacy MON_SHEETS sheet, the scout tint, then procedural art.
   // A sheet that is still decoding (or failed to load) falls through, so a creature is never drawn invisible.
@@ -2461,7 +2467,7 @@ const ACT = {
   assign: d => { ASSIGN = { k: d.k, id: d.id }; openPanel('assign'); }, setslot: d => { P.hotbar[+d.i] = ASSIGN; closePanel(); },
   lock: d => { const s = P.skills[d.k]; s.lock = s.lock === 'raise' ? 'hold' : s.lock === 'hold' ? 'lower' : 'raise'; renderPanel(); },
   cast: d => { closePanel(); castSlot(d.s); },
-  take: d => { const c = P.lootOpen; if (!c || dist(c, P) > 2) return log('Move within 2 m.'); const it = findU(c.cont, d.u); if (!it) return; const r = SF.EQ.pickupItem(P, c.cont, { uid: it.uid, qty: d.half ? Math.ceil(it.qty / 2) : it.qty }); if (!r.ok) log(r.reason, '#ffb070'); else if (it.id === 'gold') snd('loot.coin'); renderPanel(); if (c.mine || c.pile || c.kind === 'chest') save(); },
+  take: d => { const c = P.lootOpen; if (!c || dist(c, P) > 2) return log('Move within 2 m.'); const it = findU(c.cont, d.u); if (!it) return; const r = SF.EQ.pickupItem(P, c.cont, { uid: it.uid, qty: d.half ? Math.ceil(it.qty / 2) : it.qty }); if (!r.ok) log(r.reason, '#ffb070'); else { if (it.id === 'gold') snd('loot.coin'); if (c.advBody) advLooted(c); } renderPanel(); if (c.mine || c.pile || c.kind === 'chest') save(); },
   takeall: () => { const c = P.lootOpen; if (!c || dist(c, P) > 2) return; let n = 0, gold = 0; for (const it of c.cont.items.slice()) { const r = SF.EQ.pickupItem(P, c.cont, { uid: it.uid, qty: it.qty }); if (r.ok) { n++; if (it.id === 'gold') gold++; } else { log('Stopped: ' + r.reason, '#ffb070'); break; } } if (n) snd(gold ? 'loot.coin' : 'loot.rummage'); /* one cue for the whole transfer */ renderPanel(); if (c.mine) save(); },
   skin: () => { const c = P.lootOpen || P.sel; if (c && c.mon && dist(c, P) <= 2) skin(c); else log('Stand by the remains.'); },
   depgold: () => { let g = 0; for (const it of P.pack.items.filter(i => i.id === 'gold')) if (SF.transfer(P.pack, P.bank, it.uid, it.qty).ok) g++; if (g) snd('loot.coin'); save(); renderPanel(); },
@@ -2977,7 +2983,8 @@ function save() {
     const pets = ents.filter(e => e.kind === 'pet' && e.type && !e.summon && !e.gone && e.hp > 0).map(e => ({ type: e.type, hp: e.hp, order: e.order === 'stay' ? 'stay' : 'follow', slots: e.slots, name: e.name, dx: e.x - P.x, dy: e.y - P.y, loyal: e.loyal, fedAgo: GT - (e.fedAt || GT) }));
     const nodes = []; for (const [k, o] of RES) nodes.push([k, o.gen || 1, o.spec || 0, o.n, o.max || 0, Math.round(o.t * 10) / 10]);
     const ally = allySave(); if (ally) { Object.values(ally.equip || {}).forEach(scan); ally.pack.forEach(scan); if (ally.body) ally.body.items.forEach(scan); }
-    localStorage.setItem(SAVEKEY, JSON.stringify({ v: SAVE_VERSION, char: c, corpses, piles, chests, pets, nodes, ally, sim: WS ? WS.save() : null, eco: ecoSave(), life: lifeSave(), uid: maxUid + 1, gt: GT, savedAt: Date.now(), tab: TAB_ID }));
+    const adv = advSave(); advScanItems(adv, scan);   // NPC adventurers (v0.36): their items carry real uids
+    localStorage.setItem(SAVEKEY, JSON.stringify({ v: SAVE_VERSION, char: c, corpses, piles, chests, pets, nodes, ally, sim: WS ? WS.save() : null, eco: ecoSave(), life: lifeSave(), adv, uid: maxUid + 1, gt: GT, savedAt: Date.now(), tab: TAB_ID }));
     DEV.lastSave = { ok: true, at: GT }; saveFailShown = false; return true;
   } catch (e) { DEV.lastSave = { ok: false, at: GT, err: String(e && e.name || e) }; if (!saveFailShown) { saveFailShown = true; console.warn('save failed', e); if (typeof log === 'function') log('Your game could not be saved (browser storage is full or blocked). Free some space or export your save.', '#ff6a5a'); } return false; }
 }
@@ -3070,7 +3077,7 @@ function boot(saved, fresh) {
   if (!saved) simEmit('CharacterCreated', { actor: aidOf(P), charId: P.charId, template: P.created.template, town: P.created.town, body: P.look.body });
   if (saved && !(saved.sim && saved.sim.clock)) WS.clock.setHour(GT, (GT / 60 + 9) % 24);   // older saves keep the hour they were at; from now on a day lasts 120 minutes
   NAV.walk = null; NAV.edge = null; NAV.graph = null; devInit();
-  ents.unshift(P); P.sect = P.sect || 0; P.drawn = false; P.sw = SF.newSwing(); P.movedAt = -99; while (P.hotbar.length < 9) P.hotbar.push(null); Q(); ecoLoad(saved && saved.eco); populate(); lifeLoad(saved && saved.life); seedTraps();
+  ents.unshift(P); P.sect = P.sect || 0; P.drawn = false; P.sw = SF.newSwing(); P.movedAt = -99; while (P.hotbar.length < 9) P.hotbar.push(null); Q(); ecoLoad(saved && saved.eco); populate(); lifeLoad(saved && saved.life); advLoad(saved && saved.adv); seedTraps();
   { const al = makeAlly(saved && saved.ally); const bd = saved && saved.ally && saved.ally.body; if (bd && bd.left > 0) { const cont = SF.newContainer('corpse', al.aid); cont.items = bd.items; cont.diedAt = GT - (bd.diedAgo ?? 999); cont.expires = GT + bd.left; addEnt({ kind: 'corpse', allyBody: al.aid, name: al.name + "'s body", x: bd.x, y: bd.y, cont, expires: GT + bd.left }); } }
   P.bandage = null; if (saved) bandageLoad(saved.char.bandage); P.prep = null; P.held = null; if (saved) statusLoad(saved.char);          // an application in flight resumes once, never twice
   if (saved) for (const pt of saved.pets || []) { const d = MON[pt.type]; if (!d) continue; const near = Math.hypot(pt.dx || 0, pt.dy || 0) < 12; addEnt({ kind: 'pet', type: pt.type, name: pt.name || 'your ' + d.n, x: P.x + (near ? pt.dx : 1), y: P.y + (near ? pt.dy : 0), hp: Math.min(pt.hp, d.hp), max: d.hp, state: '', home: { x: P.x, y: P.y }, sect: 0, ward: 0, order: pt.order, slots: pt.slots || 1, target: null, loyal: pt.loyal === undefined ? SF.SK.LOYALTY.max : pt.loyal, fedAt: GT - (pt.fedAgo || 0) }); }
@@ -3112,7 +3119,7 @@ function spawnMon(type, dx = 3, dy = 0) { const d = MON[type]; if (!d) return nu
   return addEnt({ kind: 'mon', type, name: d.n, x, y, hp: d.hp, max: d.hp, state: 'idle', home: { x, y }, sect: 0, ward: 0 }); }
 /* __SF is a development and test hook (the browser suites drive the game through it). It is not a security boundary: anything
    here is reachable from the console in an offline single-player game, and a multiplayer server must not trust the client. */
-window.__SF = { get LAW() { return LAW; }, LAWF, LAW_WITNESS, lawAggress, lawCrime, lawWitness, lawDowned, lawReport, lawRefuses, lawGuardTarget, lawRegion, notoOf, notoColor, lawSave, lawLoad, toggleArm, attackTick, FRAME_ERR, SHRINES, los, NPCF, NPC_FIGHT, NPC_DOWN_TIME, npcArm, damageNpc, npcEngage, npcCombatant, npcUp, npcSave, ecoTargetable, readSave, validateSave, get WS() { return WS; }, dist, closePanel, lifeSave, LIFE, LIFE_SCHED, lifeTick, lifeResume, lifeInspect, lifeTownGeo, lifeTalk, talk, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
+window.__SF = { ADV, npcUp, advTick, advThink, advDamaged, advDies, advResurrect, advCast, advSave, advLoad, advInspect, advDev, advPickGround, advTalk, advLooted, advById, advChoice: advSpellChoice, get LAW() { return LAW; }, LAWF, LAW_WITNESS, lawAggress, lawCrime, lawWitness, lawDowned, lawReport, lawRefuses, lawGuardTarget, lawRegion, notoOf, notoColor, lawSave, lawLoad, toggleArm, attackTick, FRAME_ERR, SHRINES, los, NPCF, NPC_FIGHT, NPC_DOWN_TIME, npcArm, damageNpc, npcEngage, npcCombatant, npcUp, npcSave, ecoTargetable, readSave, validateSave, get WS() { return WS; }, dist, closePanel, lifeSave, LIFE, LIFE_SCHED, lifeTick, lifeResume, lifeInspect, lifeTownGeo, lifeTalk, talk, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
 Object.assign(window.__SF, { TIER, tierStep, tierBusy, tierInspect, tierMeasure, ECO_POP, ecoRestore, ecoSpawnKeys, ecoLoad });   // Living World phase 6 (src/tiers.js, src/ecology.js)
 Object.defineProperties(window.__SF, { PICKT: { get: () => PICKT }, TRACKS: { get: () => TRACKS }, TRACKUI: { get: () => TRACKUI } });   // live views (Object.assign would copy a getter's value)
 Object.assign(window.__SF, { skillCheck, skillUse, noteLearn, SKUI, SKLOG, useAbility, ABIL, TASKS, pickTap, tameStart, loreUse, vetStart, feedPet, peaceUse, enticeUse, provokeStart, provokeUse, stealStart, npcPack, poisonApply, lockUse, untrapUse, stealthUse, hide, finishHide, reveal, trackStart, trackFollow, magicStrike, petLoyaltyTick, petCommand, evalUse, meditate, playMusic, tamedPets, chestTrapRoll, itemSkill, eat, CHESTS, cdLeft, onPlayerMoved, begUse, campUse, lightKindling, makeCamp, forensicUse, herdPick, herdUse, snoopUse, spiritUse, digUse, treasureUp, newTreasureMap, magicLoot, CAMPS, ITEM_SKILL, ghostSpeech, killMon, MG: SF.MAGERY });

@@ -38,7 +38,7 @@ function tierStep(e, dt) {
   else if (tierBusy(e)) { t = 'A'; TIER.counts.busy++; }
   else {
     t = SIM.tierOf(Math.hypot(e.x - P.x, e.y - P.y), e.tier, TIER.radii);
-    if (t === 'C' && (e.archetype === 'guard' || (typeof LIFE !== 'undefined' && LIFE.trader === e))) t = 'B';
+    if (t === 'C' && (e.archetype === 'guard' || e.archetype === 'adventurer' || (typeof LIFE !== 'undefined' && LIFE.trader === e))) t = 'B';
   }
   const prev = e.tier; e.tier = t; TIER.counts[t]++;
   if (prev === 'C' && t !== 'C') tierWake(e);

@@ -41,7 +41,7 @@ with sync_playwright() as p:
   r = J(pg, """() => { const S = __SF, P = S.P; __T.run(40); const R = S.TIER.radii, live = S.ents.filter(e => !e.gone && e.kind !== 'corpse' && e !== P);
     const d = e => Math.hypot(e.x - P.x, e.y - P.y); let wrongA = 0, wrongC = 0, guardC = 0;
     for (const e of live) { if (!e.tier) continue; const busy = S.tierBusy(e) || ['pet', 'summon', 'hireling'].includes(e.archetype) || e.quest;
-      if (d(e) < R.a - 1 && e.tier !== 'A') wrongA++; if (!busy && d(e) > R.b + 7 && e.tier !== 'C' && e.archetype !== 'guard' && e !== S.LIFE.trader) wrongC++; if (e.archetype === 'guard' && e.tier === 'C') guardC++; }
+      if (d(e) < R.a - 1 && e.tier !== 'A') wrongA++; if (!busy && d(e) > R.b + 7 && e.tier !== 'C' && e.archetype !== 'guard' && e.archetype !== 'adventurer' && e !== S.LIFE.trader) wrongC++; if (e.archetype === 'guard' && e.tier === 'C') guardC++; }
     return { R, view: S.TIER.view, last: S.TIER.last, wrongA, wrongC, guardC, wren: S.allyOf().tier, trader: S.LIFE.trader && S.LIFE.trader.tier, total: live.length }; }""")
   check(r['wrongA'] == 0 and r['wrongC'] == 0, f"tiers by distance: local {r['last']['A']}, regional {r['last']['B']}, distant {r['last']['C']} (A ≤ {r['R']['a']:.0f} m, B ≤ {r['R']['b']:.0f} m)", r)
   check(r['R']['a'] >= r['view'] + 8 and r['R']['a'] >= 40 and r['R']['b'] >= r['R']['a'] + 60, f"radius A covers the whole screen ({r['view']:.1f} m to the farthest corner) plus a margin", r)

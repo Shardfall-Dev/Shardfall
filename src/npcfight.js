@@ -44,10 +44,11 @@ function npcArm(e) {
   e.eqMig = SF.EQ.MIGRATION; e.max = Math.round(SF.maxHp(e) * F.hp); e.hp = e.max; e.stam = e.dex; e.sw = SF.newSwing(); e.downed = false; e.downAt = 0; e.foe = null;
 }
 const npcCombatant = e => !!e && e.kind === 'npc' && !!e.npcFight;
-const npcUp = e => npcCombatant(e) && !e.gone && !e.downed;
+const npcUp = e => npcCombatant(e) && !e.gone && !e.downed && !e.ghost;   // ghost: a dead NPC adventurer (v0.36)
 
 /* ---------- taking a blow (damageActor routes every NPC here) ---------- */
 function damageNpc(e, amt, kind, src, hx) {
+  if (e.adv) return advDamaged(e, amt, kind, src, hx);   // NPC adventurers take blows, fight back and die by the player's rules (src/adventurers.js)
   if (!npcUp(e) || !(amt > 0)) return;
   if (src && lawSide(src)) lawAggress(src, e);   // the law (src/law.js): the swing already recorded it; this catches every other path
   e.hp -= amt; e.lastHit = GT; e.lastCombat = GT; NPCF.hitsTaken++;
@@ -68,6 +69,7 @@ function damageNpc(e, amt, kind, src, hx) {
 /* a townsperson under attack runs for shelter at once and remembers why */
 function npcFlee(e, src, what) {
   const L = e.life; if (!L) return; SIM.frighten(L.needs, 1); L.needs.safety = 1; const who = src === P ? P.name : 'a ' + src.name;
+  if (what === 'looting') what = 'theft';   // a looted body is theft to the onlookers (v0.36)
   if (L.prof === 'trader') { L.hurry = true; L.mind.why = (what === 'theft' ? 'robbed by ' : 'attacked by ') + who + ' on the road'; }
   else { L.mind.act = null; L.thinkAt = 0; L.goal = null; }
   if (what !== 'theft' && !L.mem.knows('attacked by', aidOf(src))) L.mem.note(GT, 'attacked by', aidOf(src), { x: Math.round(e.x), y: Math.round(e.y) }, 300);
