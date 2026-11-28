@@ -21,6 +21,7 @@ export interface Config {
   trustProxy: boolean | string;
   logLevel: string;
   rateLimit: { globalPerMin: number; authPerMin: number };
+  viewRadius: number;
 }
 
 export function findRepoRoot(from = __dirname): string {
@@ -71,6 +72,7 @@ export function loadConfig(e: NodeJS.ProcessEnv = process.env): Config {
     serveGame: bool(e.SERVE_GAME, true), repoRoot: findRepoRoot(),
     trustProxy: e.TRUST_PROXY ? (/^(1|true)$/i.test(e.TRUST_PROXY) ? true : e.TRUST_PROXY) : false,
     logLevel: e.LOG_LEVEL || (env === 'test' ? 'warn' : 'info'),
+    viewRadius: num(e.WORLD_VIEW_RADIUS, 40, 2, 200, 'WORLD_VIEW_RADIUS'),
     rateLimit: { globalPerMin: num(e.RATE_LIMIT_PER_MINUTE, 300, 10, 100000, 'RATE_LIMIT_PER_MINUTE'), authPerMin: num(e.AUTH_RATE_LIMIT_PER_MINUTE, 10, 1, 10000, 'AUTH_RATE_LIMIT_PER_MINUTE') },
   };
 }

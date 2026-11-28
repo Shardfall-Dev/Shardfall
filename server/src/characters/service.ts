@@ -21,6 +21,7 @@ export function publicCharacter(r: any, rules: RulesApi, items?: any[]) {
 
 export class Characters {
   constructor(private db: Db, private rules: RulesApi, private purgeDays: number) {}
+  get SF() { return this.rules.SF; }
 
   async realmFor(realmId: string) {
     const r = await this.db.query('select id, name, status, max_characters_per_account from game.realms where id = $1', [realmId]);
@@ -119,6 +120,20 @@ export class Characters {
       await audit(c, accountId, 'character.restored', { characterId: id });
       return { ok: true };
     });
+  }
+
+  /* save where characters are (the world loop's dirty list): one statement for the batch, live characters only */
+  async savePositions(list: { id: string; x: number; y: number; sect: number; town: string; stam: number }[]) {
+    if (!list.length) return 0;
+    const r = await this.db.query(`update game.characters c set position = v.position, stam = v.stam, updated_at = now(), state_version = c.state_version + 1
+      from (select unnest($1::uuid[]) as id, unnest($2::jsonb[]) as position, unnest($3::int[]) as stam) v where c.id = v.id and c.deleted_at is null`,
+      [list.map(a => a.id), list.map(a => JSON.stringify({ map: 'anniabreen', town: a.town, x: Math.round(a.x * 1000) / 1000, y: Math.round(a.y * 1000) / 1000, sect: a.sect })), list.map(a => Math.max(0, Math.round(a.stam)))]);
+    return r.rowCount || 0;
+  }
+  /* a rules-shaped character from a snapshot (for stamina, carrying weight and armour speed) */
+  rulesCharacter(snap: any) {
+    return this.rules.characterFromRows({ name: snap.name, str: snap.stats.str, dex: snap.stats.dex, int: snap.stats.int, skills: snap.skills, stat_locks: snap.statLocks, appearance: snap.appearance },
+      (snap.items || []).map((i: any) => ({ id: i.id, container: i.container, slot: i.slot, item_def: i.itemDef, qty: i.qty, props: i.props })));
   }
 
   async markPlayed(id: string) { await this.db.query('update game.characters set last_played_at = now() where id = $1', [id]); }

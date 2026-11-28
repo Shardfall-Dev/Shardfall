@@ -10,6 +10,7 @@ COPY build.sh ./
 COPY src ./src
 COPY shared ./shared
 COPY server/src ./server/src
+COPY server/data ./server/data
 COPY supabase ./supabase
 COPY assets/audio/web ./assets/audio/web
 COPY assets/music ./assets/music
