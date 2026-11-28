@@ -121,4 +121,22 @@ function makeApi(SF) {
     itemName: id => (SF.ITEMS[id] ? SF.itemName({ id }) : id), townName: id => (CR.TOWN[id] ? CR.TOWN[id].n : id), title: ch => CR.title(ch) };
 }
 
-module.exports = { load };
+/* loadSim() — the world simulation core (src/world.js, SIM): pure, no DOM, no timers, no Math.random. The server uses its world
+   clock, light, factions, perception and seeded random streams for the creatures (Server Creatures v1), so a creature online
+   reads the time of day, sees and decides by the same rules as offline. */
+let simCached = null;
+function loadSim(srcDir) {
+  if (simCached && !srcDir) return simCached;
+  const raw = fs.readFileSync(path.join(srcDir || SRC, 'world.js'), 'utf8');
+  const code = raw.replace(/^\s*<script>\s*/, '').replace(/<\/script>\s*$/, '');
+  const mod = { exports: {} };
+  const ctx = vm.createContext({ console, Math, JSON, Object, Array, Number, String, Set, Map, WeakMap, Symbol, Error, TypeError, RangeError, Uint32Array, Int32Array, Float64Array, module: mod });
+  ctx.globalThis = ctx;
+  vm.runInContext(code, ctx, { filename: 'src/world.js' });
+  const SIM = mod.exports;
+  for (const k of ['newClock', 'lightAt', 'activityOf', 'senseRange', 'detect', 'newFactions', 'FACTION_RULES', 'stream']) if (!SIM[k]) throw new Error('src/world.js: SIM.' + k + ' missing');
+  if (!srcDir) simCached = SIM;
+  return SIM;
+}
+
+module.exports = { load, loadSim };

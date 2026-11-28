@@ -45,12 +45,14 @@ const LIMITS = { avgStepMs: +(process.env.MAX_AVG_STEP_MS || 15), overrunShare: 
     avgStepMs: +((st.totalStepMs - base.totalStepMs) / ticks).toFixed(3), maxStepMs: +st.maxStepMs.toFixed(2), overruns: st.overruns - base.overruns,
     inputsApplied: st.inputsApplied - base.inputsApplied, inputsDropped: st.inputsDropped - base.inputsDropped,
     statesPerBotPerSecond: +(bots.reduce((a, b) => a + b.states, 0) / N / el).toFixed(1), kBPerBotPerSecond: +(bots.reduce((a, b) => a + b.bytes, 0) / N / el / 1024).toFixed(1),
-    avgVisibleEnters: +(bots.reduce((a, b) => a + b.enters, 0) / N).toFixed(1), memoryMB: Math.round(process.memoryUsage().rss / 1048576) };
+    avgVisibleEnters: +(bots.reduce((a, b) => a + b.enters, 0) / N).toFixed(1), creatures: st.creatures, creaturesActive: st.creaturesActive,
+    avgCreatureMs: +((st.creatureMs - base.creatureMs) / ticks).toFixed(3), memoryMB: Math.round(process.memoryUsage().rss / 1048576) };
   console.log(JSON.stringify(out, null, 2));
   for (const b of bots) b.ws.close();
   await srv.close();
   const fails: string[] = [];
   if (out.welcomed < N) fails.push(`${N - out.welcomed} bots never got a welcome`);
+  if (out.creatures < 300) fails.push(`only ${out.creatures} creatures in the world`);
   if (out.avgStepMs > LIMITS.avgStepMs) fails.push(`average tick ${out.avgStepMs} ms > ${LIMITS.avgStepMs} ms`);
   if (out.overruns > ticks * LIMITS.overrunShare) fails.push(`${out.overruns} of ${ticks} ticks overran 50 ms`);
   const expected = N * 20 * el; if (out.inputsApplied < expected * 0.9) fails.push(`only ${out.inputsApplied} of about ${Math.round(expected)} intents applied`);

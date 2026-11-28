@@ -1,0 +1,4438 @@
+{
+ "format": 1,
+ "build": "0.41",
+ "world": "e85b4bb5",
+ "groundSha256": "c793e39ee532ae76cee5a6b3b41718545edad47db94e4d75b61e6feea2ca2a59",
+ "sightBlock": [
+  3,
+  7,
+  10,
+  24,
+  32
+ ],
+ "species": {
+  "bandit": {
+   "n": "road bandit",
+   "size": 1,
+   "hp": 60,
+   "speed": 4.2,
+   "aggro": 7,
+   "leash": 22,
+   "reach": 1.3,
+   "f": "criminals",
+   "hours": "always",
+   "temper": "hostile",
+   "hear": 8,
+   "terr": 14,
+   "social": "camp",
+   "grp": [
+    2,
+    2
+   ],
+   "resp": 120,
+   "cour": 0.5,
+   "nv": 0.3,
+   "flee": 0.3
+  },
+  "bear": {
+   "n": "brown bear",
+   "size": 1.45,
+   "hp": 120,
+   "speed": 4.3,
+   "aggro": 6,
+   "leash": 22,
+   "reach": 1.5,
+   "f": "wildlife",
+   "hours": "day",
+   "temper": "territorial",
+   "hear": 8,
+   "terr": 30,
+   "social": "solo",
+   "grp": [
+    1,
+    1
+   ],
+   "resp": 300,
+   "cour": 0.85,
+   "nv": 0.5,
+   "flee": 0.15
+  },
+  "boar": {
+   "n": "reed boar",
+   "size": 1.15,
+   "hp": 55,
+   "speed": 4.5,
+   "aggro": 4.5,
+   "leash": 20,
+   "reach": 1.4,
+   "f": "wildlife",
+   "hours": "day",
+   "temper": "territorial",
+   "hear": 6,
+   "terr": 16,
+   "social": "solo",
+   "grp": [
+    1,
+    1
+   ],
+   "resp": 60,
+   "cour": 0.75,
+   "nv": 0.3
+  },
+  "deer": {
+   "n": "red deer",
+   "size": 1.1,
+   "hp": 34,
+   "speed": 5.4,
+   "aggro": 12,
+   "leash": 34,
+   "reach": 1.2,
+   "f": "wildlife",
+   "hours": "day",
+   "temper": "timid",
+   "hear": 12,
+   "terr": 26,
+   "flight": 10,
+   "social": "herd",
+   "grp": [
+    2,
+    4
+   ],
+   "resp": 90,
+   "cour": 0.08,
+   "nv": 0.4
+  },
+  "dire_wolf": {
+   "n": "dire wolf",
+   "size": 1.05,
+   "hp": 70,
+   "speed": 4.8,
+   "aggro": 10,
+   "leash": 26,
+   "reach": 1.3,
+   "f": "predators",
+   "hours": "dusk",
+   "temper": "hostile",
+   "hear": 14,
+   "terr": 40,
+   "social": "pack",
+   "grp": [
+    2,
+    3
+   ],
+   "resp": 180,
+   "cour": 0.65,
+   "nv": 0.9,
+   "flee": 0.2
+  },
+  "earth_elemental": {
+   "n": "earth elemental",
+   "size": 1.5,
+   "hp": 220,
+   "speed": 2.6,
+   "aggro": 6,
+   "leash": 14,
+   "reach": 1.6,
+   "f": "elementals",
+   "hours": "always",
+   "temper": "hostile",
+   "hear": 6,
+   "terr": 10,
+   "social": "solo",
+   "grp": [
+    1,
+    1
+   ],
+   "resp": 360,
+   "cour": 1,
+   "nv": 1
+  },
+  "ettin": {
+   "n": "ettin",
+   "size": 1.5,
+   "hp": 190,
+   "speed": 3.4,
+   "aggro": 7,
+   "leash": 18,
+   "reach": 1.7,
+   "f": "giants",
+   "hours": "always",
+   "temper": "territorial",
+   "hear": 8,
+   "terr": 18,
+   "social": "solo",
+   "grp": [
+    1,
+    1
+   ],
+   "resp": 360,
+   "cour": 0.95,
+   "nv": 0.6
+  },
+  "gargoyle": {
+   "n": "gargoyle",
+   "size": 1.2,
+   "hp": 110,
+   "speed": 3.8,
+   "aggro": 8,
+   "leash": 18,
+   "reach": 1.4,
+   "f": "constructs",
+   "hours": "always",
+   "temper": "hostile",
+   "hear": 8,
+   "terr": 10,
+   "social": "camp",
+   "grp": [
+    1,
+    1
+   ],
+   "resp": 300,
+   "cour": 1,
+   "nv": 1
+  },
+  "giant_spider": {
+   "n": "giant spider",
+   "size": 1.2,
+   "hp": 75,
+   "speed": 4.2,
+   "aggro": 7,
+   "leash": 20,
+   "reach": 1.3,
+   "f": "arachnids",
+   "hours": "night",
+   "temper": "hostile",
+   "hear": 8,
+   "terr": 22,
+   "social": "camp",
+   "grp": [
+    1,
+    2
+   ],
+   "resp": 150,
+   "cour": 0.7,
+   "nv": 1
+  },
+  "hare": {
+   "n": "brown hare",
+   "size": 0.55,
+   "hp": 8,
+   "speed": 5.8,
+   "aggro": 9,
+   "leash": 24,
+   "reach": 1,
+   "f": "wildlife",
+   "hours": "day",
+   "temper": "timid",
+   "hear": 9,
+   "terr": 14,
+   "flight": 7,
+   "social": "solo",
+   "grp": [
+    1,
+    2
+   ],
+   "resp": 50,
+   "cour": 0.02,
+   "nv": 0.3
+  },
+  "harpy": {
+   "n": "harpy",
+   "size": 1.05,
+   "hp": 65,
+   "speed": 4.8,
+   "aggro": 9,
+   "leash": 24,
+   "reach": 1.3,
+   "f": "harpies",
+   "hours": "day",
+   "temper": "hostile",
+   "hear": 10,
+   "terr": 22,
+   "social": "camp",
+   "grp": [
+    2,
+    2
+   ],
+   "resp": 150,
+   "cour": 0.6,
+   "nv": 0.4
+  },
+  "hound": {
+   "n": "marsh hound",
+   "size": 1,
+   "hp": 46,
+   "speed": 4.6,
+   "aggro": 9,
+   "leash": 26,
+   "reach": 1.3,
+   "f": "predators",
+   "hours": "dusk",
+   "temper": "hostile",
+   "hear": 12,
+   "terr": 24,
+   "social": "pack",
+   "grp": [
+    2,
+    3
+   ],
+   "resp": 70,
+   "cour": 0.6,
+   "nv": 0.85,
+   "flee": 0.2
+  },
+  "lizardman": {
+   "n": "lizardman",
+   "size": 1,
+   "hp": 75,
+   "speed": 4.3,
+   "aggro": 8,
+   "leash": 22,
+   "reach": 1.6,
+   "f": "lizardfolk",
+   "hours": "always",
+   "temper": "hostile",
+   "hear": 9,
+   "terr": 18,
+   "social": "camp",
+   "grp": [
+    2,
+    2
+   ],
+   "resp": 150,
+   "cour": 0.7,
+   "nv": 0.7
+  },
+  "orc": {
+   "n": "orc",
+   "size": 1.05,
+   "hp": 80,
+   "speed": 4,
+   "aggro": 8,
+   "leash": 22,
+   "reach": 1.4,
+   "f": "orcs",
+   "hours": "always",
+   "temper": "hostile",
+   "hear": 10,
+   "terr": 18,
+   "social": "camp",
+   "grp": [
+    2,
+    2
+   ],
+   "resp": 150,
+   "cour": 0.75,
+   "nv": 0.6
+  },
+  "rat": {
+   "n": "dock rat",
+   "size": 0.7,
+   "hp": 20,
+   "speed": 3.6,
+   "aggro": 6,
+   "leash": 16,
+   "reach": 1.15,
+   "f": "vermin",
+   "hours": "night",
+   "temper": "hostile",
+   "hear": 5,
+   "terr": 8,
+   "social": "swarm",
+   "grp": [
+    1,
+    3
+   ],
+   "resp": 40,
+   "cour": 0.3,
+   "nv": 0.8
+  },
+  "skeleton": {
+   "n": "drowned skeleton",
+   "size": 1,
+   "hp": 55,
+   "speed": 3.6,
+   "aggro": 7,
+   "leash": 18,
+   "reach": 1.3,
+   "f": "undead",
+   "hours": "night",
+   "temper": "hostile",
+   "hear": 6,
+   "terr": 14,
+   "social": "swarm",
+   "grp": [
+    1,
+    2
+   ],
+   "resp": 90,
+   "cour": 1,
+   "nv": 1,
+   "night": true
+  },
+  "slime": {
+   "n": "bog slime",
+   "size": 0.8,
+   "hp": 35,
+   "speed": 2.2,
+   "aggro": 5,
+   "leash": 14,
+   "reach": 1.1,
+   "f": "oozes",
+   "hours": "always",
+   "temper": "hostile",
+   "hear": 3,
+   "terr": 10,
+   "social": "solo",
+   "grp": [
+    1,
+    2
+   ],
+   "resp": 90,
+   "cour": 1,
+   "nv": 1
+  },
+  "smuggler": {
+   "n": "brine smuggler",
+   "size": 1,
+   "hp": 60,
+   "speed": 4.2,
+   "aggro": 7,
+   "leash": 22,
+   "reach": 1.3,
+   "f": "criminals",
+   "hours": "always",
+   "temper": "hostile",
+   "hear": 8,
+   "terr": 12,
+   "social": "camp",
+   "grp": [
+    1,
+    2
+   ],
+   "resp": 120,
+   "cour": 0.6,
+   "nv": 0.3
+  },
+  "snapper": {
+   "n": "mud snapper",
+   "size": 1.05,
+   "hp": 60,
+   "speed": 2.8,
+   "aggro": 4,
+   "leash": 14,
+   "reach": 1.2,
+   "f": "wildlife",
+   "hours": "always",
+   "temper": "territorial",
+   "hear": 4,
+   "terr": 10,
+   "social": "solo",
+   "grp": [
+    1,
+    1
+   ],
+   "resp": 70,
+   "cour": 0.8,
+   "nv": 0.5
+  },
+  "spider": {
+   "n": "mire spider",
+   "size": 0.95,
+   "hp": 40,
+   "speed": 4.3,
+   "aggro": 7,
+   "leash": 20,
+   "reach": 1.2,
+   "f": "arachnids",
+   "hours": "night",
+   "temper": "hostile",
+   "hear": 6,
+   "terr": 14,
+   "social": "solo",
+   "grp": [
+    1,
+    2
+   ],
+   "resp": 70,
+   "cour": 0.6,
+   "nv": 1
+  },
+  "troll": {
+   "n": "troll",
+   "size": 1.4,
+   "hp": 160,
+   "speed": 3.6,
+   "aggro": 7,
+   "leash": 18,
+   "reach": 1.6,
+   "f": "giants",
+   "hours": "always",
+   "temper": "territorial",
+   "hear": 8,
+   "terr": 18,
+   "social": "solo",
+   "grp": [
+    1,
+    1
+   ],
+   "resp": 300,
+   "cour": 0.9,
+   "nv": 0.6
+  },
+  "wisp": {
+   "n": "ash wisp",
+   "size": 0.8,
+   "hp": 30,
+   "speed": 3.4,
+   "aggro": 9,
+   "leash": 18,
+   "reach": 7,
+   "f": "elementals",
+   "hours": "night",
+   "temper": "hostile",
+   "hear": 6,
+   "terr": 14,
+   "social": "solo",
+   "grp": [
+    1,
+    1
+   ],
+   "resp": 80,
+   "cour": 0.9,
+   "nv": 1
+  }
+ },
+ "spawners": [
+  {
+   "key": "rat@80,246",
+   "type": "rat",
+   "x": 80,
+   "y": 246,
+   "r": 18,
+   "max": 5,
+   "region": "wild:0,1"
+  },
+  {
+   "key": "rat@80,356",
+   "type": "rat",
+   "x": 80,
+   "y": 356,
+   "r": 18,
+   "max": 5,
+   "region": "wild:0,2"
+  },
+  {
+   "key": "rat@150,300",
+   "type": "rat",
+   "x": 150,
+   "y": 300,
+   "r": 16,
+   "max": 4,
+   "region": "wild:1,2"
+  },
+  {
+   "key": "boar@215,300",
+   "type": "boar",
+   "x": 215,
+   "y": 300,
+   "r": 42,
+   "max": 9,
+   "region": "wild:1,2"
+  },
+  {
+   "key": "boar@290,250",
+   "type": "boar",
+   "x": 290,
+   "y": 250,
+   "r": 40,
+   "max": 7,
+   "region": "wild:1,1"
+  },
+  {
+   "key": "boar@300,350",
+   "type": "boar",
+   "x": 300,
+   "y": 350,
+   "r": 36,
+   "max": 6,
+   "region": "wild:2,2"
+  },
+  {
+   "key": "snapper@455,345",
+   "type": "snapper",
+   "x": 455,
+   "y": 345,
+   "r": 26,
+   "max": 5,
+   "region": "wild:3,2"
+  },
+  {
+   "key": "spider@505,255",
+   "type": "spider",
+   "x": 505,
+   "y": 255,
+   "r": 26,
+   "max": 5,
+   "region": "wild:3,1"
+  },
+  {
+   "key": "wisp@440,300",
+   "type": "wisp",
+   "x": 440,
+   "y": 300,
+   "r": 30,
+   "max": 4,
+   "region": "wild:2,2"
+  },
+  {
+   "key": "smuggler@232,284",
+   "type": "smuggler",
+   "x": 232,
+   "y": 284,
+   "r": 7,
+   "max": 2,
+   "region": "wild:1,1"
+  },
+  {
+   "key": "smuggler@318,308",
+   "type": "smuggler",
+   "x": 318,
+   "y": 308,
+   "r": 7,
+   "max": 2,
+   "region": "wild:2,2"
+  },
+  {
+   "key": "smuggler@395,282",
+   "type": "smuggler",
+   "x": 395,
+   "y": 282,
+   "r": 7,
+   "max": 2,
+   "region": "wild:2,1"
+  },
+  {
+   "key": "hound@420,330",
+   "type": "hound",
+   "x": 420,
+   "y": 330,
+   "r": 34,
+   "max": 7,
+   "pack": 2,
+   "region": "wild:2,2"
+  },
+  {
+   "key": "hound@440,250",
+   "type": "hound",
+   "x": 440,
+   "y": 250,
+   "r": 34,
+   "max": 7,
+   "pack": 2,
+   "region": "wild:2,1"
+  },
+  {
+   "key": "hound@520,320",
+   "type": "hound",
+   "x": 520,
+   "y": 320,
+   "r": 30,
+   "max": 5,
+   "pack": 3,
+   "region": "wild:3,2"
+  },
+  {
+   "key": "skeleton@540,330",
+   "type": "skeleton",
+   "x": 540,
+   "y": 330,
+   "r": 11,
+   "max": 3,
+   "nightMax": 5,
+   "region": "graves:540,330"
+  },
+  {
+   "key": "boar@1127,827",
+   "type": "boar",
+   "x": 1126.516,
+   "y": 827.243,
+   "r": 54,
+   "max": 6,
+   "region": "wild:7,5"
+  },
+  {
+   "key": "boar@1100,650",
+   "type": "boar",
+   "x": 1099.694,
+   "y": 650.107,
+   "r": 59,
+   "max": 5,
+   "region": "wild:7,4"
+  },
+  {
+   "key": "rat@962,937",
+   "type": "rat",
+   "x": 961.533,
+   "y": 936.829,
+   "r": 19,
+   "max": 4,
+   "region": "wild:6,6"
+  },
+  {
+   "key": "skeleton@1278,937",
+   "type": "skeleton",
+   "x": 1278.134,
+   "y": 936.895,
+   "r": 12,
+   "max": 2,
+   "nightMax": 3,
+   "region": "graves:1278,937"
+  },
+  {
+   "key": "hound@1590,228",
+   "type": "hound",
+   "x": 1590.373,
+   "y": 228.409,
+   "r": 54,
+   "max": 4,
+   "pack": 2,
+   "region": "wild:10,1"
+  },
+  {
+   "key": "snapper@1748,839",
+   "type": "snapper",
+   "x": 1747.884,
+   "y": 839.279,
+   "r": 30,
+   "max": 3,
+   "region": "wild:11,5"
+  },
+  {
+   "key": "spider@2423,643",
+   "type": "spider",
+   "x": 2423,
+   "y": 643,
+   "r": 24,
+   "max": 3,
+   "region": "wild:16,4"
+  },
+  {
+   "key": "rat@1823,859",
+   "type": "rat",
+   "x": 1823.124,
+   "y": 859.025,
+   "r": 16,
+   "max": 3,
+   "region": "wild:12,5"
+  },
+  {
+   "key": "bandit@1070,801",
+   "type": "bandit",
+   "x": 1069.5,
+   "y": 800.5,
+   "r": 12,
+   "max": 5,
+   "pack": 2,
+   "region": "camp:cutpurse",
+   "camp": "cutpurse"
+  },
+  {
+   "key": "dire_wolf@1193,367",
+   "type": "dire_wolf",
+   "x": 1192.5,
+   "y": 366.5,
+   "r": 12,
+   "max": 5,
+   "pack": 2,
+   "region": "camp:greywolf",
+   "camp": "greywolf"
+  },
+  {
+   "key": "giant_spider@1875,381",
+   "type": "giant_spider",
+   "x": 1874.5,
+   "y": 380.5,
+   "r": 12,
+   "max": 3,
+   "region": "camp:silkwood",
+   "camp": "silkwood"
+  },
+  {
+   "key": "troll@1079,294",
+   "type": "troll",
+   "x": 1078.5,
+   "y": 293.5,
+   "r": 12,
+   "max": 2,
+   "region": "camp:trollgate",
+   "camp": "trollgate"
+  },
+  {
+   "key": "ettin@1079,294",
+   "type": "ettin",
+   "x": 1078.5,
+   "y": 293.5,
+   "r": 12,
+   "max": 1,
+   "region": "camp:trollgate",
+   "camp": "trollgate"
+  },
+  {
+   "key": "harpy@2488,744",
+   "type": "harpy",
+   "x": 2487.5,
+   "y": 743.5,
+   "r": 12,
+   "max": 4,
+   "pack": 2,
+   "region": "camp:harpyroost",
+   "camp": "harpyroost"
+  },
+  {
+   "key": "orc@1821,1363",
+   "type": "orc",
+   "x": 1820.5,
+   "y": 1362.5,
+   "r": 12,
+   "max": 6,
+   "pack": 2,
+   "region": "camp:kragmaw",
+   "camp": "kragmaw"
+  },
+  {
+   "key": "lizardman@906,1319",
+   "type": "lizardman",
+   "x": 905.5,
+   "y": 1318.5,
+   "r": 12,
+   "max": 5,
+   "pack": 2,
+   "region": "camp:scalemire",
+   "camp": "scalemire"
+  },
+  {
+   "key": "slime@906,1319",
+   "type": "slime",
+   "x": 905.5,
+   "y": 1318.5,
+   "r": 12,
+   "max": 4,
+   "region": "camp:scalemire",
+   "camp": "scalemire"
+  },
+  {
+   "key": "skeleton@1351,1416",
+   "type": "skeleton",
+   "x": 1350.5,
+   "y": 1415.5,
+   "r": 12,
+   "max": 6,
+   "nightMax": 9,
+   "pack": 2,
+   "region": "camp:barrows",
+   "camp": "barrows"
+  },
+  {
+   "key": "earth_elemental@1702,261",
+   "type": "earth_elemental",
+   "x": 1701.5,
+   "y": 260.5,
+   "r": 7,
+   "max": 1,
+   "region": "camp:hollowdeep",
+   "camp": "hollowdeep"
+  },
+  {
+   "key": "gargoyle@1986,1207",
+   "type": "gargoyle",
+   "x": 1985.5,
+   "y": 1206.5,
+   "r": 7,
+   "max": 2,
+   "region": "camp:wyrmhold",
+   "camp": "wyrmhold"
+  },
+  {
+   "key": "deer@242,134",
+   "type": "deer",
+   "x": 241.5,
+   "y": 133.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:1,0"
+  },
+  {
+   "key": "hare@272,98",
+   "type": "hare",
+   "x": 271.5,
+   "y": 97.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:1,0"
+  },
+  {
+   "key": "boar@206,149",
+   "type": "boar",
+   "x": 205.5,
+   "y": 148.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:1,0"
+  },
+  {
+   "key": "hare@326,119",
+   "type": "hare",
+   "x": 325.5,
+   "y": 118.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:2,0"
+  },
+  {
+   "key": "deer@356,122",
+   "type": "deer",
+   "x": 355.5,
+   "y": 121.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:2,0"
+  },
+  {
+   "key": "deer@119,227",
+   "type": "deer",
+   "x": 118.5,
+   "y": 226.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:0,1"
+  },
+  {
+   "key": "hare@107,164",
+   "type": "hare",
+   "x": 106.5,
+   "y": 163.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:0,1"
+  },
+  {
+   "key": "boar@143,233",
+   "type": "boar",
+   "x": 142.5,
+   "y": 232.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:0,1"
+  },
+  {
+   "key": "deer@230,191",
+   "type": "deer",
+   "x": 229.5,
+   "y": 190.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:1,1"
+  },
+  {
+   "key": "hare@230,260",
+   "type": "hare",
+   "x": 229.5,
+   "y": 259.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:1,1"
+  },
+  {
+   "key": "boar@203,224",
+   "type": "boar",
+   "x": 202.5,
+   "y": 223.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:1,1"
+  },
+  {
+   "key": "hare@421,248",
+   "type": "hare",
+   "x": 420.5,
+   "y": 247.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:2,1"
+  },
+  {
+   "key": "hare@474,203",
+   "type": "hare",
+   "x": 473.5,
+   "y": 202.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:3,1"
+  },
+  {
+   "key": "bear@1009,233",
+   "type": "bear",
+   "x": 1008.5,
+   "y": 232.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:6,1"
+  },
+  {
+   "key": "bear@1009,233#2",
+   "type": "bear",
+   "x": 1008.5,
+   "y": 232.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:6,1"
+  },
+  {
+   "key": "hare@1009,233",
+   "type": "hare",
+   "x": 1008.5,
+   "y": 232.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:6,1"
+  },
+  {
+   "key": "hare@1011,185",
+   "type": "hare",
+   "x": 1010.5,
+   "y": 184.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:6,1"
+  },
+  {
+   "key": "bear@1190,169",
+   "type": "bear",
+   "x": 1189.5,
+   "y": 168.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:7,1"
+  },
+  {
+   "key": "bear@1147,179",
+   "type": "bear",
+   "x": 1146.5,
+   "y": 178.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:7,1"
+  },
+  {
+   "key": "dire_wolf@1074,206",
+   "type": "dire_wolf",
+   "x": 1073.5,
+   "y": 205.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:7,1"
+  },
+  {
+   "key": "dire_wolf@1092,188",
+   "type": "dire_wolf",
+   "x": 1091.5,
+   "y": 187.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:7,1"
+  },
+  {
+   "key": "hare@1278,164",
+   "type": "hare",
+   "x": 1277.5,
+   "y": 163.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:8,1"
+  },
+  {
+   "key": "hare@1267,194",
+   "type": "hare",
+   "x": 1266.5,
+   "y": 193.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:8,1"
+  },
+  {
+   "key": "hound@1318,248",
+   "type": "hound",
+   "x": 1317.5,
+   "y": 247.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:8,1"
+  },
+  {
+   "key": "hound@1255,158",
+   "type": "hound",
+   "x": 1254.5,
+   "y": 157.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:8,1"
+  },
+  {
+   "key": "hare@1398,278",
+   "type": "hare",
+   "x": 1397.5,
+   "y": 277.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:9,1"
+  },
+  {
+   "key": "hare@1386,227",
+   "type": "hare",
+   "x": 1385.5,
+   "y": 226.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:9,1"
+  },
+  {
+   "key": "hound@1357,254",
+   "type": "hound",
+   "x": 1356.5,
+   "y": 253.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:9,1"
+  },
+  {
+   "key": "hound@1425,233",
+   "type": "hound",
+   "x": 1424.5,
+   "y": 232.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:9,1"
+  },
+  {
+   "key": "bear@1510,200",
+   "type": "bear",
+   "x": 1509.5,
+   "y": 199.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:10,1"
+  },
+  {
+   "key": "bear@1562,241",
+   "type": "bear",
+   "x": 1561.5,
+   "y": 240.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:10,1"
+  },
+  {
+   "key": "dire_wolf@1522,185",
+   "type": "dire_wolf",
+   "x": 1521.5,
+   "y": 184.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:10,1"
+  },
+  {
+   "key": "dire_wolf@1634,250",
+   "type": "dire_wolf",
+   "x": 1633.5,
+   "y": 249.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:10,1"
+  },
+  {
+   "key": "bear@1653,155",
+   "type": "bear",
+   "x": 1652.5,
+   "y": 154.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:11,1"
+  },
+  {
+   "key": "bear@1678,203",
+   "type": "bear",
+   "x": 1677.5,
+   "y": 202.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:11,1"
+  },
+  {
+   "key": "hare@1798,269",
+   "type": "hare",
+   "x": 1797.5,
+   "y": 268.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:11,1"
+  },
+  {
+   "key": "hare@1755,278",
+   "type": "hare",
+   "x": 1754.5,
+   "y": 277.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:11,1"
+  },
+  {
+   "key": "bear@1920,185",
+   "type": "bear",
+   "x": 1919.5,
+   "y": 184.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:12,1"
+  },
+  {
+   "key": "bear@1813,218",
+   "type": "bear",
+   "x": 1812.5,
+   "y": 217.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:12,1"
+  },
+  {
+   "key": "dire_wolf@1880,153",
+   "type": "dire_wolf",
+   "x": 1879.5,
+   "y": 152.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:12,1"
+  },
+  {
+   "key": "dire_wolf@1846,176",
+   "type": "dire_wolf",
+   "x": 1845.5,
+   "y": 175.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:12,1"
+  },
+  {
+   "key": "deer@131,446",
+   "type": "deer",
+   "x": 130.5,
+   "y": 445.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:0,2"
+  },
+  {
+   "key": "hare@134,449",
+   "type": "hare",
+   "x": 133.5,
+   "y": 448.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:0,2"
+  },
+  {
+   "key": "boar@89,359",
+   "type": "boar",
+   "x": 88.5,
+   "y": 358.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:0,2"
+  },
+  {
+   "key": "deer@284,407",
+   "type": "deer",
+   "x": 283.5,
+   "y": 406.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:1,2"
+  },
+  {
+   "key": "hare@188,395",
+   "type": "hare",
+   "x": 187.5,
+   "y": 394.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:1,2"
+  },
+  {
+   "key": "boar@236,446",
+   "type": "boar",
+   "x": 235.5,
+   "y": 445.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:1,2"
+  },
+  {
+   "key": "hare@395,391",
+   "type": "hare",
+   "x": 394.5,
+   "y": 390.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:2,2"
+  },
+  {
+   "key": "hare@475,413",
+   "type": "hare",
+   "x": 474.5,
+   "y": 412.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:3,2"
+  },
+  {
+   "key": "hare@953,359",
+   "type": "hare",
+   "x": 952.5,
+   "y": 358.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:6,2"
+  },
+  {
+   "key": "hare@977,365",
+   "type": "hare",
+   "x": 976.5,
+   "y": 364.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:6,2"
+  },
+  {
+   "key": "hare@1091,314",
+   "type": "hare",
+   "x": 1090.5,
+   "y": 313.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:7,2"
+  },
+  {
+   "key": "hare@1082,332",
+   "type": "hare",
+   "x": 1081.5,
+   "y": 331.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:7,2"
+  },
+  {
+   "key": "deer@1097,395",
+   "type": "deer",
+   "x": 1096.5,
+   "y": 394.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:7,2"
+  },
+  {
+   "key": "deer@1148,380",
+   "type": "deer",
+   "x": 1147.5,
+   "y": 379.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:7,2"
+  },
+  {
+   "key": "hound@1175,326",
+   "type": "hound",
+   "x": 1174.5,
+   "y": 325.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:7,2"
+  },
+  {
+   "key": "hound@1193,431",
+   "type": "hound",
+   "x": 1192.5,
+   "y": 430.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:7,2"
+  },
+  {
+   "key": "hare@1202,416",
+   "type": "hare",
+   "x": 1201.5,
+   "y": 415.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:8,2"
+  },
+  {
+   "key": "hare@1232,308",
+   "type": "hare",
+   "x": 1231.5,
+   "y": 307.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:8,2"
+  },
+  {
+   "key": "rat@1217,344",
+   "type": "rat",
+   "x": 1216.5,
+   "y": 343.5,
+   "r": 26,
+   "max": 3,
+   "region": "wild:8,2"
+  },
+  {
+   "key": "rat@1229,365",
+   "type": "rat",
+   "x": 1228.5,
+   "y": 364.5,
+   "r": 26,
+   "max": 3,
+   "region": "wild:8,2"
+  },
+  {
+   "key": "hound@1283,431",
+   "type": "hound",
+   "x": 1282.5,
+   "y": 430.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:8,2"
+  },
+  {
+   "key": "hound@1229,347",
+   "type": "hound",
+   "x": 1228.5,
+   "y": 346.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:8,2"
+  },
+  {
+   "key": "hare@1448,428",
+   "type": "hare",
+   "x": 1447.5,
+   "y": 427.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:9,2"
+  },
+  {
+   "key": "hare@1436,431",
+   "type": "hare",
+   "x": 1435.5,
+   "y": 430.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:9,2"
+  },
+  {
+   "key": "deer@1397,422",
+   "type": "deer",
+   "x": 1396.5,
+   "y": 421.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:9,2"
+  },
+  {
+   "key": "deer@1424,449",
+   "type": "deer",
+   "x": 1423.5,
+   "y": 448.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:9,2"
+  },
+  {
+   "key": "rat@1472,446",
+   "type": "rat",
+   "x": 1471.5,
+   "y": 445.5,
+   "r": 26,
+   "max": 3,
+   "region": "wild:9,2"
+  },
+  {
+   "key": "rat@1358,449",
+   "type": "rat",
+   "x": 1357.5,
+   "y": 448.5,
+   "r": 26,
+   "max": 3,
+   "region": "wild:9,2"
+  },
+  {
+   "key": "hound@1427,449",
+   "type": "hound",
+   "x": 1426.5,
+   "y": 448.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:9,2"
+  },
+  {
+   "key": "hound@1436,446",
+   "type": "hound",
+   "x": 1435.5,
+   "y": 445.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:9,2"
+  },
+  {
+   "key": "bear@1525,350",
+   "type": "bear",
+   "x": 1524.5,
+   "y": 349.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:10,2"
+  },
+  {
+   "key": "bear@1534,341",
+   "type": "bear",
+   "x": 1533.5,
+   "y": 340.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:10,2"
+  },
+  {
+   "key": "dire_wolf@1534,341",
+   "type": "dire_wolf",
+   "x": 1533.5,
+   "y": 340.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:10,2"
+  },
+  {
+   "key": "dire_wolf@1542,449",
+   "type": "dire_wolf",
+   "x": 1541.5,
+   "y": 448.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:10,2"
+  },
+  {
+   "key": "hare@1748,395",
+   "type": "hare",
+   "x": 1747.5,
+   "y": 394.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:11,2"
+  },
+  {
+   "key": "hare@1706,362",
+   "type": "hare",
+   "x": 1705.5,
+   "y": 361.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:11,2"
+  },
+  {
+   "key": "deer@1787,368",
+   "type": "deer",
+   "x": 1786.5,
+   "y": 367.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:11,2"
+  },
+  {
+   "key": "deer@1733,428",
+   "type": "deer",
+   "x": 1732.5,
+   "y": 427.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:11,2"
+  },
+  {
+   "key": "hare@1859,347",
+   "type": "hare",
+   "x": 1858.5,
+   "y": 346.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:12,2"
+  },
+  {
+   "key": "hare@1829,404",
+   "type": "hare",
+   "x": 1828.5,
+   "y": 403.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:12,2"
+  },
+  {
+   "key": "deer@1844,326",
+   "type": "deer",
+   "x": 1843.5,
+   "y": 325.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:12,2"
+  },
+  {
+   "key": "deer@1916,365",
+   "type": "deer",
+   "x": 1915.5,
+   "y": 364.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:12,2"
+  },
+  {
+   "key": "deer@185,488",
+   "type": "deer",
+   "x": 184.5,
+   "y": 487.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:1,3"
+  },
+  {
+   "key": "hare@176,494",
+   "type": "hare",
+   "x": 175.5,
+   "y": 493.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:1,3"
+  },
+  {
+   "key": "boar@182,494",
+   "type": "boar",
+   "x": 181.5,
+   "y": 493.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:1,3"
+  },
+  {
+   "key": "hare@378,458",
+   "type": "hare",
+   "x": 377.5,
+   "y": 457.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:2,3"
+  },
+  {
+   "key": "hare@1043,554",
+   "type": "hare",
+   "x": 1042.5,
+   "y": 553.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:6,3"
+  },
+  {
+   "key": "hare@983,473",
+   "type": "hare",
+   "x": 982.5,
+   "y": 472.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:6,3"
+  },
+  {
+   "key": "deer@1022,533",
+   "type": "deer",
+   "x": 1021.5,
+   "y": 532.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:6,3"
+  },
+  {
+   "key": "deer@1001,458",
+   "type": "deer",
+   "x": 1000.5,
+   "y": 457.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:6,3"
+  },
+  {
+   "key": "hare@1085,563",
+   "type": "hare",
+   "x": 1084.5,
+   "y": 562.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:7,3"
+  },
+  {
+   "key": "hare@1052,575",
+   "type": "hare",
+   "x": 1051.5,
+   "y": 574.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:7,3"
+  },
+  {
+   "key": "deer@1151,455",
+   "type": "deer",
+   "x": 1150.5,
+   "y": 454.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:7,3"
+  },
+  {
+   "key": "deer@1127,566",
+   "type": "deer",
+   "x": 1126.5,
+   "y": 565.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:7,3"
+  },
+  {
+   "key": "deer@1283,473",
+   "type": "deer",
+   "x": 1282.5,
+   "y": 472.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:8,3"
+  },
+  {
+   "key": "deer@1271,515",
+   "type": "deer",
+   "x": 1270.5,
+   "y": 514.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:8,3"
+  },
+  {
+   "key": "hare@1289,464",
+   "type": "hare",
+   "x": 1288.5,
+   "y": 463.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:8,3"
+  },
+  {
+   "key": "hare@1322,581",
+   "type": "hare",
+   "x": 1321.5,
+   "y": 580.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:8,3"
+  },
+  {
+   "key": "boar@1280,521",
+   "type": "boar",
+   "x": 1279.5,
+   "y": 520.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:8,3"
+  },
+  {
+   "key": "boar@1256,578",
+   "type": "boar",
+   "x": 1255.5,
+   "y": 577.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:8,3"
+  },
+  {
+   "key": "hare@1370,545",
+   "type": "hare",
+   "x": 1369.5,
+   "y": 544.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:9,3"
+  },
+  {
+   "key": "hare@1397,548",
+   "type": "hare",
+   "x": 1396.5,
+   "y": 547.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:9,3"
+  },
+  {
+   "key": "deer@1478,566",
+   "type": "deer",
+   "x": 1477.5,
+   "y": 565.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:9,3"
+  },
+  {
+   "key": "deer@1436,584",
+   "type": "deer",
+   "x": 1435.5,
+   "y": 583.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:9,3"
+  },
+  {
+   "key": "bear@1591,491",
+   "type": "bear",
+   "x": 1590.5,
+   "y": 490.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:10,3"
+  },
+  {
+   "key": "bear@1615,521",
+   "type": "bear",
+   "x": 1614.5,
+   "y": 520.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:10,3"
+  },
+  {
+   "key": "dire_wolf@1572,584",
+   "type": "dire_wolf",
+   "x": 1571.5,
+   "y": 583.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:10,3"
+  },
+  {
+   "key": "dire_wolf@1587,599",
+   "type": "dire_wolf",
+   "x": 1586.5,
+   "y": 598.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:10,3"
+  },
+  {
+   "key": "hare@1739,467",
+   "type": "hare",
+   "x": 1738.5,
+   "y": 466.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:11,3"
+  },
+  {
+   "key": "hare@1667,482",
+   "type": "hare",
+   "x": 1666.5,
+   "y": 481.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:11,3"
+  },
+  {
+   "key": "deer@1793,569",
+   "type": "deer",
+   "x": 1792.5,
+   "y": 568.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:11,3"
+  },
+  {
+   "key": "deer@1763,563",
+   "type": "deer",
+   "x": 1762.5,
+   "y": 562.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:11,3"
+  },
+  {
+   "key": "hare@1805,482",
+   "type": "hare",
+   "x": 1804.5,
+   "y": 481.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:12,3"
+  },
+  {
+   "key": "hare@1931,575",
+   "type": "hare",
+   "x": 1930.5,
+   "y": 574.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:12,3"
+  },
+  {
+   "key": "deer@1856,461",
+   "type": "deer",
+   "x": 1855.5,
+   "y": 460.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:12,3"
+  },
+  {
+   "key": "deer@1868,521",
+   "type": "deer",
+   "x": 1867.5,
+   "y": 520.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:12,3"
+  },
+  {
+   "key": "deer@1016,719",
+   "type": "deer",
+   "x": 1015.5,
+   "y": 718.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:6,4"
+  },
+  {
+   "key": "deer@959,713",
+   "type": "deer",
+   "x": 958.5,
+   "y": 712.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:6,4"
+  },
+  {
+   "key": "hare@1004,725",
+   "type": "hare",
+   "x": 1003.5,
+   "y": 724.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:6,4"
+  },
+  {
+   "key": "hare@935,626",
+   "type": "hare",
+   "x": 934.5,
+   "y": 625.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:6,4"
+  },
+  {
+   "key": "boar@1022,719",
+   "type": "boar",
+   "x": 1021.5,
+   "y": 718.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:6,4"
+  },
+  {
+   "key": "boar@1025,611",
+   "type": "boar",
+   "x": 1024.5,
+   "y": 610.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:6,4"
+  },
+  {
+   "key": "dire_wolf@941,701",
+   "type": "dire_wolf",
+   "x": 940.5,
+   "y": 700.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:6,4"
+  },
+  {
+   "key": "dire_wolf@926,614",
+   "type": "dire_wolf",
+   "x": 925.5,
+   "y": 613.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:6,4"
+  },
+  {
+   "key": "hare@1124,650",
+   "type": "hare",
+   "x": 1123.5,
+   "y": 649.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:7,4"
+  },
+  {
+   "key": "hare@1082,656",
+   "type": "hare",
+   "x": 1081.5,
+   "y": 655.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:7,4"
+  },
+  {
+   "key": "deer@1169,725",
+   "type": "deer",
+   "x": 1168.5,
+   "y": 724.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:7,4"
+  },
+  {
+   "key": "deer@1112,611",
+   "type": "deer",
+   "x": 1111.5,
+   "y": 610.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:7,4"
+  },
+  {
+   "key": "hare@1247,671",
+   "type": "hare",
+   "x": 1246.5,
+   "y": 670.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:8,4"
+  },
+  {
+   "key": "hare@1295,746",
+   "type": "hare",
+   "x": 1294.5,
+   "y": 745.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:8,4"
+  },
+  {
+   "key": "hound@1307,710",
+   "type": "hound",
+   "x": 1306.5,
+   "y": 709.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:8,4"
+  },
+  {
+   "key": "hound@1283,677",
+   "type": "hound",
+   "x": 1282.5,
+   "y": 676.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:8,4"
+  },
+  {
+   "key": "hare@1481,683",
+   "type": "hare",
+   "x": 1480.5,
+   "y": 682.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:9,4"
+  },
+  {
+   "key": "hare@1478,713",
+   "type": "hare",
+   "x": 1477.5,
+   "y": 712.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:9,4"
+  },
+  {
+   "key": "hound@1433,695",
+   "type": "hound",
+   "x": 1432.5,
+   "y": 694.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:9,4"
+  },
+  {
+   "key": "hound@1406,653",
+   "type": "hound",
+   "x": 1405.5,
+   "y": 652.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:9,4"
+  },
+  {
+   "key": "hare@1604,677",
+   "type": "hare",
+   "x": 1603.5,
+   "y": 676.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:10,4"
+  },
+  {
+   "key": "hare@1595,707",
+   "type": "hare",
+   "x": 1594.5,
+   "y": 706.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:10,4"
+  },
+  {
+   "key": "deer@1577,653",
+   "type": "deer",
+   "x": 1576.5,
+   "y": 652.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:10,4"
+  },
+  {
+   "key": "deer@1505,680",
+   "type": "deer",
+   "x": 1504.5,
+   "y": 679.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:10,4"
+  },
+  {
+   "key": "hare@1757,746",
+   "type": "hare",
+   "x": 1756.5,
+   "y": 745.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:11,4"
+  },
+  {
+   "key": "hare@1787,629",
+   "type": "hare",
+   "x": 1786.5,
+   "y": 628.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:11,4"
+  },
+  {
+   "key": "deer@1673,686",
+   "type": "deer",
+   "x": 1672.5,
+   "y": 685.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:11,4"
+  },
+  {
+   "key": "deer@1715,677",
+   "type": "deer",
+   "x": 1714.5,
+   "y": 676.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:11,4"
+  },
+  {
+   "key": "rat@1664,653",
+   "type": "rat",
+   "x": 1663.5,
+   "y": 652.5,
+   "r": 26,
+   "max": 3,
+   "region": "wild:11,4"
+  },
+  {
+   "key": "rat@1682,689",
+   "type": "rat",
+   "x": 1681.5,
+   "y": 688.5,
+   "r": 26,
+   "max": 3,
+   "region": "wild:11,4"
+  },
+  {
+   "key": "hound@1676,734",
+   "type": "hound",
+   "x": 1675.5,
+   "y": 733.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:11,4"
+  },
+  {
+   "key": "hound@1673,602",
+   "type": "hound",
+   "x": 1672.5,
+   "y": 601.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:11,4"
+  },
+  {
+   "key": "hare@1910,644",
+   "type": "hare",
+   "x": 1909.5,
+   "y": 643.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:12,4"
+  },
+  {
+   "key": "hare@1886,623",
+   "type": "hare",
+   "x": 1885.5,
+   "y": 622.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:12,4"
+  },
+  {
+   "key": "rat@1928,647",
+   "type": "rat",
+   "x": 1927.5,
+   "y": 646.5,
+   "r": 26,
+   "max": 3,
+   "region": "wild:12,4"
+  },
+  {
+   "key": "rat@1892,611",
+   "type": "rat",
+   "x": 1891.5,
+   "y": 610.5,
+   "r": 26,
+   "max": 3,
+   "region": "wild:12,4"
+  },
+  {
+   "key": "hound@1859,641",
+   "type": "hound",
+   "x": 1858.5,
+   "y": 640.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:12,4"
+  },
+  {
+   "key": "hound@1847,611",
+   "type": "hound",
+   "x": 1846.5,
+   "y": 610.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:12,4"
+  },
+  {
+   "key": "hare@2192,695",
+   "type": "hare",
+   "x": 2191.5,
+   "y": 694.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:14,4"
+  },
+  {
+   "key": "hare@2228,674",
+   "type": "hare",
+   "x": 2227.5,
+   "y": 673.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:14,4"
+  },
+  {
+   "key": "deer@2204,719",
+   "type": "deer",
+   "x": 2203.5,
+   "y": 718.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:14,4"
+  },
+  {
+   "key": "deer@2234,683",
+   "type": "deer",
+   "x": 2233.5,
+   "y": 682.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:14,4"
+  },
+  {
+   "key": "hound@2189,746",
+   "type": "hound",
+   "x": 2188.5,
+   "y": 745.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:14,4"
+  },
+  {
+   "key": "hound@2228,647",
+   "type": "hound",
+   "x": 2227.5,
+   "y": 646.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:14,4"
+  },
+  {
+   "key": "hare@2372,634",
+   "type": "hare",
+   "x": 2371.5,
+   "y": 633.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:15,4"
+  },
+  {
+   "key": "hare@2383,626",
+   "type": "hare",
+   "x": 2382.5,
+   "y": 625.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:15,4"
+  },
+  {
+   "key": "hound@2394,602",
+   "type": "hound",
+   "x": 2393.5,
+   "y": 601.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:15,4"
+  },
+  {
+   "key": "hound@2394,602#2",
+   "type": "hound",
+   "x": 2393.5,
+   "y": 601.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:15,4"
+  },
+  {
+   "key": "hare@2471,686",
+   "type": "hare",
+   "x": 2470.5,
+   "y": 685.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:16,4"
+  },
+  {
+   "key": "hare@2423,620",
+   "type": "hare",
+   "x": 2422.5,
+   "y": 619.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:16,4"
+  },
+  {
+   "key": "deer@2435,746",
+   "type": "deer",
+   "x": 2434.5,
+   "y": 745.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:16,4"
+  },
+  {
+   "key": "deer@2432,677",
+   "type": "deer",
+   "x": 2431.5,
+   "y": 676.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:16,4"
+  },
+  {
+   "key": "rat@2504,707",
+   "type": "rat",
+   "x": 2503.5,
+   "y": 706.5,
+   "r": 26,
+   "max": 3,
+   "region": "wild:16,4"
+  },
+  {
+   "key": "rat@2483,653",
+   "type": "rat",
+   "x": 2482.5,
+   "y": 652.5,
+   "r": 26,
+   "max": 3,
+   "region": "wild:16,4"
+  },
+  {
+   "key": "hound@2456,617",
+   "type": "hound",
+   "x": 2455.5,
+   "y": 616.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:16,4"
+  },
+  {
+   "key": "hound@2492,683",
+   "type": "hound",
+   "x": 2491.5,
+   "y": 682.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:16,4"
+  },
+  {
+   "key": "deer@1022,869",
+   "type": "deer",
+   "x": 1021.5,
+   "y": 868.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:6,5"
+  },
+  {
+   "key": "deer@1013,758",
+   "type": "deer",
+   "x": 1012.5,
+   "y": 757.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:6,5"
+  },
+  {
+   "key": "hare@968,761",
+   "type": "hare",
+   "x": 967.5,
+   "y": 760.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:6,5"
+  },
+  {
+   "key": "hare@1022,863",
+   "type": "hare",
+   "x": 1021.5,
+   "y": 862.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:6,5"
+  },
+  {
+   "key": "boar@1010,869",
+   "type": "boar",
+   "x": 1009.5,
+   "y": 868.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:6,5"
+  },
+  {
+   "key": "boar@968,761",
+   "type": "boar",
+   "x": 967.5,
+   "y": 760.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:6,5"
+  },
+  {
+   "key": "boar@1046,806",
+   "type": "boar",
+   "x": 1045.5,
+   "y": 805.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:6,5"
+  },
+  {
+   "key": "boar@1022,863",
+   "type": "boar",
+   "x": 1021.5,
+   "y": 862.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:6,5"
+  },
+  {
+   "key": "hound@1046,806",
+   "type": "hound",
+   "x": 1045.5,
+   "y": 805.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:6,5"
+  },
+  {
+   "key": "hound@1013,863",
+   "type": "hound",
+   "x": 1012.5,
+   "y": 862.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:6,5"
+  },
+  {
+   "key": "hare@1172,818",
+   "type": "hare",
+   "x": 1171.5,
+   "y": 817.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:7,5"
+  },
+  {
+   "key": "hare@1121,785",
+   "type": "hare",
+   "x": 1120.5,
+   "y": 784.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:7,5"
+  },
+  {
+   "key": "hare@1235,764",
+   "type": "hare",
+   "x": 1234.5,
+   "y": 763.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:8,5"
+  },
+  {
+   "key": "hare@1217,836",
+   "type": "hare",
+   "x": 1216.5,
+   "y": 835.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:8,5"
+  },
+  {
+   "key": "hound@1283,755",
+   "type": "hound",
+   "x": 1282.5,
+   "y": 754.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:8,5"
+  },
+  {
+   "key": "hound@1238,821",
+   "type": "hound",
+   "x": 1237.5,
+   "y": 820.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:8,5"
+  },
+  {
+   "key": "hare@1463,872",
+   "type": "hare",
+   "x": 1462.5,
+   "y": 871.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:9,5"
+  },
+  {
+   "key": "hare@1373,890",
+   "type": "hare",
+   "x": 1372.5,
+   "y": 889.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:9,5"
+  },
+  {
+   "key": "hound@1427,893",
+   "type": "hound",
+   "x": 1426.5,
+   "y": 892.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:9,5"
+  },
+  {
+   "key": "hound@1394,839",
+   "type": "hound",
+   "x": 1393.5,
+   "y": 838.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:9,5"
+  },
+  {
+   "key": "hare@1574,761",
+   "type": "hare",
+   "x": 1573.5,
+   "y": 760.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:10,5"
+  },
+  {
+   "key": "hare@1571,848",
+   "type": "hare",
+   "x": 1570.5,
+   "y": 847.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:10,5"
+  },
+  {
+   "key": "hound@1571,770",
+   "type": "hound",
+   "x": 1570.5,
+   "y": 769.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:10,5"
+  },
+  {
+   "key": "hound@1529,875",
+   "type": "hound",
+   "x": 1528.5,
+   "y": 874.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:10,5"
+  },
+  {
+   "key": "hare@1730,845",
+   "type": "hare",
+   "x": 1729.5,
+   "y": 844.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:11,5"
+  },
+  {
+   "key": "hare@1679,770",
+   "type": "hare",
+   "x": 1678.5,
+   "y": 769.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:11,5"
+  },
+  {
+   "key": "deer@1682,797",
+   "type": "deer",
+   "x": 1681.5,
+   "y": 796.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:11,5"
+  },
+  {
+   "key": "deer@1652,872",
+   "type": "deer",
+   "x": 1651.5,
+   "y": 871.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:11,5"
+  },
+  {
+   "key": "rat@1772,872",
+   "type": "rat",
+   "x": 1771.5,
+   "y": 871.5,
+   "r": 26,
+   "max": 3,
+   "region": "wild:11,5"
+  },
+  {
+   "key": "rat@1691,899",
+   "type": "rat",
+   "x": 1690.5,
+   "y": 898.5,
+   "r": 26,
+   "max": 3,
+   "region": "wild:11,5"
+  },
+  {
+   "key": "hound@1775,887",
+   "type": "hound",
+   "x": 1774.5,
+   "y": 886.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:11,5"
+  },
+  {
+   "key": "hound@1718,839",
+   "type": "hound",
+   "x": 1717.5,
+   "y": 838.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:11,5"
+  },
+  {
+   "key": "hare@1922,878",
+   "type": "hare",
+   "x": 1921.5,
+   "y": 877.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:12,5"
+  },
+  {
+   "key": "hare@1922,887",
+   "type": "hare",
+   "x": 1921.5,
+   "y": 886.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:12,5"
+  },
+  {
+   "key": "rat@1838,896",
+   "type": "rat",
+   "x": 1837.5,
+   "y": 895.5,
+   "r": 26,
+   "max": 3,
+   "region": "wild:12,5"
+  },
+  {
+   "key": "rat@1850,887",
+   "type": "rat",
+   "x": 1849.5,
+   "y": 886.5,
+   "r": 26,
+   "max": 3,
+   "region": "wild:12,5"
+  },
+  {
+   "key": "hound@1949,899",
+   "type": "hound",
+   "x": 1948.5,
+   "y": 898.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:12,5"
+  },
+  {
+   "key": "hound@1934,881",
+   "type": "hound",
+   "x": 1933.5,
+   "y": 880.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:12,5"
+  },
+  {
+   "key": "hare@2249,866",
+   "type": "hare",
+   "x": 2248.5,
+   "y": 865.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:14,5"
+  },
+  {
+   "key": "hare@2174,821",
+   "type": "hare",
+   "x": 2173.5,
+   "y": 820.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:14,5"
+  },
+  {
+   "key": "hare@2489,878",
+   "type": "hare",
+   "x": 2488.5,
+   "y": 877.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:16,5"
+  },
+  {
+   "key": "hare@2450,785",
+   "type": "hare",
+   "x": 2449.5,
+   "y": 784.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:16,5"
+  },
+  {
+   "key": "rat@2471,839",
+   "type": "rat",
+   "x": 2470.5,
+   "y": 838.5,
+   "r": 26,
+   "max": 3,
+   "region": "wild:16,5"
+  },
+  {
+   "key": "rat@2459,881",
+   "type": "rat",
+   "x": 2458.5,
+   "y": 880.5,
+   "r": 26,
+   "max": 3,
+   "region": "wild:16,5"
+  },
+  {
+   "key": "hound@2471,797",
+   "type": "hound",
+   "x": 2470.5,
+   "y": 796.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:16,5"
+  },
+  {
+   "key": "hound@2501,758",
+   "type": "hound",
+   "x": 2500.5,
+   "y": 757.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:16,5"
+  },
+  {
+   "key": "hare@965,908",
+   "type": "hare",
+   "x": 964.5,
+   "y": 907.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:6,6"
+  },
+  {
+   "key": "hare@905,923",
+   "type": "hare",
+   "x": 904.5,
+   "y": 922.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:6,6"
+  },
+  {
+   "key": "deer@995,953",
+   "type": "deer",
+   "x": 994.5,
+   "y": 952.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:6,6"
+  },
+  {
+   "key": "deer@1040,905",
+   "type": "deer",
+   "x": 1039.5,
+   "y": 904.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:6,6"
+  },
+  {
+   "key": "rat@1043,929",
+   "type": "rat",
+   "x": 1042.5,
+   "y": 928.5,
+   "r": 26,
+   "max": 3,
+   "region": "wild:6,6"
+  },
+  {
+   "key": "rat@1007,914",
+   "type": "rat",
+   "x": 1006.5,
+   "y": 913.5,
+   "r": 26,
+   "max": 3,
+   "region": "wild:6,6"
+  },
+  {
+   "key": "hound@995,932",
+   "type": "hound",
+   "x": 994.5,
+   "y": 931.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:6,6"
+  },
+  {
+   "key": "hound@1031,959",
+   "type": "hound",
+   "x": 1030.5,
+   "y": 958.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:6,6"
+  },
+  {
+   "key": "hare@1052,926",
+   "type": "hare",
+   "x": 1051.5,
+   "y": 925.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:7,6"
+  },
+  {
+   "key": "hare@1124,917",
+   "type": "hare",
+   "x": 1123.5,
+   "y": 916.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:7,6"
+  },
+  {
+   "key": "deer@1139,923",
+   "type": "deer",
+   "x": 1138.5,
+   "y": 922.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:7,6"
+  },
+  {
+   "key": "deer@1163,962",
+   "type": "deer",
+   "x": 1162.5,
+   "y": 961.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:7,6"
+  },
+  {
+   "key": "hare@1259,1028",
+   "type": "hare",
+   "x": 1258.5,
+   "y": 1027.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:8,6"
+  },
+  {
+   "key": "hare@1325,950",
+   "type": "hare",
+   "x": 1324.5,
+   "y": 949.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:8,6"
+  },
+  {
+   "key": "deer@1211,938",
+   "type": "deer",
+   "x": 1210.5,
+   "y": 937.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:8,6"
+  },
+  {
+   "key": "deer@1280,950",
+   "type": "deer",
+   "x": 1279.5,
+   "y": 949.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:8,6"
+  },
+  {
+   "key": "hare@1469,965",
+   "type": "hare",
+   "x": 1468.5,
+   "y": 964.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:9,6"
+  },
+  {
+   "key": "hare@1421,974",
+   "type": "hare",
+   "x": 1420.5,
+   "y": 973.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:9,6"
+  },
+  {
+   "key": "hound@1427,1022",
+   "type": "hound",
+   "x": 1426.5,
+   "y": 1021.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:9,6"
+  },
+  {
+   "key": "hound@1370,956",
+   "type": "hound",
+   "x": 1369.5,
+   "y": 955.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:9,6"
+  },
+  {
+   "key": "hare@1529,1031",
+   "type": "hare",
+   "x": 1528.5,
+   "y": 1030.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:10,6"
+  },
+  {
+   "key": "hare@1598,1019",
+   "type": "hare",
+   "x": 1597.5,
+   "y": 1018.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:10,6"
+  },
+  {
+   "key": "hound@1622,1004",
+   "type": "hound",
+   "x": 1621.5,
+   "y": 1003.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:10,6"
+  },
+  {
+   "key": "hound@1553,1019",
+   "type": "hound",
+   "x": 1552.5,
+   "y": 1018.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:10,6"
+  },
+  {
+   "key": "hare@1664,956",
+   "type": "hare",
+   "x": 1663.5,
+   "y": 955.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:11,6"
+  },
+  {
+   "key": "hare@1670,947",
+   "type": "hare",
+   "x": 1669.5,
+   "y": 946.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:11,6"
+  },
+  {
+   "key": "deer@1754,944",
+   "type": "deer",
+   "x": 1753.5,
+   "y": 943.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:11,6"
+  },
+  {
+   "key": "deer@1739,962",
+   "type": "deer",
+   "x": 1738.5,
+   "y": 961.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:11,6"
+  },
+  {
+   "key": "hare@1832,956",
+   "type": "hare",
+   "x": 1831.5,
+   "y": 955.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:12,6"
+  },
+  {
+   "key": "hare@1937,908",
+   "type": "hare",
+   "x": 1936.5,
+   "y": 907.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:12,6"
+  },
+  {
+   "key": "hare@866,1193",
+   "type": "hare",
+   "x": 865.5,
+   "y": 1192.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:5,7"
+  },
+  {
+   "key": "hare@845,1169",
+   "type": "hare",
+   "x": 844.5,
+   "y": 1168.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:5,7"
+  },
+  {
+   "key": "deer@773,1166",
+   "type": "deer",
+   "x": 772.5,
+   "y": 1165.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:5,7"
+  },
+  {
+   "key": "deer@878,1175",
+   "type": "deer",
+   "x": 877.5,
+   "y": 1174.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:5,7"
+  },
+  {
+   "key": "deer@1034,1142",
+   "type": "deer",
+   "x": 1033.5,
+   "y": 1141.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:6,7"
+  },
+  {
+   "key": "deer@1046,1157",
+   "type": "deer",
+   "x": 1045.5,
+   "y": 1156.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:6,7"
+  },
+  {
+   "key": "hare@1013,1136",
+   "type": "hare",
+   "x": 1012.5,
+   "y": 1135.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:6,7"
+  },
+  {
+   "key": "hare@959,1130",
+   "type": "hare",
+   "x": 958.5,
+   "y": 1129.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:6,7"
+  },
+  {
+   "key": "boar@1034,1133",
+   "type": "boar",
+   "x": 1033.5,
+   "y": 1132.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:6,7"
+  },
+  {
+   "key": "boar@938,1181",
+   "type": "boar",
+   "x": 937.5,
+   "y": 1180.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:6,7"
+  },
+  {
+   "key": "dire_wolf@917,1157",
+   "type": "dire_wolf",
+   "x": 916.5,
+   "y": 1156.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:6,7"
+  },
+  {
+   "key": "dire_wolf@947,1157",
+   "type": "dire_wolf",
+   "x": 946.5,
+   "y": 1156.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:6,7"
+  },
+  {
+   "key": "hare@1076,1193",
+   "type": "hare",
+   "x": 1075.5,
+   "y": 1192.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:7,7"
+  },
+  {
+   "key": "hare@1193,1163",
+   "type": "hare",
+   "x": 1192.5,
+   "y": 1162.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:7,7"
+  },
+  {
+   "key": "hound@1193,1172",
+   "type": "hound",
+   "x": 1192.5,
+   "y": 1171.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:7,7"
+  },
+  {
+   "key": "hound@1199,1187",
+   "type": "hound",
+   "x": 1198.5,
+   "y": 1186.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:7,7"
+  },
+  {
+   "key": "hare@1319,1196",
+   "type": "hare",
+   "x": 1318.5,
+   "y": 1195.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:8,7"
+  },
+  {
+   "key": "hare@1319,1178",
+   "type": "hare",
+   "x": 1318.5,
+   "y": 1177.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:8,7"
+  },
+  {
+   "key": "deer@1328,1187",
+   "type": "deer",
+   "x": 1327.5,
+   "y": 1186.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:8,7"
+  },
+  {
+   "key": "deer@1265,1196",
+   "type": "deer",
+   "x": 1264.5,
+   "y": 1195.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:8,7"
+  },
+  {
+   "key": "hare@1361,1163",
+   "type": "hare",
+   "x": 1360.5,
+   "y": 1162.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:9,7"
+  },
+  {
+   "key": "hare@1439,1196",
+   "type": "hare",
+   "x": 1438.5,
+   "y": 1195.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:9,7"
+  },
+  {
+   "key": "hare@1598,1193",
+   "type": "hare",
+   "x": 1597.5,
+   "y": 1192.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:10,7"
+  },
+  {
+   "key": "hare@1562,1142",
+   "type": "hare",
+   "x": 1561.5,
+   "y": 1141.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:10,7"
+  },
+  {
+   "key": "deer@1517,1187",
+   "type": "deer",
+   "x": 1516.5,
+   "y": 1186.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:10,7"
+  },
+  {
+   "key": "deer@1631,1130",
+   "type": "deer",
+   "x": 1630.5,
+   "y": 1129.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:10,7"
+  },
+  {
+   "key": "bear@1732,1184",
+   "type": "bear",
+   "x": 1731.5,
+   "y": 1183.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:11,7"
+  },
+  {
+   "key": "bear@1714,1196",
+   "type": "bear",
+   "x": 1713.5,
+   "y": 1195.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:11,7"
+  },
+  {
+   "key": "hare@1777,1172",
+   "type": "hare",
+   "x": 1776.5,
+   "y": 1171.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:11,7"
+  },
+  {
+   "key": "hare@1763,1182",
+   "type": "hare",
+   "x": 1762.5,
+   "y": 1181.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:11,7"
+  },
+  {
+   "key": "bear@1850,1192",
+   "type": "bear",
+   "x": 1849.5,
+   "y": 1191.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:12,7"
+  },
+  {
+   "key": "bear@1806,1157",
+   "type": "bear",
+   "x": 1805.5,
+   "y": 1156.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:12,7"
+  },
+  {
+   "key": "hare@1850,1192",
+   "type": "hare",
+   "x": 1849.5,
+   "y": 1191.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:12,7"
+  },
+  {
+   "key": "hare@1945,1142",
+   "type": "hare",
+   "x": 1944.5,
+   "y": 1141.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:12,7"
+  },
+  {
+   "key": "bear@2046,1184",
+   "type": "bear",
+   "x": 2045.5,
+   "y": 1183.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:13,7"
+  },
+  {
+   "key": "bear@2000,1195",
+   "type": "bear",
+   "x": 1999.5,
+   "y": 1194.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:13,7"
+  },
+  {
+   "key": "dire_wolf@2049,1178",
+   "type": "dire_wolf",
+   "x": 2048.5,
+   "y": 1177.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:13,7"
+  },
+  {
+   "key": "dire_wolf@1961,1167",
+   "type": "dire_wolf",
+   "x": 1960.5,
+   "y": 1166.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:13,7"
+  },
+  {
+   "key": "hare@749,1343",
+   "type": "hare",
+   "x": 748.5,
+   "y": 1342.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:4,8"
+  },
+  {
+   "key": "hare@713,1322",
+   "type": "hare",
+   "x": 712.5,
+   "y": 1321.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:4,8"
+  },
+  {
+   "key": "deer@740,1208",
+   "type": "deer",
+   "x": 739.5,
+   "y": 1207.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:4,8"
+  },
+  {
+   "key": "deer@728,1274",
+   "type": "deer",
+   "x": 727.5,
+   "y": 1273.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:4,8"
+  },
+  {
+   "key": "slime@892,1280",
+   "type": "slime",
+   "x": 891.5,
+   "y": 1279.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:5,8"
+  },
+  {
+   "key": "slime@756,1292",
+   "type": "slime",
+   "x": 755.5,
+   "y": 1291.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:5,8"
+  },
+  {
+   "key": "hare@852,1238",
+   "type": "hare",
+   "x": 851.5,
+   "y": 1237.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:5,8"
+  },
+  {
+   "key": "hare@777,1274",
+   "type": "hare",
+   "x": 776.5,
+   "y": 1273.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:5,8"
+  },
+  {
+   "key": "spider@884,1291",
+   "type": "spider",
+   "x": 883.5,
+   "y": 1290.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:5,8"
+  },
+  {
+   "key": "spider@892,1271",
+   "type": "spider",
+   "x": 891.5,
+   "y": 1270.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:5,8"
+  },
+  {
+   "key": "slime@1012,1310",
+   "type": "slime",
+   "x": 1011.5,
+   "y": 1309.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:6,8"
+  },
+  {
+   "key": "slime@1046,1312",
+   "type": "slime",
+   "x": 1045.5,
+   "y": 1311.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:6,8"
+  },
+  {
+   "key": "hare@989,1240",
+   "type": "hare",
+   "x": 988.5,
+   "y": 1239.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:6,8"
+  },
+  {
+   "key": "hare@906,1301",
+   "type": "hare",
+   "x": 905.5,
+   "y": 1300.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:6,8"
+  },
+  {
+   "key": "spider@1003,1316",
+   "type": "spider",
+   "x": 1002.5,
+   "y": 1315.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:6,8"
+  },
+  {
+   "key": "spider@989,1240",
+   "type": "spider",
+   "x": 988.5,
+   "y": 1239.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:6,8"
+  },
+  {
+   "key": "hare@1154,1256",
+   "type": "hare",
+   "x": 1153.5,
+   "y": 1255.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:7,8"
+  },
+  {
+   "key": "hare@1118,1346",
+   "type": "hare",
+   "x": 1117.5,
+   "y": 1345.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:7,8"
+  },
+  {
+   "key": "deer@1106,1334",
+   "type": "deer",
+   "x": 1105.5,
+   "y": 1333.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:7,8"
+  },
+  {
+   "key": "deer@1070,1208",
+   "type": "deer",
+   "x": 1069.5,
+   "y": 1207.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:7,8"
+  },
+  {
+   "key": "hare@1310,1208",
+   "type": "hare",
+   "x": 1309.5,
+   "y": 1207.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:8,8"
+  },
+  {
+   "key": "hare@1304,1217",
+   "type": "hare",
+   "x": 1303.5,
+   "y": 1216.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:8,8"
+  },
+  {
+   "key": "deer@1292,1253",
+   "type": "deer",
+   "x": 1291.5,
+   "y": 1252.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:8,8"
+  },
+  {
+   "key": "deer@1280,1313",
+   "type": "deer",
+   "x": 1279.5,
+   "y": 1312.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:8,8"
+  },
+  {
+   "key": "hare@1442,1307",
+   "type": "hare",
+   "x": 1441.5,
+   "y": 1306.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:9,8"
+  },
+  {
+   "key": "hare@1394,1214",
+   "type": "hare",
+   "x": 1393.5,
+   "y": 1213.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:9,8"
+  },
+  {
+   "key": "deer@1496,1316",
+   "type": "deer",
+   "x": 1495.5,
+   "y": 1315.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:9,8"
+  },
+  {
+   "key": "deer@1409,1238",
+   "type": "deer",
+   "x": 1408.5,
+   "y": 1237.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:9,8"
+  },
+  {
+   "key": "hare@1601,1274",
+   "type": "hare",
+   "x": 1600.5,
+   "y": 1273.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:10,8"
+  },
+  {
+   "key": "hare@1634,1283",
+   "type": "hare",
+   "x": 1633.5,
+   "y": 1282.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:10,8"
+  },
+  {
+   "key": "deer@1604,1325",
+   "type": "deer",
+   "x": 1603.5,
+   "y": 1324.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:10,8"
+  },
+  {
+   "key": "deer@1529,1286",
+   "type": "deer",
+   "x": 1528.5,
+   "y": 1285.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:10,8"
+  },
+  {
+   "key": "hound@1631,1250",
+   "type": "hound",
+   "x": 1630.5,
+   "y": 1249.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:10,8"
+  },
+  {
+   "key": "hound@1598,1340",
+   "type": "hound",
+   "x": 1597.5,
+   "y": 1339.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:10,8"
+  },
+  {
+   "key": "bear@1801,1301",
+   "type": "bear",
+   "x": 1800.5,
+   "y": 1300.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:11,8"
+  },
+  {
+   "key": "bear@1760,1254",
+   "type": "bear",
+   "x": 1759.5,
+   "y": 1253.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:11,8"
+  },
+  {
+   "key": "hare@1698,1208",
+   "type": "hare",
+   "x": 1697.5,
+   "y": 1207.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:11,8"
+  },
+  {
+   "key": "hare@1778,1249",
+   "type": "hare",
+   "x": 1777.5,
+   "y": 1248.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:11,8"
+  },
+  {
+   "key": "bear@1825,1238",
+   "type": "bear",
+   "x": 1824.5,
+   "y": 1237.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:12,8"
+  },
+  {
+   "key": "bear@1951,1217",
+   "type": "bear",
+   "x": 1950.5,
+   "y": 1216.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:12,8"
+  },
+  {
+   "key": "dire_wolf@1815,1304",
+   "type": "dire_wolf",
+   "x": 1814.5,
+   "y": 1303.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:12,8"
+  },
+  {
+   "key": "dire_wolf@1889,1311",
+   "type": "dire_wolf",
+   "x": 1888.5,
+   "y": 1310.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:12,8"
+  },
+  {
+   "key": "bear@2029,1334",
+   "type": "bear",
+   "x": 2028.5,
+   "y": 1333.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:13,8"
+  },
+  {
+   "key": "bear@2068,1313",
+   "type": "bear",
+   "x": 2067.5,
+   "y": 1312.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:13,8"
+  },
+  {
+   "key": "hare@1950,1277",
+   "type": "hare",
+   "x": 1949.5,
+   "y": 1276.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:13,8"
+  },
+  {
+   "key": "hare@1990,1334",
+   "type": "hare",
+   "x": 1989.5,
+   "y": 1333.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:13,8"
+  },
+  {
+   "key": "bear@2149,1241",
+   "type": "bear",
+   "x": 2148.5,
+   "y": 1240.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:14,8"
+  },
+  {
+   "key": "bear@2122,1271",
+   "type": "bear",
+   "x": 2121.5,
+   "y": 1270.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:14,8"
+  },
+  {
+   "key": "hare@2146,1241",
+   "type": "hare",
+   "x": 2145.5,
+   "y": 1240.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:14,8"
+  },
+  {
+   "key": "hare@2141,1276",
+   "type": "hare",
+   "x": 2140.5,
+   "y": 1275.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:14,8"
+  },
+  {
+   "key": "slime@834,1352",
+   "type": "slime",
+   "x": 833.5,
+   "y": 1351.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:5,9"
+  },
+  {
+   "key": "slime@829,1385",
+   "type": "slime",
+   "x": 828.5,
+   "y": 1384.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:5,9"
+  },
+  {
+   "key": "hare@861,1415",
+   "type": "hare",
+   "x": 860.5,
+   "y": 1414.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:5,9"
+  },
+  {
+   "key": "hare@898,1379",
+   "type": "hare",
+   "x": 897.5,
+   "y": 1378.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:5,9"
+  },
+  {
+   "key": "spider@829,1424",
+   "type": "spider",
+   "x": 828.5,
+   "y": 1423.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:5,9"
+  },
+  {
+   "key": "spider@801,1382",
+   "type": "spider",
+   "x": 800.5,
+   "y": 1381.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:5,9"
+  },
+  {
+   "key": "slime@1032,1379",
+   "type": "slime",
+   "x": 1031.5,
+   "y": 1378.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:6,9"
+  },
+  {
+   "key": "slime@1004,1420",
+   "type": "slime",
+   "x": 1003.5,
+   "y": 1419.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:6,9"
+  },
+  {
+   "key": "hare@940,1379",
+   "type": "hare",
+   "x": 939.5,
+   "y": 1378.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:6,9"
+  },
+  {
+   "key": "hare@1045,1364",
+   "type": "hare",
+   "x": 1044.5,
+   "y": 1363.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:6,9"
+  },
+  {
+   "key": "spider@973,1406",
+   "type": "spider",
+   "x": 972.5,
+   "y": 1405.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:6,9"
+  },
+  {
+   "key": "spider@913,1409",
+   "type": "spider",
+   "x": 912.5,
+   "y": 1408.5,
+   "r": 26,
+   "max": 1,
+   "region": "wild:6,9"
+  },
+  {
+   "key": "hare@1166,1466",
+   "type": "hare",
+   "x": 1165.5,
+   "y": 1465.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:7,9"
+  },
+  {
+   "key": "hare@1088,1361",
+   "type": "hare",
+   "x": 1087.5,
+   "y": 1360.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:7,9"
+  },
+  {
+   "key": "deer@1106,1427",
+   "type": "deer",
+   "x": 1105.5,
+   "y": 1426.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:7,9"
+  },
+  {
+   "key": "deer@1166,1439",
+   "type": "deer",
+   "x": 1165.5,
+   "y": 1438.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:7,9"
+  },
+  {
+   "key": "hare@1292,1469",
+   "type": "hare",
+   "x": 1291.5,
+   "y": 1468.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:8,9"
+  },
+  {
+   "key": "hare@1268,1442",
+   "type": "hare",
+   "x": 1267.5,
+   "y": 1441.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:8,9"
+  },
+  {
+   "key": "deer@1214,1430",
+   "type": "deer",
+   "x": 1213.5,
+   "y": 1429.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:8,9"
+  },
+  {
+   "key": "deer@1208,1355",
+   "type": "deer",
+   "x": 1207.5,
+   "y": 1354.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:8,9"
+  },
+  {
+   "key": "hare@1478,1391",
+   "type": "hare",
+   "x": 1477.5,
+   "y": 1390.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:9,9"
+  },
+  {
+   "key": "hare@1418,1352",
+   "type": "hare",
+   "x": 1417.5,
+   "y": 1351.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:9,9"
+  },
+  {
+   "key": "deer@1373,1358",
+   "type": "deer",
+   "x": 1372.5,
+   "y": 1357.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:9,9"
+  },
+  {
+   "key": "deer@1460,1469",
+   "type": "deer",
+   "x": 1459.5,
+   "y": 1468.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:9,9"
+  },
+  {
+   "key": "hound@1355,1394",
+   "type": "hound",
+   "x": 1354.5,
+   "y": 1393.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:9,9"
+  },
+  {
+   "key": "hound@1484,1376",
+   "type": "hound",
+   "x": 1483.5,
+   "y": 1375.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:9,9"
+  },
+  {
+   "key": "hare@1526,1352",
+   "type": "hare",
+   "x": 1525.5,
+   "y": 1351.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:10,9"
+  },
+  {
+   "key": "hare@1517,1484",
+   "type": "hare",
+   "x": 1516.5,
+   "y": 1483.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:10,9"
+  },
+  {
+   "key": "deer@1523,1442",
+   "type": "deer",
+   "x": 1522.5,
+   "y": 1441.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:10,9"
+  },
+  {
+   "key": "deer@1619,1364",
+   "type": "deer",
+   "x": 1618.5,
+   "y": 1363.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:10,9"
+  },
+  {
+   "key": "hound@1571,1361",
+   "type": "hound",
+   "x": 1570.5,
+   "y": 1360.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:10,9"
+  },
+  {
+   "key": "hound@1580,1412",
+   "type": "hound",
+   "x": 1579.5,
+   "y": 1411.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:10,9"
+  },
+  {
+   "key": "hare@1682,1433",
+   "type": "hare",
+   "x": 1681.5,
+   "y": 1432.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:11,9"
+  },
+  {
+   "key": "hare@1658,1457",
+   "type": "hare",
+   "x": 1657.5,
+   "y": 1456.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:11,9"
+  },
+  {
+   "key": "deer@1766,1388",
+   "type": "deer",
+   "x": 1765.5,
+   "y": 1387.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:11,9"
+  },
+  {
+   "key": "deer@1688,1388",
+   "type": "deer",
+   "x": 1687.5,
+   "y": 1387.5,
+   "r": 26,
+   "max": 2,
+   "pack": 2,
+   "region": "wild:11,9"
+  },
+  {
+   "key": "hare@1817,1469",
+   "type": "hare",
+   "x": 1816.5,
+   "y": 1468.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:12,9"
+  },
+  {
+   "key": "hare@1907,1376",
+   "type": "hare",
+   "x": 1906.5,
+   "y": 1375.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:12,9"
+  },
+  {
+   "key": "hound@1946,1400",
+   "type": "hound",
+   "x": 1945.5,
+   "y": 1399.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:12,9"
+  },
+  {
+   "key": "hound@1883,1400",
+   "type": "hound",
+   "x": 1882.5,
+   "y": 1399.5,
+   "r": 26,
+   "max": 3,
+   "pack": 3,
+   "region": "wild:12,9"
+  },
+  {
+   "key": "hare@2075,1391",
+   "type": "hare",
+   "x": 2074.5,
+   "y": 1390.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:13,9"
+  },
+  {
+   "key": "hare@2015,1358",
+   "type": "hare",
+   "x": 2014.5,
+   "y": 1357.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:13,9"
+  },
+  {
+   "key": "hare@2108,1442",
+   "type": "hare",
+   "x": 2107.5,
+   "y": 1441.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:14,9"
+  },
+  {
+   "key": "hare@2237,1370",
+   "type": "hare",
+   "x": 2236.5,
+   "y": 1369.5,
+   "r": 26,
+   "max": 2,
+   "region": "wild:14,9"
+  }
+ ],
+ "note": "Generated by tools/export-world.py from the game build. Do not edit by hand."
+}

@@ -69,9 +69,9 @@ test('interest management: a nearby character is announced and its steps arrive;
   const a = await player('Near'), b = await player('Watcher'), far = await player('Faraway');
   await srv.db.query(`update game.characters set position = '{"map":"anniabreen","town":"quay","x":2342.5,"y":860.7}' where id = $1`, [far.ch.id]);
   const B = await join(b); const F = await join(far); const A = await join(a);
-  const e = await B.w.wait(m => m.type === 'actor.enter' && m.p.characterId === a.ch.id); assert.equal(e.p.name, a.ch.name);
+  const e = await B.w.wait(m => m.type === 'actor.enter' && m.p.characterId === a.ch.id); assert.equal(e.p.name, a.ch.name); assert.equal(e.p.kind, 'player');
   assert.equal(JSON.stringify(e).includes(a.ch.id) && JSON.stringify(e.p).includes('account'), false, 'no account id');
-  await sleep(200); assert.equal(F.w.msgs.some(m => m.type === 'actor.enter'), false, 'the far character sees nobody');
+  await sleep(200); assert.equal(F.w.msgs.some(m => m.type === 'actor.enter' && m.p.kind === 'player'), false, 'the far character sees no other player');
   const r = await walk(A.w, 0, 10, { x: 1, y: 0 });
   await B.w.wait(m => m.type === 'state' && m.p.moves.some((mv: any) => mv[0] === e.p.nid && mv[1] > e.p.x + .5));
   await walk(A.w, r.last + 1, 60, { x: 1, y: 0 }, true);   // radius 12 + margin: about 3 s of sprinting gets well clear

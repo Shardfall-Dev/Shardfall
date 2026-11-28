@@ -8,22 +8,30 @@
       positions that changed this tick are sent (state), together with your own authoritative position and the last of
       your intents the server has applied (ack), which the client uses to reconcile its prediction;
    3. the flushers send the queued messages.
+   Since Server Creatures v1, step 1b runs the creatures (server/src/world/creatures.ts): one population per realm, created
+   when the realm's first character enters, filled from the game's spawners; creatures share the interest grid, so they are
+   announced, moved and dropped exactly like characters (actor.enter carries kind 'creature').
    Nothing a client sends sets a position, a speed or a stamina value. Combat, NPCs, items and the rest are not simulated here
    yet; they will arrive as further systems in this loop, one at a time. */
 import P = require('../../../shared/protocol');
 import COL = require('../../../shared/collision');
 import MV = require('../../../shared/movement');
 import type { Terrain } from './terrain';
+import { Population, type Creature, type CreatureHost, type PopulationData, type Clock } from './creatures';
+import type { SimApi } from '../../../shared/game-rules-adapter';
 
 export interface Input { s: number; x: number; y: number; w: number; r?: boolean }
 export interface ActorInfo { characterId: string; name: string; body: string; appearance: any; title: string | null; town: string; equip: Record<string, any> }
 export interface Actor {
-  nid: number; characterId: string; accountId: string; realmId: string; info: ActorInfo;
+  kind: 'player'; nid: number; characterId: string; accountId: string; realmId: string; info: ActorInfo;
   s: MV.MoveState; ctx: MV.MoveCtx; speed: number; changed: boolean;
   inputs: Input[]; lastSeq: number; credit: number; acked: number;
   viewing: boolean; known: Set<number>; cell: number; dirty: boolean; lastSentSelf: string;
 }
 export type Sink = (a: Actor, type: string, payload: object) => void;
+/* anything with a place in the interest grid: a character or a creature */
+export type Body = Actor | Creature;
+export interface CreatureOpts { data: PopulationData; sim: SimApi; clock: Clock; seed?: number }
 
 const CELL = 16, LEAVE_MARGIN = 4, MAX_CREDIT = 3, SELF_KEEPALIVE_TICKS = 20;
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
@@ -34,13 +42,38 @@ export class World {
   private flushers = new Set<() => void>();
   readonly actors = new Map<string, Actor>();
   private byNid = new Map<number, Actor>();
-  private grid = new Map<number, Set<Actor>>();
+  private grid = new Map<number, Set<Body>>();
+  readonly populations = new Map<string, Population>();
+  private creatureOpts: CreatureOpts | null;
+  private host: CreatureHost;
   private nextNid = 1;
   private sink: Sink = () => {};
   readonly viewRadius: number;
-  stats = { ticks: 0, overruns: 0, lastStepMs: 0, maxStepMs: 0, totalStepMs: 0, inputsApplied: 0, inputsDropped: 0, inputsLate: 0, actors: 0 };
+  stats = { ticks: 0, overruns: 0, lastStepMs: 0, maxStepMs: 0, totalStepMs: 0, inputsApplied: 0, inputsDropped: 0, inputsLate: 0, actors: 0, creatures: 0, creaturesActive: 0, creatureMs: 0 };
 
-  constructor(public terrain: Terrain | null, opts: { viewRadius?: number } = {}) { this.viewRadius = opts.viewRadius || P.VIEW_RADIUS; }
+  constructor(public terrain: Terrain | null, opts: { viewRadius?: number; creatures?: CreatureOpts | null } = {}) {
+    this.viewRadius = opts.viewRadius || P.VIEW_RADIUS; this.creatureOpts = opts.creatures || null;
+    const each = (realmId: string, x: number, y: number, r: number, fn: (b: Body) => void) => {
+      const span = Math.ceil(r / CELL), cx = Math.floor(x / CELL), cy = Math.floor(y / CELL), r2 = r * r;
+      for (let gy = cy - span; gy <= cy + span; gy++) for (let gx = cx - span; gx <= cx + span; gx++) {
+        const g = this.grid.get(gy * 4096 + gx); if (!g) continue;
+        for (const o of g) if (o.realmId === realmId && (o.s.x - x) ** 2 + (o.s.y - y) ** 2 <= r2) fn(o);
+      }
+    };
+    this.host = {
+      nextNid: () => this.nextNid++,
+      place: c => this.place(c),
+      unplace: c => this.unplace(c),
+      playersNear: (realm, x, y, r, fn) => each(realm, x, y, r, b => { if (b.kind === 'player') fn(b); }),
+      playerByNid: nid => { const a = this.byNid.get(nid); return a && a.kind === 'player' ? a : null; },
+      creaturesNear: (realm, x, y, r, fn) => each(realm, x, y, r, b => { if (b.kind === 'creature') fn(b); }),
+      activeCreatures: (realm, r, fn) => {   // every creature in a grid cell within r of one of the realm's characters, once
+        const span = Math.ceil(r / CELL), cells = new Set<number>();
+        for (const a of this.actors.values()) { if (a.realmId !== realm) continue; const cx = Math.floor(a.s.x / CELL), cy = Math.floor(a.s.y / CELL); for (let gy = cy - span; gy <= cy + span; gy++) for (let gx = cx - span; gx <= cx + span; gx++) cells.add(gy * 4096 + gx); }
+        const list: Creature[] = []; for (const k of cells) { const g = this.grid.get(k); if (g) for (const o of g) if (o.kind === 'creature' && o.realmId === realm) list.push(o); }
+        for (const c of list) fn(c);
+      } };
+  }
 
   start() { if (this.timer) return; let next = Date.now() + P.TICK_MS; const loop = () => { const t0 = performance.now(); this.step(); const dt = performance.now() - t0; this.stats.lastStepMs = dt; this.stats.totalStepMs += dt; if (dt > this.stats.maxStepMs) this.stats.maxStepMs = dt; if (dt > P.TICK_MS) this.stats.overruns++; next += P.TICK_MS; const wait = Math.max(0, next - Date.now()); if (wait === 0) next = Date.now(); this.timer = setTimeout(loop, wait); }; this.timer = setTimeout(loop, P.TICK_MS); }
   stop() { if (this.timer) clearTimeout(this.timer); this.timer = null; }
@@ -50,11 +83,26 @@ export class World {
   submit(_cmd: { kind: string; characterId: string; payload: Record<string, unknown> }): boolean { return false; }
 
   private cellOf(x: number, y: number) { return Math.floor(y / CELL) * 4096 + Math.floor(x / CELL); }
-  private place(a: Actor) {
+  private place(a: Body) {
     const c = this.cellOf(a.s.x, a.s.y); if (c === a.cell) return;
     const old = this.grid.get(a.cell); if (old) { old.delete(a); if (!old.size) this.grid.delete(a.cell); }
     let g = this.grid.get(c); if (!g) this.grid.set(c, g = new Set()); g.add(a); a.cell = c;
   }
+  /* take a body out of the grid; everyone who could see it is told at once (a creature that sinks, a character that leaves) */
+  private unplace(b: Body) {
+    const g = this.grid.get(b.cell); if (g) { g.delete(b); if (!g.size) this.grid.delete(b.cell); } b.cell = -1;
+    for (const v of this.actors.values()) if (v.known.delete(b.nid) && v.viewing) this.sink(v, 'actor.leave', { nid: b.nid });
+  }
+  /* the creatures of a realm, made (and filled from the spawners) when its first character enters */
+  population(realmId: string): Population | null {
+    if (!this.creatureOpts || !this.terrain) return null;
+    let p = this.populations.get(realmId);
+    if (!p) { const o = this.creatureOpts; p = new Population(realmId, this.terrain, o.data, o.sim, o.clock, this.host, o.seed); this.populations.set(realmId, p); p.fill(); this.stats.creatures = this.creatureCount(); }
+    return p;
+  }
+  creatureCount() { let n = 0; for (const p of this.populations.values()) n += p.creatures.size; return n; }
+  /* the time of day everyone shares (null without creatures) */
+  clockInfo() { const c = this.creatureOpts && this.creatureOpts.clock; return c ? { hour: Math.round(c.hour() * 1000) / 1000, dayMinutes: c.dayMinutes, period: c.period() } : null; }
 
   /* where a character enters: its saved position if it can stand there, else its town's spawn, else Saltmarsh Quay */
   resolvePosition(pos: any, town: string): { x: number; y: number; sect: number } {
@@ -69,10 +117,11 @@ export class World {
     const had = this.actors.get(o.characterId);
     if (had) { had.viewing = true; had.known = new Set(); had.inputs = []; had.info = o.info; return { actor: had, resumed: true }; }
     const p = this.resolvePosition(o.position, o.info.town);
-    const a: Actor = { nid: this.nextNid++, characterId: o.characterId, accountId: o.accountId, realmId: o.realmId, info: o.info,
+    const a: Actor = { kind: 'player', nid: this.nextNid++, characterId: o.characterId, accountId: o.accountId, realmId: o.realmId, info: o.info,
       s: { x: p.x, y: p.y, sect: p.sect, stam: Math.min(o.stam, o.ctx.stamMax), lastDrain: -99, t: 0 }, ctx: o.ctx, speed: 0, changed: true,
       inputs: [], lastSeq: -1, credit: 0, acked: -1, viewing: true, known: new Set(), cell: -1, dirty: false, lastSentSelf: '' };
     this.actors.set(o.characterId, a); this.byNid.set(a.nid, a); this.place(a); this.stats.actors = this.actors.size;
+    this.population(o.realmId);   // the realm's creatures, filled out of this first character's sight
     return { actor: a, resumed: false };
   }
   /* detach(): the connection dropped — the character stays where it is (reconnect grace), stops moving and receives nothing */
@@ -81,8 +130,7 @@ export class World {
   remove(characterId: string): Actor | null {
     const a = this.actors.get(characterId); if (!a) return null;
     this.actors.delete(characterId); this.byNid.delete(a.nid);
-    const g = this.grid.get(a.cell); if (g) { g.delete(a); if (!g.size) this.grid.delete(a.cell); }
-    for (const v of this.actors.values()) if (v.known.delete(a.nid) && v.viewing) this.sink(v, 'actor.leave', { nid: a.nid });
+    this.unplace(a);
     this.stats.actors = this.actors.size;
     return a;
   }
@@ -97,7 +145,9 @@ export class World {
   }
   setCtx(characterId: string, ctx: MV.MoveCtx) { const a = this.actors.get(characterId); if (a) { a.ctx = ctx; a.s.stam = Math.min(a.s.stam, ctx.stamMax); } }
   /* the public face of an actor for actor.enter */
-  enterPayload(a: Actor) { return { nid: a.nid, characterId: a.characterId, name: a.info.name, body: a.info.body, appearance: a.info.appearance, title: a.info.title, town: a.info.town, equip: a.info.equip, x: r3(a.s.x), y: r3(a.s.y), sect: a.s.sect ?? 0, speed: r3(a.speed) }; }
+  enterPayload(b: Body) { return b.kind === 'creature' ? this.creaturePayload(b) : this.playerPayload(b); }
+  creaturePayload(c: Creature) { return { kind: 'creature', nid: c.nid, type: c.type, name: c.d.n, x: r3(c.s.x), y: r3(c.s.y), sect: c.s.sect, speed: r3(c.speed), hp: c.hp, max: c.max }; }
+  playerPayload(a: Actor) { return { kind: 'player', nid: a.nid, characterId: a.characterId, name: a.info.name, body: a.info.body, appearance: a.info.appearance, title: a.info.title, town: a.info.town, equip: a.info.equip, x: r3(a.s.x), y: r3(a.s.y), sect: a.s.sect ?? 0, speed: r3(a.speed) }; }
   selfPayload(a: Actor) { return { nid: a.nid, x: a.s.x, y: a.s.y, sect: a.s.sect ?? 0, stam: a.s.stam, stamMax: a.ctx.stamMax, ack: a.acked, t: a.s.t, ld: a.s.lastDrain }; }
 
   step() {
@@ -119,6 +169,8 @@ export class World {
         a.changed = a.s.x !== x0 || a.s.y !== y0 || a.s.sect !== s0 || (a.speed === 0) !== (moved === 0);
         if (moved) { a.dirty = true; this.place(a); }
       }
+      // 1b. creatures
+      if (this.populations.size) { const c0 = performance.now(); let act = 0; for (const p of this.populations.values()) { p.step(); act += p.stats.active; } this.stats.creaturesActive = act; this.stats.creatures = this.creatureCount(); this.stats.creatureMs += performance.now() - c0; }
       // 2. interest management and state
       const R = this.viewRadius, R2 = R * R, L2 = (R + LEAVE_MARGIN) ** 2, span = Math.ceil((R + LEAVE_MARGIN) / CELL);
       for (const v of this.actors.values()) {

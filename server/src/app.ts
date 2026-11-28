@@ -17,6 +17,7 @@ import { Characters } from './characters/service';
 import { registerCharacterRoutes } from './characters/routes';
 import { World } from './world/world';
 import { loadTerrain } from './world/terrain';
+import { loadPopulation, worldClock } from './world/creatures';
 import { Gateway } from './realtime/gateway';
 import P = require('../../shared/protocol');
 import adapter = require('../../shared/game-rules-adapter');
@@ -43,7 +44,8 @@ export async function buildApp(cfg: Config, opts: { db?: Db } = {}): Promise<App
   const sessions = new Sessions(db, cfg, auth);
   const guards = makeGuards(cfg, sessions);
   const chars = new Characters(db, rules, cfg.characterPurgeDays);
-  const world = new World(loadTerrain(cfg.repoRoot), { viewRadius: cfg.viewRadius });
+  const terrain = loadTerrain(cfg.repoRoot); const sim = adapter.loadSim();
+  const world = new World(terrain, { viewRadius: cfg.viewRadius, creatures: cfg.creatures ? { data: loadPopulation(cfg.repoRoot, terrain), sim, clock: worldClock(sim) } : null });
   const gateway = new Gateway(cfg, sessions, chars, world, app.log);
 
   await app.register(cookie);

@@ -130,4 +130,4 @@ A v1 client is refused with `protocol_mismatch` (close 4005), and the page reloa
   - the walking animation for others is the tinted body sheet (or the layered gear art when that setting is on). Weapons
     drawn and combat poses come with combat.
 - **Next:** server-owned creatures and NPCs in the world loop (with the same interest management), then combat, then items
-  and the economy — one subsystem at a time.
+  and the economy — one subsystem at a time. Creatures arrived in v0.41: [CREATURES.md](CREATURES.md).

@@ -18,3 +18,16 @@ export interface RulesApi {
   itemName(id: string): string; townName(id: string): string; title(ch: any): string;
 }
 export declare function load(srcDir?: string): RulesApi;
+export interface SimClock { hourAt(t: number): number; dayAt(t: number): number; periodAt(t: number): string; secondsPerHour(): number; readonly dayMinutes: number }
+export interface SimFactions { hostile(a: string, b: string): boolean; friendly(a: string, b: string): boolean }
+export interface SimApi {
+  CLOCK: { dayMinutes: number; startHour: number };
+  newClock(saved?: { dayMinutes?: number; offset?: number }, cfg?: { dayMinutes?: number; startHour?: number }): SimClock;
+  lightAt(hour: number): { dark: number; period: string };
+  activityOf(hours: string, period: string): 'active' | 'rest' | 'sleep';
+  senseRange(p: { sight: number; hear: number; nightVision: number }, c: { dark: number; activity: string; alert: boolean }): { sight: number; hear: number };
+  detect(p: { sight: number; hear: number; nightVision: number }, c: { dark: number; activity: string; alert: boolean }, d: number, o: { los: boolean; moving: boolean; noisy: boolean; hidden: boolean }): 'seen' | 'heard' | null;
+  newFactions(rules: unknown, opt?: unknown): SimFactions; FACTION_RULES: unknown;
+  stream(seed: number, name: string): () => number;
+}
+export declare function loadSim(srcDir?: string): SimApi;

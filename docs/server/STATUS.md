@@ -1,5 +1,22 @@
 # Server status
 
+## Phase 3 — Server Creatures v1 (branch `feature/server-creatures-v1`, build v0.41)
+
+The wildlife and monsters live on the server: one population per realm from the game's own 417 spawners, one world clock,
+roaming, herds bolting, hostile creatures stalking players to striking distance and giving up at their limits. Nobody is
+attacked yet (combat is next). Details: [CREATURES.md](CREATURES.md).
+
+| Area | State |
+| --- | --- |
+| Data | `population.json` + `ground.bin.gz` exported from the build; deterministic; creature footing equal to the game's on 102 000 points; checked in CI |
+| Simulation | Tiers (56 tiles), idle by activity hours, packs, senses by `SIM`, flee, stalk, return, graveyards by night, separation; seeded per realm |
+| Protocol | v3: `actor.enter` with `kind` (`player` / `creature`), the world clock in the welcome |
+| Client | Creatures drawn with the game's art and interpolated; the HUD clock and light follow the server |
+| Cost | ~890 creatures, about 0.1 ms per tick with one player; 120 spread-out players under 8 ms (unit test) |
+| Not yet | Combat, creature-vs-creature hunting, feeding, sorties, camp clearance, creature persistence, NPCs |
+
+---
+
 ## Phase 2 — Server Movement v1 (branch `feature/server-movement-v1.1`, build v0.40)
 
 Online characters walk the real Anniabreen map together in the game's renderer. Walking is server-authoritative: the client
