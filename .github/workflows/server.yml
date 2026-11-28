@@ -1,0 +1,62 @@
+# Server Foundation v1 checks: type check, unit tests, then the integration suites against the real stack —
+# PostgreSQL 16, Supabase Auth (GoTrue) and Mailpit from server/dev/docker-compose.yml — and the browser flow (two accounts,
+# email verification, roster, creator, presence lobby, offline save untouched) in Chrome on desktop and phone sizes.
+name: Server
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install (exact versions from package.json)
+        run: |
+          if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi
+          npm ls --depth=0
+      - name: Type check
+        run: npm run typecheck
+      - name: Unit tests (protocol, rules adapter, crypto)
+        run: npm run test:unit
+      - name: Start PostgreSQL, Supabase Auth and Mailpit
+        run: docker compose -f server/dev/docker-compose.yml up -d --wait
+      - name: Migrations on a fresh database, twice (the second run must be a no-op)
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:54329/postgres
+        run: npm run migrate && npm run migrate
+      - name: Integration tests (auth, characters, realtime)
+        run: npm run test:server
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Browser flow (desktop and phone)
+        env:
+          E2E_SHOTS: ${{ runner.temp }}/e2e-shots
+          E2E_PRINT_SHOTS: '1'
+        run: |
+          pip install playwright
+          python3 tests/e2e/online_flow.py
+      - name: Production image builds and loads the game rules
+        run: |
+          docker build -f server/Dockerfile -t shardfall-server .
+          docker run --rm shardfall-server node -e "const r=require('./shared/game-rules-adapter').load(); console.log('rules ok', Object.keys(r.RULES_VERSION).join(','))"
+      - name: Screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-foundation-screenshots
+          path: ${{ runner.temp }}/e2e-shots
+          if-no-files-found: ignore
+      - name: Service logs on failure
+        if: failure()
+        run: docker compose -f server/dev/docker-compose.yml logs --tail=200

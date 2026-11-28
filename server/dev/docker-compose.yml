@@ -1,0 +1,74 @@
+# Local development and CI: PostgreSQL 16, Supabase Auth (the same GoTrue server supabase.co runs) and Mailpit (catches the
+# confirmation and reset emails; open http://localhost:8025). Development credentials only — nothing here is a secret and
+# none of it is used in production. Start: docker compose -f server/dev/docker-compose.yml up -d --wait
+# The Supabase CLI (`supabase start`) is the alternative; see docs/server/LOCAL_DEVELOPMENT.md.
+name: shardfall-dev
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports: ["54329:5432"]
+    volumes:
+      - ./init-auth.sql:/docker-entrypoint-initdb.d/00-init-auth.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  mail:
+    image: axllent/mailpit:v1.21.8
+    ports: ["8025:8025", "1025:1025"]
+  auth:
+    image: supabase/gotrue:v2.186.0
+    depends_on:
+      db: { condition: service_healthy }
+      mail: { condition: service_started }
+    ports: ["9999:9999"]
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: "9999"
+      PORT: "9999"
+      API_EXTERNAL_URL: http://localhost:9999
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:auth_dev_password@db:5432/postgres
+      GOTRUE_SITE_URL: http://localhost:8787
+      GOTRUE_URI_ALLOW_LIST: "http://localhost:*/**,http://127.0.0.1:*/**"
+      GOTRUE_DISABLE_SIGNUP: "false"
+      GOTRUE_JWT_SECRET: shardfall-local-dev-jwt-secret-not-for-production-use
+      GOTRUE_JWT_EXP: "3600"
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "false"
+      GOTRUE_MAILER_URLPATHS_CONFIRMATION: /verify
+      GOTRUE_MAILER_URLPATHS_RECOVERY: /verify
+      GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: /verify
+      GOTRUE_MAILER_URLPATHS_INVITE: /verify
+      GOTRUE_SMTP_HOST: mail
+      GOTRUE_SMTP_PORT: "1025"
+      GOTRUE_SMTP_ADMIN_EMAIL: noreply@shardfall.local
+      GOTRUE_SMTP_SENDER_NAME: Shardfall
+      GOTRUE_SMTP_MAX_FREQUENCY: 1s
+      GOTRUE_PASSWORD_MIN_LENGTH: "10"
+      GOTRUE_SECURITY_MANUAL_LINKING_ENABLED: "true"
+      GOTRUE_SECURITY_REFRESH_TOKEN_ROTATION_ENABLED: "true"
+      GOTRUE_RATE_LIMIT_EMAIL_SENT: "100000"
+      GOTRUE_RATE_LIMIT_SIGN_IN_SIGN_UPS: "100000"
+      GOTRUE_RATE_LIMIT_TOKEN_REFRESH: "100000"
+      GOTRUE_RATE_LIMIT_VERIFY: "100000"
+      GOTRUE_RATE_LIMIT_OTP: "100000"
+      # Test fixture for the Google button plumbing only: Supabase Auth builds the provider redirect, nothing is sent to
+      # Google with these placeholder values and no real Google sign-in can succeed with them.
+      GOTRUE_EXTERNAL_GOOGLE_ENABLED: "true"
+      GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID: placeholder-client-id.apps.googleusercontent.com
+      GOTRUE_EXTERNAL_GOOGLE_SECRET: placeholder-secret
+      GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI: http://localhost:9999/callback
+      GOTRUE_LOG_LEVEL: info
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9999/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
