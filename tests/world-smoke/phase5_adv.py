@@ -70,6 +70,7 @@ with sync_playwright() as p:
   check(r['loot'] > 0 and r['lawful'] and r['gains'] > 0, f"they loot their own kills ({r['loot']} bodies, all lawful) and learn from use ({r['gains']} skill gains)", r)
 
   # 3. First Aid by the player's rules: a bandage after the delay; a blow makes the fingers slip; a draught when low
+  pg.evaluate('(' + (SEED % 5) + ')(__SF)')   # a fixed draw for the bandage roll, whatever the hunting run above consumed
   r = J(pg, """() => { const S = __SF, T = __T, e = T.stage(T.A('Aldric'), T.wild(S.lifeTownGeo('vespar').center.x + 70, S.lifeTownGeo('vespar').center.y)); e.hp = Math.round(e.max * .5);
     const b0 = SF.count(e.pack, 'bandage'), s0 = T.seq(); T.run(.2); const started = !!e.adv.tend, kind = e.adv.tend && e.adv.tend.kind;
     const rat = T.mon('rat', e, 1.2); S.damageActor(e, 2, 'phys', rat); const slips = e.adv.tend ? e.adv.tend.slips : -1; S.rmEnt(rat); e.foe = null;
