@@ -5,7 +5,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="screen-orientation" content="landscape">
-<title>Shardfall v0.37</title>
+<title>Shardfall v0.39</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=Alegreya+Sans:wght@400;500;700&family=Cinzel:wght@600;700&display=swap" rel="stylesheet">
 <style>
@@ -3397,7 +3397,7 @@ SIM.newRegistry = newRegistry;
    without bound. Movement is transient: it is never kept. */
 SIM.EVENT_TYPES = ['ActorSpawned', 'ActorRemoved', 'ActorMoved', 'ActorDamaged', 'ActorHealed', 'ActorKilled', 'CombatStarted', 'CombatEnded',
   'ItemTransferred', 'ItemCrafted', 'CrimeCommitted', 'CrimeWitnessed', 'ResourceGathered', 'MerchantArrived', 'CampCleared', 'PopulationReplenished', 'AppearanceChanged',
-  'StatChanged', 'CharacterCreated', 'AggressionRecorded', 'MurderReported', 'NotorietyChanged', 'SpellCast', 'ActorResurrected', 'CorpseLooted'];   // SpellCast, ActorResurrected, CorpseLooted: v0.36 NPC adventurers (phase 5 step 3); AggressionRecorded … NotorietyChanged: v0.34 law (phase 5 step 2); AppearanceChanged: v0.25 equipment, for the future layered sprites; StatChanged, CharacterCreated: v0.30 natural attributes and creation
+  'StatChanged', 'CharacterCreated', 'AggressionRecorded', 'MurderReported', 'NotorietyChanged', 'SpellCast', 'ActorResurrected', 'CorpseLooted', 'ActorReturned'];   // ActorReturned: v0.39 a dead townsperson back home (phase 5 step 4);   // SpellCast, ActorResurrected, CorpseLooted: v0.36 NPC adventurers (phase 5 step 3); AggressionRecorded … NotorietyChanged: v0.34 law (phase 5 step 2); AppearanceChanged: v0.25 equipment, for the future layered sprites; StatChanged, CharacterCreated: v0.30 natural attributes and creation
 SIM.TRANSIENT = { ActorMoved: 1 };
 function newBus(opt) {
   opt = opt || {}; const cap = opt.cap || 256, clock = opt.clock || (() => 0), known = new Set(SIM.EVENT_TYPES);
@@ -3993,6 +3993,70 @@ SIM.advShopping = (style, have, gold, prices, reagents, cfg) => {
 };
 /* the resurrection policy for a dead adventurer */
 SIM.advAfterDeath = cfg => { const p = (cfg || SIM.ADV_CFG).res; return p === 'replace' || p === 'none' ? p : 'healer'; };
+
+/* ---------------- NPC death and NPC crime (§19, §20; Living World phase 5 step 4) ----------------
+   Townsfolk and guards die at 0 health instead of being knocked down: one death transaction, a body holding what they really
+   wore and carried, loot rights, murder reports. Then, like UO's vendors, they come back after a while (the same person, so
+   shops, quests and schedules keep working). The game side is src/npcdeath.js; these are the data and pure decisions. */
+SIM.NPCD_VERSION = 1;
+SIM.NPCD_CFG = {
+  policy: 'return',     // 'return': everyone comes back after `back` seconds; 'none': only the people the town cannot do without come back
+  back: 600,            // seconds dead before a townsperson is back at home
+  unseen: 120,          // extra seconds a return may wait for nobody to be watching the spot (after that it happens anyway)
+  purse: { guard: [15, 40], shop: [20, 60], smith: [20, 60], innkeeper: [25, 70], scholar: [10, 30], astronomer: [10, 30], default: [3, 20] } };
+/* professions the towns cannot do without: shops, guards, the travelling merchant */
+SIM.NPCD_ESSENTIAL = { guard: 1, trader: 1, shop: 1, smith: 1, innkeeper: 1, scholar: 1, astronomer: 1 };
+SIM.npcdReturns = (prof, cfg) => (cfg || SIM.NPCD_CFG).policy !== 'none' || !!SIM.NPCD_ESSENTIAL[prof];
+/* pocket gold on a townsperson's body: their own purse when they keep one (life.gold), else a roll in the profession's range */
+SIM.npcdPurse = (prof, own, rnd, cfg) => {
+  if (Number.isFinite(own) && own >= 0) return Math.floor(own);
+  const P = (cfg || SIM.NPCD_CFG).purse, r = P[prof] || P.default; return r[0] + Math.floor((typeof rnd === 'number' ? rnd : .5) * (r[1] - r[0] + 1));
+};
+/* may a dead townsperson come back now? waited: seconds dead; seen: someone would watch it appear at home */
+SIM.npcdReady = (waited, seen, cfg) => { cfg = cfg || SIM.NPCD_CFG; return waited >= cfg.back && (!seen || waited >= cfg.back + cfg.unseen); };
+/* saved bodies: [{ owner, key, x, y, left, diedAgo, items, gear }] → the rows to restore. One row per key (owner@time of death),
+   only known owners, only items that exist, never an expired body. Returns { rows, dropped } */
+SIM.npcdBodyRows = (rows, o) => {
+  const out = [], seen = new Set(), dropped = {}; const drop = k => { dropped[k] = (dropped[k] || 0) + 1; };
+  for (const r of Array.isArray(rows) ? rows : []) {
+    if (!r || typeof r !== 'object') { drop('shape'); continue; }
+    if (typeof r.owner !== 'string' || !o.validOwner(r.owner)) { drop('owner'); continue; }
+    const key = typeof r.key === 'string' && r.key ? r.key : null; if (!key || seen.has(key)) { drop('duplicate'); continue; }
+    if (![r.x, r.y, r.left].every(Number.isFinite) || r.left <= 0) { drop('number'); continue; }
+    if (!Array.isArray(r.items)) { drop('items'); continue; }
+    seen.add(key); out.push(Object.assign({}, r, { items: r.items.filter(it => it && o.validItem(it)) }));
+  }
+  return { rows: out, dropped };
+};
+
+/* NPC criminals (§19: "criminal NPCs may loot illegally and receive consequences"). Two outlaws on the adventurer controller,
+   living at the outlaw camp: a cutthroat who preys on lone people in the wild (murder) and a cutpurse who loots bodies it has no
+   right to (crime). Both obey the same law as you: grey or red, guards and witnesses react, anyone may fight them lawfully. */
+SIM.CRIM_CFG = { preyRatio: .8, preyOnPlayer: true, crimeGap: 240, bodySight: 18, guardWary: 16, sight: 16 };
+Object.assign(SIM.ADV_STYLES, {
+  cutthroat: { style: 'melee', crim: 'murderer', str: 85, dex: 70, int: 30, skills: { swordsmanship: 75, tactics: 75, anatomy: 60, healing: 50, parrying: 45, hiding: 40, wrestling: 45 },
+    weapon: 'sword', shield: null, wear: ['leather_cap', 'studded_tunic', 'leather_gloves', 'leather_leggings', 'boots', 'cloak', 'shirt', 'trousers'], kit: { bandage: 10, draught: 1 }, cloth: 'charcoal' },
+  cutpurse:  { style: 'melee', crim: 'thief', str: 60, dex: 85, int: 45, skills: { fencing: 62, tactics: 55, hiding: 60, stealing: 60, snooping: 55, lockpicking: 40, healing: 40, wrestling: 40 },
+    weapon: 'dagger', shield: null, wear: ['leather_cap', 'leather_tunic', 'leather_leggings', 'shoes', 'cloak', 'shirt', 'trousers'], kit: { bandage: 8, draught: 1 }, cloth: 'ochre' } });
+SIM.CRIM_ROSTER = [['Vesk, cutthroat', 'cutthroat', 'camp', .9, 'male'], ['Mott, cutpurse', 'cutpurse', 'camp', .45, 'male']];
+/* whom a cutthroat attacks. cands: [{ id, dist, ratio (their strength / its own), guarded (a guard or the law is near), hpF }].
+   The weakest, nearest person it expects to beat, never where a guard would see it. */
+SIM.crimPrey = (cands, cfg) => {
+  cfg = cfg || SIM.CRIM_CFG; let best = null, bs = -1e9;
+  for (const c of cands) {
+    if (c.guarded || !(c.ratio < cfg.preyRatio)) continue;
+    const s = (1 - c.ratio) + .5 * (1 - Math.min(1, c.dist / cfg.sight)) + .3 * (1 - (c.hpF ?? 1));
+    if (s > bs || (s === bs && best && String(c.id) < String(best.id))) { bs = s; best = c; }
+  }
+  return best;
+};
+/* which body a criminal loots. cands: [{ key, dist, lawful (it has the right), items (worth taking), guarded }] — a thief takes what it
+   has no right to as readily as what it does, but not under a guard's eyes; it ignores bodies with nothing worth carrying */
+SIM.crimBody = (cands, cfg) => {
+  cfg = cfg || SIM.CRIM_CFG; let best = null;
+  for (const c of cands) { if (c.guarded || !(c.items > 0) || c.dist > cfg.bodySight) continue; if (!best || c.dist < best.dist || (c.dist === best.dist && String(c.key) < String(best.key))) best = c; }
+  return best;
+};
 
 if (typeof module !== 'undefined' && module.exports) module.exports = SIM; else root.SIM = SIM;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
@@ -5744,7 +5808,7 @@ function devRender() {
   paths: queue ${NAV.jobs.length} (+${NAV.low.length} background) · cache ${NAV.cache.size} · searched ${NAV.searches} · failed ${NAV.failed} · cache hits ${NAV.hits}<br>
   AI ${DEV.aiMs.toFixed(3)} ms/step · audio voices ${SFXA.stats.voices} · save ${saveKB} · last save ${ls ? (ls.ok ? 'ok' : 'FAILED') + ' at ' + Math.round(ls.at) + ' s' : '—'}<br>
   ${devEco()}<br>
-  ${lifeDev()}<br>${npcFightDev()}<br>${lawDev()}<br>${advDev()}
+  ${lifeDev()}<br>${npcFightDev()}<br>${lawDev()}<br>${advDev()}<br>${npcdDev()}
   <hr style="border-color:#334">
   ${B('hour', 'Dawn', 'data-h="5.5"')}${B('hour', 'Noon', 'data-h="12"')}${B('hour', 'Dusk', 'data-h="17.8"')}${B('hour', 'Midnight', 'data-h="0"')}${B('shift', '−1 h', 'data-h="-1"')}${B('shift', '+1 h', 'data-h="1"')}${B('daynight', 'Day/night')}<br>
   ${B('pause', SIMPAUSE ? 'Resume' : 'Pause')}${B('step', 'Step')}${B('adv', 'Run +1 min', 'data-s="60"')}${B('adv', 'Run +10 min', 'data-s="600"')}${DEV.advance ? ' running… ' + Math.ceil(DEV.advance) + ' s' : ''}${B('save', 'Save now')}<br>
@@ -6466,10 +6530,11 @@ function lifeDev() {
    Positions are not saved: a load places everyone where the clock says (lifeResume). */
 function lifeSave() {
   const npcs = {}; for (const e of LIFE.npcs) { if (!e.actorId || e.gone) continue; const L = e.life; npcs[e.actorId] = { needs: L.needs, mem: L.mem.save(), carry: L.carry || 0, gold: L.gold ?? null }; const f = npcSave(e); if (f) npcs[e.actorId].fight = f; }
-  const t = LIFE.trader && LIFE.trader.life; return { v: 1, npcs, stock: LIFE.stock, trader: t ? { town: t.town, legs: t.legs, gold: t.gold } : null, law: lawSave() };   // law: v0.34, additive
+  const t = LIFE.trader && LIFE.trader.life; return { v: 1, npcs, stock: LIFE.stock, trader: t ? { town: t.town, legs: t.legs, gold: t.gold } : null, law: lawSave(), npcd: npcdSave() };   // npcd: v0.39 the dead and their bodies, additive   // law: v0.34, additive
 }
 function lifeLoad(saved) {
   lawLoad(saved && saved.law);   // a new character starts with a clean record
+  npcdLoad(saved && saved.npcd);   // v0.39: who is dead, for how long, and their bodies (src/npcdeath.js); a new character: nobody
   if (!saved || !saved.npcs) return;
   for (const e of LIFE.npcs) { const r = e.actorId && saved.npcs[e.actorId]; if (!r) continue; const L = e.life; L.needs = SIM.newNeeds(r.needs); L.mem = SIM.newMemory(8, r.mem); if (r.carry !== undefined) L.carry = r.carry; if (r.gold !== null && r.gold !== undefined) L.gold = r.gold; if (r.fight) npcLoad(e, r.fight); }
   if (saved.stock) for (const k in saved.stock) LIFE.stock[k] = Object.assign(LIFE.stock[k] || {}, saved.stock[k]);
@@ -6486,8 +6551,9 @@ function lifeLoad(saved) {
        their halberds, give up when it leaves the jurisdiction, and go back to patrolling. They also answer a cry for help.
      · Everyone else runs: a hit townsperson drops what they are doing and shelters (phase 4's danger response), shouting for
        the guards; the merchant hurries on.
-     · At 0 health an NPC is knocked down, not killed: creatures lose interest, and after NPC_DOWN_TIME they get up with a
-       third of their health and go home to recover. Real NPC death, corpses and looting are phase 5 step 4.
+     · At 0 health an NPC dies (since v0.39, src/npcdeath.js npcDies): a body with what it wore and carried, loot rights, murder
+       reports; the same person is back at home ten minutes later. (v0.30–v0.38 knocked them down instead; npcDown / npcRise remain
+       only for that history and are no longer called.)
      · Since v0.34 (phase 5 step 2, src/law.js) you can attack townsfolk: it is a crime unless they are grey or red or you have
        a right over them, witnesses call the guards, and the guards fight you inside their jurisdiction like any creature.
    Pure numbers live here as data; the game's existing functions call in through npcFighter / damageNpc / npcCombatTick. */
@@ -6521,7 +6587,7 @@ function npcArm(e) {
   e.eqMig = SF.EQ.MIGRATION; e.max = Math.round(SF.maxHp(e) * F.hp); e.hp = e.max; e.stam = e.dex; e.sw = SF.newSwing(); e.downed = false; e.downAt = 0; e.foe = null;
 }
 const npcCombatant = e => !!e && e.kind === 'npc' && !!e.npcFight;
-const npcUp = e => npcCombatant(e) && !e.gone && !e.downed && !e.ghost;   // ghost: a dead NPC adventurer (v0.36)
+const npcUp = e => npcCombatant(e) && !e.gone && !e.downed && !e.ghost && !e.npcDead;   // ghost: a dead NPC adventurer (v0.36)
 
 /* ---------- taking a blow (damageActor routes every NPC here) ---------- */
 function damageNpc(e, amt, kind, src, hx) {
@@ -6541,11 +6607,11 @@ function damageNpc(e, amt, kind, src, hx) {
     else npcFlee(e, who);
     npcCallGuards(e, who);
   }
-  if (e.hp <= 0) npcDown(e, src);
+  if (e.hp <= 0) npcDies(e, src);   // since v0.39 (phase 5 step 4) a death with a body, not a knock-down (src/npcdeath.js)
 }
 /* a townsperson under attack runs for shelter at once and remembers why */
 function npcFlee(e, src, what) {
-  const L = e.life; if (!L) return; SIM.frighten(L.needs, 1); L.needs.safety = 1; const who = src === P ? P.name : 'a ' + src.name;
+  const L = e.life; if (!L) return; SIM.frighten(L.needs, 1); L.needs.safety = 1; const who = src === P ? P.name : src.kind === 'npc' ? String(src.name).split(',')[0] : 'a ' + src.name;
   if (what === 'looting') what = 'theft';   // a looted body is theft to the onlookers (v0.36)
   if (L.prof === 'trader') { L.hurry = true; L.mind.why = (what === 'theft' ? 'robbed by ' : 'attacked by ') + who + ' on the road'; }
   else { L.mind.act = null; L.thinkAt = 0; L.goal = null; }
@@ -6615,6 +6681,7 @@ function guardFightTick(g, dt) {
     g.scanAt = GT + .5; let best = null, bd = NPC_GUARD_SIGHT;
     ECOS.grid.query(g.x, g.y, NPC_GUARD_SIGHT, c => { if (!npcThreat(g, c)) return; const d = dist(g, c); if (d < bd && npcInJurisdiction(g, c, 0) && los(g, c)) { bd = d; best = c; } });
     if (best) npcEngage(g, best, 'defending ' + (best.target === P ? 'you' : best.target && best.target.name ? best.target.name.split(',')[0] : 'the town') + ' from a ' + best.name);
+    else if ((best = lawOutlawSeen(g))) npcEngage(g, best, (notoOf(best) === 'murderer' ? 'a murderer: ' : 'a criminal: ') + best.name.split(',')[0]);   // grey and red NPC outlaws (v0.39)
     else if (lawGuardTarget(g, P) && !P.hidden && dist(g, P) < NPC_GUARD_SIGHT && npcInJurisdiction(g, P, 0) && los(g, P)) npcEngage(g, P, notoOf(P) === 'murderer' ? 'a murderer in town' : notoOf(P) === 'criminal' ? 'a criminal in town' : 'you attacked him');
   }
   const c = g.foe; if (!c) return false;
@@ -6634,9 +6701,9 @@ function guardFightTick(g, dt) {
 
 /* ---------- save: health and the knock-down timer by actor id (life save carries it) ---------- */
 function npcSave(e) { if (!npcCombatant(e)) return null; if (e.hp >= e.max && !e.downed) return null; return { hp: Math.round(e.hp), down: e.downed ? Math.max(1e-3, NPC_DOWN_TIME - (GT - e.downAt)) : 0 }; }
-function npcLoad(e, r) { if (!npcCombatant(e) || !r) return; e.hp = cl(Math.round(r.hp) || 0, 0, e.max); if (r.down > 0) { e.downed = true; e.downAt = GT - (NPC_DOWN_TIME - r.down); e.hp = 0; e.nav = null; } else if (e.hp <= 0) e.hp = 1; }
+function npcLoad(e, r) { if (!npcCombatant(e) || !r) return; e.hp = cl(Math.round(r.hp) || 0, 0, e.max); if (r.down > 0) e.hp = Math.max(1, Math.round(e.max / 3)); else if (e.hp <= 0) e.hp = 1; }   // a knock-down saved by v0.30–v0.38: up again (v0.39 has no knock-downs)
 function npcFightDev() { const up = LIFE.npcs.filter(npcUp), dn = LIFE.npcs.filter(e => e.downed).length, fighting = LIFE.npcs.filter(e => e.foe && fighterAlive(e.foe)).length, hurt = up.filter(e => e.hp < e.max).length;
-  return `npc combat: ${fighting} guards fighting · ${dn} knocked down · ${hurt} hurt · hits taken ${NPCF.hitsTaken}, downs ${NPCF.downs}, rises ${NPCF.rises}, guard fights ${NPCF.guardFights}, guard kills ${NPCF.guardKills}, calls ${NPCF.calls}`; }
+  return `npc combat: ${fighting} guards fighting · ${NPCD.dead.length} dead · ${hurt} hurt · hits taken ${NPCF.hitsTaken}, deaths ${NPCD.stats.deaths}, guard fights ${NPCF.guardFights}, guard kills ${NPCF.guardKills}, calls ${NPCF.calls}`; }
 /* ================= LAW (Living World phase 5, step 2, v0.34; master spec §19) =================
    Criminality and murder in single-player, on top of the pure law core in src/world.js (SIM.newLaw):
      · Notoriety for every human that has one: you and the townsfolk with a life (blue innocent, grey criminal, red murderer).
@@ -6649,10 +6716,11 @@ function npcFightDev() { const up = LIFE.npcs.filter(npcUp), dn = LIFE.npcs.filt
        and will not deal with you for a while. Guards who see it or hear the cry come for you inside their jurisdiction.
      · Guards fight criminals and murderers inside their town's jurisdiction with the same guardFightTick they use on creatures,
        and give up when you leave it, hide, die or stop being a lawful target (the flag runs out and you are not red).
-     · Murder counts: an innocent knocked down by someone with no right over them reports a murder (until phase 5 step 4
-       gives townsfolk real death, a knock-down is the death). Short-term counts last 8 active hours, long-term 40; five
+     · Murder counts: an innocent killed by someone with no right over them reports a murder (since v0.39 townsfolk really die,
+       src/npcdeath.js; v0.34–v0.38 counted the knock-down). Short-term counts last 8 active hours, long-term 40; five
        long-term counts make you red. Townsfolk refuse to talk or trade with a murderer; guards attack one on sight.
-     · If an NPC kills you unlawfully, the ghost window offers to report the murder (no NPC can do that yet; the path is ready).
+     · If an NPC kills you unlawfully, the ghost window offers to report the murder (since v0.39 the cutthroat can).
+     · Since v0.39 NPCs commit crimes too (src/npcdeath.js): the same records, flags, witnesses and guards apply to them.
    Saved in the life block (additive): the law core's records, flags, counts and handled deaths, by actor id. */
 
 const LAW_WITNESS = 14;          // a townsperson sees a crime this far away, in sight
@@ -6680,8 +6748,15 @@ function lawRegion(x, y) {
 }
 /* may this guard fight t now? creatures by the creature rules; you when grey or red, or when you attacked him */
 function lawGuardTarget(g, t) {
-  if (!t || t !== P || P.ghost) return false; const n = notoOf(P);
-  return n === 'criminal' || n === 'murderer' || (!!g && LAW.rights(aidOf(g), aidOf(P), GT));
+  if (!t) return false;
+  if (t === P) { if (P.ghost) return false; } else if (!(t.adv && npcUp(t))) return false;   // since v0.39 also NPC adventurers and outlaws (src/npcdeath.js)
+  const n = notoOf(t); return n === 'criminal' || n === 'murderer' || (!!g && LAW.rights(aidOf(g), aidOf(t), GT));
+}
+/* a grey or red NPC this guard can see inside its jurisdiction (guardFightTick, src/npcfight.js) */
+function lawOutlawSeen(g) {
+  let best = null, bd = NPC_GUARD_SIGHT;
+  for (const c of ADV.list) { if (c === g || !lawGuardTarget(g, c)) continue; const d = dist(g, c); if (d < bd && npcInJurisdiction(g, c, 0) && los(g, c)) { bd = d; best = c; } }
+  return best;
 }
 
 /* ---------- an attack on a human (swingAt calls this before the blow; damageNpc again for anything else) ---------- */
@@ -6693,7 +6768,7 @@ function lawAggress(a, v) {
   if (r.crime && r.fresh) lawCrimeDone(who, v, 'assault', before);
   return r;
 }
-/* any other crime (theft today; illegal looting in step 4) */
+/* any other crime: theft, illegal looting (v0.39) */
 function lawCrime(off, victim, what) {
   const who = lawResponsible(off) || off, before = notoOf(who); LAW.crime(aidOf(who), GT, what); lawCrimeDone(who, victim, what, before);
 }
@@ -6703,6 +6778,9 @@ function lawCrimeDone(off, victim, what, before) {
     const nm = victim && victim.name ? victim.name.split(',')[0] : 'someone';
     if (before === 'innocent') log(what === 'theft' ? `You are caught stealing from ${nm}. You are a criminal for two minutes.` : what === 'looting' ? `You loot ${nm}'s body. You are a criminal for two minutes.` : `You attack ${nm}, an innocent. You are a criminal for two minutes.`, '#ff8a6a');
     else if (before === 'criminal') log('Your criminal flag is renewed.', '#ff8a6a');
+  } else if (off && off.kind === 'npc' && P && dist(off, P) < 24) {   // NPC crime you can see (v0.39)
+    const nm = victim === P ? 'you' : victim && victim.name ? victim.name.split(',')[0] : 'someone', on = off.name.split(',')[0];
+    log(what === 'looting' ? `${on} loots ${victim === P ? 'your' : nm + "'s"} body!` : what === 'theft' ? `${on} steals from ${nm}!` : `${on} attacks ${nm}!`, victim === P ? '#ff6a5a' : '#ffb070');
   }
   lawWitness(off, victim, what); lawNotoCheck();
 }
@@ -6731,6 +6809,7 @@ function lawDowned(e, src) {
   if (e.life) e.life.mem.note(GT, 'murdered by', aidOf(who), { x: Math.round(e.x), y: Math.round(e.y) }, 0);
   if (who === P) { log(`${e.name.split(',')[0]} reports you for murder. Murder counts: ${r.short} short-term, ${r.long} long-term.`, '#ff6a5a');
     if (r.red) log('You are now known as a murderer. Guards attack you on sight and townsfolk will not deal with you.', '#ff4848'); }
+  else if (who.kind === 'npc' && P && dist(e, P) < 30) log(`${e.name.split(',')[0]} was murdered by ${who.name.split(',')[0]}.${r.red ? ' ' + who.name.split(',')[0] + ' is now a known murderer.' : ''}`, '#ff6a5a');
   lawNotoCheck(before); return r;
 }
 /* you died: if an NPC killed you with no right over you, the ghost window offers a report */
@@ -6803,7 +6882,13 @@ const ADV_REAGENTS = Object.keys(SF.MAGERY.REAGENTS);
 const ADV_KEEP = { gold: 1, bandage: 1, draught: 1, arrow: 1, spellbook: 1, garment: 1, journal: 1 };   // never sold
 for (const r of ADV_REAGENTS) ADV_KEEP[r] = 1;
 const ADV_SPELL_COL = { 'magery.05': '#ffd27a', 'magery.18': '#ff7a30', 'magery.42': '#5fe0d0', 'magery.30': '#e0f0ff', 'magery.12': '#c8a0ff' };
-const ADV_TOWN_N = { vespar: 'Vespar', mynoc: 'Mynoc', skara: 'Skara Bryn', moonglen: 'Moonglen' };
+const ADV_TOWN_N = { vespar: 'Vespar', mynoc: 'Mynoc', skara: 'Skara Bryn', moonglen: 'Moonglen', camp: 'the Ashfen camp' };
+/* where an adventurer calls home: one of the four towns, or (the outlaws, v0.39) the Ashfen outlaw camp, laid out like a small town */
+let ADV_CAMP = null;
+function advGeo(town) {
+  if (town !== 'camp') return lifeTownGeo(town); if (ADV_CAMP) return ADV_CAMP; const c = ZONES.camp;
+  return ADV_CAMP = { id: 'camp', blds: [], homes: [], center: { x: c.cx, y: c.cy }, hall: { x: c.cx - 1, y: c.cy + 2, r: 2.5 }, market: { x: c.cx, y: c.cy, r: 6 }, guards: [], patrol: [] };
+}
 const advById = id => ADV.list.find(e => e.actorId === id && !e.gone) || null;
 const advFirst = e => String(e.name || '').split(',')[0];
 const advNear = e => P && dist(e, P) < 24;
@@ -6831,7 +6916,7 @@ function advCheck(e, key) { const r = SF.SK.check(e, key, 0, 100, { rng: R, now:
 
 /* ---------- population ---------- */
 function advMake(npc, row, at) {
-  const [name, style, town, courage, body] = row, D = SIM.ADV_STYLES[style]; if (!D || !LIFE_TOWNS[town]) return null; const G = lifeTownGeo(town);
+  const [name, style, town, courage, body] = row, D = SIM.ADV_STYLES[style]; if (!D || !(LIFE_TOWNS[town] || town === 'camp')) return null; const G = advGeo(town);
   const p = at || lifeSpot({ id: 31 + ADV.list.length * 17 }, G.market, 7, ADV.list.length);
   const e = npc('adventurer', name, p.x, p.y); e.town = town;
   e.str = D.str; e.dex = D.dex; e.int = D.int; e.skills = SF.newSkills(); for (const k in D.skills) if (e.skills[k]) e.skills[k].v = D.skills[k] * 10;
@@ -6842,7 +6927,7 @@ function advMake(npc, row, at) {
   advGive(e, 'gold', 40);
   e.npcFight = { fights: true, adv: true, hp: 1 }; e.max = SF.maxHp(e); e.hp = e.max; e.stam = SF.maxStam(e); e.mana = e.int; e.sw = SF.newSwing();
   e.downed = false; e.foe = null; e.ghost = false;
-  e.adv = { style: D.style, key: style, D, town, courage, body, mode: 'town', why: ['arrived in town'], bank: 150, ground: null, grounds: 0, groundAt: 0, spot: null,
+  e.adv = { style: D.style, key: style, D, town, courage, body, crim: D.crim || null, mode: 'town', why: ['arrived in town'], bank: 150, ground: null, grounds: 0, groundAt: 0, spot: null,
     thinkAt: 0, castReady: 0, potAt: 0, tend: null, prep: null, lootQ: null, busyUntil: 0, failN: 0, row: row.slice(),
     rec: { kills: 0, deaths: 0, trips: 0, loots: 0, earned: 0, casts: 0, bandages: 0 } };
   e.home = { x: p.x, y: p.y }; e._gLook = GEAR.npcLook(e.actorId || name, { body, cloth: D.cloth });
@@ -6851,6 +6936,7 @@ function advMake(npc, row, at) {
 function advPopulate(npc) {
   ADV.list.length = 0; ADV.gone = []; ADV.waiting = []; ADV.next = 0; if (!ADV.on) return;
   for (const row of SIM.ADV_ROSTER) advMake(npc, row);
+  if (CRIM.on) for (const row of SIM.CRIM_ROSTER) advMake(npc, row);   // the outlaws (v0.39, src/npcdeath.js)
 }
 
 /* ---------- each step (the AdventurerAI controller) ---------- */
@@ -6878,7 +6964,7 @@ function advTick(e, dt) {
   lifeSeparate(e);
 }
 /* the town it calls home: inside its jurisdiction counts as in town */
-const advTownGeo = e => lifeTownGeo(e.adv.town);
+const advTownGeo = e => advGeo(e.adv.town);
 const advInTown = e => { const G = advTownGeo(e); return Math.hypot(e.x - G.center.x, e.y - G.center.y) < Math.min(NPC_JURISDICTION, 40); };
 const advNight = () => { const h = hourOfDay(); return h >= ADV.cfg.nightAt || h < ADV.cfg.dayStart; };
 function advSay(e, lines, gap) { if (!advNear(e) || GT < (e.adv.sayAt || 0)) return; e.adv.sayAt = GT + (gap || 8); say(e, typeof lines === 'string' ? lines : pick(lines)); }
@@ -6900,8 +6986,10 @@ function advFoes(e) {
 function advThink(e) {
   const A = e.adv, C = ADV.cfg;
   // self-defence against you: the law gives it the right while your aggression stands
-  let foe = null;
-  if (e.foe === P && fighterAlive(P) && !P.hidden && dist(e, P) < C.leash && LAW.rights(aidOf(e), aidOf(P), GT)) foe = { c: P, ratio: ecoPower(P) / Math.max(1, ecoPower(e)) };
+  // a person it is fighting: you or an NPC (v0.39). Lawful adventurers only while the law gives them the right; outlaws regardless
+  let foe = null; const hf = e.foe && e.foe.kind !== 'mon' ? e.foe : null;
+  if (hf && fighterAlive(hf) && !hf.hidden && dist(e, hf) < C.leash && (A.crim || LAW.rights(aidOf(e), aidOf(hf), GT))) foe = { c: hf, ratio: ecoPower(hf) / Math.max(1, ecoPower(e)) };
+  if (!foe && A.crim) foe = crimPreyFor(e);   // a cutthroat picks its prey (src/npcdeath.js)
   if (!foe) { const pick_ = SIM.advTarget(advFoes(e), A.courage, C.sight); if (pick_) foe = pick_; }
   if (!foe && e.foe && e.foe.kind === 'mon' && fighterAlive(e.foe) && dist(e, e.foe) < C.leash && e.foe.target === e) foe = { c: e.foe, ratio: ecoPower(e.foe) / Math.max(1, ecoPower(e)) };
   const s = { hpF: e.hp / e.max, manaF: advCaster(e) ? e.mana / Math.max(1, e.int) : null, style: A.style, courage: A.courage, inTown: advInTown(e), night: advNight(),
@@ -6912,17 +7000,20 @@ function advThink(e) {
     if (chased) A.safeAt = GT; if (GT - (A.safeAt || 0) < 6 && !(s.inTown && !chased)) return; }
   let d = SIM.advChoose(s, C);
   if (d.act !== 'fight' && d.act !== 'flee' && advBodyOf(e)) { if (A.mode !== 'reclaim') { e.nav = null; advSet(e, 'reclaim', ['going back for my body']); } return; }   // first, its own body (also after running from a fight)
+  if (A.crim && d.act !== 'fight' && d.act !== 'flee' && A.mode !== 'town') {   // an outlaw robs the dead it has no right to (src/npcdeath.js)
+    const b = crimBodyFor(e); if (b) { advSet(e, 'loot', ['robbing ' + b.name]); A.lootQ = b; return; } }
   if (d.act !== 'fight' && d.act !== 'flee' && A.mode !== 'town') {          // its own kills to loot, before moving on
     const c = advLootable(e); if (c) { advSet(e, 'loot', ['looting the ' + c.name.replace(/ remains$/, '')]); A.lootQ = c; return; } }
-  if (d.act === 'fight') { if (e.foe !== foe.c) { e.foe = foe.c; e.nav = null; A.foeAt = GT; if (A.mode !== 'fight') A.was = A.mode; simEmit('CombatStarted', { actor: aidOf(e), target: aidOf(foe.c), x: e.x, y: e.y, detail: { why: foe.c === P ? 'self-defence' : foe.onMe ? 'attacked' : foe.onFriend ? 'helping' : 'hunting' } });
-      if (foe.onFriend && foe.c.target === P) advSay(e, ['I have it!', 'Hold on, friend!', 'Over here, beast!']); else if (foe.c === P) advSay(e, ['You will regret that!', 'Thief! Murderer!', 'Guards! Guards!'], 4); }
+  if (d.act === 'fight') { if (e.foe !== foe.c) { e.foe = foe.c; e.nav = null; A.foeAt = GT; if (A.mode !== 'fight') A.was = A.mode; simEmit('CombatStarted', { actor: aidOf(e), target: aidOf(foe.c), x: e.x, y: e.y, detail: { why: foe.prey ? 'preying' : foe.c.kind !== 'mon' ? 'self-defence' : foe.onMe ? 'attacked' : foe.onFriend ? 'helping' : 'hunting' } });
+      if (foe.prey) advSay(e, ['Your purse or your life. Both, then.', 'Nobody will hear you out here.', 'Should have stayed in town.'], 4);
+      else if (foe.onFriend && foe.c.target === P) advSay(e, ['I have it!', 'Hold on, friend!', 'Over here, beast!']); else if (foe.c === P) advSay(e, ['You will regret that!', 'Thief! Murderer!', 'Guards! Guards!'], 4); }
     advSet(e, 'fight', d.why); return; }
-  if (e.foe && (!fighterAlive(e.foe) || e.foe === P)) { const w = e.foe; e.foe = null; simEmit('CombatEnded', { actor: aidOf(e), target: aidOf(w), x: e.x, y: e.y, detail: { outcome: !fighterAlive(w) ? 'won' : 'disengaged' } }); }
+  if (e.foe && (!fighterAlive(e.foe) || e.foe.kind !== 'mon')) { const w = e.foe; e.foe = null; simEmit('CombatEnded', { actor: aidOf(e), target: aidOf(w), x: e.x, y: e.y, detail: { outcome: !fighterAlive(w) ? 'won' : 'disengaged' } }); }
   if (d.act === 'flee') { if (A.mode !== 'flee') { ADV.stats.flees++; A.safeAt = GT; e.nav = null; advSay(e, ['Fall back!', 'Too many of them!', 'I need to get out of here!'], 4); } e.foe = null; advSet(e, 'flee', d.why); return; }
   if (d.act === 'town') { if (A.mode !== 'town') { if (A.mode === 'return' || A.mode === 'flee') { A.rec.trips++; ADV.stats.trips++; } A.spot = null; e.nav = null; } advSet(e, 'town', d.why); return; }
   if (d.act === 'return') { if (A.mode !== 'return') { e.nav = null; A.ground = null; } advSet(e, 'return', d.why); return; }
   // hunt: leaving town now and then means moving on to another town (§8: travelling between cities)
-  if (A.mode === 'town' && A.rec.trips > 0 && A.rec.trips % 3 === 0 && A.movedTrip !== A.rec.trips && R() < .5) {
+  if (!A.crim && A.mode === 'town' && A.rec.trips > 0 && A.rec.trips % 3 === 0 && A.movedTrip !== A.rec.trips && R() < .5) {
     A.movedTrip = A.rec.trips; const others = Object.keys(LIFE_TOWNS).filter(k => k !== A.town && !(A.dry && A.dry[k] > GT)); const to = others[Math.floor(R() * others.length)];
     A.town = to; e.town = to; A.spot = null; e.nav = null; ADV.stats.moves++; advSay(e, 'On to ' + ADV_TOWN_N[to] + '!'); advSet(e, 'return', ['moving on to ' + ADV_TOWN_N[to]]); return; }
   if (A.mode !== 'hunt') { e.nav = null; A.grounds = 0; A.ground = null; if (A.mode === 'town') advSay(e, ['Back to the hunt.', 'Time to earn my keep.', 'Off I go.']); }
@@ -7063,6 +7154,7 @@ function advTravel(e, dt) {
     const G = advTownGeo(e); advGo(e, G.center.x, G.center.y + 2, 'home to ' + ADV_TOWN_N[A.town]); return; }
   // hunt
   if (!A.ground) { if (A.grounds >= C.grounds) { advSet(e, 'return', ['no luck hunting']); return; } A.ground = advPickGround(e); A.groundAt = 0;
+    if (!A.ground && A.crim) { A.grounds = C.grounds; advSet(e, 'return', ['no game near the camp']); return; }   // outlaws stay by their camp
     if (!A.ground) { const was = A.town; A.grounds = C.grounds;
       if (A.noGameAt === undefined || GT - A.noGameAt > 600) { A.noGameAt = GT; advSet(e, 'return', ['no game near ' + ADV_TOWN_N[was]]); return; }
       (A.dry || (A.dry = {}))[was] = GT + 3600; const others = Object.keys(LIFE_TOWNS).filter(k => k !== was && !(A.dry[k] > GT)), to = others.length ? others[Math.floor(R() * others.length)] : Object.keys(LIFE_TOWNS).find(k => k !== was); A.town = to; e.town = to; A.spot = null; e.nav = null; A.noGameAt = undefined; ADV.stats.moves++;   // twice in ten minutes: move on (§8: travelling between cities)
@@ -7087,13 +7179,17 @@ function advLoot(e, dt) {
   if (!c || c.gone) { A.lootQ = null; A.thinkAt = 0; advSet(e, 'hunt', ['looted']); return; }
   const d = dist(e, c), late = GT - (A.modeAt || GT) > 25;
   if (d > 1.3 && !(d <= 2 && (!e.nav || e.nav.state !== 'moving'))) {   // within 2 m, like you, once it has stopped walking
-    if (late || (e.nav && e.nav.state === 'failed') || (e.nav && e.nav.state === 'done' && d > 2)) { c.advDone = true; A.lootQ = null; e.nav = null; return; }   // out of reach: leave it
+    if (late || (e.nav && e.nav.state === 'failed') || (e.nav && e.nav.state === 'done' && d > 2)) { c.advDone = true; (A.robbed || (A.robbed = {}))[c.id] = 1; A.lootQ = null; e.nav = null; return; }   // out of reach: leave it
+    if (d < 6 && (!e.nav || e.nav.state !== 'moving') && los(e, c)) { e.nav = null; allyStep(e, c.x, c.y, dt); return; }   // the last few metres straight in, without waiting for a search (v0.39)
     if (!e.nav) navTo(e, c.x, c.y, { direct: true, doors: true, speed: SF.WALK * .6, name: 'loot', low: true }); if (e.nav && e.nav.state === 'moving') navStep(e, dt); return; }
   e.nav = null; e.speed = 0; if (!A.lootAt) { A.lootAt = GT + .6; sndAt('loot.rummage', c, { gain: .5 }); return; } if (GT < A.lootAt) return; A.lootAt = 0;
+  const human = npcdHumanBody(c), illegal = human && npcdLooted(c, e);   // a person's body: inside its loot-rights window, robbing an innocent is a crime (v0.39)
+  if (human) { (A.robbed || (A.robbed = {}))[c.id] = 1; if (A.crim) CRIM.stats.loots++; }
   let n = 0, val = 0; for (const it of c.cont.items.slice()) { if (!advWants(it)) continue; if (SF.containerKg(e.pack) + SF.itemKg(it) > 60) break; c.cont.items.splice(c.cont.items.indexOf(it), 1); c.cont.ver = (c.cont.ver || 0) + 1;
     const ex = SF.ITEMS[it.id].stack && e.pack.items.find(o => o.id === it.id); if (ex) ex.qty += it.qty; else e.pack.items.push(it); e.pack.ver++; n++; val += it.id === 'gold' ? it.qty : (SF.PRICES[it.id] || 0) * it.qty; }
   c.advDone = true; A.lootQ = null; A.rec.loots++; A.rec.earned += val; ADV.stats.loots++;
-  if (n) simEmit('CorpseLooted', { actor: aidOf(e), x: c.x, y: c.y, detail: { items: n, value: val, lawful: true } });
+  if (n) simEmit('CorpseLooted', { actor: aidOf(e), x: c.x, y: c.y, detail: { items: n, value: val, lawful: !illegal } });
+  if (n && c.mine && P) log(`${advFirst(e)} took ${n} item${n > 1 ? 's' : ''} from your body!`, '#ff6a5a');
   A.thinkAt = 0; advSet(e, A.was && A.was !== 'loot' && A.was !== 'fight' ? A.was : 'hunt', ['looted']);
 }
 
@@ -7156,7 +7252,10 @@ function advProvoked(e, src) {
   const A = e.adv; if (!A || !npcUp(e)) return; const who = !src ? null : src.kind === 'mon' ? src : lawResponsible(src);
   if (!who || who === e || !fighterAlive(who)) return;
   if (who.kind === 'mon') { if (!e.foe || !fighterAlive(e.foe)) { e.foe = who; A.foeAt = GT; if (A.mode !== 'fight' && A.mode !== 'flee') { A.was = A.mode; advSet(e, 'fight', ['attacked by a ' + who.name]); } } return; }
-  if (who !== P) return;
+  if (who !== P) {   // another person (v0.39): an adventurer fights back while the law gives it the right; an outlaw always does
+    if (who.kind !== 'npc' || who === e) return;
+    if ((A.crim || LAW.rights(aidOf(e), aidOf(who), GT)) && (!e.foe || e.foe.kind === 'mon') && A.mode !== 'flee') { e.foe = who; A.foeAt = GT; if (A.mode !== 'fight') A.was = A.mode === 'loot' ? 'hunt' : A.mode; advSet(e, 'fight', ['attacked by ' + advFirst(who)]); }
+    if (!A.crim) npcCallGuards(e, who); return; }
   if (LAW.rights(aidOf(e), aidOf(P), GT) && (!e.foe || e.foe.kind !== 'mon' || dist(e, e.foe) > 3) && A.mode !== 'flee') {
     if (e.foe !== P) advSay(e, ['You will regret that!', 'Guards! Help!', 'So that is how it is.'], 4);
     e.foe = P; A.foeAt = GT; if (A.mode !== 'fight') A.was = A.mode === 'loot' ? 'hunt' : A.mode; advSet(e, 'fight', ['attacked by you']); }
@@ -7230,7 +7329,7 @@ function advSuccessors() {
 
 /* ---------- you and adventurers: talking, looting their bodies ---------- */
 function advTalk(n) {
-  const A = n.adv; if (!A) return false;
+  const A = n.adv; if (!A) return false; if (A.crim) return crimTalk(n);
   if (n.ghost) { say(n, pick(['Oooo… (a ghost, looking for a healer)', 'Wooo… my body… my things…'])); return true; }
   const no = notoOf(P); if (no === 'murderer' || no === 'criminal') { say(n, no === 'murderer' ? 'Stay back, murderer!' : 'I do not talk to criminals.'); return true; }
   const first = (P.name || 'friend').split(' ')[0], town = ADV_TOWN_N[A.town];
@@ -7241,11 +7340,7 @@ function advTalk(n) {
   say(n, line); return true;
 }
 /* the take button on a body (src/game.js) calls this: inside its loot-rights window, looting an innocent's body is a crime */
-function advLooted(c) {
-  if (!c || !c.advBody || (c.crimeAt && GT - c.crimeAt < 10)) return; const owner = advById(c.advBody); if (!owner) return;
-  const ls = SF.lootStatus(c.cont, aidOf(P), GT); if (ls.lawful || notoOf(owner) !== 'innocent') return;
-  c.crimeAt = GT; lawCrime(P, owner, 'looting');
-}
+function advLooted(c) { return npcdLooted(c, P); }   // since v0.39 one rule for every person's body (src/npcdeath.js)
 
 /* ---------- save: everything an adventurer is, by actor id (the save's `adv` block, additive) ---------- */
 function advSave() {
@@ -7299,6 +7394,157 @@ function advDev() {
 }
 /* each step, once (game update): successors that are due */
 function advWorldTick() { if (ADV.waiting.length) advSuccessors(); }
+/* ================= NPC DEATH AND NPC CRIME (Living World phase 5, step 4, v0.39; master spec §19, §20) =================
+   Townsfolk, shopkeepers, guards and the travelling merchant die at 0 health instead of being knocked down:
+     · One death transaction (npcDies, exactly once): movement, combat and errands stop; ActorKilled; whoever killed them is
+       judged by the law (lawDowned: an innocent killed unlawfully reports a murder, once per death); everything they wore and a
+       purse of gold become real items on a body, under the player's loot rules (SF.deathTransaction, 90 s loot rights, 12 min
+       decay). Looting an innocent's body inside its loot-rights window is a crime, for you and for NPCs alike.
+     · Then, as UO's vendors did, they come back: the same person (same id, name, home, shop and quests) is back at home after
+       NPCD.cfg.back seconds (10 min), where nobody watches it happen if that can be helped. Policy 'none' keeps ordinary residents
+       dead for good; shops, guards and the merchant always come back, so the game never loses a service.
+     · Saved: who is dead and for how long, and every body with its contents and time left (the life block's `npcd`, additive).
+   And the first NPC criminals (§19 "criminal NPCs may loot illegally and receive consequences"), two outlaws living at the Ashfen
+   camp on the adventurer controller (src/adventurers.js), with the same rules as everyone:
+     · Vesk, a cutthroat, attacks lone people in the wild who look weaker than him (townsfolk at work, the merchant on the road,
+       adventurers, and you), never where a guard would see it, at most once every few minutes. Each kill of an innocent is a
+       murder count: five make him red.
+     · Mott, a cutpurse, loots bodies he has no right to (a crime: grey for two minutes), never under a guard's eyes.
+     · Witnesses and guards react to NPC crime as they do to yours (src/law.js): guards fight grey and red outlaws inside their
+       jurisdiction, adventurers fight back, and you may attack a grey or red outlaw lawfully. Dead outlaws go to the camp healer.
+   ?crim=off leaves the outlaws out (?adv=off leaves out every adventurer, outlaws included). */
+
+const NPCD = { cfg: SIM.NPCD_CFG, dead: [], checkAt: 0, stats: { deaths: 0, returns: 0, bodies: 0, illegal: 0 } };
+const CRIM = { on: !/[?&#]crim=off\b/.test(location.search + location.hash), cfg: SIM.CRIM_CFG, stats: { preys: 0, murders: 0, loots: 0, crimes: 0 } };
+const npcdFirst = e => String((e && e.name) || 'someone').split(',')[0];
+const npcdNear = (e, r) => P && e && dist(e, P) < (r || 24);
+/* everyone with a life, the dead included (they are out of `ents` while dead) */
+const npcdById = id => LIFE.npcs.find(e => e.actorId === id) || null;
+
+/* ---------- the death transaction ---------- */
+/* the outfit an NPC wears has negative uids (src/npcfight.js npcItem: never saved, never in a player container); on a body it can
+   reach your pack, so each piece becomes a real item with a real uid at the moment of death */
+function npcdRealItem(it) { if (!it || it.uid > 0) return it; const n = SF.newItem(it.id, it.qty || 1); return Object.assign({}, it, { uid: n.uid }); }
+function npcDies(e, src) {
+  if (e.gone || e.npcDead) return; const L = e.life, look = gearSnapOf(e);   // the look is taken before the items move
+  e.hp = 0; e.foe = null; e.nav = null; e.poison = null; e.speed = 0; e.downed = false;
+  simEmit('ActorKilled', { actor: aidOf(e), killer: aidOf(src), x: e.x, y: e.y });
+  const who = lawResponsible(src), murder = lawDowned(e, src);   // an innocent killed by someone with no right over them reports a murder (src/law.js)
+  if (murder && murder.counted && who && who !== P && who.adv) CRIM.stats.murders++;
+  // what they wore and carried, and their purse, on a body under the player's rules
+  e.pack = SF.newContainer('pack', e.actorId);
+  for (const s in e.equip) e.equip[s] = npcdRealItem(e.equip[s]);
+  const gold = SIM.npcdPurse(L && L.prof, L && L.gold, R(), NPCD.cfg); if (gold > 0) e.pack.items.push(SF.newItem('gold', gold)); if (L && Number.isFinite(L.gold)) L.gold = 0;
+  const body = SF.deathTransaction(e, GT, { x: e.x, y: e.y }); body.owner = e.actorId; body.key = e.actorId + '@' + GT.toFixed(2);
+  addEnt({ kind: 'corpse', npcBody: e.actorId, name: npcdFirst(e) + "'s body", x: e.x, y: e.y, cont: body, expires: body.expires, gear: look, t0: GT, sect: e.sect || 0 });
+  NPCD.stats.bodies++;
+  // nobody keeps fighting or targeting the dead
+  for (const o of ents) if (o.target === e) { o.target = null; if (o.kind === 'mon' && o.state !== 'flee') o.state = 'return'; if (o.mind) o.mind.act = null; }
+  for (const g of LIFE.npcs) if (g.foe === e) g.foe = null; for (const o of ADV.list) if (o.foe === e) o.foe = null;
+  if (P.sel === e) { P.sel = null; P.armed = false; } if (P.talkTo === e) P.talkTo = null;
+  if (L) { L.goal = null; L.mind.act = null; L.mind.why = 'dead'; L.hurry = false; if (src) L.mem.note(GT, 'killed by', aidOf(src), { x: Math.round(e.x), y: Math.round(e.y) }, 0); }
+  e.npcDead = { at: GT, back: SIM.npcdReturns(L && L.prof, NPCD.cfg) }; e.dead = true; NPCD.dead.push(e); NPCD.stats.deaths++;
+  rmEnt(e);
+  if (npcdNear(e)) log(`${npcdFirst(e)} has been killed${src === P ? ' by you' : who && who !== P && who.kind === 'npc' ? ' by ' + npcdFirst(who) : src && src.kind === 'mon' ? ' by a ' + src.name : ''}. The body holds everything they carried.`, '#ff8a6a');
+  sndAt('player.death', e, { gain: .5 });
+}
+
+/* ---------- coming back ---------- */
+function npcdHome(e) { const L = e.life; if (L && L.prof === 'guard') return L.post || e.home; return e.home || { x: e.x, y: e.y }; }
+function npcdSeen(p) { if (!P || !p) return false; const r = (typeof TIER !== 'undefined' && TIER.radii && TIER.radii.a) || 40; return Math.hypot(p.x - P.x, p.y - P.y) < r + 6; }
+function npcdTick() {
+  if (!NPCD.dead.length || GT < NPCD.checkAt) return; NPCD.checkAt = GT + 1;
+  for (const e of NPCD.dead.slice()) { const D = e.npcDead; if (!D || !D.back) continue; const home = npcdHome(e);
+    if (SIM.npcdReady(GT - D.at, npcdSeen(home), NPCD.cfg)) npcdReturn(e, home); }
+}
+function npcdReturn(e, p) {
+  const i = NPCD.dead.indexOf(e); if (i >= 0) NPCD.dead.splice(i, 1); const diedAt = e.npcDead ? e.npcDead.at : GT; delete e.npcDead; e.dead = false; e.gone = false; delete e.pack;
+  npcArm(e);   // a fresh outfit, full health (src/npcfight.js)
+  const L = e.life; if (L) { L.needs = SIM.newNeeds(); L.mind = {}; L.goal = null; L.thinkAt = 0; L.hurry = false; L.wd = null; L.retryAt = 0;
+    if (Number.isFinite(L.gold) || L.gold === 0) L.gold = L.prof === 'trader' ? 120 : 20 + (e.id % 7) * 5;
+    if (L.prof === 'trader') { L.town = e.town = 'mynoc'; L.phase = 'selling'; L.until = 0; L.legs = 0; } }
+  e.x = p.x; e.y = p.y; if (!canStand(e, e.x, e.y)) { const q = lifeSpot(e, p, 3); if (q) { e.x = q.x; e.y = q.y; } } e._px = e.x; e._py = e.y; e.speed = 0;
+  ents.push(e); if (WS && e.archetype) WS.adopt(e, e.archetype);
+  NPCD.stats.returns++; simEmit('ActorReturned', { actor: aidOf(e), x: e.x, y: e.y, detail: { after: Math.round(GT - diedAt) } });
+  if (npcdNear(e, 30)) log(`${npcdFirst(e)} is back${L && LIFE.towns[L.town] ? ' in ' + (ADV_TOWN_N[L.town] || 'town') : ''}.`, '#ffe08a');
+}
+
+/* ---------- bodies: whose, and looting them (you and NPCs alike) ---------- */
+function npcdBodyOwner(c) { return !c ? null : c.advBody ? advById(c.advBody) : c.npcBody ? npcdById(c.npcBody) : c.mine ? P : null; }
+const npcdHumanBody = c => !!c && c.kind === 'corpse' && !c.gone && !!c.cont && !!(c.npcBody || c.advBody || c.mine);
+/* `by` took something from body `c`: inside the loot-rights window, an innocent's body is a crime (at most one per 10 s per looter) */
+function npcdLooted(c, by) {
+  by = by || P; if (!npcdHumanBody(c)) return false; const owner = npcdBodyOwner(c); if (!owner || owner === by) return false;
+  const ls = SF.lootStatus(c.cont, aidOf(by), GT); if (ls.lawful || notoOf(owner) !== 'innocent') return false;
+  const k = aidOf(by); c.crimeBy = c.crimeBy || {}; if (c.crimeBy[k] !== undefined && GT - c.crimeBy[k] < 10) return false;
+  c.crimeBy[k] = GT; NPCD.stats.illegal++; if (by !== P) CRIM.stats.crimes++;
+  lawCrime(by, owner, 'looting'); return true;
+}
+
+/* ---------- the outlaws' choices (the adventurer controller asks these; src/adventurers.js advThink) ---------- */
+const crimOf = e => e && e.adv && e.adv.crim;
+/* is a guard watching this spot? */
+function crimGuarded(p) { const r = CRIM.cfg.guardWary; for (const g of LIFE.npcs) if (npcUp(g) && g.npcFight.fights && Math.hypot(g.x - p.x, g.y - p.y) < r && los(g, p)) return true; return lawRegion(p.x, p.y) !== 'wild'; }
+/* a cutthroat looks for prey: someone alone in the wild it expects to beat (SIM.crimPrey) */
+function crimPreyFor(e) {
+  const A = e.adv; if (A.crim !== 'murderer' || GT < (A.nextCrime || 0) || A.mode === 'town' || e.hp < e.max * .7) return null;
+  const C = CRIM.cfg, mine = ecoPower(e), out = [];
+  const add = v => {
+    if (!v || v === e || !fighterAlive(v) || v.hidden || (v.adv && v.adv.crim)) return;
+    if (v.kind === 'npc' && !v.adv && v.npcFight && v.npcFight.fights) return;   // never a guard
+    const d = dist(e, v); if (d > C.sight || protAt(v.x, v.y) || !los(e, v)) return;
+    const max = v === P ? SF.maxHp(P) : (v.max || 1);
+    out.push({ id: aidOf(v), v, dist: d, ratio: ecoPower(v) / Math.max(1, mine), guarded: crimGuarded(v), hpF: v.hp / Math.max(1, max) });
+  };
+  for (const v of LIFE.npcs) add(v); for (const v of ADV.list) add(v); if (C.preyOnPlayer && P && !P.ghost) add(P);
+  const pick_ = SIM.crimPrey(out, C); if (!pick_) return null;
+  A.nextCrime = GT + C.crimeGap; CRIM.stats.preys++; return { c: pick_.v, ratio: pick_.ratio, prey: true };
+}
+/* any outlaw looks for a body worth robbing that it has not robbed yet (SIM.crimBody) */
+function crimBodyFor(e) {
+  const A = e.adv; if (!A.crim) return null; const out = [], done = A.robbed || (A.robbed = {});
+  for (const c of ents) {
+    if (!npcdHumanBody(c) || c.advBody === e.actorId || done[c.id]) continue; const d = dist(e, c); if (d > CRIM.cfg.bodySight) continue;
+    const n = c.cont.items.filter(advWants).length; if (!n) continue;
+    out.push({ key: c.id, c, dist: d, items: n, lawful: SF.lootStatus(c.cont, aidOf(e), GT).lawful, guarded: crimGuarded(c) });
+  }
+  const b = SIM.crimBody(out, CRIM.cfg); return b ? b.c : null;
+}
+function crimTalk(n) {
+  const A = n.adv; if (!A || !A.crim) return false; if (n.ghost) { say(n, 'Oooo… (a ghost, cursing)'); return true; }
+  const no = notoOf(n);
+  say(n, A.crim === 'murderer' ? pick(no === 'murderer' ? ['Walk away while you still can.', 'You did not see me. Understood?'] : ['What are you looking at?', 'Lonely road, this. Mind yourself.'])
+    : pick(no === 'criminal' ? ['I found it. Finders keepers.', 'Not a word to the guards, friend.'] : ['Nice boots. Be a shame to lose them.', 'Dead folk do not need their coin.']));
+  return true;
+}
+
+/* ---------- save: who is dead and for how long, and every body (the life block's `npcd`, additive) ---------- */
+function npcdSave() {
+  const dead = NPCD.dead.map(e => ({ id: e.actorId, ago: Math.round(GT - e.npcDead.at), back: !!e.npcDead.back }));
+  const bodies = ents.filter(c => c.kind === 'corpse' && c.npcBody && !c.gone && c.expires > GT && c.cont).map(c => ({ owner: c.npcBody, key: c.cont.key || c.npcBody + '@' + (c.cont.diedAt || 0).toFixed(2),
+    x: Math.round(c.x * 10) / 10, y: Math.round(c.y * 10) / 10, left: Math.round(c.expires - GT), diedAgo: Math.round(GT - (c.cont.diedAt ?? GT)), items: c.cont.items, gear: c.gear || null, sect: c.sect || 0 }));
+  return { v: SIM.NPCD_VERSION, dead, bodies };
+}
+function npcdLoad(s) {
+  NPCD.dead.length = 0; if (!s || s.v !== SIM.NPCD_VERSION) return;
+  for (const r of Array.isArray(s.dead) ? s.dead : []) {
+    const e = r && typeof r.id === 'string' ? npcdById(r.id) : null; if (!e || e.gone || e.npcDead) continue;
+    if (P && P.sel === e) P.sel = null; e.hp = 0; e.foe = null; e.nav = null; e.npcDead = { at: GT - Math.max(0, +r.ago || 0), back: r.back !== false && SIM.npcdReturns(e.life && e.life.prof, NPCD.cfg) }; e.dead = true; NPCD.dead.push(e); rmEnt(e);
+  }
+  const res = SIM.npcdBodyRows(s.bodies, { validOwner: id => !!npcdById(id), validItem: it => !!SF.ITEMS[it.id] && it.qty > 0 && Number.isFinite(it.uid) });
+  for (const r of res.rows) { const cont = SF.newContainer('corpse', r.owner); cont.items = r.items; cont.owner = r.owner; cont.key = r.key; cont.diedAt = GT - Math.max(0, r.diedAgo ?? 999); cont.expires = GT + r.left;
+    addEnt({ kind: 'corpse', npcBody: r.owner, name: npcdFirst(npcdById(r.owner)) + "'s body", x: r.x, y: r.y, cont, expires: cont.expires, gear: r.gear || null, t0: GT - 9, sect: r.sect || 0 }); }
+  NPCD.loadDropped = res.dropped;
+}
+/* item uids the save must count (the save's uid counter, src/game.js saveData) */
+function npcdScanItems(scan) { for (const c of ents) if (c.kind === 'corpse' && c.npcBody && !c.gone && c.cont) c.cont.items.forEach(scan); }
+
+/* ---------- developer panel ---------- */
+function npcdDev() {
+  const S = NPCD.stats, C = CRIM.stats, outl = ADV.list.filter(crimOf).map(e => npcdFirst(e) + ' ' + (e.ghost ? 'ghost' : notoOf(e))).join(', ') || 'none';
+  return `npc death: ${NPCD.dead.length} dead now (${NPCD.dead.map(npcdFirst).slice(0, 6).join(', ') || '—'}) · deaths ${S.deaths}, back ${S.returns}, bodies ${S.bodies}, illegal loots ${S.illegal} · back after ${NPCD.cfg.back} s (${NPCD.cfg.policy})<br>
+  outlaws: ${outl} · preyed ${C.preys}, murders ${C.murders}, crimes ${C.crimes}`;
+}
 /* ================= SIMULATION TIERS (Living World phase 6, v0.34; master spec §25) =================
    Replaces the phase 3 stopgap (idle creatures beyond 80 m thought at a quarter rate) with the spec's three tiers. The pure
    rules are in src/world.js (SIM.tierOf, SIM.tierRadii, SIM.tierDue); this file decides each actor's tier every step, just
@@ -8257,7 +8503,7 @@ function update(dt) {
     if (!inCombat() && !P.poison) P.hp = Math.min(SF.maxHp(P), P.hp + (P.fed > GT ? 1 : .1) * dt);
     if (P.poison && GT >= P.poison.next) { P.poison.next = GT + SF.POISON_GAP; damagePlayer(SF.POISON[P.poison.tier], null, 'poison'); if (P.poison && --P.poison.ticks <= 0) P.poison = null; }
   }
-  lawTick(); advWorldTick(); navTick(); ecoTick(); const aiT0 = DEV.on ? performance.now() : 0;
+  lawTick(); advWorldTick(); npcdTick(); navTick(); ecoTick(); const aiT0 = DEV.on ? performance.now() : 0;
   for (const e of ents.slice()) {                                    // every actor is driven by its controller; corpses are objects that decay
     if (e.gone || e === P) continue;
     if (e.kind === 'corpse') { if (GT > e.expires) { if (e.mine) log('Your body has crumbled to dust, and everything on it is gone.', '#ff6a5a'); rmEnt(e); if (P.lootOpen === e) { closePanel(); P.lootOpen = null; } } continue; }
@@ -9429,7 +9675,7 @@ function beastSprite(e) {
   const c = document.createElement('canvas'); c.width = dm[0]; c.height = dm[1]; const g = c.getContext('2d'); g.translate(dm[2], dm[3]); g.scale(face * 1.25, 1.25); if (e.type === 'deer' || e.type === 'hare' || e.type === 'bear') wildArt(g, e.type, fr, atk); else beastArt(g, e.type, fr, atk);
   s = outlined(pixelize(c)); s.ox = dm[2] + 1; s.oy = dm[3] + 1; SPR.set(k, s); return s;
 }
-const ADV_COL = { navy: '#2a3a6a', wine: '#6a2a32', forest: '#2f5a32', plum: '#5a2a6a', oatmeal: '#8a7a5a' };
+const ADV_COL = { navy: '#2a3a6a', wine: '#6a2a32', forest: '#2f5a32', plum: '#5a2a6a', oatmeal: '#8a7a5a', charcoal: '#2e2e30', ochre: '#7a5a22' };   // charcoal, ochre: the outlaws (v0.39)
 const NPC_COL = { traveller: '#3a6a5a', assay: '#4a6a7a', qsmith: '#7a3a22', banker: '#2a3a8a', smith: '#6a4a2a', trainer: '#8a2a2a', workshop: '#6a6a2a', apothecary: '#5a2a6a', provisioner: '#8a6a2a', guard: '#5a5a62', healer: '#d8d0c0', outlaw: '#3a2a22' };
 /* ---- 8-direction creature sheets: rows S,SW,W,NW,N,NE,E,SE; cols 0-3 walk, 4 wind-up, 5 strike, 6 hit, 7 dead ---- */
 const MSI = {}; for (const k in MON_SHEETS) { const im = new Image(); im.onload = () => { MSI[k] = im; }; im.src = MON_SHEETS[k].src; }
@@ -9796,7 +10042,7 @@ const PANELS = {
   picker: () => ['Which one?', PICK.map((e, i) => `<div class="row"><span class="nm">${esc(e.name)}</span><span class="v">${dist(e, P).toFixed(1)} m</span>${btn('pick', 'Select', { i })}</div>`).join('')],
   menu: () => ['Menu', `<div class="grid2">${btn('open', 'Abilities', { p: 'abilities' })}${btn('open', 'Log', { p: 'log' })}${btn('zoom', 'Zoom ×' + ZOOM)}${btn('mirror', SETTINGS.mirror ? 'Right-handed layout' : 'Left-handed layout')}${btn('sprintt', SETTINGS.stickSprint ? 'Stick sprint: on (push far)' : 'Stick sprint: off (button only)')}${btn('mute', muted ? 'Sound off' : 'Sound on')}${btn('music', SFXA.musicOn ? 'Music on' : 'Music off')}${btn('savenow', 'Save now')}${btn('open', 'How to play', { p: 'help' })}</div><p class="note" style="margin-top:12px">Shardfall web slice · offline M1. ${btn('wipe', 'Delete character', {}, 'on')}</p>`],
   quest: () => questPanel(), journal: () => journalPanel(),
-  help: () => ['How to play', `<p><b>Move</b> with the floating stick on the left. Press <b>Sprint</b> to run faster; it drains 7 stamina a second and switches off when you run out. Tapping the world never moves you.</p><p><b>Target</b> by tapping a creature, person, corpse or resource, or press <b>Target</b> to cycle nearby creatures. Tap your portrait to target yourself.</p><p><b>Attack</b> arms your basic attack on the selected creature or person; with nothing selected it picks the nearest creature you can see (never a person). Enemy spells do the same. You swing whenever it is in reach and your weapon is ready. It never chases, picks targets, casts or loots for you. <b>Cancel</b> disarms and stops actions.</p><p><b>Combat</b> follows the Second Age rules: your weapon skill against the defender's sets the hit chance; Tactics, Anatomy and Strength set the damage; armor absorbs part of each blow; a shield parries with half your Parrying as a percent. Swing speed comes from the weapon and your current stamina. Bows and crossbows reload while you move, but you must stand still to aim, and the shot lands a second later.</p><p><b>First Aid</b>: the bandage slot treats you (15 s; poison 18 s). Tap an ally or a ghost and press <b>Bandage</b> to treat them (5 s; poison 6 s; resurrection 10 s at 80 Healing and Anatomy). Being hit makes your fingers slip and the bandage heal less. Wren, a sellsword by the plaza, will follow you if asked.</p><p><b>Spells</b>: tap a spell slot to prepare (stand still), it is then held for 3 s; tap a target or tap the slot again to release. Ground spells need a tap on the ground. Casting stows your weapon.</p><p><b>Interact</b> gathers, opens bodies and chests, disarms revealed snares, talks and uses stations in reach. Stairs in the Sunken Bell ruin and the north Ashfen hatch lead down three levels to the Bellkeeper.</p><p><b>Menu → Abilities</b> holds every skill you can use: Detect Hidden, Animal Taming, pet care, the bardic skills, Stealing, Poisoning and more. <b>Bar</b> cycles through three pages of three slots.</p><p><b>Law</b>: your name is blue while innocent, grey while a criminal and red as a murderer. Attacking an innocent townsperson (press Attack twice to confirm) or being caught stealing makes you a criminal for two minutes: witnesses shout for the guards, and guards fight criminals and murderers inside their town. Anyone who attacks you first may be fought back lawfully. Knocking an innocent down is reported as a murder; five murders within 40 hours of play make you red, and townsfolk will not deal with you.</p><p><b>Death</b> in the wilderness leaves tradeable gear on your body for 12 minutes. On protected roads you keep your gear. Walk to a shrine or healer, or wait 12 s to return to your bound shrine. Bank what you cannot afford to lose.</p><p><b>Crafting</b>: Interact at the forge, anvil, bench, still or fire. Pick a category, then a recipe: the detail shows every input, the metal, your odds and what a failure costs before you commit. Mining and Blacksmithy mentors stand by the public forge.</p><p><b>Skills</b> are the 49 of the Second Age. They rise from real use while the task is still a challenge for you, to 100 each and 700 in all; set one to Lower to make room at the cap. Your Strength, Dexterity and Intelligence grow with the skills that use them (225 in all). Townsfolk teach their trades up to 30 for a gold piece a tenth.</p><p class="note">Keyboard: WASD/arrows move, Shift sprints, Space attack, E interact, B bandage self, 1–3 current bar slots, Tab target, Esc cancel.</p>`] };
+  help: () => ['How to play', `<p><b>Move</b> with the floating stick on the left. Press <b>Sprint</b> to run faster; it drains 7 stamina a second and switches off when you run out. Tapping the world never moves you.</p><p><b>Target</b> by tapping a creature, person, corpse or resource, or press <b>Target</b> to cycle nearby creatures. Tap your portrait to target yourself.</p><p><b>Attack</b> arms your basic attack on the selected creature or person; with nothing selected it picks the nearest creature you can see (never a person). Enemy spells do the same. You swing whenever it is in reach and your weapon is ready. It never chases, picks targets, casts or loots for you. <b>Cancel</b> disarms and stops actions.</p><p><b>Combat</b> follows the Second Age rules: your weapon skill against the defender's sets the hit chance; Tactics, Anatomy and Strength set the damage; armor absorbs part of each blow; a shield parries with half your Parrying as a percent. Swing speed comes from the weapon and your current stamina. Bows and crossbows reload while you move, but you must stand still to aim, and the shot lands a second later.</p><p><b>First Aid</b>: the bandage slot treats you (15 s; poison 18 s). Tap an ally or a ghost and press <b>Bandage</b> to treat them (5 s; poison 6 s; resurrection 10 s at 80 Healing and Anatomy). Being hit makes your fingers slip and the bandage heal less. Wren, a sellsword by the plaza, will follow you if asked.</p><p><b>Spells</b>: tap a spell slot to prepare (stand still), it is then held for 3 s; tap a target or tap the slot again to release. Ground spells need a tap on the ground. Casting stows your weapon.</p><p><b>Interact</b> gathers, opens bodies and chests, disarms revealed snares, talks and uses stations in reach. Stairs in the Sunken Bell ruin and the north Ashfen hatch lead down three levels to the Bellkeeper.</p><p><b>Menu → Abilities</b> holds every skill you can use: Detect Hidden, Animal Taming, pet care, the bardic skills, Stealing, Poisoning and more. <b>Bar</b> cycles through three pages of three slots.</p><p><b>Law</b>: your name is blue while innocent, grey while a criminal and red as a murderer. Attacking an innocent townsperson (press Attack twice to confirm) or being caught stealing makes you a criminal for two minutes: witnesses shout for the guards, and guards fight criminals and murderers inside their town. Anyone who attacks you first may be fought back lawfully. Killing an innocent is reported as a murder; five murders within 40 hours of play make you red, and townsfolk will not deal with you. The dead leave a body with what they carried: taking from an innocent's body in its first 90 seconds is a crime too. Townsfolk who die are back home ten minutes later. Beware the outlaws of the Ashfen camp: a cutthroat who preys on lone travellers in the wild, and a cutpurse who robs the dead. Once they are grey or red, anyone may fight them.</p><p><b>Death</b> in the wilderness leaves tradeable gear on your body for 12 minutes. On protected roads you keep your gear. Walk to a shrine or healer, or wait 12 s to return to your bound shrine. Bank what you cannot afford to lose.</p><p><b>Crafting</b>: Interact at the forge, anvil, bench, still or fire. Pick a category, then a recipe: the detail shows every input, the metal, your odds and what a failure costs before you commit. Mining and Blacksmithy mentors stand by the public forge.</p><p><b>Skills</b> are the 49 of the Second Age. They rise from real use while the task is still a challenge for you, to 100 each and 700 in all; set one to Lower to make room at the cap. Your Strength, Dexterity and Intelligence grow with the skills that use them (225 in all). Townsfolk teach their trades up to 30 for a gold piece a tenth.</p><p class="note">Keyboard: WASD/arrows move, Shift sprints, Space attack, E interact, B bandage self, 1–3 current bar slots, Tab target, Esc cancel.</p>`] };
 let PICK = [];
 function uiOpen(k) { openPanel(k); snd('ui.open'); }   // deliberate panel changes only, never on re-render
 
@@ -9828,8 +10074,8 @@ const ACT = {
   assign: d => { ASSIGN = { k: d.k, id: d.id }; openPanel('assign'); }, setslot: d => { P.hotbar[+d.i] = ASSIGN; closePanel(); },
   lock: d => { const s = P.skills[d.k]; s.lock = s.lock === 'raise' ? 'hold' : s.lock === 'hold' ? 'lower' : 'raise'; renderPanel(); },
   cast: d => { closePanel(); castSlot(d.s); },
-  take: d => { const c = P.lootOpen; if (!c || dist(c, P) > 2) return log('Move within 2 m.'); const it = findU(c.cont, d.u); if (!it) return; const r = SF.EQ.pickupItem(P, c.cont, { uid: it.uid, qty: d.half ? Math.ceil(it.qty / 2) : it.qty }); if (!r.ok) log(r.reason, '#ffb070'); else { if (it.id === 'gold') snd('loot.coin'); if (c.advBody) advLooted(c); } renderPanel(); if (c.mine || c.pile || c.kind === 'chest') save(); },
-  takeall: () => { const c = P.lootOpen; if (!c || dist(c, P) > 2) return; let n = 0, gold = 0; for (const it of c.cont.items.slice()) { const r = SF.EQ.pickupItem(P, c.cont, { uid: it.uid, qty: it.qty }); if (r.ok) { n++; if (it.id === 'gold') gold++; } else { log('Stopped: ' + r.reason, '#ffb070'); break; } } if (n) snd(gold ? 'loot.coin' : 'loot.rummage'); /* one cue for the whole transfer */ renderPanel(); if (c.mine) save(); },
+  take: d => { const c = P.lootOpen; if (!c || dist(c, P) > 2) return log('Move within 2 m.'); const it = findU(c.cont, d.u); if (!it) return; const r = SF.EQ.pickupItem(P, c.cont, { uid: it.uid, qty: d.half ? Math.ceil(it.qty / 2) : it.qty }); if (!r.ok) log(r.reason, '#ffb070'); else { if (it.id === 'gold') snd('loot.coin'); npcdLooted(c, P); /* a person's body: robbing an innocent inside its loot-rights window is a crime (src/npcdeath.js) */ } renderPanel(); if (c.mine || c.pile || c.kind === 'chest') save(); },
+  takeall: () => { const c = P.lootOpen; if (!c || dist(c, P) > 2) return; let n = 0, gold = 0; for (const it of c.cont.items.slice()) { const r = SF.EQ.pickupItem(P, c.cont, { uid: it.uid, qty: it.qty }); if (r.ok) { n++; if (it.id === 'gold') gold++; } else { log('Stopped: ' + r.reason, '#ffb070'); break; } } if (n) { snd(gold ? 'loot.coin' : 'loot.rummage'); npcdLooted(c, P); } /* one cue for the whole transfer; Take all is looting too (v0.39) */ renderPanel(); if (c.mine) save(); },
   skin: () => { const c = P.lootOpen || P.sel; if (c && c.mon && dist(c, P) <= 2) skin(c); else log('Stand by the remains.'); },
   depgold: () => { let g = 0; for (const it of P.pack.items.filter(i => i.id === 'gold')) if (SF.transfer(P.pack, P.bank, it.uid, it.qty).ok) g++; if (g) snd('loot.coin'); save(); renderPanel(); },
   dep: d => { const it = findU(P.pack, d.u); if (it) SF.transfer(P.pack, P.bank, it.uid, it.qty); save(); renderPanel(); },
@@ -10366,6 +10612,7 @@ function saveData() {
     const pets = ents.filter(e => e.kind === 'pet' && e.type && !e.summon && !e.gone && e.hp > 0).map(e => ({ type: e.type, hp: e.hp, order: e.order === 'stay' ? 'stay' : 'follow', slots: e.slots, name: e.name, dx: e.x - P.x, dy: e.y - P.y, x: e.x, y: e.y, aid: e.actorId || null, owner: e.owner || P.charId || null, loyal: e.loyal, fedAgo: GT - (e.fedAt || GT) }));   // v0.33.1: x/y (where a staying pet waits), aid (its actor id) and owner; dx/dy stay for older builds
     const nodes = []; for (const [k, o] of RES) nodes.push([k, o.gen || 1, o.spec || 0, o.n, o.max || 0, Math.round(o.t * 10) / 10]);
     const ally = allySave(); if (ally) { Object.values(ally.equip || {}).forEach(scan); ally.pack.forEach(scan); if (ally.body) ally.body.items.forEach(scan); }
+    npcdScanItems(scan);   // townsfolk bodies (v0.39): their items carry real uids
     const adv = advSave(); advScanItems(adv, scan);   // NPC adventurers (v0.36): their items carry real uids
     return { v: SAVE_VERSION, char: c, corpses, piles, chests, pets, nodes, ally, sim: WS ? WS.save() : null, eco: ecoSave(), life: lifeSave(), adv, uid: maxUid + 1, gt: GT, savedAt: Date.now(), tab: TAB_ID };
   }
@@ -10517,7 +10764,7 @@ function spawnMon(type, dx = 3, dy = 0) { const d = MON[type]; if (!d) return nu
   return addEnt({ kind: 'mon', type, name: d.n, x, y, hp: d.hp, max: d.hp, state: 'idle', home: { x, y }, sect: 0, ward: 0 }); }
 /* __SF is a development and test hook (the browser suites drive the game through it). It is not a security boundary: anything
    here is reachable from the console in an offline single-player game, and a multiplayer server must not trust the client. */
-window.__SF = { SAVE, saveData, get saveLocked() { return saveLocked; }, ADV, npcUp, advTick, advThink, advDamaged, advDies, advResurrect, advCast, advSave, advLoad, advInspect, advDev, advPickGround, advTalk, advLooted, advById, advChoice: advSpellChoice, get LAW() { return LAW; }, LAWF, LAW_WITNESS, lawAggress, lawCrime, lawWitness, lawDowned, lawReport, lawRefuses, lawGuardTarget, lawRegion, notoOf, notoColor, lawSave, lawLoad, toggleArm, attackTick, FRAME_ERR, SHRINES, los, NPCF, NPC_FIGHT, NPC_DOWN_TIME, npcArm, damageNpc, npcEngage, npcCombatant, npcUp, npcSave, ecoTargetable, readSave, validateSave, get WS() { return WS; }, dist, closePanel, lifeSave, LIFE, LIFE_SCHED, lifeTick, lifeResume, lifeInspect, lifeTownGeo, lifeTalk, talk, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
+window.__SF = { SAVE, saveData, get saveLocked() { return saveLocked; }, NPCD, CRIM, npcDies, npcdReturn, npcdTick, npcdLooted, npcdById, npcdSave, npcdLoad, crimPreyFor, crimBodyFor, lawOutlawSeen, advGeo, ADV, npcUp, advTick, advThink, advDamaged, advDies, advResurrect, advCast, advSave, advLoad, advInspect, advDev, advPickGround, advTalk, advLooted, advById, advChoice: advSpellChoice, get LAW() { return LAW; }, LAWF, LAW_WITNESS, lawAggress, lawCrime, lawWitness, lawDowned, lawReport, lawRefuses, lawGuardTarget, lawRegion, notoOf, notoColor, lawSave, lawLoad, toggleArm, attackTick, FRAME_ERR, SHRINES, los, NPCF, NPC_FIGHT, NPC_DOWN_TIME, npcArm, damageNpc, npcEngage, npcCombatant, npcUp, npcSave, ecoTargetable, readSave, validateSave, get WS() { return WS; }, dist, closePanel, lifeSave, LIFE, LIFE_SCHED, lifeTick, lifeResume, lifeInspect, lifeTownGeo, lifeTalk, talk, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
 Object.assign(window.__SF, { TIER, tierStep, tierBusy, tierInspect, tierMeasure, ECO_POP, ecoRestore, ecoSpawnKeys, ecoLoad });   // Living World phase 6 (src/tiers.js, src/ecology.js)
 Object.defineProperties(window.__SF, { PICKT: { get: () => PICKT }, TRACKS: { get: () => TRACKS }, TRACKUI: { get: () => TRACKUI } });   // live views (Object.assign would copy a getter's value)
 Object.assign(window.__SF, { skillCheck, skillUse, noteLearn, SKUI, SKLOG, useAbility, ABIL, TASKS, pickTap, tameStart, loreUse, vetStart, feedPet, peaceUse, enticeUse, provokeStart, provokeUse, stealStart, npcPack, poisonApply, lockUse, untrapUse, stealthUse, hide, finishHide, reveal, trackStart, trackFollow, magicStrike, petLoyaltyTick, petCommand, evalUse, meditate, playMusic, tamedPets, chestTrapRoll, itemSkill, eat, CHESTS, cdLeft, onPlayerMoved, begUse, campUse, lightKindling, makeCamp, forensicUse, herdPick, herdUse, snoopUse, spiritUse, digUse, treasureUp, newTreasureMap, magicLoot, CAMPS, ITEM_SKILL, ghostSpeech, killMon, MG: SF.MAGERY });

@@ -2,7 +2,7 @@
 # Notoriety on names and the target frame; arming on an innocent asks twice; a swing at an innocent is an unlawful aggression record
 # and makes you grey for 120 s; witnesses remember, flee and call the guards; guards fight you inside their jurisdiction through the
 # shared resolver and give up when you hide or the flag runs out; self-defence is lawful; theft is a crime; witnesses refuse to talk;
-# an innocent knocked down by you reports a murder, once per knock-down; five long-term counts make you red, guards attack a murderer
+# an innocent killed by you reports a murder, once per death (v0.34–v0.38: per knock-down); five long-term counts make you red, guards attack a murderer
 # on sight and townsfolk refuse him; counts and flags survive a reload; an NPC who kills you unlawfully can be reported from the
 # ghost window; fighting creatures is never a crime.
 # usage: python3 tests/world-smoke/phase5_law.py Shardfall_v0.34.html [/path/to/chrome]   (also run by world-smoke/run.py)
@@ -95,12 +95,12 @@ with sync_playwright() as p:
     S.talk(e); out.panel = S.PANEL || null; return out; }""")
   check(r['noto'] == 'criminal' and r['cr'] == ['theft'] and r['refuse'] and r['said'] and r['panel'] is None, f"caught stealing makes you a criminal; the victim refuses to trade (\"{r['said']}\")", r)
 
-  # 7. murder: an innocent knocked down by you reports it, once; five long-term counts make you red
+  # 7. murder: an innocent killed by you reports it, once; five long-term counts make you red
   r = J(pg, """() => { const S = __SF, T = __T; S.lawLoad(null); T.run(.1); const names = ['Old Tomas', 'Lise', 'Corin', 'Nell', 'Garrick']; const s0 = T.seq(); const res = [];
-    for (const n of names) { const e = T.by(n); T.stage('vespar', e, 40); T.swing(e); S.damageActor(e, 9999, 'phys', S.P); S.damageActor(e, 9999, 'phys', S.P); res.push([e.downed, S.LAW.counts('player:p1', S.GT).long]); }
+    for (const n of names) { const e = T.by(n); T.stage('vespar', e, 40); T.swing(e); S.damageActor(e, 9999, 'phys', S.P); S.damageActor(e, 9999, 'phys', S.P); res.push([!!e.gone, S.LAW.counts('player:p1', S.GT).long]); }
     const rep = T.ev('MurderReported', s0).map(m => [m.actor, m.target, m.detail.long]); S.refreshHud();
     return { res, rep, noto: S.notoOf(S.P), red: T.logHas('now known as a murderer'), first: T.logHas('Old Tomas reports you for murder'), pname: [document.querySelector('#pname').textContent, document.querySelector('#pname').style.color] }; }""")
-  check(r['res'] == [[True, 1], [True, 2], [True, 3], [True, 4], [True, 5]] and len(r['rep']) == 5 and r['rep'][0][:2] == ['npc:old-tomas', 'player:p1'] and r['first'], 'each innocent you knock down reports one murder (double blows on one fall count once)', r)
+  check(r['res'] == [[True, 1], [True, 2], [True, 3], [True, 4], [True, 5]] and len(r['rep']) == 5 and r['rep'][0][:2] == ['npc:old-tomas', 'player:p1'] and r['first'], 'each innocent you kill reports one murder (double killing blows on one death count once)', r)
   check(r['noto'] == 'murderer' and r['red'] and r['pname'][0] == 'Tess · murderer' and r['pname'][1] == 'rgb(255, 90, 72)', 'the fifth long-term count makes you red: a log line and a red name', r)
 
   # 8. a murderer: guards attack on sight once the criminal flag is long gone; townsfolk refuse to deal

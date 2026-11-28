@@ -28,7 +28,13 @@ const ADV_REAGENTS = Object.keys(SF.MAGERY.REAGENTS);
 const ADV_KEEP = { gold: 1, bandage: 1, draught: 1, arrow: 1, spellbook: 1, garment: 1, journal: 1 };   // never sold
 for (const r of ADV_REAGENTS) ADV_KEEP[r] = 1;
 const ADV_SPELL_COL = { 'magery.05': '#ffd27a', 'magery.18': '#ff7a30', 'magery.42': '#5fe0d0', 'magery.30': '#e0f0ff', 'magery.12': '#c8a0ff' };
-const ADV_TOWN_N = { vespar: 'Vespar', mynoc: 'Mynoc', skara: 'Skara Bryn', moonglen: 'Moonglen' };
+const ADV_TOWN_N = { vespar: 'Vespar', mynoc: 'Mynoc', skara: 'Skara Bryn', moonglen: 'Moonglen', camp: 'the Ashfen camp' };
+/* where an adventurer calls home: one of the four towns, or (the outlaws, v0.39) the Ashfen outlaw camp, laid out like a small town */
+let ADV_CAMP = null;
+function advGeo(town) {
+  if (town !== 'camp') return lifeTownGeo(town); if (ADV_CAMP) return ADV_CAMP; const c = ZONES.camp;
+  return ADV_CAMP = { id: 'camp', blds: [], homes: [], center: { x: c.cx, y: c.cy }, hall: { x: c.cx - 1, y: c.cy + 2, r: 2.5 }, market: { x: c.cx, y: c.cy, r: 6 }, guards: [], patrol: [] };
+}
 const advById = id => ADV.list.find(e => e.actorId === id && !e.gone) || null;
 const advFirst = e => String(e.name || '').split(',')[0];
 const advNear = e => P && dist(e, P) < 24;
@@ -56,7 +62,7 @@ function advCheck(e, key) { const r = SF.SK.check(e, key, 0, 100, { rng: R, now:
 
 /* ---------- population ---------- */
 function advMake(npc, row, at) {
-  const [name, style, town, courage, body] = row, D = SIM.ADV_STYLES[style]; if (!D || !LIFE_TOWNS[town]) return null; const G = lifeTownGeo(town);
+  const [name, style, town, courage, body] = row, D = SIM.ADV_STYLES[style]; if (!D || !(LIFE_TOWNS[town] || town === 'camp')) return null; const G = advGeo(town);
   const p = at || lifeSpot({ id: 31 + ADV.list.length * 17 }, G.market, 7, ADV.list.length);
   const e = npc('adventurer', name, p.x, p.y); e.town = town;
   e.str = D.str; e.dex = D.dex; e.int = D.int; e.skills = SF.newSkills(); for (const k in D.skills) if (e.skills[k]) e.skills[k].v = D.skills[k] * 10;
@@ -67,7 +73,7 @@ function advMake(npc, row, at) {
   advGive(e, 'gold', 40);
   e.npcFight = { fights: true, adv: true, hp: 1 }; e.max = SF.maxHp(e); e.hp = e.max; e.stam = SF.maxStam(e); e.mana = e.int; e.sw = SF.newSwing();
   e.downed = false; e.foe = null; e.ghost = false;
-  e.adv = { style: D.style, key: style, D, town, courage, body, mode: 'town', why: ['arrived in town'], bank: 150, ground: null, grounds: 0, groundAt: 0, spot: null,
+  e.adv = { style: D.style, key: style, D, town, courage, body, crim: D.crim || null, mode: 'town', why: ['arrived in town'], bank: 150, ground: null, grounds: 0, groundAt: 0, spot: null,
     thinkAt: 0, castReady: 0, potAt: 0, tend: null, prep: null, lootQ: null, busyUntil: 0, failN: 0, row: row.slice(),
     rec: { kills: 0, deaths: 0, trips: 0, loots: 0, earned: 0, casts: 0, bandages: 0 } };
   e.home = { x: p.x, y: p.y }; e._gLook = GEAR.npcLook(e.actorId || name, { body, cloth: D.cloth });
@@ -76,6 +82,7 @@ function advMake(npc, row, at) {
 function advPopulate(npc) {
   ADV.list.length = 0; ADV.gone = []; ADV.waiting = []; ADV.next = 0; if (!ADV.on) return;
   for (const row of SIM.ADV_ROSTER) advMake(npc, row);
+  if (CRIM.on) for (const row of SIM.CRIM_ROSTER) advMake(npc, row);   // the outlaws (v0.39, src/npcdeath.js)
 }
 
 /* ---------- each step (the AdventurerAI controller) ---------- */
@@ -103,7 +110,7 @@ function advTick(e, dt) {
   lifeSeparate(e);
 }
 /* the town it calls home: inside its jurisdiction counts as in town */
-const advTownGeo = e => lifeTownGeo(e.adv.town);
+const advTownGeo = e => advGeo(e.adv.town);
 const advInTown = e => { const G = advTownGeo(e); return Math.hypot(e.x - G.center.x, e.y - G.center.y) < Math.min(NPC_JURISDICTION, 40); };
 const advNight = () => { const h = hourOfDay(); return h >= ADV.cfg.nightAt || h < ADV.cfg.dayStart; };
 function advSay(e, lines, gap) { if (!advNear(e) || GT < (e.adv.sayAt || 0)) return; e.adv.sayAt = GT + (gap || 8); say(e, typeof lines === 'string' ? lines : pick(lines)); }
@@ -125,8 +132,10 @@ function advFoes(e) {
 function advThink(e) {
   const A = e.adv, C = ADV.cfg;
   // self-defence against you: the law gives it the right while your aggression stands
-  let foe = null;
-  if (e.foe === P && fighterAlive(P) && !P.hidden && dist(e, P) < C.leash && LAW.rights(aidOf(e), aidOf(P), GT)) foe = { c: P, ratio: ecoPower(P) / Math.max(1, ecoPower(e)) };
+  // a person it is fighting: you or an NPC (v0.39). Lawful adventurers only while the law gives them the right; outlaws regardless
+  let foe = null; const hf = e.foe && e.foe.kind !== 'mon' ? e.foe : null;
+  if (hf && fighterAlive(hf) && !hf.hidden && dist(e, hf) < C.leash && (A.crim || LAW.rights(aidOf(e), aidOf(hf), GT))) foe = { c: hf, ratio: ecoPower(hf) / Math.max(1, ecoPower(e)) };
+  if (!foe && A.crim) foe = crimPreyFor(e);   // a cutthroat picks its prey (src/npcdeath.js)
   if (!foe) { const pick_ = SIM.advTarget(advFoes(e), A.courage, C.sight); if (pick_) foe = pick_; }
   if (!foe && e.foe && e.foe.kind === 'mon' && fighterAlive(e.foe) && dist(e, e.foe) < C.leash && e.foe.target === e) foe = { c: e.foe, ratio: ecoPower(e.foe) / Math.max(1, ecoPower(e)) };
   const s = { hpF: e.hp / e.max, manaF: advCaster(e) ? e.mana / Math.max(1, e.int) : null, style: A.style, courage: A.courage, inTown: advInTown(e), night: advNight(),
@@ -137,17 +146,20 @@ function advThink(e) {
     if (chased) A.safeAt = GT; if (GT - (A.safeAt || 0) < 6 && !(s.inTown && !chased)) return; }
   let d = SIM.advChoose(s, C);
   if (d.act !== 'fight' && d.act !== 'flee' && advBodyOf(e)) { if (A.mode !== 'reclaim') { e.nav = null; advSet(e, 'reclaim', ['going back for my body']); } return; }   // first, its own body (also after running from a fight)
+  if (A.crim && d.act !== 'fight' && d.act !== 'flee' && A.mode !== 'town') {   // an outlaw robs the dead it has no right to (src/npcdeath.js)
+    const b = crimBodyFor(e); if (b) { advSet(e, 'loot', ['robbing ' + b.name]); A.lootQ = b; return; } }
   if (d.act !== 'fight' && d.act !== 'flee' && A.mode !== 'town') {          // its own kills to loot, before moving on
     const c = advLootable(e); if (c) { advSet(e, 'loot', ['looting the ' + c.name.replace(/ remains$/, '')]); A.lootQ = c; return; } }
-  if (d.act === 'fight') { if (e.foe !== foe.c) { e.foe = foe.c; e.nav = null; A.foeAt = GT; if (A.mode !== 'fight') A.was = A.mode; simEmit('CombatStarted', { actor: aidOf(e), target: aidOf(foe.c), x: e.x, y: e.y, detail: { why: foe.c === P ? 'self-defence' : foe.onMe ? 'attacked' : foe.onFriend ? 'helping' : 'hunting' } });
-      if (foe.onFriend && foe.c.target === P) advSay(e, ['I have it!', 'Hold on, friend!', 'Over here, beast!']); else if (foe.c === P) advSay(e, ['You will regret that!', 'Thief! Murderer!', 'Guards! Guards!'], 4); }
+  if (d.act === 'fight') { if (e.foe !== foe.c) { e.foe = foe.c; e.nav = null; A.foeAt = GT; if (A.mode !== 'fight') A.was = A.mode; simEmit('CombatStarted', { actor: aidOf(e), target: aidOf(foe.c), x: e.x, y: e.y, detail: { why: foe.prey ? 'preying' : foe.c.kind !== 'mon' ? 'self-defence' : foe.onMe ? 'attacked' : foe.onFriend ? 'helping' : 'hunting' } });
+      if (foe.prey) advSay(e, ['Your purse or your life. Both, then.', 'Nobody will hear you out here.', 'Should have stayed in town.'], 4);
+      else if (foe.onFriend && foe.c.target === P) advSay(e, ['I have it!', 'Hold on, friend!', 'Over here, beast!']); else if (foe.c === P) advSay(e, ['You will regret that!', 'Thief! Murderer!', 'Guards! Guards!'], 4); }
     advSet(e, 'fight', d.why); return; }
-  if (e.foe && (!fighterAlive(e.foe) || e.foe === P)) { const w = e.foe; e.foe = null; simEmit('CombatEnded', { actor: aidOf(e), target: aidOf(w), x: e.x, y: e.y, detail: { outcome: !fighterAlive(w) ? 'won' : 'disengaged' } }); }
+  if (e.foe && (!fighterAlive(e.foe) || e.foe.kind !== 'mon')) { const w = e.foe; e.foe = null; simEmit('CombatEnded', { actor: aidOf(e), target: aidOf(w), x: e.x, y: e.y, detail: { outcome: !fighterAlive(w) ? 'won' : 'disengaged' } }); }
   if (d.act === 'flee') { if (A.mode !== 'flee') { ADV.stats.flees++; A.safeAt = GT; e.nav = null; advSay(e, ['Fall back!', 'Too many of them!', 'I need to get out of here!'], 4); } e.foe = null; advSet(e, 'flee', d.why); return; }
   if (d.act === 'town') { if (A.mode !== 'town') { if (A.mode === 'return' || A.mode === 'flee') { A.rec.trips++; ADV.stats.trips++; } A.spot = null; e.nav = null; } advSet(e, 'town', d.why); return; }
   if (d.act === 'return') { if (A.mode !== 'return') { e.nav = null; A.ground = null; } advSet(e, 'return', d.why); return; }
   // hunt: leaving town now and then means moving on to another town (§8: travelling between cities)
-  if (A.mode === 'town' && A.rec.trips > 0 && A.rec.trips % 3 === 0 && A.movedTrip !== A.rec.trips && R() < .5) {
+  if (!A.crim && A.mode === 'town' && A.rec.trips > 0 && A.rec.trips % 3 === 0 && A.movedTrip !== A.rec.trips && R() < .5) {
     A.movedTrip = A.rec.trips; const others = Object.keys(LIFE_TOWNS).filter(k => k !== A.town && !(A.dry && A.dry[k] > GT)); const to = others[Math.floor(R() * others.length)];
     A.town = to; e.town = to; A.spot = null; e.nav = null; ADV.stats.moves++; advSay(e, 'On to ' + ADV_TOWN_N[to] + '!'); advSet(e, 'return', ['moving on to ' + ADV_TOWN_N[to]]); return; }
   if (A.mode !== 'hunt') { e.nav = null; A.grounds = 0; A.ground = null; if (A.mode === 'town') advSay(e, ['Back to the hunt.', 'Time to earn my keep.', 'Off I go.']); }
@@ -288,6 +300,7 @@ function advTravel(e, dt) {
     const G = advTownGeo(e); advGo(e, G.center.x, G.center.y + 2, 'home to ' + ADV_TOWN_N[A.town]); return; }
   // hunt
   if (!A.ground) { if (A.grounds >= C.grounds) { advSet(e, 'return', ['no luck hunting']); return; } A.ground = advPickGround(e); A.groundAt = 0;
+    if (!A.ground && A.crim) { A.grounds = C.grounds; advSet(e, 'return', ['no game near the camp']); return; }   // outlaws stay by their camp
     if (!A.ground) { const was = A.town; A.grounds = C.grounds;
       if (A.noGameAt === undefined || GT - A.noGameAt > 600) { A.noGameAt = GT; advSet(e, 'return', ['no game near ' + ADV_TOWN_N[was]]); return; }
       (A.dry || (A.dry = {}))[was] = GT + 3600; const others = Object.keys(LIFE_TOWNS).filter(k => k !== was && !(A.dry[k] > GT)), to = others.length ? others[Math.floor(R() * others.length)] : Object.keys(LIFE_TOWNS).find(k => k !== was); A.town = to; e.town = to; A.spot = null; e.nav = null; A.noGameAt = undefined; ADV.stats.moves++;   // twice in ten minutes: move on (§8: travelling between cities)
@@ -312,13 +325,17 @@ function advLoot(e, dt) {
   if (!c || c.gone) { A.lootQ = null; A.thinkAt = 0; advSet(e, 'hunt', ['looted']); return; }
   const d = dist(e, c), late = GT - (A.modeAt || GT) > 25;
   if (d > 1.3 && !(d <= 2 && (!e.nav || e.nav.state !== 'moving'))) {   // within 2 m, like you, once it has stopped walking
-    if (late || (e.nav && e.nav.state === 'failed') || (e.nav && e.nav.state === 'done' && d > 2)) { c.advDone = true; A.lootQ = null; e.nav = null; return; }   // out of reach: leave it
+    if (late || (e.nav && e.nav.state === 'failed') || (e.nav && e.nav.state === 'done' && d > 2)) { c.advDone = true; (A.robbed || (A.robbed = {}))[c.id] = 1; A.lootQ = null; e.nav = null; return; }   // out of reach: leave it
+    if (d < 6 && (!e.nav || e.nav.state !== 'moving') && los(e, c)) { e.nav = null; allyStep(e, c.x, c.y, dt); return; }   // the last few metres straight in, without waiting for a search (v0.39)
     if (!e.nav) navTo(e, c.x, c.y, { direct: true, doors: true, speed: SF.WALK * .6, name: 'loot', low: true }); if (e.nav && e.nav.state === 'moving') navStep(e, dt); return; }
   e.nav = null; e.speed = 0; if (!A.lootAt) { A.lootAt = GT + .6; sndAt('loot.rummage', c, { gain: .5 }); return; } if (GT < A.lootAt) return; A.lootAt = 0;
+  const human = npcdHumanBody(c), illegal = human && npcdLooted(c, e);   // a person's body: inside its loot-rights window, robbing an innocent is a crime (v0.39)
+  if (human) { (A.robbed || (A.robbed = {}))[c.id] = 1; if (A.crim) CRIM.stats.loots++; }
   let n = 0, val = 0; for (const it of c.cont.items.slice()) { if (!advWants(it)) continue; if (SF.containerKg(e.pack) + SF.itemKg(it) > 60) break; c.cont.items.splice(c.cont.items.indexOf(it), 1); c.cont.ver = (c.cont.ver || 0) + 1;
     const ex = SF.ITEMS[it.id].stack && e.pack.items.find(o => o.id === it.id); if (ex) ex.qty += it.qty; else e.pack.items.push(it); e.pack.ver++; n++; val += it.id === 'gold' ? it.qty : (SF.PRICES[it.id] || 0) * it.qty; }
   c.advDone = true; A.lootQ = null; A.rec.loots++; A.rec.earned += val; ADV.stats.loots++;
-  if (n) simEmit('CorpseLooted', { actor: aidOf(e), x: c.x, y: c.y, detail: { items: n, value: val, lawful: true } });
+  if (n) simEmit('CorpseLooted', { actor: aidOf(e), x: c.x, y: c.y, detail: { items: n, value: val, lawful: !illegal } });
+  if (n && c.mine && P) log(`${advFirst(e)} took ${n} item${n > 1 ? 's' : ''} from your body!`, '#ff6a5a');
   A.thinkAt = 0; advSet(e, A.was && A.was !== 'loot' && A.was !== 'fight' ? A.was : 'hunt', ['looted']);
 }
 
@@ -381,7 +398,10 @@ function advProvoked(e, src) {
   const A = e.adv; if (!A || !npcUp(e)) return; const who = !src ? null : src.kind === 'mon' ? src : lawResponsible(src);
   if (!who || who === e || !fighterAlive(who)) return;
   if (who.kind === 'mon') { if (!e.foe || !fighterAlive(e.foe)) { e.foe = who; A.foeAt = GT; if (A.mode !== 'fight' && A.mode !== 'flee') { A.was = A.mode; advSet(e, 'fight', ['attacked by a ' + who.name]); } } return; }
-  if (who !== P) return;
+  if (who !== P) {   // another person (v0.39): an adventurer fights back while the law gives it the right; an outlaw always does
+    if (who.kind !== 'npc' || who === e) return;
+    if ((A.crim || LAW.rights(aidOf(e), aidOf(who), GT)) && (!e.foe || e.foe.kind === 'mon') && A.mode !== 'flee') { e.foe = who; A.foeAt = GT; if (A.mode !== 'fight') A.was = A.mode === 'loot' ? 'hunt' : A.mode; advSet(e, 'fight', ['attacked by ' + advFirst(who)]); }
+    if (!A.crim) npcCallGuards(e, who); return; }
   if (LAW.rights(aidOf(e), aidOf(P), GT) && (!e.foe || e.foe.kind !== 'mon' || dist(e, e.foe) > 3) && A.mode !== 'flee') {
     if (e.foe !== P) advSay(e, ['You will regret that!', 'Guards! Help!', 'So that is how it is.'], 4);
     e.foe = P; A.foeAt = GT; if (A.mode !== 'fight') A.was = A.mode === 'loot' ? 'hunt' : A.mode; advSet(e, 'fight', ['attacked by you']); }
@@ -455,7 +475,7 @@ function advSuccessors() {
 
 /* ---------- you and adventurers: talking, looting their bodies ---------- */
 function advTalk(n) {
-  const A = n.adv; if (!A) return false;
+  const A = n.adv; if (!A) return false; if (A.crim) return crimTalk(n);
   if (n.ghost) { say(n, pick(['Oooo… (a ghost, looking for a healer)', 'Wooo… my body… my things…'])); return true; }
   const no = notoOf(P); if (no === 'murderer' || no === 'criminal') { say(n, no === 'murderer' ? 'Stay back, murderer!' : 'I do not talk to criminals.'); return true; }
   const first = (P.name || 'friend').split(' ')[0], town = ADV_TOWN_N[A.town];
@@ -466,11 +486,7 @@ function advTalk(n) {
   say(n, line); return true;
 }
 /* the take button on a body (src/game.js) calls this: inside its loot-rights window, looting an innocent's body is a crime */
-function advLooted(c) {
-  if (!c || !c.advBody || (c.crimeAt && GT - c.crimeAt < 10)) return; const owner = advById(c.advBody); if (!owner) return;
-  const ls = SF.lootStatus(c.cont, aidOf(P), GT); if (ls.lawful || notoOf(owner) !== 'innocent') return;
-  c.crimeAt = GT; lawCrime(P, owner, 'looting');
-}
+function advLooted(c) { return npcdLooted(c, P); }   // since v0.39 one rule for every person's body (src/npcdeath.js)
 
 /* ---------- save: everything an adventurer is, by actor id (the save's `adv` block, additive) ---------- */
 function advSave() {

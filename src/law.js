@@ -10,10 +10,11 @@
        and will not deal with you for a while. Guards who see it or hear the cry come for you inside their jurisdiction.
      · Guards fight criminals and murderers inside their town's jurisdiction with the same guardFightTick they use on creatures,
        and give up when you leave it, hide, die or stop being a lawful target (the flag runs out and you are not red).
-     · Murder counts: an innocent knocked down by someone with no right over them reports a murder (until phase 5 step 4
-       gives townsfolk real death, a knock-down is the death). Short-term counts last 8 active hours, long-term 40; five
+     · Murder counts: an innocent killed by someone with no right over them reports a murder (since v0.39 townsfolk really die,
+       src/npcdeath.js; v0.34–v0.38 counted the knock-down). Short-term counts last 8 active hours, long-term 40; five
        long-term counts make you red. Townsfolk refuse to talk or trade with a murderer; guards attack one on sight.
-     · If an NPC kills you unlawfully, the ghost window offers to report the murder (no NPC can do that yet; the path is ready).
+     · If an NPC kills you unlawfully, the ghost window offers to report the murder (since v0.39 the cutthroat can).
+     · Since v0.39 NPCs commit crimes too (src/npcdeath.js): the same records, flags, witnesses and guards apply to them.
    Saved in the life block (additive): the law core's records, flags, counts and handled deaths, by actor id. */
 
 const LAW_WITNESS = 14;          // a townsperson sees a crime this far away, in sight
@@ -41,8 +42,15 @@ function lawRegion(x, y) {
 }
 /* may this guard fight t now? creatures by the creature rules; you when grey or red, or when you attacked him */
 function lawGuardTarget(g, t) {
-  if (!t || t !== P || P.ghost) return false; const n = notoOf(P);
-  return n === 'criminal' || n === 'murderer' || (!!g && LAW.rights(aidOf(g), aidOf(P), GT));
+  if (!t) return false;
+  if (t === P) { if (P.ghost) return false; } else if (!(t.adv && npcUp(t))) return false;   // since v0.39 also NPC adventurers and outlaws (src/npcdeath.js)
+  const n = notoOf(t); return n === 'criminal' || n === 'murderer' || (!!g && LAW.rights(aidOf(g), aidOf(t), GT));
+}
+/* a grey or red NPC this guard can see inside its jurisdiction (guardFightTick, src/npcfight.js) */
+function lawOutlawSeen(g) {
+  let best = null, bd = NPC_GUARD_SIGHT;
+  for (const c of ADV.list) { if (c === g || !lawGuardTarget(g, c)) continue; const d = dist(g, c); if (d < bd && npcInJurisdiction(g, c, 0) && los(g, c)) { bd = d; best = c; } }
+  return best;
 }
 
 /* ---------- an attack on a human (swingAt calls this before the blow; damageNpc again for anything else) ---------- */
@@ -54,7 +62,7 @@ function lawAggress(a, v) {
   if (r.crime && r.fresh) lawCrimeDone(who, v, 'assault', before);
   return r;
 }
-/* any other crime (theft today; illegal looting in step 4) */
+/* any other crime: theft, illegal looting (v0.39) */
 function lawCrime(off, victim, what) {
   const who = lawResponsible(off) || off, before = notoOf(who); LAW.crime(aidOf(who), GT, what); lawCrimeDone(who, victim, what, before);
 }
@@ -64,6 +72,9 @@ function lawCrimeDone(off, victim, what, before) {
     const nm = victim && victim.name ? victim.name.split(',')[0] : 'someone';
     if (before === 'innocent') log(what === 'theft' ? `You are caught stealing from ${nm}. You are a criminal for two minutes.` : what === 'looting' ? `You loot ${nm}'s body. You are a criminal for two minutes.` : `You attack ${nm}, an innocent. You are a criminal for two minutes.`, '#ff8a6a');
     else if (before === 'criminal') log('Your criminal flag is renewed.', '#ff8a6a');
+  } else if (off && off.kind === 'npc' && P && dist(off, P) < 24) {   // NPC crime you can see (v0.39)
+    const nm = victim === P ? 'you' : victim && victim.name ? victim.name.split(',')[0] : 'someone', on = off.name.split(',')[0];
+    log(what === 'looting' ? `${on} loots ${victim === P ? 'your' : nm + "'s"} body!` : what === 'theft' ? `${on} steals from ${nm}!` : `${on} attacks ${nm}!`, victim === P ? '#ff6a5a' : '#ffb070');
   }
   lawWitness(off, victim, what); lawNotoCheck();
 }
@@ -92,6 +103,7 @@ function lawDowned(e, src) {
   if (e.life) e.life.mem.note(GT, 'murdered by', aidOf(who), { x: Math.round(e.x), y: Math.round(e.y) }, 0);
   if (who === P) { log(`${e.name.split(',')[0]} reports you for murder. Murder counts: ${r.short} short-term, ${r.long} long-term.`, '#ff6a5a');
     if (r.red) log('You are now known as a murderer. Guards attack you on sight and townsfolk will not deal with you.', '#ff4848'); }
+  else if (who.kind === 'npc' && P && dist(e, P) < 30) log(`${e.name.split(',')[0]} was murdered by ${who.name.split(',')[0]}.${r.red ? ' ' + who.name.split(',')[0] + ' is now a known murderer.' : ''}`, '#ff6a5a');
   lawNotoCheck(before); return r;
 }
 /* you died: if an NPC killed you with no right over you, the ghost window offers a report */

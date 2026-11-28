@@ -1,8 +1,9 @@
 # Living World phase 5, step 1 in the built game (Playwright + Chrome): NPCs as combatants.
 # Every townsperson with a life gets a fighting profile; creatures target townsfolk outside protected ground through the shared
 # resolver; inside protected ground nobody is targetable; guards leave their patrol to fight a creature attacking someone in their
-# jurisdiction, and go back; a townsperson at 0 health is knocked down once (not killed) and gets up later; your blows reach
-# townsfolk (v0.34; the law is in phase5_law.py); health and knock-downs survive a reload; NPC gear never touches the player's uid counter; a seeded day of fights.
+# jurisdiction, and go back; a townsperson at 0 health dies once (since v0.39; v0.30–v0.38 knocked them down) and is back home later;
+# your blows reach townsfolk (v0.34; the law is in phase5_law.py); health and deaths survive a reload; NPC gear never touches the player's
+# uid counter while worn; a seeded day of fights. Bodies, looting and the outlaws: phase5_death.py.
 # usage: python3 tests/world-smoke/phase5.py Shardfall_v0.30.html [/path/to/chrome]   (also run by world-smoke/run.py)
 import sys, json, os
 from playwright.sync_api import sync_playwright
@@ -41,18 +42,18 @@ with sync_playwright() as p:
   b = p.chromium.launch(executable_path=chrome, args=['--no-sandbox'])
   ctx, pg, errs = page(b); new_char(pg, seed=5); J(pg, HELP)
 
-  # 0. a knock-down at simulation time 0 still counts (the time is kept apart from the flag)
-  r = J(pg, """() => { const S = __SF, d = __T.by('Ysolde'), gt = S.GT; S.damageActor(d, 9999, 'phys', null); const a = [!!d.downed, d.hp]; S.update(.05); S.update(.05); return { gt, a, still: !!d.downed, up: S.npcUp(d) }; }""")
-  check(r['a'] == [True, 0] and r['still'] and not r['up'], f"a townsperson knocked down at simulation time {r['gt']} stays down", r)
+  # 0. a death at simulation time 0 still counts (the time is kept apart from the flag)
+  r = J(pg, """() => { const S = __SF, d = __T.by('Ysolde'), gt = S.GT; S.damageActor(d, 9999, 'phys', null); const a = [!!d.gone, d.hp]; S.update(.05); S.update(.05); return { gt, a, still: !!d.gone && S.NPCD.dead.includes(d), up: S.npcUp(d) }; }""")
+  check(r['a'] == [True, 0] and r['still'] and not r['up'], f"a townsperson killed at simulation time {r['gt']} stays dead", r)
 
   # 1. profiles: everyone with a life can fight or be hurt; guards are armed and armoured; gear stays off the player's uid counter
   r = J(pg, """() => { const S = __SF, L = __T.L(); const g = L.filter(e => e.life.prof === 'guard'), t = S.LIFE.trader;
-    const bad = L.filter(e => !e.name.startsWith('Ysolde') && (!S.npcCombatant(e) || !(e.hp > 0) || e.hp !== e.max || !e.sw)).map(e => e.name);   /* Ysolde was knocked down in check 0 */
-    const gear = L.flatMap(e => Object.values(e.equip).filter(Boolean)); const P = S.P; const mine = [...P.pack.items, ...P.bank.items, ...Object.values(P.equip).filter(Boolean)];
+    const bad = L.filter(e => !e.name.startsWith('Ysolde') && (!S.npcCombatant(e) || !(e.hp > 0) || e.hp !== e.max || !e.sw)).map(e => e.name);   /* Ysolde died in check 0 */
+    const gear = L.filter(e => !e.gone).flatMap(e => Object.values(e.equip).filter(Boolean));   /* the dead's outfit became real items on the body (phase5_death.py) */ const P = S.P; const mine = [...P.pack.items, ...P.bank.items, ...Object.values(P.equip).filter(Boolean)];
     return { n: L.length, bad, guards: g.length, gw: [...new Set(g.map(e => e.equip.weapon && e.equip.weapon.id))], garmor: g.every(e => e.equip.chest && e.equip.chest.id === 'chain_tunic'), ghp: g[0].max, civhp: S.LIFE.npcs.find(e => e.life.prof === 'townsfolk').max,
       neg: gear.every(i => i.uid < 0), uniq: new Set(gear.map(i => i.uid)).size === gear.length, mineNeg: mine.some(i => i.uid < 0), trader: [t.equip.weapon.id, t.max],
       ids: L.every(e => e.actorId && e.actorId.startsWith('npc:')), stats: S.fighter(g[0]).atk }; }""")
-  check(not r['bad'] and r['n'] >= 35, f"all {r['n']} townsfolk with a life have a fighting profile (all but the one knocked down at full health)", r)
+  check(not r['bad'] and r['n'] >= 35, f"all {r['n']} townsfolk with a life have a fighting profile (all but the one who died at full health)", r)
   check(r['guards'] >= 8 and r['gw'] == ['glaive'] and r['garmor'] and r['ghp'] > r['civhp'] and r['stats'] == 90, f"{r['guards']} guards with halberds and chainmail (guard {r['ghp']} hp, townsperson {r['civhp']} hp, weapon skill {r['stats']})", r)
   check(r['neg'] and r['uniq'] and not r['mineNeg'] and r['ids'], 'NPC gear has its own negative uids, nothing in your pack, bank or equipment; actor ids unchanged', r)
 
@@ -83,32 +84,32 @@ with sync_playwright() as p:
   check(r['dead'] and r['gid'] in r['dmgBy'] and r['kills'] == [r['gid']], f"the guard's halberd blows land through the shared resolver and he kills it ({r['t']} s); one ActorKilled", r)
   check(r['foe'] is None and 'won' in r['ended'] and 'patrol' in r['doing'], 'the guard reports the fight won and goes back to the patrol', r)
 
-  # 4. knocked down once, not killed; creatures lose interest; up again after the down time; the player cannot hurt townsfolk
+  # 4. killed once (one ActorKilled, one body); creatures lose interest; back home after the configured time; your blows reach townsfolk
   r = J(pg, """() => { const S = __SF, T = __T; T.calm(); const e = T.by('Corin'), p = T.edge('vespar', 18, 60); T.clearNear(p.x, p.y, 30); T.put(e, p); e.life.thinkAt = S.GT + 1e9;
     const m = T.hound(p, 1.3); m.pacified = 0; m.target = e; m.state = 'chase'; const kills = [], downs = [];
     const u1 = S.WS.bus.on('ActorKilled', d => { if (d.actor === e.actorId) kills.push(1); }), u2 = S.WS.bus.on('CombatEnded', d => { if (d.actor === e.actorId) downs.push(d.detail && d.detail.outcome); });
     const hp0 = e.hp; S.damageActor(e, 5, 'phys', S.P); const playerHit = hp0 - e.hp;
     S.damageActor(e, 9999, 'phys', m); S.damageActor(e, 9999, 'phys', m); S.update(.05); S.update(.05);
-    const st = { down: !!e.downed, hp: e.hp, mTarget: m.target === e, targetable: S.ecoTargetable(m, e), alive: !e.gone };
-    T.run(S.NPC_DOWN_TIME - 5); const still = !!e.downed; T.run(7); [u1, u2].forEach(u => u && u());
-    return { playerHit, st, kills: kills.length, downs, still, up: !e.downed, hp: [e.hp, e.max], downsN: S.NPCF.downs }; }""")
+    const st = { dead: !!e.gone, hp: e.hp, mTarget: m.target === e, targetable: S.ecoTargetable(m, e), bodies: S.ents.filter(c => c.npcBody === e.actorId).length };
+    T.hideP(); T.run(S.NPCD.cfg.back - 5); const still = !!e.gone; T.run(S.NPCD.cfg.unseen + 10, () => !e.gone); [u1, u2].forEach(u => u && u());
+    return { playerHit, st, kills: kills.length, downs, still, up: S.npcUp(e), hp: [e.hp, e.max], deaths: S.NPCD.stats.deaths }; }""")
   check(r['playerHit'] == 5, 'since v0.34 your blows reach a townsperson (the law that follows is tested in phase5_law.py)', r)
-  check(r['st']['down'] and r['st']['hp'] == 0 and not r['st']['mTarget'] and r['st']['targetable'] is False and r['st']['alive'] and r['kills'] == 0 and r['downs'] == ['downed'], 'at 0 health a townsperson is knocked down exactly once (no death, no ActorKilled); the creature loses interest', r)
-  check(r['still'] and r['up'] and round(r['hp'][1] / 3) <= r['hp'][0] < round(r['hp'][1] / 3) + 3, f"he stays down for the down time, then gets up with a third of his health ({round(r['hp'][0])}/{r['hp'][1]} two seconds later)", r)
+  check(r['st']['dead'] and r['st']['hp'] == 0 and not r['st']['mTarget'] and r['st']['targetable'] is False and r['st']['bodies'] == 1 and r['kills'] == 1 and r['downs'] == [], 'at 0 health a townsperson dies exactly once (one ActorKilled, one body, no knock-down); the creature loses interest', r)
+  check(r['still'] and r['up'] and r['hp'][0] == r['hp'][1], f"he stays dead for the configured time, then is back home at full health ({round(r['hp'][0])}/{r['hp'][1]})", r)
 
-  # 5. save and reload: hurt and knocked-down townsfolk stay that way, by actor id
-  r = J(pg, """() => { const S = __SF, T = __T; const a = T.by('Lise'), c = T.by('Nell'); a.hp = 7; S.damageActor(c, 9999, 'phys', null); S.save(); return { a: a.actorId, c: c.actorId, down: !!c.downed }; }""")
+  # 5. save and reload: hurt and dead townsfolk stay that way, by actor id
+  r = J(pg, """() => { const S = __SF, T = __T; const a = T.by('Lise'), c = T.by('Nell'); a.hp = 7; S.damageActor(c, 9999, 'phys', null); S.save(); return { a: a.actorId, c: c.actorId, down: !!c.gone }; }""")
   pg.reload(); pg.wait_for_timeout(500); pg.click('[data-c=cont]'); pg.wait_for_timeout(300); J(pg, HELP)
-  r2 = J(pg, """() => { const S = __SF, T = __T; const a = T.by('Lise'), c = T.by('Nell'); const left = S.NPC_DOWN_TIME - (S.GT - c.downAt); return { a: [a.actorId, a.hp], c: [c.actorId, !!c.downed, c.hp], left }; }""")
-  check(r2['a'] == [r['a'], 7] and r2['c'][0] == r['c'] and r2['c'][1] and r2['c'][2] == 0 and 0 < r2['left'] <= 60.1, 'a hurt townsperson keeps her health and a knocked-down one stays down for the time left, through a reload', [r, r2])
+  r2 = J(pg, """() => { const S = __SF, T = __T; const a = T.by('Lise'), c = T.by('Nell'); const left = S.NPCD.cfg.back - (S.GT - c.npcDead.at); return { a: [a.actorId, a.hp], c: [c.actorId, !!c.gone, c.hp], left }; }""")
+  check(r2['a'] == [r['a'], 7] and r2['c'][0] == r['c'] and r2['c'][1] and r2['c'][2] == 0 and 0 < r2['left'] <= 600 + .1, 'a hurt townsperson keeps her health and a dead one stays dead for the time left, through a reload', [r, r2])
 
   # 6. a seeded game day with the ecosystem awake: fights happen, nobody stays down, no errors
   new_char(pg, seed=11); J(pg, HELP)
   r = J(pg, """() => { const S = __SF, T = __T; T.hideP(); S.WS.clock.setDayMinutes(S.GT, 24); const L = T.L(); let maxDown = 0, stuckDown = 0;
-    T.run(24 * 60, () => { const now = S.GT; for (const e of L) if (e.downed && now - e.downAt > S.NPC_DOWN_TIME + 2) stuckDown++; maxDown = Math.max(maxDown, L.filter(e => e.downed).length); return false; });
-    const nan = L.filter(e => !Number.isFinite(e.hp) || e.hp < 0 || e.hp > e.max).map(e => e.name);
-    return { F: S.NPCF, maxDown, stuckDown, nan, inProt: L.filter(e => e.downed && S.protAt(e.x, e.y)).length, ferr: (S.FRAME_ERR || {}).n || 0 }; }""")
-  check(r['stuckDown'] == 0 and not r['nan'], f"a full accelerated day: {r['F']['hitsTaken']} blows taken by townsfolk, {r['F']['downs']} knocked down, {r['F']['rises']} up again, {r['F']['guardFights']} guard fights ({r['F']['guardKills']} won); nobody stays down, health always valid", r)
+    const C = S.NPCD.cfg; T.run(24 * 60, () => { const now = S.GT; for (const e of S.NPCD.dead) if (e.npcDead.back && now - e.npcDead.at > C.back + C.unseen + 3) stuckDown++; maxDown = Math.max(maxDown, S.NPCD.dead.length); return false; });
+    const nan = L.filter(e => !e.gone && (!Number.isFinite(e.hp) || e.hp < 0 || e.hp > e.max)).map(e => e.name);
+    return { F: S.NPCF, D: S.NPCD.stats, maxDown, stuckDown, nan, ferr: (S.FRAME_ERR || {}).n || 0 }; }""")
+  check(r['stuckDown'] == 0 and not r['nan'], f"a full accelerated day: {r['F']['hitsTaken']} blows taken by townsfolk, {r['D']['deaths']} deaths, {r['D']['returns']} back, {r['F']['guardFights']} guard fights ({r['F']['guardKills']} won); nobody stays dead past their time, health always valid", r)
   check(not errs, 'no page errors or console errors', errs[:5])
   b.close()
 print('ALL PASS' if not fails else f'{fails} FAILED'); sys.exit(1 if fails else 0)

@@ -4,7 +4,7 @@ The roadmap is `docs/WORLD_SIMULATION_MASTER.md` (the full specification, unchan
 
 **Status words:** **Tested** — implemented and covered by an automated test that passes. **Implemented** — in the build, checked by hand only. **Partial** — some of the item is in; the rest is listed. **Planned** — not started. **Blocked** — waiting on something named.
 
-**Current build:** v0.36 (`Shardfall_v0.36.html`), branch `feature/living-world-phase5c`, on top of v0.35 (`feature/living-world-phase6a`, phase 6 step 1, itself on v0.34 `feature/living-world-phase5b`): phase 5, step 3 — NPC adventurers and NPC spellcasting.
+**Current build:** v0.39 (`Shardfall_v0.39.html`), branch `feature/living-world-phase5d`, on main at v0.37 (v0.33.1 + v0.34–v0.36 + Server Foundation v1). v0.38 is the server movement work in #57, built in parallel. Phase 5, step 4: NPC death, bodies and looting, and the first NPC outlaws. Phase 5 is complete.
 
 ---
 
@@ -19,7 +19,7 @@ The spec's development sequence (§29, phases A–G) is numbered 1–7 here. Eac
 | 2½ | — | **World expansion** (asked for between phases 2 and 3): Anniabreen stretched ×1.35 between rigid towns, the Southern Reach, 8 camps, 5 sealed dungeon mouths, world 2620 × 1520 | 2 | **Tested** (v0.23) |
 | 3 | C | Population and monster ecosystem: regions and habitats, species profiles as data, roaming, territories, predator/prey, monster-vs-monster factions, creature audio | 1, 2 | **Tested** (v0.25) |
 | 4 | D | Living NPCs: named townsfolk with homes, workplaces and schedules; guards patrolling; merchants travelling; resource workers; basic adventurers | 1, 2, 3 (factions) | **Tested** (v0.27); adventurers moved to phase 5, which gives NPCs combat |
-| 5 | E | Shared combat and law: NPC-vs-NPC and NPC-vs-monster combat, NPC spellcasting through Magery, actor death and looting, criminal flags, murder counts, guards, witnesses | 1, 3, 4 | **Partial**: step 1 (NPCs as combatants, guards fight creatures) **Tested** (v0.30); step 2 (notoriety, aggression, criminal flags, witnesses, guards against you, murder counts) **Tested** (v0.34); adventurers, NPC death and looting planned |
+| 5 | E | Shared combat and law: NPC-vs-NPC and NPC-vs-monster combat, NPC spellcasting through Magery, actor death and looting, criminal flags, murder counts, guards, witnesses | 1, 3, 4 | **Tested**: step 1 (NPCs as combatants, guards fight creatures, v0.30); step 2 (notoriety, aggression, criminal flags, witnesses, guards against you, murder counts, v0.34); step 3 (NPC adventurers and NPC Magery, v0.36); step 4 (NPC death, bodies, looting crimes, the first NPC outlaws, v0.39) |
 | 6 | F | Persistence and optimisation: world-state save (regions, camps, corpses, cargo), simulation tiers A/B/C, spatial index, mobile profiling, regression tests | 1–5 | **Partial**: step 1 (tiers A/B/C, the population saved creature by creature, phone profiling, tier and persistence tests) **Tested** (v0.35, built alongside phase 5 step 2); corpses, cargo and NPC-adventurer state wait for phase 5 steps 3–4 |
 | 7 | G | Emergent gameplay: merchant ambushes, dungeon expeditions, camp patrols, NPC healing and recovery, basic economy, encounters | 1–6 | Planned |
 
@@ -451,6 +451,56 @@ Requested on 2026-11-26: bigger distances, more camps, and places for dungeons. 
 - **Creatures respawn on load as before; camp clearance is the one thing saved now.** Saving every creature is phase 6 (§26).
 - **The quarter-rate tier for distant idle creatures** is a stopgap so the larger population costs less than the old one did. Phase 6 replaces it with the spec's tiers A/B/C.
 
+## Phase 5, step 4 — NPC death, bodies and looting, the first NPC outlaws (v0.39) — **Tested**
+
+Branch `feature/living-world-phase5d`, on main at v0.37. This finishes phase 5.
+
+### What was built
+
+- **Death instead of knock-down** (`src/npcdeath.js` `npcDies`, called by `damageNpc` at 0 health). This covers townsfolk with a life, shopkeepers, guards and the travelling merchant, following the spec's death transaction (§20):
+  1. Resolved once (a second killing blow does nothing).
+  2. Movement, combat, errands and poison stop, and nobody keeps targeting the body.
+  3. One `ActorKilled` event.
+  4. `lawDowned` judges the killer, unchanged: an innocent killed unlawfully reports one murder, keyed by the time of death.
+  5. Their negative-uid outfit becomes real items, together with a purse (their own `life.gold`, else a roll by profession, `SIM.npcdPurse`).
+  6. `SF.deathTransaction` puts everything on a body (`npcBody`, owner = their actor id, 90 s loot rights, 12 min decay) drawn with their look.
+  7. They leave `ents` and the registry.
+- **Coming back**, as UO's vendors did. The same object (same id, name, home, shop and quests) is back at home after `NPCD.cfg.back` (600 s), with a fresh outfit (`npcArm`) and full health; `ActorReturned` is emitted. If you are watching the spot, the return waits up to `unseen` (120 s) more. Policy `'none'` keeps ordinary residents dead; shops, guards, the merchant, scholars and the innkeeper always return (`SIM.NPCD_ESSENTIAL`).
+- **Looting crimes, one rule for every body** (`npcdLooted`): your body, an adventurer's, a townsperson's. Taking from an innocent's body inside its loot-rights window is a crime (`lawCrime(…, 'looting')`), for you and for NPCs, at most once per 10 s per looter. Take all now counts too; before this, it did not call the check.
+- **The first NPC outlaws** (§19: "criminal NPCs may loot illegally and receive consequences"). Two archetypes on the adventurer controller (`SIM.ADV_STYLES.cutthroat / cutpurse`, roster `SIM.CRIM_ROSTER`) live at the Ashfen outlaw camp (`advGeo('camp')`, outside every jurisdiction, with its healer, fence and strongbox):
+  - **Vesk, cutthroat** (`crimPreyFor`, `SIM.crimPrey`): at most once every `crimeGap` (240 s), and only when healthy, he attacks the weakest person in sight that he expects to beat (strength ratio < 0.8). Candidates are townsfolk (never guards), adventurers and you (`CRIM.cfg.preyOnPlayer`), and only outside every jurisdiction and protected ground, with no guard within 16 m. Each innocent he kills is a murder count against him: five make him red.
+  - **Mott, cutpurse** (`crimBodyFor`, `SIM.crimBody`): robs the nearest fresh body worth robbing that he has not robbed yet, never under a guard's eyes. Both outlaws rob bodies.
+  - **The law applies to them unchanged.** `lawGuardTarget` accepts NPC adventurers who are grey or red. Guards look for them as they look for creatures and for you (`lawOutlawSeen`). Witnesses react through `lawWitness`. Adventurers fight back while the law gives them the right (`advProvoked`). Attacking a grey or red outlaw is lawful. If Vesk kills you, the ghost window offers the murder report, using the path built in step 2.
+  - **Everyday life** is the adventurer's: hunting around the camp, selling to the fence, banking in the strongbox, the camp healer when dead, and their bodies under the same rules.
+- **Saved** in the life block's `npcd` (additive; the save version is unchanged): who is dead and for how long, and every NPC body with its items, time left and look. Rows are validated (`SIM.npcdBodyRows`: one per owner and time of death, known owners and items only, never an expired body). The save's uid counter counts the bodies' items. A knock-down saved by v0.30–v0.38 loads standing at a third of their health.
+- **Also fixed:** adventurers and outlaws walk the last few metres to a body directly, instead of waiting for a background path search.
+
+### Tests
+
+- `node tests/npcdeath.test.js` (new, in CI): who comes back and when, purses, saved body rows, the outlaw archetypes and roster, whom a cutthroat preys on, which body a thief robs.
+- `python3 tests/world-smoke/phase5_death.py` (new, called by `world-smoke/run.py`), 29 checks in Chrome:
+  - death once with a body of real items and a purse, and one murder;
+  - a creature kill is no murder; Take and Take all are crimes inside 90 s, and nothing is a crime after;
+  - the return home, also when watched; the `'none'` policy; a guard's real glaive on his body;
+  - the dead and their bodies through a reload, with the same uids and the uid counter ahead; an older save;
+  - the two outlaws: Vesk preys, murders and robs; never inside a jurisdiction; guards against red and grey outlaws; you may attack a grey one lawfully; an adventurer fights back; Mott robs a body and every unit is accounted for; Vesk preys on a weak you and the report is offered;
+  - `?crim=off`; 30 accelerated minutes with tiers on, with nobody late, lost or duplicated.
+- `phase5.py` and `phase5_law.py` now test deaths where they tested knock-downs (a death at time 0, one death with one body, the return, the dead through a reload, a seeded day where nobody stays dead past their time, murders by killing). `phase5_adv.py` runs with `?crim=off` so its roster checks stay about the six.
+
+### Decisions
+
+- **Everyone dies, everyone comes back.** Permanent death of named shopkeepers would break the game, and a knock-down that never kills does not match the spec's full-loot law. UO's answer was vendor respawn: the same person back after a while. `'none'` is there for a harsher world.
+- **Townsfolk die inside towns too.** Only you (and now outlaws) can hurt them there, and the law already makes that expensive.
+- **The victim still reports at once.** A dead NPC reports its own murder, as in UO. Witness-only reporting is not needed while every victim can report.
+- **Outlaws live at the camp, not in town.** They sell, bank and heal there, so red outlaws are never forced into a guarded town.
+- **Vesk preys on you as well.** That is the UO wilderness, and the reason to travel with care. `CRIM.cfg.preyOnPlayer = false` turns it off. He only picks people he expects to beat and never near guards, so a fresh character near town is safe.
+
+### Not done yet
+
+- NPC theft from packs (snooping and stealing from you or townsfolk), more outlaw archetypes, outlaw gangs, bounties.
+- Creature corpses and merchant cargo through a reload (phase 6 step 2; NPC bodies are saved now).
+- Blessed or insured items: the field exists, and nothing sets it yet.
+
 ## Phase 5, step 3 — NPC adventurers and NPC spellcasting (v0.36) — **Tested**
 
 Built on `feature/living-world-phase6a` (v0.35, which already carries v0.34's law), so it uses the tiers and the law as they are. Master spec §8 (NPC adventurers — simulated players), §18 (NPC weapon attacks, archery, spellcasting, bandaging, potions, retreat, target changes, group assistance) and §20 for the adventurers' own deaths.
@@ -818,7 +868,7 @@ v0.26 merges phase 3 with the equipment and paper doll work (#19, which already 
 | 5 | World clock | `hourOfDay()` = `(GT/60 + 9) % 24`: a 24-minute day, starting at 09:00. `GT` is saved, so time already persists. HUD clock exists. | **Tested** (phase 2): 120-minute day, periods, saved, HUD | Offline progression stays off (spec) |
 | 6 | Day/night visuals | `darkness()` overlay with radial holes for the player, `LIGHTS` and blasts. Night Sight sets darkness to 0. Dungeons fixed at 0.8. | **Tested** (phase 2): tinted periods, local lights and glow, partial Night Sight, dungeons apart | Torch items and spell light radii when those exist; night gameplay in phase 3 |
 | 7 | NPC life | 58 static NPCs (Saltmarsh + Anniabreen towns), roles, shops, dialogue lines; no movement or schedules | **Tested** (phase 4; all four towns since v0.28, with memory of the player and saved state): homes, workplaces, schedules, needs, memory, nine residents, resource workers on real nodes, shop hours, shelter from danger; guard patrols in all four towns; a travelling merchant | Saltmarsh Quay residents; the economy behind the stores (phase 7) |
-| 8 | NPC adventurers | Wren: one hireling with skills, equipment, bandaging, ghost/resurrection, follow/wait | **Tested** (v0.36): six persistent adventurers (swordsman, mace fighter, fencer, archer, mage, healer) that hunt, fight, loot, bank, repair, restock, flee, travel between towns, die by the player's rules and come back | Gathering, training, crafting, tamers, bards, thieves and murderers |
+| 8 | NPC adventurers | Wren: one hireling with skills, equipment, bandaging, ghost/resurrection, follow/wait | **Tested** (v0.36): six persistent adventurers (swordsman, mace fighter, fencer, archer, mage, healer) that hunt, fight, loot, bank, repair, restock, flee, travel between towns, die by the player's rules and come back (v0.39) two outlaws: a cutthroat and a cutpurse | Gathering, training, crafting, tamers, bardsers |
 | 9–10 | Monster ecosystem | `MON` table (23 types) with aggro, leash, speed, loot, skin; `SPAWNS` point spawners with caps and respawn timers; `aiMon` idle/chase/telegraph/strike/recover/return | **Tested** (phase 3): 27 species profiles as data, temperaments, hours, prey, packs and herds, retreat, feeding; deer, hares and bears added | Goblins, zombies, dragons when art exists; orc roles and lich commands with NPC Magery (phase 5) |
 | 11 | Factions | None; creatures target only the player, pets or Wren (or a provoked creature) | **Tested** (phase 3): 20 factions, five levels, symmetric table; creatures fight creatures; hostility is not a crime | Law and notoriety: phase 5 |
 | 12 | Utility AI + state machines | `aiMon` state machine; no utility scoring, personality or hysteresis | **Tested** (phase 3) for creatures: scored options, commitment, hysteresis, forced retreat, reasons in the inspector | Townsfolk and adventurers: phase 4 |
@@ -828,8 +878,8 @@ v0.26 merges phase 3 with the equipment and paper doll work (#19, which already 
 | 16 | Camps | Ashfen outlaw camp (static vendors, smugglers spawner) | **Tested** (phase 3): 8 camps and 2 guarded mouths as persistent populations; clearance saved, gradual recovery; orc patrols, bandit road watches, wolf hunting trips | Supplies, treasure, leadership: phases 5 and 7 |
 | 17 | Dungeons | Sunken Bell, 3 levels, seeded rooms, Bellkeeper boss, chests, stairs; Mynoc mine first chamber | **Partial** (v0.23): 5 sealed mouths placed and reachable; interiors **Planned** | One step per dungeon interior |
 | 18 | Combat between actors | Creatures ↔ player/pets/Wren; provoked creature ↔ creature | Shared entry **Tested** | Phase 5 |
-| 19 | Criminality | Protected zones (`PROT`, guarded towns); theft/pickpocket and snooping exist for the player; no notoriety | **Tested** (v0.34): notoriety, aggression records with self-defence and expiry, criminal flag, theft, witnesses, guards in jurisdiction, murder counts with decay and reports, red restrictions | Illegal looting (step 4); NPC criminals and murderers (step 3+); green and orange (guilds) |
-| 20 | Corpses, death, loot | `SF.deathTransaction` for player and Wren, creature corpses with loot rolls, decay timers, skinning, the player's corpse saved | Death once **Tested** | Phase 5 (NPC looting), phase 6 (persist all corpses) |
+| 19 | Criminality | Protected zones (`PROT`, guarded towns); theft/pickpocket and snooping exist for the player; no notoriety | **Tested** (v0.34): notoriety, aggression records with self-defence and expiry, criminal flag, theft, witnesses, guards in jurisdiction, murder counts with decay and reports, red restrictions. (v0.39): illegal looting for you and NPCs; NPC criminals (a cutthroat and a cutpurse) under the same law; guards fight grey and red NPCs | Green and orange (guilds); NPC theft from packs; more outlaws (phase 7) |
+| 20 | Corpses, death, loot | `SF.deathTransaction` for player and Wren, creature corpses with loot rolls, decay timers, skinning, the player's corpse saved | **Tested** (v0.39): townsfolk, guards and the merchant die once with a body of real items and loot rights; NPCs loot lawfully (adventurers, their own kills) and unlawfully (outlaws) with consequences; NPC bodies saved with their contents and time left | Blessed items have a field but nothing sets it; creature corpses are not saved (phase 6 step 2) |
 | 21 | Economy | Shops with fixed prices, resource nodes deplete/refill and persist, crafting consumes materials | Planned | Phase 7 |
 | 23 | Sound | `SFXA` Web Audio player: buses, positional pan, priorities, area music, ambience per zone, footsteps by surface; volume/mute settings | **Implemented** (phase 3): alert on first sight of prey or enemy for every species with takes, documented stand-ins, rare idle calls, night howls; silent where no take exists | Separate volume sliders and environment profiles (birds, insects, owls, groans) when takes exist |
 | 24 | Animation | Player: 8-direction walk/attack clips per weapon family. Rat and skeleton sheets. 11 bestiary sheets (walk, wind-up, impact; no death, cast, sleep). Other creatures procedural. | Untouched | Backlog below |
@@ -912,16 +962,12 @@ v0.26 merges phase 3 with the equipment and paper doll work (#19, which already 
   - Next step for phones: choose DP from a budget of back-buffer pixels instead of from the pixel ratio alone, then measure on a real device. The night tint and the light pass are the next numbers to watch.
   - Heap: 61–76 MB with tiers, 69–105 MB without. The save is about 86 KB.
 
-## Next task (phase 5, step 4)
+## Next task
 
-NPC death, corpses and looting under the player's rules, for townsfolk and guards (§20), now that adventurers already die that way:
+Phase 5 is complete. Next is phase 6 step 2 (below), then phase 7 (emergent gameplay: merchant ambushes, dungeon expeditions, camp patrols, a basic economy).
 
-1. `lawDowned` moves into a death transaction for townsfolk; knock-downs become deaths where the spec wants them (outside protected ground), with bodies, decay and looting rights.
-2. Illegal looting by NPCs (an outlaw or a thief archetype) as a crime the law already knows (`lawCrime(…, 'looting')`).
-3. The first NPC criminals (thief, murderer) using the adventurer controller with unlawful targets, so guards and witnesses react to NPC crime.
+## Next in phase 6 (step 2)
 
-## Next in phase 6 (step 2, after phase 5 steps 3–4)
-
-1. Save NPC corpses with their contents and remaining lifetime and merchant cargo through the same validated-rows path as the creatures (no duplicates on load). NPC adventurers are already saved whole (v0.36, the `adv` block).
+1. Save creature corpses with their contents and remaining lifetime, and merchant cargo, through the same validated-rows path (no duplicates on load). NPC adventurers (v0.36, the `adv` block) and townsfolk bodies (v0.39, the life block's `npcd`) are already saved.
 2. Phone drawing: pick the back-buffer divisor from a pixel budget (see Performance), then profile on a real phone.
 3. A seeded long-run check with tiers on (the soak), added to the browser suites with the spec's long-running checks: no population explosion or extinction, no infinite loot or gold, no stuck NPCs, a bounded event log and memory.
