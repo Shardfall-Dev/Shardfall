@@ -41,7 +41,14 @@ def email_link(to, timeout=20):
     raise RuntimeError('no email to ' + to)
 
 import urllib.parse
-async def shot(page, name): await page.screenshot(path=os.path.join(SHOTS, name + '.png'))
+async def shot(page, name):
+    await page.screenshot(path=os.path.join(SHOTS, name + '.png'))
+    if os.environ.get('E2E_PRINT_SHOTS'):   # CI: also print a small JPEG into the log (the review copy of the screenshots)
+        jpg = await page.screenshot(type='jpeg', quality=60)
+        b64 = base64.b64encode(jpg).decode()
+        print(f'@@SHOT {name} {len(b64)}', flush=True)
+        for i in range(0, len(b64), 4000): print('@@B64 ' + b64[i:i + 4000], flush=True)
+        print(f'@@END {name}', flush=True)
 
 async def register_and_create(page, email, char_name, tag):
     await page.goto(BASE + '/'); await page.wait_for_selector('[data-c=online]')

@@ -42,6 +42,7 @@ jobs:
       - name: Browser flow (desktop and phone)
         env:
           E2E_SHOTS: ${{ runner.temp }}/e2e-shots
+          E2E_PRINT_SHOTS: '1'
         run: |
           pip install playwright
           python3 tests/e2e/online_flow.py
