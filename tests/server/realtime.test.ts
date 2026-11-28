@@ -24,7 +24,7 @@ test('upgrade needs a session and an allowed Origin', async () => {
 test('two separate accounts connect at once and see each other’s presence', async () => {
   const a = await player('Alder'), b = await player('Briar');
   const A = await join(a);
-  assert.equal(A.welcome.p.serverAuthoritative, false); assert.equal(A.welcome.p.tickMs, 50); assert.equal(A.welcome.p.character.id, a.ch.id);
+  assert.equal(A.welcome.p.serverAuthoritative, false); assert.equal(A.welcome.p.authoritative.movement, true); assert.equal(A.welcome.p.tickMs, 50); assert.equal(A.welcome.p.character.id, a.ch.id);
   assert.ok(A.welcome.p.character.items.length > 0, 'the snapshot carries the server-owned items');
   const B = await join(b);
   assert.ok(B.welcome.p.presence.some((x: any) => x.characterId === a.ch.id && x.name === a.ch.name), 'B sees A on arrival');
@@ -49,7 +49,7 @@ test('a character of another account cannot be played (closes 4003)', async () =
 
 test('client-authoritative messages are refused and change nothing', async () => {
   const a = await player('Cheat'); const { w } = await join(a);
-  for (const type of ['move', 'attack', 'gold', 'inventory', 'skill', 'stat', 'damage']) { const id = w.send(type, { gold: 1e9, x: 5, y: 5 }); const e = await w.wait(m => m.type === 'error' && m.id === id); assert.equal(e.p.code, 'not_authoritative'); }
+  for (const type of ['teleport', 'position', 'attack', 'gold', 'inventory', 'skill', 'stat', 'damage']) { const id = w.send(type, { gold: 1e9, x: 5, y: 5 }); const e = await w.wait(m => m.type === 'error' && m.id === id); assert.equal(e.p.code, 'not_authoritative'); }
   w.send('', {}, '{"v":1,"type":"hello","p":{"characterId":"' + a.ch.id + '","gold":5}}'); await w.wait(m => m.type === 'error' && m.p.code === 'bad_payload');
   const id2 = w.send('hello', { characterId: a.ch.id }); assert.equal((await w.wait(m => m.id === id2)).p.code, 'already_joined');
   const fresh = (await a.c.get('/api/characters/' + a.ch.id)).json.character; assert.deepEqual(fresh.items, a.ch.items); assert.deepEqual(fresh.stats, a.ch.stats);

@@ -247,6 +247,15 @@ async function onSubmit(form) {
     if (f === 'delacct') { await onApi('DELETE', '/api/account', { confirm: v('on-delphrase') }); ON.session = null; ON.account = null; ON.roster = null; ON.view = 'signin'; ON.msg = 'Your account has been deleted.'; return; }
   });
 }
-const ONLINE = { open: onOpen, html: onHtml, click: onClick, submit: onSubmit, bootFromUrl: onBootFromUrl, create: onCreateFromWizard, leaveWizard: onLeaveWizard, paintLobby: onLobbyPaint, drawPortraits: onDrawPortraits,
+/* the live world, for the online client's collision (shared/collision.js) and for tools/export-world.py, which exports it for
+   the server. Doors are opened first: online (v1) every door stands open, on the server and in the client alike. */
+function onWorldSource() {
+  for (const d of DOORS) if (!d.open) setDoor(d, true);
+  const rects = []; const seen = new Set(); for (const a of ECOL.values()) for (const r of a) if (!seen.has(r)) { seen.add(r); rects.push(r); }
+  return { W, H, tiles: map, blk: BLK, soft: SOFT, rects, ecol: ECOL, shrines: SHRINES.map(s => ({ id: s.id, x: s.x, y: s.y })),
+    gameStand: (x, y) => canStand({ kind: 'player' }, x, y),
+    townSpawns: () => Object.fromEntries(CR.TOWNS.map(t => [t.id, CR.townReady(t.id, { shrines: SHRINES, npcs: ANN.npcs, stand: (x, y) => canStand({ kind: 'player' }, x, y) })])) };
+}
+const ONLINE = { worldSource: onWorldSource, open: onOpen, html: onHtml, click: onClick, submit: onSubmit, bootFromUrl: onBootFromUrl, create: onCreateFromWizard, leaveWizard: onLeaveWizard, paintLobby: onLobbyPaint, drawPortraits: onDrawPortraits,
   realm: id => { ON.realm = id; onLoadRoster(); }, get state() { return ON; } };
 window.__ONLINE = ONLINE;   // test hook (the browser flow suite); not a security boundary — the server checks everything

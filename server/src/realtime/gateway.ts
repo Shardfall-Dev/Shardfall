@@ -1,4 +1,5 @@
-/* The realtime gateway — authenticated WebSocket connections and the alpha presence lobby.
+/* The realtime gateway — authenticated WebSocket connections, the realm presence list and the bridge to the world loop
+   (server-authoritative movement, server/src/world/world.ts).
    Upgrade: same-origin cookie session (no token in the URL), Origin must be allowed, the session must be a full one.
    Policy:
    - one live connection per character: a second connection for the same character takes over and the first is closed (4004);
@@ -7,7 +8,9 @@
    - sign-out, password change, account or character deletion close the affected connections at once (4010);
    - heartbeat every HEARTBEAT_MS; per-connection rate limit, payload limit (MAX_MESSAGE_BYTES) and bounded send queue;
    - outgoing events are batched and flushed on the world tick (50 ms);
-   - nothing the client sends can change game state: movement, combat, items, gold, skills and stats are refused. */
+   - movement: the client sends intents (move); the world applies them and the positions it computes are the only ones sent;
+     positions are saved every 30 s, when a character leaves the world and when the server stops;
+   - nothing else the client sends can change game state: combat, items, gold, skills and stats are refused. */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { WebSocket } from 'ws';
 import type { Config } from '../config';
@@ -15,7 +18,8 @@ import P = require('../../../shared/protocol');
 import { originAllowed, requestOrigin } from '../auth/guard';
 import type { Sessions } from '../auth/sessions';
 import type { Characters } from '../characters/service';
-import type { World } from '../world/world';
+import type { World, Actor } from '../world/world';
+import MV = require('../../../shared/movement');
 
 interface Conn {
   id: number; socket: WebSocket; sessionId: string; sessionToken: string; accountId: string; characterId: string | null; realmId: string | null;
@@ -23,8 +27,8 @@ interface Conn {
 }
 interface Entry { characterId: string; accountId: string; realmId: string; conn: Conn | null; info: ReturnType<typeof P.presenceOf>; graceTimer: NodeJS.Timeout | null }
 
-const BUCKET = 20, REFILL_PER_S = 10, MAX_OUTBOX = 256, MAX_BUFFERED = 1 << 20, SESSION_CHECK_MS = 30_000;
-const NOTICE = 'You can see who else is online. Movement, combat and the world are not simulated on the server yet.';
+const BUCKET = 40, REFILL_PER_S = 20, MAX_OUTBOX = 512, MAX_BUFFERED = 1 << 20, SESSION_CHECK_MS = 30_000, SAVE_MS = 30_000;
+const NOTICE = 'Walking is server-authoritative: the server decides where everyone is. Creatures, combat, items and trading are not online yet.';
 
 export class Gateway {
   private conns = new Set<Conn>();
@@ -32,10 +36,18 @@ export class Gateway {
   private nextId = 1;
   private heartbeat: NodeJS.Timeout | null = null;
   private sessionCheck: NodeJS.Timeout | null = null;
+  private saver: NodeJS.Timeout | null = null;
   counters = { opened: 0, closed: 0, rejectedUpgrades: 0, takeovers: 0, reconnects: 0, refused: 0 };
 
   constructor(private cfg: Config, private sessions: Sessions, private chars: Characters, private world: World, private log: any) {
     world.onFlush(() => this.flush());
+    world.setSink((a: Actor, type: string, payload: object) => { const e = this.presence.get(a.characterId); if (e && e.conn) this.send(e.conn, type, payload); });
+  }
+  /* save positions (never blocks the tick; failures are logged and retried at the next save) */
+  private persist(list: Actor[]) {
+    if (!list.length) return Promise.resolve();
+    return this.chars.savePositions(list.map(a => ({ id: a.characterId, x: a.s.x, y: a.s.y, sect: a.s.sect ?? 0, town: a.info.town, stam: a.s.stam })))
+      .then(() => undefined, e => { for (const a of list) a.dirty = true; this.log.error({ err: (e as Error).message }, 'saving positions failed'); });
   }
 
   register(app: FastifyInstance) {
@@ -50,6 +62,7 @@ export class Gateway {
     } as any, (socket: WebSocket, req: FastifyRequest) => this.open(socket, req));
     this.heartbeat = setInterval(() => this.beat(), P.HEARTBEAT_MS);
     this.sessionCheck = setInterval(() => { this.checkSessions().catch(e => this.log.error({ err: e.message }, 'session check failed')); }, SESSION_CHECK_MS);
+    this.saver = setInterval(() => { void this.persist(this.world.takeDirty()); }, SAVE_MS);
   }
 
   private open(socket: WebSocket, req: FastifyRequest) {
@@ -80,6 +93,7 @@ export class Gateway {
     if (m.type === 'ping') return this.send(c, 'pong', { t: m.p.t ?? null, tick: this.world.tick, serverTime: Date.now() }, m.id, true);
     if (m.type === 'hello') return this.hello(c, m.p.characterId, m.id);
     if (!c.characterId) return this.error(c, 'hello_first', 'Say hello with a character first.', m.id);
+    if (m.type === 'move') { this.world.input(c.characterId, m.p.inputs as any); return; }
     if (m.type === 'resync') { const ch = await this.chars.snapshot(c.accountId, c.characterId); if (!ch) return this.close(c, P.CLOSE.FORBIDDEN, 'character gone', true); return this.send(c, 'snapshot', { tick: this.world.tick, character: ch, presence: this.others(c) }, m.id); }
   }
 
@@ -105,7 +119,13 @@ export class Gateway {
       this.broadcast(ch.realmId, 'presence.join', { character: info }, characterId);
     }
     c.characterId = characterId; c.realmId = ch.realmId;
-    this.send(c, 'welcome', { protocol: P.PROTOCOL_VERSION, tick: this.world.tick, tickMs: P.TICK_MS, serverAuthoritative: false, notice: NOTICE, resumed, character: ch, presence: this.others(c) }, reqId, true);
+    const rc = this.chars.rulesCharacter(ch); const ctx = MV.ctxFor(this.chars.SF, rc);
+    const { actor, resumed: inWorld } = this.world.add({ characterId, accountId: c.accountId, realmId: ch.realmId, ctx, stam: ch.vitals.stam,
+      position: ch.position, info: { characterId, name: ch.name, body: ch.body, appearance: ch.appearance, title: ch.title, town: ch.startingTown } });
+    const t = this.world.terrain!;
+    this.send(c, 'welcome', { protocol: P.PROTOCOL_VERSION, tick: this.world.tick, tickMs: P.TICK_MS, serverAuthoritative: false, authoritative: { movement: true, combat: false, items: false },
+      notice: NOTICE, resumed: resumed || inWorld, character: ch, presence: this.others(c),
+      world: { hash: t.hash, W: t.world.W, H: t.world.H, step: MV.STEP, viewRadius: this.world.viewRadius }, you: this.world.selfPayload(actor) }, reqId, true);
     c.log.info({ character: characterId, resumed }, 'joined lobby');
     this.chars.markPlayed(characterId).catch(() => {});
   }
@@ -120,6 +140,7 @@ export class Gateway {
     if (!e || e.conn !== c) return;                        // taken over, or never joined
     e.conn = null;
     if (c.noGrace) return this.removeEntry(e);
+    this.world.detach(e.characterId);
     e.graceTimer = setTimeout(() => { e.graceTimer = null; if (!e.conn) this.removeEntry(e); }, P.RECONNECT_GRACE_MS);
   }
 
@@ -127,6 +148,7 @@ export class Gateway {
     if (e.graceTimer) clearTimeout(e.graceTimer);
     if (this.presence.get(e.characterId) !== e) return;
     this.presence.delete(e.characterId);
+    const a = this.world.remove(e.characterId); if (a) void this.persist([a]);
     this.broadcast(e.realmId, 'presence.leave', { characterId: e.characterId }, e.characterId);
   }
 
@@ -168,9 +190,11 @@ export class Gateway {
     for (const c of [...this.conns]) if (c.characterId === characterId) this.endConn(c, 'character_deleted');
     const e = this.presence.get(characterId); if (e && !e.conn) this.removeEntry(e);
   }
-  stats() { return { connections: this.conns.size, present: this.presence.size, tick: this.world.tick, ...this.counters }; }
-  shutdown() {
-    if (this.heartbeat) clearInterval(this.heartbeat); if (this.sessionCheck) clearInterval(this.sessionCheck);
+  stats() { return { connections: this.conns.size, present: this.presence.size, inWorld: this.world.actors.size, tick: this.world.tick, ...this.counters }; }
+  /* stop: tell everyone, close every connection, and save where every character stands */
+  async shutdown() {
+    if (this.heartbeat) clearInterval(this.heartbeat); if (this.sessionCheck) clearInterval(this.sessionCheck); if (this.saver) clearInterval(this.saver);
+    await this.persist([...this.world.actors.values()]);
     for (const e of this.presence.values()) if (e.graceTimer) clearTimeout(e.graceTimer);
     for (const c of [...this.conns]) { c.noGrace = true; this.send(c, 'kicked', { reason: 'server_restart' }, undefined, true); try { c.socket.close(P.CLOSE.GOING_AWAY, 'server restart'); } catch { /* */ } }
   }

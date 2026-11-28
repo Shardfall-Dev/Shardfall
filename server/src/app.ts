@@ -16,6 +16,7 @@ import { registerAccountRoutes } from './accounts/routes';
 import { Characters } from './characters/service';
 import { registerCharacterRoutes } from './characters/routes';
 import { World } from './world/world';
+import { loadTerrain } from './world/terrain';
 import { Gateway } from './realtime/gateway';
 import P = require('../../shared/protocol');
 import adapter = require('../../shared/game-rules-adapter');
@@ -42,7 +43,7 @@ export async function buildApp(cfg: Config, opts: { db?: Db } = {}): Promise<App
   const sessions = new Sessions(db, cfg, auth);
   const guards = makeGuards(cfg, sessions);
   const chars = new Characters(db, rules, cfg.characterPurgeDays);
-  const world = new World();
+  const world = new World(loadTerrain(cfg.repoRoot), { viewRadius: cfg.viewRadius });
   const gateway = new Gateway(cfg, sessions, chars, world, app.log);
 
   await app.register(cookie);
@@ -103,6 +104,6 @@ export async function buildApp(cfg: Config, opts: { db?: Db } = {}): Promise<App
   const purge = setInterval(() => { chars.purge().catch(() => {}); sessions.cleanup().catch(() => {}); }, 3600_000); purge.unref();
   return {
     app, db, sessions, chars, gateway, world,
-    async close() { clearInterval(purge); gateway.shutdown(); world.stop(); await app.close(); if (!opts.db) await db.end(); },
+    async close() { clearInterval(purge); world.stop(); await gateway.shutdown(); await app.close(); if (!opts.db) await db.end(); },
   };
 }
