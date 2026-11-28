@@ -148,6 +148,16 @@ with sync_playwright() as p:
     pg.click(cell('Bandage')); pg.wait_for_timeout(100); pg.click('#ipop button:text-is("Split 1")'); pg.wait_for_timeout(150)
     check(pg.evaluate("() => __SF.P.pack.items.filter(i => i.id === 'bandage').map(i => i.qty).sort()") == [1, 4], 'Split 1 splits the stack', pg.evaluate("() => __SF.P.pack.items.filter(i => i.id === 'bandage').map(i => i.qty)"))
     # ---- compare and equip ----
+    # v0.33.1: the bandage popup opens beside the bandage tile and, depending on the scroll position left by the checks above, can
+    # cover the tunic tile. Playwright then retries the click with other scroll positions, racing the virtualized grid's redraw on
+    # scroll, and the click could miss (seen in 1 of 16 and 1 of 9 runs; a diagnostic run showed the popup's close button over the
+    # tunic). Close the popup first, as a player would, after the grid shows both bandage stacks.
+    settled = True
+    try: pg.wait_for_function("() => [...document.querySelectorAll('#panel .bagcell small')].filter(s => s.textContent === 'Bandage').length === 2", timeout=5000)
+    except Exception: settled = False
+    check(settled, 'the backpack shows the split stack (two bandage tiles)')
+    pg.keyboard.press('Escape'); pg.wait_for_timeout(80)
+    check(pg.evaluate(IPOP) is None and pg.evaluate("__SF.PANEL") == 'bag', 'Escape closes the bandage popup (backpack stays open)')
     pg.click(cell('Iron chainmail tunic')); pg.wait_for_timeout(120)
     pop = pg.evaluate(IPOP)
     check(pop and all(k in pop['kv'] for k in ['Armor family', 'Material', 'Armor protection', 'Weight', 'Quality']) and ('Durability' in pop['kv']) == pg.evaluate("() => __SF.P.pack.items.find(i => i.id === 'chain_tunic').cond !== undefined") and 'Equip' in pop['acts'] and 'Inspect' in pop['acts'], 'armor popup: family, material, protection, weight, quality (durability only when tracked), Equip, Inspect', pop)
