@@ -219,6 +219,7 @@ function performDrop(src, dst) {
   if (sk === 'pack' && dk === 'eq') { const it = findU(P.pack, sv0); if (!it) return; equipUid(it.uid, dv === 'auto' ? undefined : dv); }
   else if (sk === 'eq' && dk === 'pack') { unequipTo(sv0); }
   else if (sk === 'eq' && dk === 'eq' && dv !== sv0 && dv !== 'auto') log('That piece belongs in its own slot.', '#ffb070');
+  else if (sk === 'pack' && dk === 'pack' && dv && dv !== sv0 && ONW && ONW.items) { const a = findU(P.pack, sv0), b = findU(P.pack, dv); if (a && b && SF.canStack(a, b)) owMerge(a.uid, b.uid); }   // online: the server merges
   else if (sk === 'pack' && dk === 'pack' && dv && dv !== sv0) { const a = findU(P.pack, sv0), b = findU(P.pack, dv); if (a && b && SF.canStack(a, b)) { const r = EQ.mergeStacks(P.pack, { from: a.uid, into: b.uid }); if (r.ok) snd('ui.page'); } }
   renderPanel(); renderEqWin(true);
 }

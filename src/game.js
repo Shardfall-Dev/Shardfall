@@ -2923,9 +2923,11 @@ function petCommand(c) {
     const min = p.type ? tameMin(p.type) : null, ch = min === null ? 1 : SF.SK.controlChance(sv('animaltaming'), sv('animallore'), min, p.loyal);   // 80% Taming + 20% Animal Lore against the creature (src/skills.js)
     if (R() > ch) { log(`${cap1(p.name)} looks at you and winces.`); continue; } p.order = c; p.tgt = tgt; }
   say(P, c === 'attack' ? 'Attack!' : c === 'follow' ? 'Heel.' : 'Stay.'); }
-function unequipTo(s) { const r = SF.EQ.unequipItem(P, { slot: s }); if (!r.ok) return false; snd('item.equip'); if (s === 'weapon') weaponChanged(); eqChanged(); return true; }
+function unequipTo(s) { if (ONW && ONW.items) return owUnequip(s);   // online: the server holds the items (src/online.js)
+  const r = SF.EQ.unequipItem(P, { slot: s }); if (!r.ok) return false; snd('item.equip'); if (s === 'weapon') weaponChanged(); eqChanged(); return true; }
 /* the one equip path for every control (button, double-click, drag, context menu): a validated, atomic command */
 function equipUid(u, slot) {
+  if (ONW && ONW.items) return owEquip(u, slot);   // online: the server holds the items (src/online.js)
   if (P.ghost) return log('Ghosts cannot handle equipment.', '#ffb070');
   const r = SF.EQ.equipItem(P, { uid: u, slot: slot || undefined });
   if (!r.ok) { log(cap1(r.reason) + '.', '#ffb070'); return false; }

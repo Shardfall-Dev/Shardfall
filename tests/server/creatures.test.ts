@@ -24,9 +24,9 @@ function wilds() {
   const q = COL.nearestStand(T.world, s.x + 6, s.y, 12); assert.ok(q); return q!;
 }
 
-test('the welcome carries the world clock and says creatures and combat are server-authoritative, items still are not', async () => {
+test('the welcome carries the world clock and says creatures, combat and items are server-authoritative', async () => {
   const a = await player('Clock'); const { w, welcome } = await join(a);
-  assert.equal(welcome.p.authoritative.creatures, true); assert.equal(welcome.p.authoritative.combat, true); assert.equal(welcome.p.authoritative.items, false);
+  assert.equal(welcome.p.authoritative.creatures, true); assert.equal(welcome.p.authoritative.combat, true); assert.equal(welcome.p.authoritative.items, true);
   const c = welcome.p.clock; assert.ok(c && c.hour >= 0 && c.hour < 24 && c.dayMinutes === 120 && typeof c.period === 'string');
   assert.match(welcome.p.notice, /creatures/i);
   w.close();

@@ -19,6 +19,7 @@ import { originAllowed, requestOrigin } from '../auth/guard';
 import type { Sessions } from '../auth/sessions';
 import type { Characters } from '../characters/service';
 import type { World, Actor } from '../world/world';
+import { rowsOf } from '../world/items';
 import MV = require('../../../shared/movement');
 
 interface Conn {
@@ -30,7 +31,7 @@ interface Entry { characterId: string; accountId: string; realmId: string; conn:
 /* what a character visibly wears (item ids and their look-relevant fields), for others to draw it */
 const wornOf = (ch: any) => { const o: Record<string, any> = {}; for (const i of ch.items || []) if (i.container === 'equip' && i.slot) o[i.slot] = Object.assign({}, i.props, { id: i.itemDef }); return o; };
 const BUCKET = 40, REFILL_PER_S = 20, MAX_OUTBOX = 512, MAX_BUFFERED = 1 << 20, SESSION_CHECK_MS = 30_000, SAVE_MS = 30_000;
-const NOTICE = 'Walking, creatures and combat are server-authoritative: the server decides where everyone is, what the wildlife does and every blow. Items, loot and trading are not online yet.';
+const NOTICE = 'Walking, creatures, combat and items are server-authoritative: the server decides where everyone is, what the wildlife does, every blow and every item. Trading, crafting, banks and shops are not online yet.';
 
 export class Gateway {
   private conns = new Set<Conn>();
@@ -45,10 +46,22 @@ export class Gateway {
   constructor(private cfg: Config, private sessions: Sessions, private chars: Characters, private world: World, private log: any) {
     world.onFlush(() => this.flush());
     world.setSink((a: Actor, type: string, payload: object) => { const e = this.presence.get(a.characterId); if (e && e.conn) this.send(e.conn, type, payload); });
+    world.onInventory = (a: Actor) => { void this.saveItems(a); };
+  }
+  /* save a character's items (Server Items v1). The rows are taken now, and every save in the server runs in one queue, in the
+     order the changes happened: an item handed from one character to another (a body looted by its owner, a pile picked up) is
+     always written to its latest holder last. A failed save is retried with the next change or the next periodic save. */
+  private itemQueue: Promise<void> = Promise.resolve();
+  private saveItems(a: Actor) {
+    if (!a.ch || this.stopping) return this.itemQueue;
+    const id = a.characterId, rows = rowsOf(a.ch);
+    this.itemQueue = this.itemQueue.then(() => this.chars.saveInventory(id, rows)).then(() => undefined, e => { a.invDirty = true; this.log.error({ err: (e as Error).message, character: id }, 'saving items failed'); });
+    return this.itemQueue;
   }
   /* save positions (never blocks the tick; failures are logged and retried at the next save) */
   private persist(list: Actor[]) {
     if (!list.length || this.stopping) return Promise.resolve();
+    for (const a of list) if (a.invDirty) { a.invDirty = false; void this.saveItems(a); }
     return this.chars.savePositions(list.map(a => ({ id: a.characterId, x: a.s.x, y: a.s.y, sect: a.s.sect ?? 0, town: a.info.town, stam: a.s.stam,
       combat: a.ch ? { hp: Math.ceil(a.hp), mana: Math.round(a.mana), ghost: a.ghost, skills: a.ch.skills, str: a.ch.str, dex: a.ch.dex, int: a.ch.int } : undefined })))
       .then(() => undefined, e => { for (const a of list) a.dirty = true; this.log.error({ err: (e as Error).message }, 'saving positions failed'); });
@@ -66,7 +79,7 @@ export class Gateway {
     } as any, (socket: WebSocket, req: FastifyRequest) => this.open(socket, req));
     this.heartbeat = setInterval(() => this.beat(), P.HEARTBEAT_MS);
     this.sessionCheck = setInterval(() => { this.checkSessions().catch(e => this.log.error({ err: e.message }, 'session check failed')); }, SESSION_CHECK_MS);
-    this.saver = setInterval(() => { void this.persist(this.world.takeDirty()); }, SAVE_MS);
+    this.saver = setInterval(() => { for (const a of this.world.takeInvDirty()) void this.saveItems(a); void this.persist(this.world.takeDirty()); }, SAVE_MS);
   }
 
   private open(socket: WebSocket, req: FastifyRequest) {
@@ -98,8 +111,8 @@ export class Gateway {
     if (m.type === 'hello') return this.hello(c, m.p.characterId, m.id);
     if (!c.characterId) return this.error(c, 'hello_first', 'Say hello with a character first.', m.id);
     if (m.type === 'move') { this.world.input(c.characterId, m.p.inputs as any); return; }
-    if (m.type === 'target' || m.type === 'resurrect') {
-      const why = m.type === 'target' ? this.world.target(c.characterId, m.p.nid as number | null) : this.world.resurrect(c.characterId, m.p.at as 'shrine' | 'bound');
+    if (m.type === 'target' || m.type === 'resurrect' || m.type === 'item') {
+      const why = m.type === 'target' ? this.world.target(c.characterId, m.p.nid as number | null) : m.type === 'item' ? this.world.item(c.characterId, m.p as any) : this.world.resurrect(c.characterId, m.p.at as 'shrine' | 'bound');
       if (why) this.send(c, 'combat', { k: 'refused', what: m.type, reason: why }, m.id, true);
       return;
     }
@@ -133,9 +146,10 @@ export class Gateway {
       ch: rc, hp: ch.vitals.hp, mana: ch.vitals.mana, ghost: !!ch.ghost, bound: ch.boundShrine,
       position: ch.position, info: { characterId, name: ch.name, body: ch.body, appearance: ch.appearance, title: ch.title, town: ch.startingTown, equip: wornOf(ch) } });
     const t = this.world.terrain!;
-    this.send(c, 'welcome', { protocol: P.PROTOCOL_VERSION, tick: this.world.tick, tickMs: P.TICK_MS, serverAuthoritative: false, authoritative: { movement: true, creatures: !!this.world.clockInfo(), combat: this.world.combatOn, items: false }, clock: this.world.clockInfo(),
+    this.send(c, 'welcome', { protocol: P.PROTOCOL_VERSION, tick: this.world.tick, tickMs: P.TICK_MS, serverAuthoritative: false, authoritative: { movement: true, creatures: !!this.world.clockInfo(), combat: this.world.combatOn, items: this.world.combatOn }, clock: this.world.clockInfo(),
       notice: NOTICE, resumed: resumed || inWorld, character: ch, presence: this.others(c),
       world: { hash: t.hash, W: t.world.W, H: t.world.H, step: MV.STEP, viewRadius: this.world.viewRadius }, you: this.world.selfPayload(actor) }, reqId, true);
+    this.world.sendInventory(characterId);   // after the welcome: the live items (Server Items v1)
     c.log.info({ character: characterId, resumed }, 'joined lobby');
     this.chars.markPlayed(characterId).catch(() => {});
   }
@@ -158,7 +172,7 @@ export class Gateway {
     if (e.graceTimer) clearTimeout(e.graceTimer);
     if (this.presence.get(e.characterId) !== e) return;
     this.presence.delete(e.characterId);
-    const a = this.world.remove(e.characterId); if (a) void this.persist([a]);
+    const a = this.world.remove(e.characterId); if (a) { if (a.ch) void this.saveItems(a); void this.persist([a]); }
     this.broadcast(e.realmId, 'presence.leave', { characterId: e.characterId }, e.characterId);
   }
 
@@ -204,7 +218,8 @@ export class Gateway {
   /* stop: tell everyone, close every connection, and save where every character stands */
   async shutdown() {
     if (this.heartbeat) clearInterval(this.heartbeat); if (this.sessionCheck) clearInterval(this.sessionCheck); if (this.saver) clearInterval(this.saver);
-    await this.persist([...this.world.actors.values()]); this.stopping = true;   // everything is saved; late socket closes save nothing more
+    for (const a of this.world.actors.values()) if (a.ch) void this.saveItems(a);
+    await this.persist([...this.world.actors.values()]); await this.itemQueue; this.stopping = true;   // everything is saved; late socket closes save nothing more
     for (const e of this.presence.values()) if (e.graceTimer) clearTimeout(e.graceTimer);
     for (const c of [...this.conns]) { c.noGrace = true; this.send(c, 'kicked', { reason: 'server_restart' }, undefined, true); try { c.socket.close(P.CLOSE.GOING_AWAY, 'server restart'); } catch { /* */ } }
   }

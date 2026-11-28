@@ -103,7 +103,7 @@ function onConnect() {
     if (ON.lobby !== L) return; const r = ONP.parseServer(ev.data); if (!r.ok) return; const m = r.msg;
     if (typeof m.seq === 'number') { if (L.seq && m.seq !== L.seq + 1 && L.character) ws.send(JSON.stringify({ v: ONP.PROTOCOL_VERSION, type: 'resync', p: {} })); L.seq = m.seq; }
     if (m.type === 'welcome' || m.type === 'snapshot') { L.character = m.p.character; L.tick = m.p.tick; L.presence = new Map((m.p.presence || []).map(x => [x.characterId, x])); L.status = 'connected'; L.tries = 0; L.note = m.p.notice || L.note; if (m.type === 'welcome') { L.joinedAt = Date.now(); if (ONW) owResume(m.p); else if (m.p.world && !owEnter(L, m.p)) { L.stop = true; L.status = 'ended'; try { ws.close(1000, 'world mismatch'); } catch (e) { } } } }
-    else if (m.type === 'state' || m.type === 'actor.enter' || m.type === 'actor.leave' || m.type === 'combat' || m.type === 'gain') { if (ONW) owMessage(m); return; }
+    else if (m.type === 'state' || m.type === 'actor.enter' || m.type === 'actor.leave' || m.type === 'combat' || m.type === 'gain' || m.type === 'inv' || m.type === 'remains') { if (ONW) owMessage(m); return; }
     else if (m.type === 'presence.join') L.presence.set(m.p.character.characterId, Object.assign({ connected: true }, m.p.character));
     else if (m.type === 'presence.leave') L.presence.delete(m.p.characterId);
     else if (m.type === 'pong') { if (typeof m.p.t === 'number') L.rtt = Math.round(performance.now() - m.p.t); L.tick = m.p.tick; }
@@ -268,7 +268,7 @@ function onWorldSource() {
    bit 2 no spawning (ecology.js ecoSpot: blocking tiles, water, bridges, stairs, shallows, camp zones). */
 function onPopulationSource() {
   ecoSpecies(); ecoSpawnKeys();
-  const SPEC_MON = ['n', 'size', 'hp', 'speed', 'aggro', 'leash', 'reach', 'atk', 'def', 'dmg', 'tele', 'rec', 'armor', 'ar', 'str', 'dex', 'diff', 'ward', 'ranged', 'keep', 'aoe'], SPEC_ECO = ['f', 'hours', 'temper', 'hear', 'terr', 'pur', 'flight', 'social', 'grp', 'resp', 'cour', 'nv', 'night', 'flee'];
+  const SPEC_MON = ['n', 'size', 'hp', 'speed', 'aggro', 'leash', 'reach', 'atk', 'def', 'dmg', 'tele', 'rec', 'armor', 'ar', 'str', 'dex', 'diff', 'ward', 'ranged', 'keep', 'aoe', 'loot', 'purse'], SPEC_ECO = ['f', 'hours', 'temper', 'hear', 'terr', 'pur', 'flight', 'social', 'grp', 'resp', 'cour', 'nv', 'night', 'flee'];
   const spawners = [], types = new Set();
   for (const s of SPAWNS) {
     if (s.quest || !MON[s.type] || levelAt(Math.floor(s.x), Math.floor(s.y))) continue;
@@ -304,7 +304,11 @@ function onPopulationSource() {
 const OW_INTERP_MS = 120, OW_MAX_PENDING = 40;
 const OW_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', 'W', 'A', 'S', 'D', 'Shift', 'Escape']);
 const OW_ACTIONS = new Set(['sprint', 'map', 'mapfit', 'mapall', 'scrclose', 'rotok']);
-const OW_KEYS_FIGHT = new Set([' ', 'Escape']);   // Space arms on a creature (or stands down); Escape clears the selection
+const OW_KEYS_FIGHT = new Set([' ', 'Escape']);
+const OW_KEYS_ITEMS = new Set(['c', 'C', 'b', 'B', 'i', 'I']);   // C the paper doll, B / I the backpack
+/* online item UI (Server Items v1): panels and views that only draw are allowed; item changes are sent to the server */
+const OW_UI = new Set(['bag', 'gear', 'eqwin', 'eqclose', 'eqsel', 'bagfilter', 'bagsort', 'baginspect', 'close', 'tab', 'gearart']);
+const OW_ITEM_ACTS = new Set(['equip', 'uneq', 'drop', 'take', 'takeall', 'split', 'mergekind', 'bagmerge']);   // Space arms on a creature (or stands down); Escape clears the selection
 function owEnter(L, w) {
   if (P) { L.note = 'An offline game is open in this tab. Reload the page to play online.'; return false; }
   genWorld(); buildTiles(); buildMini(); resize();
@@ -323,12 +327,13 @@ function owEnter(L, w) {
   ecoSpecies();   // the wildlife species the server may send (deer, hare, bear) have their art data
   ents.unshift(P); P.sw = SF.newSwing(); P.movedAt = -99; P.drawn = false;
   P.hp = you.hp ?? P.hp; P.ghost = !!you.ghost; P.armed = false;
-  ONW = { L, nid: you.nid, combat: !!(w.authoritative && w.authoritative.combat), world, ctx: Object.assign(SF_MOVEMENT.ctxFor(SF, P), { ghost: !!you.ghost }), ps: { x: you.x, y: you.y, stam: you.stam, sect: you.sect || 0, t: you.t || 0, lastDrain: you.ld ?? -99 }, seq: 0, pending: [], batch: [], wasMoving: false,
+  ONW = { L, nid: you.nid, combat: !!(w.authoritative && w.authoritative.combat), items: !!(w.authoritative && w.authoritative.items), uidOf: new Map(), charId: ch.id, world, ctx: Object.assign(SF_MOVEMENT.ctxFor(SF, P), { ghost: !!you.ghost }), ps: { x: you.x, y: you.y, stam: you.stam, sect: you.sect || 0, t: you.t || 0, lastDrain: you.ld ?? -99 }, seq: 0, pending: [], batch: [], wasMoving: false,
     remotes: new Map(), corrections: 0, lastErr: 0, acked: you.ack, notice: w.notice, viewRadius: w.world.viewRadius };
   $('#cc').hidden = true; document.body.classList.add('online'); owBar(); STEPPER.reset();
   log(w.authoritative && w.authoritative.combat ? 'Welcome to Anniabreen, online. The server decides where everyone walks, what the wildlife does and every blow. Items, loot and trading are not online yet.' : w.authoritative && w.authoritative.creatures ? 'Welcome to Anniabreen, online. The server decides where everyone walks and what the wildlife does. Combat, items and trading are not online yet: creatures may stalk you, but cannot attack.' : 'Welcome to Anniabreen, online. Walking is decided by the server; creatures, combat, items and trading are not online yet.', '#ffe08a');
   log(ONW.combat ? 'Left stick or WASD moves; Sprint runs. Tap a creature, then Attack (or Space). Leave from the online bar.' : 'Left stick or WASD moves; Sprint runs. Leave from the online bar.', '#b6a68a');
   if (ONW.combat) document.body.classList.add('online-fight');
+  if (ONW.items) { for (const it of [...P.pack.items, ...P.bank.items, ...Object.values(P.equip)]) if (it && it.sid) ONW.uidOf.set(it.sid, it.uid); log('Your backpack and equipment are kept by the server: B opens the backpack, C the paper doll. Tap remains beside you to loot them.', '#b6a68a'); }
   if (P.ghost) log('You are a ghost. Walk to a shrine to be restored, or use Return to shrine.', '#ffe08a');
   refreshHud(); return true;
 }
@@ -380,6 +385,7 @@ function owMessage(m) {
     for (const mv of p.moves) { const e = W.remotes.get(mv[0]); if (e) e.buf.push([now, mv[1], mv[2], mv[3], mv[4]]); }
   } else if (m.type === 'actor.enter') {
     if (W.remotes.has(p.nid)) return;
+    if (p.kind === 'remains') { owRemainsEnter(p, now); return; }
     if (p.kind === 'creature') {   // a server creature, drawn by the game's own creature art (bestiary sheet, legacy sheet or procedural)
       if (!MON[p.type]) return;
       const e = { kind: 'mon', online: true, id: 1e6 + p.nid, nid: p.nid, type: p.type, name: p.name || MON[p.type].n, x: p.x, y: p.y, sect: p.sect, speed: p.speed, hp: p.hp, max: p.max, state: 'idle', buf: [[now, p.x, p.y, p.sect, p.speed]] };
@@ -389,8 +395,10 @@ function owMessage(m) {
       x: p.x, y: p.y, sect: p.sect, speed: p.speed, hp: 1, max: 1, buf: [[now, p.x, p.y, p.sect, p.speed]] };
     W.remotes.set(p.nid, e); ents.push(e); owBar();
   } else if (m.type === 'combat') owCombat(p);
+  else if (m.type === 'inv') owInventory(p);
+  else if (m.type === 'remains') owRemainsItems(p);
   else if (m.type === 'gain') owGain(p);
-  else if (m.type === 'actor.leave') { const e = W.remotes.get(p.nid); if (e) { W.remotes.delete(p.nid); if (e.kind === 'mon') W.creatures--; rmEnt(e); owBar(); } }
+  else if (m.type === 'actor.leave') { const e = W.remotes.get(p.nid); if (e) { W.remotes.delete(p.nid); if (e.kind === 'mon') W.creatures--; if (P.lootOpen === e) { closePanel(); P.lootOpen = null; } if (P.sel === e) P.sel = null; rmEnt(e); owBar(); } }
 }
 /* ---------- online combat (Server Combat v1): the server swings and strikes; the client shows what it was told ---------- */
 const owEnt = nid => nid === (ONW && ONW.nid) ? P : ONW && ONW.remotes.get(nid);
@@ -419,11 +427,61 @@ function owCombat(p) {
     else if (t) log(`${p.name || t.name} has died${p.by ? ' to a ' + p.by : ''}.`, '#ffb070');
     return;
   }
+  if (p.k === 'look' && t && t !== P && t.kind === 'remote') { t.equip = Object.assign(emptyEquip(), p.equip || {}); return; }
+  if (p.k === 'broke' && me) { log((SF.ITEMS[p.itemDef] ? SF.ITEMS[p.itemDef].n : 'An item') + ' breaks!', '#ff6a5a'); return; }
+  if (p.k === 'shot' && a) { if (mine) { try { playOnce('Bow_Attack', 0); P.drawn = true; P.lastCombat = GT; SF.swingSpend(P.sw, GT); snd('bow.release', { key: 'P' }); } catch (e) { } } if (t) EFX.push({ k: 'proj', x: a.x, y: a.y, tx: t.x, ty: t.y, t0: GT, t1: GT + (p.flight || 1), col: '#e8dcc0', at: GT + 99, fn: () => { } }); return; }
+  if ((p.k === 'wide' || p.k === 'blocked') && t) { floater(t.x, t.y, p.k, '#c8c8c8'); return; }
   if (p.k === 'res' && t && t !== P) log(`${p.name || t.name} is restored to life.`, '#ffe08a');
 }
 function owGain(p) {
   const k = p.skill; if (P.skills[k] && Number.isFinite(p.value) && !p.stat) { const d = p.value - P.skills[k].v; P.skills[k].v = p.value; if (d > 0) { log(`${SF.SKILL[k].n} +${f1(d)} (${f1(p.value)})`, '#7fd4ff', 'skill'); if (GT - SND.gainAt > 1.5) { SND.gainAt = GT; try { snd('skill.gain'); } catch (e) { } } } }
   if (p.stat && Number.isFinite(p.statValue)) { P[p.stat] = p.statValue; log(`Your ${STAT_NAME[p.stat]} rises to ${p.statValue}.`, '#ffe08a', 'skill'); ONW.ctx = Object.assign(SF_MOVEMENT.ctxFor(SF, P), { ghost: P.ghost }); refreshHud(); }
+}
+/* ---------- online items (Server Items v1): the server holds the items; the client shows them and asks ---------- */
+const owPlayersNear = () => { let n = 0; for (const e of ONW.remotes.values()) if (e.kind === 'remote') n++; return n; };
+/* an item from the server's public form, keeping the same client uid for the same server id (the panels track items by uid) */
+function owItem(o) {
+  const W = ONW; const uid = W.uidOf.get(o.id); const it = Object.assign(SF.newItem(o.itemDef, o.qty), o.props || {}, { sid: o.id });
+  if (uid) it.uid = uid; else W.uidOf.set(o.id, it.uid); return it;
+}
+function owInventory(inv) {
+  const wasWeapon = P.equip.weapon && P.equip.weapon.sid;
+  P.pack.items = (inv.pack || []).map(owItem); P.pack.ver = (P.pack.ver || 0) + 1;
+  const eq = emptyEquip(); for (const s in inv.equip || {}) eq[s] = inv.equip[s] ? owItem(inv.equip[s]) : null; P.equip = eq;
+  ONW.ctx = Object.assign(SF_MOVEMENT.ctxFor(SF, P), { ghost: P.ghost });
+  if ((P.equip.weapon && P.equip.weapon.sid) !== wasWeapon) { try { SF.swingEquip(P.sw, GT, P.stam, wDef()); P.drawn = false; } catch (e) { } }
+  try { renderEqWin(true); } catch (e) { } if (PANEL === 'bag' || PANEL === 'gear' || PANEL === 'loot') renderPanel(); refreshHud();
+}
+function owRemainsEnter(p, now) {
+  const W = ONW, cont = SF.newContainer(p.pile ? 'pile' : 'corpse'); cont.items = (p.items || []).map(owItem);
+  const e = { kind: 'corpse', online: true, nid: p.nid, id: 2e6 + p.nid, x: p.x, y: p.y, sect: p.sect || 0, name: p.ownerName ? p.ownerName + "'s body" : p.name, mon: p.mon || null, pile: !!p.pile,
+    mine: !!(p.owner && p.owner === W.charId), owner: p.owner || null, cont, expires: GT + (p.left || 600), t0: GT - 1, skinned: true, speed: 0, buf: [[now, p.x, p.y, p.sect || 0, 0]] };
+  W.remotes.set(p.nid, e); ents.unshift(e);
+}
+function owRemainsItems(p) { const e = ONW.remotes.get(p.nid); if (!e || e.kind !== 'corpse') return; e.cont.items = (p.items || []).map(owItem); e.cont.ver = (e.cont.ver || 0) + 1; if (P.lootOpen === e) renderPanel(); }
+function owItemCmd(op, a) { if (!ONW || !ONW.items) return false; owSend('item', Object.assign({ op }, a)); return true; }
+const owSidOf = u => { const it = [...P.pack.items, ...Object.values(P.equip)].find(i => i && i.uid === +u); return it && it.sid; };
+/* the game's equip paths (button, double-click, drag, context menu) end here online */
+function owEquip(u, slot) { if (P.ghost) { log('Ghosts cannot handle equipment.', '#ffb070'); return false; } const sid = owSidOf(u); if (!sid) return false; owItemCmd('equip', slot ? { item: sid, slot } : { item: sid }); try { snd('item.equip'); } catch (e) { } return true; }
+function owUnequip(s) { if (P.ghost) return false; owItemCmd('unequip', { slot: s }); try { snd('item.equip'); } catch (e) { } return true; }
+function owMerge(fromU, intoU) { const f = owSidOf(fromU), t = owSidOf(intoU); if (f && t) owItemCmd('merge', { item: f, into: t }); }
+/* routed panel actions: the dataset of the clicked control names the item by its client uid */
+function owItemAct(a, d) {
+  if (a === 'equip') return owEquip(d.u, d.slot);
+  if (a === 'uneq') return owUnequip(d.s);
+  if (a === 'drop') { const sid = owSidOf(d.u); if (sid) { owItemCmd('drop', d.q ? { item: sid, qty: +d.q } : { item: sid }); try { snd('loot.rummage'); } catch (e) { } } return; }
+  if (a === 'split') { const sid = owSidOf(d.u); if (sid && +d.q >= 1) owItemCmd('split', { item: sid, qty: Math.floor(+d.q) }); return; }
+  if (a === 'mergekind' || a === 'bagmerge') return owItemCmd('mergeall', {});
+  const c = P.lootOpen; if (!c || !c.online) return;
+  if (a === 'takeall') { owItemCmd('takeall', { from: c.nid }); try { snd('loot.rummage'); } catch (e) { } return; }
+  if (a === 'take') { const it = c.cont.items.find(i => i.uid === +d.u); if (!it) return; owItemCmd('take', d.half ? { from: c.nid, item: it.sid, qty: Math.ceil(it.qty / 2) } : { from: c.nid, item: it.sid }); try { snd(it.id === 'gold' ? 'loot.coin' : 'loot.rummage'); } catch (e) { } }
+}
+/* tapping remains beside you opens them (the server checks the distance and ownership again when you take) */
+function owOpenRemains(e) {
+  if (P.ghost) return log('Ghosts cannot handle items.', '#ffb070');
+  if (dist(e, P) > 2.2) return log('Walk next to the remains to loot them.');
+  if (e.owner && !e.mine) return log(`That is ${e.name}; only its owner can take from it.`, '#ffb070');
+  P.lootOpen = e; openPanel('loot'); try { sndAt('loot.rummage', e); } catch (x) { }
 }
 /* Attack (or Space): arm on the selected creature, else the nearest one in sight; again to stand down. The server decides the rest. */
 function owToggleArm() {
@@ -436,7 +494,7 @@ function owToggleArm() {
 }
 /* a tap online: select a creature or person under the finger (the offline tap does much more; online only selection exists) */
 const owNearShrine = () => SHRINES.some(z => Math.hypot(z.x + .5 - P.x, z.y + .5 - P.y) <= 2.5);   // the server's reach (world.ts COMBAT.shrineReach)
-function owTap(sx, sy) { const w = screenToWorld(sx, sy), hits = hitEnts(w.wx, w.wy).filter(e => e.kind === 'mon' || e.kind === 'remote'); if (!hits.length) return false; P.sel = hits[0]; P.sel.nameUntil = GT + 3; return true; }
+function owTap(sx, sy) { const w = screenToWorld(sx, sy), hits = hitEnts(w.wx, w.wy).filter(e => e.kind === 'mon' || e.kind === 'remote' || (e.kind === 'corpse' && e.online)); if (!hits.length) return false; P.sel = hits[0]; if (hits[0].kind === 'corpse') { if (ONW.items) owOpenRemains(hits[0]); return true; } P.sel.nameUntil = GT + 3; return true; }
 function drawRemote(g, e, x, y) {
   const mv = e.speed > .3, k = mv ? 'Walk' : 'Idle', im = tinted(animSheet(k), e.look, k);
   if (!im) { drawScout(g, e, x, y, e.look); return true; }
@@ -448,7 +506,7 @@ function owBar() {
   if (!ONW) return; let el = $('#owbar');
   if (!el) { el = document.createElement('div'); el.id = 'owbar'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
   const L = ONW.L, st = L.status === 'connected' ? 'Online' : L.status === 'ended' ? 'Disconnected' : 'Reconnecting…';
-  el.innerHTML = `<span class="ondot ${onEsc(L.status)}"></span><b>${st}</b><span class="owalpha">Alpha</span><span>${ONW.remotes.size - (ONW.creatures || 0)} nearby</span>${L.rtt != null ? `<span>${L.rtt} ms</span>` : ''}${P && P.ghost ? `<span class="owghost">Ghost</span>${owNearShrine() ? '<button type="button" class="ccb sm pri" data-ow="res-shrine">Restore at shrine</button>' : ''}` : ''}<button type="button" class="ccb sm" data-ow="leave">Leave world</button>`;
+  el.innerHTML = `<span class="ondot ${onEsc(L.status)}"></span><b>${st}</b><span class="owalpha">Alpha</span><span>${owPlayersNear()} nearby</span>${ONW.items ? '<button type="button" class="ccb sm" data-a="bag">Bag</button><button type="button" class="ccb sm" data-a="eqwin">Gear</button>' : ''}${L.rtt != null ? `<span>${L.rtt} ms</span>` : ''}${P && P.ghost ? `<span class="owghost">Ghost</span>${owNearShrine() ? '<button type="button" class="ccb sm pri" data-ow="res-shrine">Restore at shrine</button>' : ''}` : ''}<button type="button" class="ccb sm" data-ow="leave">Leave world</button>`;
 }
 function owEnded(note) {
   if (!ONW) return; owBar(); let el = $('#owend');
@@ -457,15 +515,18 @@ function owEnded(note) {
 }
 function owLeave() { const L = ONW && ONW.L; if (L) { L.stop = true; try { if (L.ws) L.ws.close(1000, 'leave'); } catch (e) { } } location.assign('/?online=roster'); }
 /* online, only walking is live: other keys and HUD actions are held back here, before the offline handlers see them */
-addEventListener('keydown', e => { if (!ONW || e.target.matches('input,select,textarea')) return; if (ONW.combat && OW_KEYS_FIGHT.has(e.key)) { e.stopImmediatePropagation(); e.preventDefault(); if (e.key === ' ' && !e.repeat) owToggleArm(); else if (e.key === 'Escape') { P.sel = null; } return; } if (!OW_KEYS.has(e.key)) { e.stopImmediatePropagation(); } }, true);
+addEventListener('keydown', e => { if (!ONW || e.target.matches('input,select,textarea')) return; if (ONW.items && OW_KEYS_ITEMS.has(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) { e.stopImmediatePropagation(); e.preventDefault(); if (e.key === 'c' || e.key === 'C') { try { toggleEqWin(); } catch (x) { } } else uiOpen('bag'); refreshHud(); return; }
+  if (ONW.combat && OW_KEYS_FIGHT.has(e.key)) { e.stopImmediatePropagation(); e.preventDefault(); if (e.key === ' ' && !e.repeat) owToggleArm(); else if (e.key === 'Escape') { P.sel = null; } return; } if (!OW_KEYS.has(e.key)) { e.stopImmediatePropagation(); } }, true);
 document.addEventListener('click', e => {
   if (!ONW) return; const ow = e.target.closest('[data-ow]'); if (ow) { e.preventDefault(); e.stopImmediatePropagation(); if (ow.dataset.ow === 'leave') owLeave(); else if (ow.dataset.ow === 'res-shrine') owSend('resurrect', { at: 'shrine' }); else if (ow.dataset.ow === 'res-bound') owSend('resurrect', { at: 'bound' }); return; }
   const fb = e.target.closest('[data-a]'); if (fb && fb.dataset.a === 'atk' && ONW.combat) { e.preventDefault(); e.stopImmediatePropagation(); owToggleArm(); return; }
+  if (fb && ONW.items && OW_ITEM_ACTS.has(fb.dataset.a)) { e.preventDefault(); e.stopImmediatePropagation(); try { owItemAct(fb.dataset.a, fb.dataset); } catch (x) { console.error(x); } return; }
+  if (fb && ONW.items && OW_UI.has(fb.dataset.a)) return;   // drawing only: the game's own handler runs
   if (fb && fb.dataset.a === 'desel' && ONW.combat) { e.preventDefault(); e.stopImmediatePropagation(); if (P.armed) owSend('target', { nid: null }); P.sel = null; P.armed = false; refreshHud(); return; }
   if (fb && fb.dataset.a === 'ghostret' && ONW.combat) { e.preventDefault(); e.stopImmediatePropagation(); owSend('resurrect', { at: 'bound' }); return; }   // the game's ghost panel: the server decides
   const b = e.target.closest('[data-a]'); if (b && !OW_ACTIONS.has(b.dataset.a)) { e.preventDefault(); e.stopImmediatePropagation(); if (GT - (ONW.heldMsg || -99) > 3) { ONW.heldMsg = GT; log(ONW.combat ? 'Not available online yet: walking and fighting are live on the server.' : 'Not available online yet: only walking is live on the server.', '#ffb070'); } }
 }, true);
 
-const ONLINE = { worldSource: onWorldSource, tap: owTap, arm: owToggleArm, open: onOpen, html: onHtml, click: onClick, submit: onSubmit, bootFromUrl: onBootFromUrl, create: onCreateFromWizard, leaveWizard: onLeaveWizard, paintLobby: onLobbyPaint, drawPortraits: onDrawPortraits,
+const ONLINE = { worldSource: onWorldSource, tap: owTap, arm: owToggleArm, itemAct: owItemAct, openRemains: owOpenRemains, open: onOpen, html: onHtml, click: onClick, submit: onSubmit, bootFromUrl: onBootFromUrl, create: onCreateFromWizard, leaveWizard: onLeaveWizard, paintLobby: onLobbyPaint, drawPortraits: onDrawPortraits,
   realm: id => { ON.realm = id; onLoadRoster(); }, get state() { return ON; }, get world() { return ONW; }, get player() { return ONW ? P : null; } };
 window.__ONLINE = ONLINE;   // test hook (the browser flow suite); not a security boundary — the server checks everything

@@ -12,7 +12,9 @@ gateway), which is unchanged.
 
 **Update — Server Combat v1 (v0.42):** characters and creatures fight, and the server decides every blow; see [COMBAT.md](COMBAT.md).
 
-**What this is not yet:** apart from walking, creatures and combat, the world is not simulated on the server. Items, loot, magic, NPCs, crafting, trading, PvP and loot still run
+**Update — Server Items v1 (v0.44):** items are the server's: loot, bodies, piles, wear and arrows; see [ITEMS.md](ITEMS.md).
+
+**What this is not yet:** apart from walking, creatures, combat and items, the world is not simulated on the server. Banks, shops, crafting, magic, NPCs, crafting, trading, PvP and loot still run
 only in the offline game. The UI says so on every online screen; nothing here should be described as "multiplayer" until the
 gameplay itself is server-authoritative.
 

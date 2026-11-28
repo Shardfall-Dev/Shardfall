@@ -83,5 +83,5 @@ statement. One migration: `supabase/migrations/20261128000002_server_combat_v1.s
 
 ## Next
 
-Items and loot on the server: corpses (creatures' loot tables and the player's death transaction), picking up, the backpack and
+Items arrived in v0.44 ([ITEMS.md](ITEMS.md)): loot, bodies, wear and arrows are online. Before that, the plan was items and loot on the server: corpses (creatures' loot tables and the player's death transaction), picking up, the backpack and
 equipment as server-owned state, item wear, ammunition — then magic.
