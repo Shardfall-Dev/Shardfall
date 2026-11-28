@@ -1,4 +1,26 @@
-# Server Foundation v1 — status
+# Server status
+
+## Phase 2 — Server Movement v1 (branch `feature/server-movement-v1`, build v0.37)
+
+Online characters walk the real Anniabreen map together in the game's renderer. Walking is server-authoritative: the client
+sends intents and predicts, and the server moves everyone with the shared rules and collision. Details:
+[MOVEMENT.md](MOVEMENT.md).
+
+| Area | State |
+| --- | --- |
+| World on the server | Exported from the build (`tools/export-world.py`), verified deterministic and collision-equal to the game on 316 000 points, checked in CI |
+| Movement | Intents only; one per tick on average (credit cap 3); the game's speeds, stamina, encumbrance, shallows, slide and facing (`shared/movement.js`) |
+| Client | Online mode in the game: prediction, reconciliation (zero corrections in the e2e), others interpolated 120 ms behind; no local save, no taps, only walking keys and Sprint |
+| Interest | 16-tile grid, 40-tile radius plus a 4-tile leave margin, deltas only |
+| Persistence | Every 30 s, on leaving the world, and on shutdown |
+| Load | 150 bots, half crowded in one town: about 3 ms average tick, 0 overruns, about 14 KB/s per bot, 157 MB (CI runner) |
+| Phone | CI's phone player runs in WebKit (Safari's engine) with the iPhone 13 profile |
+
+Not online yet: creatures, NPCs, combat, gathering, crafting, items, trading, doors (always open online), chat.
+
+---
+
+## Phase 1 — Server Foundation v1
 
 Branch `feature/server-foundation-v1`, build **v0.36**. Specification: [SERVER_FOUNDATION_V1.md](SERVER_FOUNDATION_V1.md).
 Online play is an **alpha foundation**: accounts, a persistent roster and an authenticated realtime lobby. Gameplay is not yet
