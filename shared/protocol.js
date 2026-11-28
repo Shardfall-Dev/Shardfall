@@ -11,14 +11,18 @@
    stick is pushed, sprint) for each 50 ms step; the server applies at most one per tick per character with the game's own
    speeds and collision (shared/movement.js, shared/collision.js) and answers with authoritative positions (state) for the
    characters near you (interest management: actor.enter / actor.leave). Messages that would make the client authoritative over
-   anything else (combat, items, gold, skills, stats) are still refused with 'not_authoritative'. */
+   anything else (combat, items, gold, skills, stats) are still refused with 'not_authoritative'.
+   v3 (Server Creatures v1): creatures live on the server and share the interest grid. actor.enter carries kind: 'player'
+   (a character, as in v2) or 'creature' ({ nid, type, name, x, y, sect, speed, hp, max }); creatures move in state like
+   characters and leave with actor.leave. welcome carries the world clock ({ hour, dayMinutes, period }). Clients still send
+   only hello, ping, resync and move. */
 (function (root, factory) {
   const P = factory();
   if (typeof module !== 'undefined' && module.exports) module.exports = P; else root.SF_PROTOCOL = P;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
   const P = {};
-  P.PROTOCOL_VERSION = 2;
+  P.PROTOCOL_VERSION = 3;
   P.MAX_MESSAGE_BYTES = 16 * 1024;     // a single frame, client → server
   P.TICK_MS = 50;                      // the server tick: the same 50 ms fixed step as the game's world simulation (src/world.js)
   P.HEARTBEAT_MS = 15000;              // the server pings; a connection that misses two heartbeats is closed

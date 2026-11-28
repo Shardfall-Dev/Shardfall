@@ -7,7 +7,10 @@ the server, and authenticated realtime connections. The specification is [SERVER
 everyone is; see [MOVEMENT.md](MOVEMENT.md). The rest of this page describes the foundation (accounts, sessions, roster,
 gateway), which is unchanged.
 
-**What this is not yet:** apart from walking, the world is not simulated on the server. Movement, combat, NPCs, crafting, trading, PvP and loot still run
+**Update — Server Creatures v1 (v0.41):** the wildlife and monsters are simulated on the server too (no combat yet); see
+[CREATURES.md](CREATURES.md).
+
+**What this is not yet:** apart from walking and creatures, the world is not simulated on the server. Combat, NPCs, crafting, trading, PvP and loot still run
 only in the offline game. The UI says so on every online screen; nothing here should be described as "multiplayer" until the
 gameplay itself is server-authoritative.
 

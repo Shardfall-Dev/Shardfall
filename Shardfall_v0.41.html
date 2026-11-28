@@ -5,7 +5,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="screen-orientation" content="landscape">
-<title>Shardfall v0.40</title>
+<title>Shardfall v0.41</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=Alegreya+Sans:wght@400;500;700&family=Cinzel:wght@600;700&display=swap" rel="stylesheet">
 <style>
@@ -11806,14 +11806,18 @@ globalThis.__PAINTED = { state: PNT, why: paintedWhy, set: setPaintedMode, atlas
    stick is pushed, sprint) for each 50 ms step; the server applies at most one per tick per character with the game's own
    speeds and collision (shared/movement.js, shared/collision.js) and answers with authoritative positions (state) for the
    characters near you (interest management: actor.enter / actor.leave). Messages that would make the client authoritative over
-   anything else (combat, items, gold, skills, stats) are still refused with 'not_authoritative'. */
+   anything else (combat, items, gold, skills, stats) are still refused with 'not_authoritative'.
+   v3 (Server Creatures v1): creatures live on the server and share the interest grid. actor.enter carries kind: 'player'
+   (a character, as in v2) or 'creature' ({ nid, type, name, x, y, sect, speed, hp, max }); creatures move in state like
+   characters and leave with actor.leave. welcome carries the world clock ({ hour, dayMinutes, period }). Clients still send
+   only hello, ping, resync and move. */
 (function (root, factory) {
   const P = factory();
   if (typeof module !== 'undefined' && module.exports) module.exports = P; else root.SF_PROTOCOL = P;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
   const P = {};
-  P.PROTOCOL_VERSION = 2;
+  P.PROTOCOL_VERSION = 3;
   P.MAX_MESSAGE_BYTES = 16 * 1024;     // a single frame, client → server
   P.TICK_MS = 50;                      // the server tick: the same 50 ms fixed step as the game's world simulation (src/world.js)
   P.HEARTBEAT_MS = 15000;              // the server pings; a connection that misses two heartbeats is closed
@@ -12310,7 +12314,41 @@ function onWorldSource() {
   const rects = []; const seen = new Set(); for (const a of ECOL.values()) for (const r of a) if (!seen.has(r)) { seen.add(r); rects.push(r); }
   return { W, H, tiles: map, blk: BLK, soft: SOFT, rects, ecol: ECOL, shrines: SHRINES.map(s => ({ id: s.id, x: s.x, y: s.y })),
     gameStand: (x, y) => canStand({ kind: 'player' }, x, y),
+    monStand: (x, y) => canStand({ kind: 'mon' }, x, y),
+    population: onPopulationSource,
     townSpawns: () => Object.fromEntries(CR.TOWNS.map(t => [t.id, CR.townReady(t.id, { shrines: SHRINES, npcs: ANN.npcs, stand: (x, y) => canStand({ kind: 'player' }, x, y) })])) };
+}
+/* the creature population for the server (Server Creatures v1), exported by tools/export-world.py: the species' movement and
+   temperament (MON + the ecosystem profiles, src/ecology.js), every spawner the offline game builds (Anniabreen, the stretch,
+   frontier camps, the ecosystem's habitat regions) except those inside the Sunken Bell levels (not reachable online yet) and
+   quest spawners, and a per-tile ground mask (one byte per tile): bit 1 protected ground (creatures never step on it, game.js canStand),
+   bit 2 no spawning (ecology.js ecoSpot: blocking tiles, water, bridges, stairs, shallows, camp zones). */
+function onPopulationSource() {
+  ecoSpecies(); ecoSpawnKeys();
+  const SPEC_MON = ['n', 'size', 'hp', 'speed', 'aggro', 'leash', 'reach'], SPEC_ECO = ['f', 'hours', 'temper', 'hear', 'terr', 'pur', 'flight', 'social', 'grp', 'resp', 'cour', 'nv', 'night', 'flee'];
+  const spawners = [], types = new Set();
+  for (const s of SPAWNS) {
+    if (s.quest || !MON[s.type] || levelAt(Math.floor(s.x), Math.floor(s.y))) continue;
+    const o = { key: s.key, type: s.type, x: +s.x.toFixed(3), y: +s.y.toFixed(3), r: s.r, max: s.max };
+    if (s.nightMax) o.nightMax = s.nightMax; if (s.pack > 1) o.pack = s.pack; if (s.region) o.region = s.region; if (s.camp) o.camp = s.camp.id; if (s.boss) o.boss = true; if (s.delay) o.delay = s.delay;
+    spawners.push(o); types.add(s.type);
+  }
+  const species = {};
+  for (const t of [...types].sort()) {
+    const d = MON[t], pr = ecoP(t), o = {};
+    for (const k of SPEC_MON) if (d[k] !== undefined) o[k] = d[k];
+    for (const k of SPEC_ECO) if (pr[k] !== undefined) o[k] = pr[k];
+    if (d.boss) o.boss = true; species[t] = o;
+  }
+  const noSpawn = new Set([T.WA, T.BR, T.SD, T.SU, T.SH]), mask = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = y * W + x, t = map[i]; let v = PROT[i] === 1 ? 1 : 0;
+    if (BLK[t] || noSpawn.has(t) || zoneAt(x, y) === 'camp') v |= 2;
+    mask[i] = v;
+  }
+  let b64 = ''; for (let i = 0; i < mask.length; i += 0x8000) b64 += String.fromCharCode.apply(null, mask.subarray(i, i + 0x8000));
+  const sightBlock = []; for (let t = 0; t < LOSB.length; t++) if (LOSB[t]) sightBlock.push(t);   // tiles that block a creature's line of sight (game.js los)
+  return { species, spawners, sightBlock, ground: { W, H, mask: btoa(b64) } };   // mask: one byte per tile, row by row
 }
 /* ---------- the online world (Server Movement v1) ----------
    "Play" connects, and on the server's welcome the game's own world and renderer start with the server's character. Walking
@@ -12337,16 +12375,18 @@ function owEnter(L, w) {
   P.charId = ch.id; P.online = true; P.created = { v: SF.CREATION.VERSION, template: ch.template, town: ch.startingTown }; P.bound = ch.boundShrine;
   P.cx = { survey: {}, pins: [], track: null, mark: false, doors: {} }; P.batch = null; while (P.hotbar.length < 9) P.hotbar.push(null);
   WS = SIM.create({ clock: () => GT, onError: e => console.error(e) }); simAdopt(P);
+  if (w.clock && Number.isFinite(w.clock.hour)) { WS.clock.setDayMinutes(GT, w.clock.dayMinutes || SIM.CLOCK.dayMinutes); WS.clock.setHour(GT, w.clock.hour); }   // the server's time of day (Server Creatures v1)
+  ecoSpecies();   // the wildlife species the server may send (deer, hare, bear) have their art data
   ents.unshift(P); P.sw = SF.newSwing(); P.movedAt = -99; P.drawn = false;
   ONW = { L, world, ctx: SF_MOVEMENT.ctxFor(SF, P), ps: { x: you.x, y: you.y, stam: you.stam, sect: you.sect || 0, t: you.t || 0, lastDrain: you.ld ?? -99 }, seq: 0, pending: [], batch: [], wasMoving: false,
     remotes: new Map(), corrections: 0, lastErr: 0, acked: you.ack, notice: w.notice, viewRadius: w.world.viewRadius };
   $('#cc').hidden = true; document.body.classList.add('online'); owBar(); STEPPER.reset();
-  log('Welcome to Anniabreen, online. Walking is decided by the server; creatures, combat, items and trading are not online yet.', '#ffe08a');
+  log(w.authoritative && w.authoritative.creatures ? 'Welcome to Anniabreen, online. The server decides where everyone walks and what the wildlife does. Combat, items and trading are not online yet: creatures may stalk you, but cannot attack.' : 'Welcome to Anniabreen, online. Walking is decided by the server; creatures, combat, items and trading are not online yet.', '#ffe08a');
   log('Left stick or WASD moves; Sprint runs. Leave from the online bar.', '#b6a68a');
   refreshHud(); return true;
 }
 function owResume(w) {   // a reconnect: the server's position replaces the prediction; others are re-announced
-  const W = ONW; for (const e of W.remotes.values()) rmEnt(e); W.remotes.clear(); W.pending = []; W.batch = []; W.wasMoving = false;
+  const W = ONW; for (const e of W.remotes.values()) rmEnt(e); W.remotes.clear(); W.creatures = 0; W.pending = []; W.batch = []; W.wasMoving = false;
   const y = w.you; W.ps = { x: y.x, y: y.y, stam: y.stam, sect: y.sect || 0, t: y.t || 0, lastDrain: y.ld ?? -99 }; P.x = y.x; P.y = y.y; P.stam = y.stam; W.acked = y.ack;
   owBar();
 }
@@ -12390,10 +12430,15 @@ function owMessage(m) {
     for (const mv of p.moves) { const e = W.remotes.get(mv[0]); if (e) e.buf.push([now, mv[1], mv[2], mv[3], mv[4]]); }
   } else if (m.type === 'actor.enter') {
     if (W.remotes.has(p.nid)) return;
+    if (p.kind === 'creature') {   // a server creature, drawn by the game's own creature art (bestiary sheet, legacy sheet or procedural)
+      if (!MON[p.type]) return;
+      const e = { kind: 'mon', online: true, id: 1e6 + p.nid, nid: p.nid, type: p.type, name: p.name || MON[p.type].n, x: p.x, y: p.y, sect: p.sect, speed: p.speed, hp: p.hp, max: p.max, state: 'idle', buf: [[now, p.x, p.y, p.sect, p.speed]] };
+      W.remotes.set(p.nid, e); ents.push(e); W.creatures = (W.creatures || 0) + 1; owBar(); return;
+    }
     const e = { kind: 'remote', id: 'r' + p.nid, nid: p.nid, characterId: p.characterId, name: p.name, title: p.title, look: CR.normalizeLook(p.appearance || {}), equip: Object.assign(emptyEquip(), p.equip || {}),
       x: p.x, y: p.y, sect: p.sect, speed: p.speed, hp: 1, max: 1, buf: [[now, p.x, p.y, p.sect, p.speed]] };
     W.remotes.set(p.nid, e); ents.push(e); owBar();
-  } else if (m.type === 'actor.leave') { const e = W.remotes.get(p.nid); if (e) { W.remotes.delete(p.nid); rmEnt(e); owBar(); } }
+  } else if (m.type === 'actor.leave') { const e = W.remotes.get(p.nid); if (e) { W.remotes.delete(p.nid); if (e.kind === 'mon') W.creatures--; rmEnt(e); owBar(); } }
 }
 function drawRemote(g, e, x, y) {
   const mv = e.speed > .3, k = mv ? 'Walk' : 'Idle', im = tinted(animSheet(k), e.look, k);
@@ -12406,7 +12451,7 @@ function owBar() {
   if (!ONW) return; let el = $('#owbar');
   if (!el) { el = document.createElement('div'); el.id = 'owbar'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
   const L = ONW.L, st = L.status === 'connected' ? 'Online' : L.status === 'ended' ? 'Disconnected' : 'Reconnecting…';
-  el.innerHTML = `<span class="ondot ${onEsc(L.status)}"></span><b>${st}</b><span class="owalpha">Alpha</span><span>${ONW.remotes.size} nearby</span>${L.rtt != null ? `<span>${L.rtt} ms</span>` : ''}<button type="button" class="ccb sm" data-ow="leave">Leave world</button>`;
+  el.innerHTML = `<span class="ondot ${onEsc(L.status)}"></span><b>${st}</b><span class="owalpha">Alpha</span><span>${ONW.remotes.size - (ONW.creatures || 0)} nearby</span>${L.rtt != null ? `<span>${L.rtt} ms</span>` : ''}<button type="button" class="ccb sm" data-ow="leave">Leave world</button>`;
 }
 function owEnded(note) {
   if (!ONW) return; owBar(); let el = $('#owend');

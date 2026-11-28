@@ -22,6 +22,7 @@ export interface Config {
   logLevel: string;
   rateLimit: { globalPerMin: number; authPerMin: number };
   viewRadius: number;
+  creatures: boolean;
 }
 
 export function findRepoRoot(from = __dirname): string {
@@ -73,6 +74,7 @@ export function loadConfig(e: NodeJS.ProcessEnv = process.env): Config {
     trustProxy: e.TRUST_PROXY ? (/^(1|true)$/i.test(e.TRUST_PROXY) ? true : e.TRUST_PROXY) : false,
     logLevel: e.LOG_LEVEL || (env === 'test' ? 'warn' : 'info'),
     viewRadius: num(e.WORLD_VIEW_RADIUS, 40, 2, 200, 'WORLD_VIEW_RADIUS'),
+    creatures: bool(e.WORLD_CREATURES, true),   // Server Creatures v1: the world's wildlife and monsters (off only for diagnosis)
     rateLimit: { globalPerMin: num(e.RATE_LIMIT_PER_MINUTE, 300, 10, 100000, 'RATE_LIMIT_PER_MINUTE'), authPerMin: num(e.AUTH_RATE_LIMIT_PER_MINUTE, 10, 1, 10000, 'AUTH_RATE_LIMIT_PER_MINUTE') },
   };
 }
