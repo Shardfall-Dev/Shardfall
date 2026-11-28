@@ -29,8 +29,8 @@ export function registerAuthRoutes(app: FastifyInstance, cfg: Config, db: Db, se
     setSessionCookie(cfg, reply, created.token, kind === 'recovery' ? cfg.recoveryTtlMs : cfg.sessionTtlMs);
   };
 
-  app.post('/api/auth/register', { config: authLimit, schema: { body: { type: 'object', additionalProperties: false, required: ['email', 'password'], properties: { email: EMAIL, password: PASSWORD, displayName: DISPLAY } } } },
-    async (req: FastifyRequest<{ Body: { email: string; password: string; displayName?: string } }>, reply) => {
+  app.post<{ Body: { email: string; password: string; displayName?: string } }>('/api/auth/register', { config: authLimit, schema: { body: { type: 'object', additionalProperties: false, required: ['email', 'password'], properties: { email: EMAIL, password: PASSWORD, displayName: DISPLAY } } } },
+    async (req, reply) => {
       checkMutationOrigin(cfg, req);
       const { verifier, challenge } = pkcePair();
       const flow = await sessions.createFlow('signup', verifier, { provider: 'email' });
@@ -46,8 +46,8 @@ export function registerAuthRoutes(app: FastifyInstance, cfg: Config, db: Db, se
       return { ok: true, message: 'If this address can be used, a confirmation email is on its way. Open the link in this browser to finish.' };
     });
 
-  app.post('/api/auth/login', { config: authLimit, schema: { body: { type: 'object', additionalProperties: false, required: ['email', 'password'], properties: { email: EMAIL, password: { type: 'string', minLength: 1, maxLength: 72 } } } } },
-    async (req: FastifyRequest<{ Body: { email: string; password: string } }>, reply) => {
+  app.post<{ Body: { email: string; password: string } }>('/api/auth/login', { config: authLimit, schema: { body: { type: 'object', additionalProperties: false, required: ['email', 'password'], properties: { email: EMAIL, password: { type: 'string', minLength: 1, maxLength: 72 } } } } },
+    async (req, reply) => {
       checkMutationOrigin(cfg, req);
       let s;
       try { s = await sessions.auth.signInWithPassword(req.body.email.trim(), req.body.password); }
@@ -81,8 +81,8 @@ export function registerAuthRoutes(app: FastifyInstance, cfg: Config, db: Db, se
     return { ok: true, ended: ids.length };
   });
 
-  app.post('/api/auth/recover', { config: authLimit, schema: { body: { type: 'object', additionalProperties: false, required: ['email'], properties: { email: EMAIL } } } },
-    async (req: FastifyRequest<{ Body: { email: string } }>, reply) => {
+  app.post<{ Body: { email: string } }>('/api/auth/recover', { config: authLimit, schema: { body: { type: 'object', additionalProperties: false, required: ['email'], properties: { email: EMAIL } } } },
+    async (req, reply) => {
       checkMutationOrigin(cfg, req);
       const { verifier, challenge } = pkcePair();
       const flow = await sessions.createFlow('recovery', verifier, { provider: 'email' });
@@ -93,8 +93,8 @@ export function registerAuthRoutes(app: FastifyInstance, cfg: Config, db: Db, se
     });
 
   /* set a new password: from a recovery session, or from a full session that signed in within the last few minutes */
-  app.post('/api/auth/password', { config: authLimit, preHandler: guards.requireSession({ allowRecovery: true }), schema: { body: { type: 'object', additionalProperties: false, required: ['password'], properties: { password: PASSWORD } } } },
-    async (req: FastifyRequest<{ Body: { password: string } }>, reply) => {
+  app.post<{ Body: { password: string } }>('/api/auth/password', { config: authLimit, preHandler: guards.requireSession({ allowRecovery: true }), schema: { body: { type: 'object', additionalProperties: false, required: ['password'], properties: { password: PASSWORD } } } },
+    async (req, reply) => {
       const s = req.sess!;
       if (s.kind !== 'recovery' && !sessions.recentlyAuthenticated(s)) throw fail(403, 'reauth_required', 'Confirm it is you: enter your current password again.');
       try { await sessions.auth.updateUser(await sessions.accessToken(s.id), { password: req.body.password }); }
@@ -113,8 +113,8 @@ export function registerAuthRoutes(app: FastifyInstance, cfg: Config, db: Db, se
     });
 
   /* re-authentication for sensitive actions (linking, unlinking, email change, deletion): the current password */
-  app.post('/api/auth/reauth', { config: authLimit, preHandler: guards.requireSession(), schema: { body: { type: 'object', additionalProperties: false, required: ['password'], properties: { password: { type: 'string', minLength: 1, maxLength: 72 } } } } },
-    async (req: FastifyRequest<{ Body: { password: string } }>) => {
+  app.post<{ Body: { password: string } }>('/api/auth/reauth', { config: authLimit, preHandler: guards.requireSession(), schema: { body: { type: 'object', additionalProperties: false, required: ['password'], properties: { password: { type: 'string', minLength: 1, maxLength: 72 } } } } },
+    async (req) => {
       const s = req.sess!;
       const user = await sessions.auth.getUser(await sessions.accessToken(s.id));
       if (!user.email) throw fail(400, 'no_password', 'This account signs in with Google or Apple: confirm with that instead.');
@@ -125,7 +125,7 @@ export function registerAuthRoutes(app: FastifyInstance, cfg: Config, db: Db, se
     });
 
   /* Google / Apple: start (a top-level navigation). 404 when the provider is not configured. */
-  app.get('/api/auth/oauth/:provider', { config: authLimit }, async (req: FastifyRequest<{ Params: { provider: string } }>, reply) => {
+  app.get<{ Params: { provider: string } }>('/api/auth/oauth/:provider', { config: authLimit }, async (req, reply) => {
     const p = req.params.provider; if (!(PROVIDERS as readonly string[]).includes(p)) throw fail(404, 'unknown_provider', 'Unknown sign-in provider.');
     const st = await providerStatus(cfg, sessions); if (!(st as any)[p]) throw fail(404, 'provider_disabled', 'This sign-in option is not available.');
     const { verifier, challenge } = pkcePair();
@@ -135,7 +135,7 @@ export function registerAuthRoutes(app: FastifyInstance, cfg: Config, db: Db, se
   });
 
   /* re-authentication or identity linking through a provider (for accounts without a password, or to add Google / Apple) */
-  app.post('/api/auth/oauth/:provider/:purpose', { config: authLimit, preHandler: guards.requireSession() }, async (req: FastifyRequest<{ Params: { provider: string; purpose: string } }>, reply) => {
+  app.post<{ Params: { provider: string; purpose: string } }>('/api/auth/oauth/:provider/:purpose', { config: authLimit, preHandler: guards.requireSession() }, async (req, reply) => {
     const { provider: p, purpose } = req.params;
     if (!(PROVIDERS as readonly string[]).includes(p) || !['link', 'reauth'].includes(purpose)) throw fail(404, 'not_found', 'Not found.');
     const st = await providerStatus(cfg, sessions); if (!(st as any)[p]) throw fail(404, 'provider_disabled', 'This sign-in option is not available.');
@@ -149,7 +149,7 @@ export function registerAuthRoutes(app: FastifyInstance, cfg: Config, db: Db, se
   });
 
   /* the one callback: email confirmation, password recovery, provider sign-in, linking and re-authentication */
-  app.get('/api/auth/callback', { config: authLimit }, async (req: FastifyRequest<{ Querystring: Record<string, string> }>, reply) => {
+  app.get<{ Querystring: Record<string, string> }>('/api/auth/callback', { config: authLimit }, async (req, reply) => {
     const q = req.query || {};
     const flowId = req.cookies[cookieNames(cfg).flow]; clearFlowCookie(cfg, reply);
     if (q.error || q.error_code) {

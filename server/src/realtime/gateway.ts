@@ -8,7 +8,7 @@
    - heartbeat every HEARTBEAT_MS; per-connection rate limit, payload limit (MAX_MESSAGE_BYTES) and bounded send queue;
    - outgoing events are batched and flushed on the world tick (50 ms);
    - nothing the client sends can change game state: movement, combat, items, gold, skills and stats are refused. */
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { WebSocket } from 'ws';
 import type { Config } from '../config';
 import P = require('../../../shared/protocol');
@@ -41,7 +41,7 @@ export class Gateway {
   register(app: FastifyInstance) {
     app.get('/ws', {
       websocket: true,
-      preValidation: async (req: FastifyRequest, reply) => {
+      preValidation: async (req: FastifyRequest, reply: FastifyReply) => {
         if (!originAllowed(this.cfg, requestOrigin(req))) { this.counters.rejectedUpgrades++; return reply.code(403).send({ error: { code: 'bad_origin', message: 'Origin not allowed.' } }); }
         const s = await this.sessions.lookup(req.cookies[this.cfg.cookiePrefix + 'sf_session']);
         if (!s || s.kind !== 'full' || (await this.sessions.recheck(s)) !== 'ok') { this.counters.rejectedUpgrades++; return reply.code(401).send({ error: { code: 'not_signed_in', message: 'Please sign in.' } }); }

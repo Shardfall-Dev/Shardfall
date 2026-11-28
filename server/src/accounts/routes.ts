@@ -33,8 +33,8 @@ export function registerAccountRoutes(app: FastifyInstance, cfg: Config, db: Db,
       recentAuth: sessions.recentlyAuthenticated(s), providers: await providerStatus(cfg, sessions), canDelete: !!cfg.authServiceKey };
   });
 
-  app.patch('/api/account', { preHandler: guards.requireSession(), schema: { body: { type: 'object', additionalProperties: false, required: ['displayName'], properties: { displayName: { type: ['string', 'null'], maxLength: 32 } } } } },
-    async (req: FastifyRequest<{ Body: { displayName: string | null } }>) => {
+  app.patch<{ Body: { displayName: string | null } }>('/api/account', { preHandler: guards.requireSession(), schema: { body: { type: 'object', additionalProperties: false, required: ['displayName'], properties: { displayName: { type: ['string', 'null'], maxLength: 32 } } } } },
+    async (req) => {
       const raw = req.body.displayName; const v = raw === null ? null : raw.replace(/[\u0000-\u001f\u007f-\u009f<>]/g, '').replace(/\s+/g, ' ').trim();
       if (v !== null && [...v].length < 2) throw fail(400, 'bad_display_name', 'A display name needs 2 to 32 characters.');
       await db.query('update game.accounts set display_name = $2, updated_at = now() where id = $1', [req.sess!.account_id, v]);
@@ -43,15 +43,15 @@ export function registerAccountRoutes(app: FastifyInstance, cfg: Config, db: Db,
     });
 
   /* change the sign-in email: Supabase Auth confirms the new address by email before it takes effect */
-  app.post('/api/account/email', { preHandler: [guards.requireSession(), guards.requireRecentAuth], schema: { body: { type: 'object', additionalProperties: false, required: ['email'], properties: { email: EMAIL } } } },
-    async (req: FastifyRequest<{ Body: { email: string } }>) => {
+  app.post<{ Body: { email: string } }>('/api/account/email', { preHandler: [guards.requireSession(), guards.requireRecentAuth], schema: { body: { type: 'object', additionalProperties: false, required: ['email'], properties: { email: EMAIL } } } },
+    async (req) => {
       try { await sessions.auth.updateUser(await sessions.accessToken(req.sess!.id), { email: req.body.email.trim() }, new URL('/?online=account', cfg.publicUrl).toString()); }
       catch (e) { if ((e as AuthError).unavailable) throw fail(503, 'auth_unavailable', 'The sign-in service is unreachable.'); req.log.info({ code: (e as AuthError).code }, 'email change refused'); }
       await audit(db, req.sess!.account_id, 'account.email_change_requested', {});
       return { ok: true, message: 'If the new address can be used, we sent a confirmation link to it. The change happens once you open it.' };
     });
 
-  app.post('/api/account/unlink/:provider', { preHandler: [guards.requireSession(), guards.requireRecentAuth] }, async (req: FastifyRequest<{ Params: { provider: string } }>) => {
+  app.post<{ Params: { provider: string } }>('/api/account/unlink/:provider', { preHandler: [guards.requireSession(), guards.requireRecentAuth] }, async (req) => {
     const p = req.params.provider; if (!(PROVIDERS as readonly string[]).includes(p)) throw fail(404, 'not_found', 'Not found.');
     const token = await sessions.accessToken(req.sess!.id); const user = await sessions.auth.getUser(token);
     const ids = user.identities || []; const it = ids.find(i => i.provider === p);
@@ -74,8 +74,8 @@ export function registerAccountRoutes(app: FastifyInstance, cfg: Config, db: Db,
   });
 
   /* delete: recent sign-in + the exact phrase. Characters and items go with the account; the Supabase Auth user is deleted. */
-  app.delete('/api/account', { preHandler: [guards.requireSession(), guards.requireRecentAuth], schema: { body: { type: 'object', additionalProperties: false, required: ['confirm'], properties: { confirm: { type: 'string', maxLength: 40 } } } } },
-    async (req: FastifyRequest<{ Body: { confirm: string } }>, reply) => {
+  app.delete<{ Body: { confirm: string } }>('/api/account', { preHandler: [guards.requireSession(), guards.requireRecentAuth], schema: { body: { type: 'object', additionalProperties: false, required: ['confirm'], properties: { confirm: { type: 'string', maxLength: 40 } } } } },
+    async (req, reply) => {
       if (req.body.confirm !== 'DELETE MY ACCOUNT') throw fail(400, 'confirm_phrase', 'Type DELETE MY ACCOUNT to confirm.');
       if (!cfg.authServiceKey) throw fail(503, 'deletion_unavailable', 'Account deletion is not configured on this server yet. Nothing was deleted.');
       const s = req.sess!;

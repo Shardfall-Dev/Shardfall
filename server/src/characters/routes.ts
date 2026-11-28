@@ -22,29 +22,29 @@ export function registerCharacterRoutes(app: FastifyInstance, chars: Characters,
 
   app.get('/api/realms', { preHandler: guards.requireSession() }, async req => ({ realms: await chars.realms(req.sess!.account_id) }));
 
-  app.get('/api/realms/:realmId/characters', { preHandler: guards.requireSession(), schema: { params: { type: 'object', properties: { realmId: REALM } } } },
-    async (req: FastifyRequest<{ Params: { realmId: string } }>) => chars.roster(req.sess!.account_id, req.params.realmId));
+  app.get<{ Params: { realmId: string } }>('/api/realms/:realmId/characters', { preHandler: guards.requireSession(), schema: { params: { type: 'object', properties: { realmId: REALM } } } },
+    async (req) => chars.roster(req.sess!.account_id, req.params.realmId));
 
-  app.post('/api/realms/:realmId/characters', { preHandler: guards.requireSession(), config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+  app.post<{ Params: { realmId: string }; Body: unknown }>('/api/realms/:realmId/characters', { preHandler: guards.requireSession(), config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
     schema: { params: { type: 'object', properties: { realmId: REALM } }, body: CREATE, headers: { type: 'object', properties: { 'idempotency-key': UUID } } } },
-    async (req: FastifyRequest<{ Params: { realmId: string }; Body: unknown }>, reply) => {
+    async (req, reply) => {
       const key = req.headers['idempotency-key']; const creationKey = typeof key === 'string' && P.isUuid(key) ? key : null;
       const r = await chars.create(req.sess!.account_id, req.params.realmId, req.body, creationKey);
       reply.code(r.replayed ? 200 : 201);
       return { character: r.character, replayed: r.replayed, notes: (r as any).notes || [] };
     });
 
-  app.get('/api/characters/:id', { preHandler: guards.requireSession(), schema: { params: { type: 'object', properties: { id: UUID } } } },
-    async (req: FastifyRequest<{ Params: { id: string } }>) => {
+  app.get<{ Params: { id: string } }>('/api/characters/:id', { preHandler: guards.requireSession(), schema: { params: { type: 'object', properties: { id: UUID } } } },
+    async (req) => {
       const c = await chars.snapshot(req.sess!.account_id, req.params.id); if (!c) throw fail(404, 'not_found', 'Character not found.');
       return { character: c };
     });
 
-  app.post('/api/characters/:id/delete', { preHandler: guards.requireSession(), schema: { params: { type: 'object', properties: { id: UUID } }, body: { type: 'object', additionalProperties: false, required: ['confirmName'], properties: { confirmName: { type: 'string', maxLength: 64 } } } } },
-    async (req: FastifyRequest<{ Params: { id: string }; Body: { confirmName: string } }>) => {
+  app.post<{ Params: { id: string }; Body: { confirmName: string } }>('/api/characters/:id/delete', { preHandler: guards.requireSession(), schema: { params: { type: 'object', properties: { id: UUID } }, body: { type: 'object', additionalProperties: false, required: ['confirmName'], properties: { confirmName: { type: 'string', maxLength: 64 } } } } },
+    async (req) => {
       const r = await chars.remove(req.sess!.account_id, req.params.id, req.body.confirmName); onCharacterGone(req.params.id); return r;
     });
 
-  app.post('/api/characters/:id/restore', { preHandler: guards.requireSession(), schema: { params: { type: 'object', properties: { id: UUID } } } },
-    async (req: FastifyRequest<{ Params: { id: string } }>) => chars.restore(req.sess!.account_id, req.params.id));
+  app.post<{ Params: { id: string } }>('/api/characters/:id/restore', { preHandler: guards.requireSession(), schema: { params: { type: 'object', properties: { id: UUID } } } },
+    async (req) => chars.restore(req.sess!.account_id, req.params.id));
 }

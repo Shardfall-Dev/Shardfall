@@ -48,7 +48,7 @@ export class Characters {
   /* create: validate with the game's own creation rules, generate everything else, insert atomically.
      Quota: the account row is locked for the transaction, so parallel requests are counted one at a time.
      Names: unique per realm by name_key (a unique index — the database settles races). */
-  async create(accountId: string, realmId: string, payload: unknown, creationKey: string | null) {
+  async create(accountId: string, realmId: string, payload: unknown, creationKey: string | null): Promise<{ character: any; replayed: boolean; notes?: string[] }> {
     const v = this.rules.validateCreation(payload);
     if (!v.ok) throw Object.assign(fail(400, 'invalid_character', v.errors[0] || 'The character is not valid.'), { details: v.field });
     const built = this.rules.buildCharacter(v.value);
