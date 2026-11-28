@@ -45,7 +45,8 @@ export async function buildApp(cfg: Config, opts: { db?: Db } = {}): Promise<App
   const guards = makeGuards(cfg, sessions);
   const chars = new Characters(db, rules, cfg.characterPurgeDays);
   const terrain = loadTerrain(cfg.repoRoot); const sim = adapter.loadSim();
-  const world = new World(terrain, { viewRadius: cfg.viewRadius, creatures: cfg.creatures ? { data: loadPopulation(cfg.repoRoot, terrain), sim, clock: worldClock(sim) } : null });
+  const world = new World(terrain, { viewRadius: cfg.viewRadius, creatures: cfg.creatures ? { data: loadPopulation(cfg.repoRoot, terrain), sim, clock: worldClock(sim) } : null,
+    combat: cfg.creatures ? { SF: rules.SF } : null });
   const gateway = new Gateway(cfg, sessions, chars, world, app.log);
 
   await app.register(cookie);

@@ -1,5 +1,21 @@
 # Server status
 
+## Phase 4 — Server Combat v1 (branch `feature/server-combat-v1`, build v0.42)
+
+Characters and creatures fight online, and the server decides every blow with the game's rules: arming, the swing timer, hit
+chance, damage and armour, creature wind-up → strike → recover, death as a ghost, resurrection at shrines, regeneration, and the
+skills and stats a fight teaches — all saved. Details: [COMBAT.md](COMBAT.md).
+
+| Area | State |
+| --- | --- |
+| Rules | `server/src/world/combat.ts` on `SF.hitChance`, `SF.rawDamage`, `SF.mitigate`, `SF.EQ.regionArmor`, `SF.SK.use/check` |
+| Protocol | v4: `target`, `resurrect` from clients; `combat` and `gain` events; health, ghost and target in `state.you` |
+| Persistence | Health, mana, ghost, skills and stats with the position save; migration `…000002_server_combat_v1.sql` |
+| Client | Attack / Space / tap to select, the game's animations, floaters, target frame, ghost panel and shrine arrow |
+| Not yet | Items and loot, item wear, ammunition, magic, PvP, healers |
+
+---
+
 ## Phase 3 — Server Creatures v1 (branch `feature/server-creatures-v1`, build v0.41)
 
 The wildlife and monsters live on the server: one population per realm from the game's own 417 spawners, one world clock,

@@ -30,7 +30,7 @@ interface Entry { characterId: string; accountId: string; realmId: string; conn:
 /* what a character visibly wears (item ids and their look-relevant fields), for others to draw it */
 const wornOf = (ch: any) => { const o: Record<string, any> = {}; for (const i of ch.items || []) if (i.container === 'equip' && i.slot) o[i.slot] = Object.assign({}, i.props, { id: i.itemDef }); return o; };
 const BUCKET = 40, REFILL_PER_S = 20, MAX_OUTBOX = 512, MAX_BUFFERED = 1 << 20, SESSION_CHECK_MS = 30_000, SAVE_MS = 30_000;
-const NOTICE = 'Walking and creatures are server-authoritative: the server decides where everyone is and what the wildlife does. Combat, items and trading are not online yet, so creatures can stalk you but not attack.';
+const NOTICE = 'Walking, creatures and combat are server-authoritative: the server decides where everyone is, what the wildlife does and every blow. Items, loot and trading are not online yet.';
 
 export class Gateway {
   private conns = new Set<Conn>();
@@ -49,7 +49,8 @@ export class Gateway {
   /* save positions (never blocks the tick; failures are logged and retried at the next save) */
   private persist(list: Actor[]) {
     if (!list.length || this.stopping) return Promise.resolve();
-    return this.chars.savePositions(list.map(a => ({ id: a.characterId, x: a.s.x, y: a.s.y, sect: a.s.sect ?? 0, town: a.info.town, stam: a.s.stam })))
+    return this.chars.savePositions(list.map(a => ({ id: a.characterId, x: a.s.x, y: a.s.y, sect: a.s.sect ?? 0, town: a.info.town, stam: a.s.stam,
+      combat: a.ch ? { hp: Math.ceil(a.hp), mana: Math.round(a.mana), ghost: a.ghost, skills: a.ch.skills, str: a.ch.str, dex: a.ch.dex, int: a.ch.int } : undefined })))
       .then(() => undefined, e => { for (const a of list) a.dirty = true; this.log.error({ err: (e as Error).message }, 'saving positions failed'); });
   }
 
@@ -97,6 +98,11 @@ export class Gateway {
     if (m.type === 'hello') return this.hello(c, m.p.characterId, m.id);
     if (!c.characterId) return this.error(c, 'hello_first', 'Say hello with a character first.', m.id);
     if (m.type === 'move') { this.world.input(c.characterId, m.p.inputs as any); return; }
+    if (m.type === 'target' || m.type === 'resurrect') {
+      const why = m.type === 'target' ? this.world.target(c.characterId, m.p.nid as number | null) : this.world.resurrect(c.characterId, m.p.at as 'shrine' | 'bound');
+      if (why) this.send(c, 'combat', { k: 'refused', what: m.type, reason: why }, m.id, true);
+      return;
+    }
     if (m.type === 'resync') { const ch = await this.chars.snapshot(c.accountId, c.characterId); if (!ch) return this.close(c, P.CLOSE.FORBIDDEN, 'character gone', true); return this.send(c, 'snapshot', { tick: this.world.tick, character: ch, presence: this.others(c) }, m.id); }
   }
 
@@ -124,9 +130,10 @@ export class Gateway {
     c.characterId = characterId; c.realmId = ch.realmId;
     const rc = this.chars.rulesCharacter(ch); const ctx = MV.ctxFor(this.chars.SF, rc);
     const { actor, resumed: inWorld } = this.world.add({ characterId, accountId: c.accountId, realmId: ch.realmId, ctx, stam: ch.vitals.stam,
+      ch: rc, hp: ch.vitals.hp, mana: ch.vitals.mana, ghost: !!ch.ghost, bound: ch.boundShrine,
       position: ch.position, info: { characterId, name: ch.name, body: ch.body, appearance: ch.appearance, title: ch.title, town: ch.startingTown, equip: wornOf(ch) } });
     const t = this.world.terrain!;
-    this.send(c, 'welcome', { protocol: P.PROTOCOL_VERSION, tick: this.world.tick, tickMs: P.TICK_MS, serverAuthoritative: false, authoritative: { movement: true, creatures: !!this.world.clockInfo(), combat: false, items: false }, clock: this.world.clockInfo(),
+    this.send(c, 'welcome', { protocol: P.PROTOCOL_VERSION, tick: this.world.tick, tickMs: P.TICK_MS, serverAuthoritative: false, authoritative: { movement: true, creatures: !!this.world.clockInfo(), combat: this.world.combatOn, items: false }, clock: this.world.clockInfo(),
       notice: NOTICE, resumed: resumed || inWorld, character: ch, presence: this.others(c),
       world: { hash: t.hash, W: t.world.W, H: t.world.H, step: MV.STEP, viewRadius: this.world.viewRadius }, you: this.world.selfPayload(actor) }, reqId, true);
     c.log.info({ character: characterId, resumed }, 'joined lobby');

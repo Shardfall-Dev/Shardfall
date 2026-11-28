@@ -103,7 +103,7 @@ function onConnect() {
     if (ON.lobby !== L) return; const r = ONP.parseServer(ev.data); if (!r.ok) return; const m = r.msg;
     if (typeof m.seq === 'number') { if (L.seq && m.seq !== L.seq + 1 && L.character) ws.send(JSON.stringify({ v: ONP.PROTOCOL_VERSION, type: 'resync', p: {} })); L.seq = m.seq; }
     if (m.type === 'welcome' || m.type === 'snapshot') { L.character = m.p.character; L.tick = m.p.tick; L.presence = new Map((m.p.presence || []).map(x => [x.characterId, x])); L.status = 'connected'; L.tries = 0; L.note = m.p.notice || L.note; if (m.type === 'welcome') { L.joinedAt = Date.now(); if (ONW) owResume(m.p); else if (m.p.world && !owEnter(L, m.p)) { L.stop = true; L.status = 'ended'; try { ws.close(1000, 'world mismatch'); } catch (e) { } } } }
-    else if (m.type === 'state' || m.type === 'actor.enter' || m.type === 'actor.leave') { if (ONW) owMessage(m); return; }
+    else if (m.type === 'state' || m.type === 'actor.enter' || m.type === 'actor.leave' || m.type === 'combat' || m.type === 'gain') { if (ONW) owMessage(m); return; }
     else if (m.type === 'presence.join') L.presence.set(m.p.character.characterId, Object.assign({ connected: true }, m.p.character));
     else if (m.type === 'presence.leave') L.presence.delete(m.p.characterId);
     else if (m.type === 'pong') { if (typeof m.p.t === 'number') L.rtt = Math.round(performance.now() - m.p.t); L.tick = m.p.tick; }
@@ -268,7 +268,7 @@ function onWorldSource() {
    bit 2 no spawning (ecology.js ecoSpot: blocking tiles, water, bridges, stairs, shallows, camp zones). */
 function onPopulationSource() {
   ecoSpecies(); ecoSpawnKeys();
-  const SPEC_MON = ['n', 'size', 'hp', 'speed', 'aggro', 'leash', 'reach'], SPEC_ECO = ['f', 'hours', 'temper', 'hear', 'terr', 'pur', 'flight', 'social', 'grp', 'resp', 'cour', 'nv', 'night', 'flee'];
+  const SPEC_MON = ['n', 'size', 'hp', 'speed', 'aggro', 'leash', 'reach', 'atk', 'def', 'dmg', 'tele', 'rec', 'armor', 'ar', 'str', 'dex', 'diff', 'ward', 'ranged', 'keep', 'aoe'], SPEC_ECO = ['f', 'hours', 'temper', 'hear', 'terr', 'pur', 'flight', 'social', 'grp', 'resp', 'cour', 'nv', 'night', 'flee'];
   const spawners = [], types = new Set();
   for (const s of SPAWNS) {
     if (s.quest || !MON[s.type] || levelAt(Math.floor(s.x), Math.floor(s.y))) continue;
@@ -304,6 +304,7 @@ function onPopulationSource() {
 const OW_INTERP_MS = 120, OW_MAX_PENDING = 40;
 const OW_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', 'W', 'A', 'S', 'D', 'Shift', 'Escape']);
 const OW_ACTIONS = new Set(['sprint', 'map', 'mapfit', 'mapall', 'scrclose', 'rotok']);
+const OW_KEYS_FIGHT = new Set([' ', 'Escape']);   // Space arms on a creature (or stands down); Escape clears the selection
 function owEnter(L, w) {
   if (P) { L.note = 'An offline game is open in this tab. Reload the page to play online.'; return false; }
   genWorld(); buildTiles(); buildMini(); resize();
@@ -321,11 +322,14 @@ function owEnter(L, w) {
   if (w.clock && Number.isFinite(w.clock.hour)) { WS.clock.setDayMinutes(GT, w.clock.dayMinutes || SIM.CLOCK.dayMinutes); WS.clock.setHour(GT, w.clock.hour); }   // the server's time of day (Server Creatures v1)
   ecoSpecies();   // the wildlife species the server may send (deer, hare, bear) have their art data
   ents.unshift(P); P.sw = SF.newSwing(); P.movedAt = -99; P.drawn = false;
-  ONW = { L, world, ctx: SF_MOVEMENT.ctxFor(SF, P), ps: { x: you.x, y: you.y, stam: you.stam, sect: you.sect || 0, t: you.t || 0, lastDrain: you.ld ?? -99 }, seq: 0, pending: [], batch: [], wasMoving: false,
+  P.hp = you.hp ?? P.hp; P.ghost = !!you.ghost; P.armed = false;
+  ONW = { L, nid: you.nid, combat: !!(w.authoritative && w.authoritative.combat), world, ctx: Object.assign(SF_MOVEMENT.ctxFor(SF, P), { ghost: !!you.ghost }), ps: { x: you.x, y: you.y, stam: you.stam, sect: you.sect || 0, t: you.t || 0, lastDrain: you.ld ?? -99 }, seq: 0, pending: [], batch: [], wasMoving: false,
     remotes: new Map(), corrections: 0, lastErr: 0, acked: you.ack, notice: w.notice, viewRadius: w.world.viewRadius };
   $('#cc').hidden = true; document.body.classList.add('online'); owBar(); STEPPER.reset();
-  log(w.authoritative && w.authoritative.creatures ? 'Welcome to Anniabreen, online. The server decides where everyone walks and what the wildlife does. Combat, items and trading are not online yet: creatures may stalk you, but cannot attack.' : 'Welcome to Anniabreen, online. Walking is decided by the server; creatures, combat, items and trading are not online yet.', '#ffe08a');
-  log('Left stick or WASD moves; Sprint runs. Leave from the online bar.', '#b6a68a');
+  log(w.authoritative && w.authoritative.combat ? 'Welcome to Anniabreen, online. The server decides where everyone walks, what the wildlife does and every blow. Items, loot and trading are not online yet.' : w.authoritative && w.authoritative.creatures ? 'Welcome to Anniabreen, online. The server decides where everyone walks and what the wildlife does. Combat, items and trading are not online yet: creatures may stalk you, but cannot attack.' : 'Welcome to Anniabreen, online. Walking is decided by the server; creatures, combat, items and trading are not online yet.', '#ffe08a');
+  log(ONW.combat ? 'Left stick or WASD moves; Sprint runs. Tap a creature, then Attack (or Space). Leave from the online bar.' : 'Left stick or WASD moves; Sprint runs. Leave from the online bar.', '#b6a68a');
+  if (ONW.combat) document.body.classList.add('online-fight');
+  if (P.ghost) log('You are a ghost. Walk to a shrine to be restored, or use Return to shrine.', '#ffe08a');
   refreshHud(); return true;
 }
 function owResume(w) {   // a reconnect: the server's position replaces the prediction; others are re-announced
@@ -353,7 +357,9 @@ function onlineStep(dt) {
   if (W.batch.length >= 2 || (W.batch.length && !moving)) { owSend('move', { inputs: W.batch }); W.batch = []; }
   P.x = W.ps.x; P.y = W.ps.y; P.sect = W.ps.sect; P.stam = W.ps.stam; P.speed = r.speed;
   if (r.moved > 0) { P.movedAt = GT; try { stepSound(r.moved); } catch (e) { } }
-  const rt = performance.now() - OW_INTERP_MS; for (const e of W.remotes.values()) owInterp(e, rt);
+  const rt = performance.now() - OW_INTERP_MS; for (const e of W.remotes.values()) { owInterp(e, rt); if (e.recUntil && GT > e.recUntil) { e.state = 'idle'; e.recUntil = 0; e.impactT = null; } }
+  if (P.armed || P.sw) try { SF.swingTick(P.sw, GT, P.stam, wDef()); } catch (e) { }
+  if (P.ghost && Math.floor(GT * 2) !== Math.floor((GT - dt) * 2)) { const n = owNearShrine(); if (n !== W.nearShrine) { W.nearShrine = n; owBar(); } }
 }
 function owInterp(e, rt) {
   const b = e.buf; while (b.length > 2 && b[1][0] <= rt) b.shift();
@@ -370,6 +376,7 @@ function owMessage(m) {
     for (const i of W.pending) SF_MOVEMENT.step(W.world, ps, { x: i.x, y: i.y, want: i.w, sprint: i.r }, W.ctx, SF_COLLISION);
     const err = Math.hypot(ps.x - W.ps.x, ps.y - W.ps.y); if (err > 1e-6) { W.corrections++; W.lastErr = err; }
     W.ps = ps; P.x = ps.x; P.y = ps.y; P.stam = ps.stam;
+    if (y.hp !== undefined) owVitals(y);
     for (const mv of p.moves) { const e = W.remotes.get(mv[0]); if (e) e.buf.push([now, mv[1], mv[2], mv[3], mv[4]]); }
   } else if (m.type === 'actor.enter') {
     if (W.remotes.has(p.nid)) return;
@@ -381,8 +388,55 @@ function owMessage(m) {
     const e = { kind: 'remote', id: 'r' + p.nid, nid: p.nid, characterId: p.characterId, name: p.name, title: p.title, look: CR.normalizeLook(p.appearance || {}), equip: Object.assign(emptyEquip(), p.equip || {}),
       x: p.x, y: p.y, sect: p.sect, speed: p.speed, hp: 1, max: 1, buf: [[now, p.x, p.y, p.sect, p.speed]] };
     W.remotes.set(p.nid, e); ents.push(e); owBar();
-  } else if (m.type === 'actor.leave') { const e = W.remotes.get(p.nid); if (e) { W.remotes.delete(p.nid); if (e.kind === 'mon') W.creatures--; rmEnt(e); owBar(); } }
+  } else if (m.type === 'combat') owCombat(p);
+  else if (m.type === 'gain') owGain(p);
+  else if (m.type === 'actor.leave') { const e = W.remotes.get(p.nid); if (e) { W.remotes.delete(p.nid); if (e.kind === 'mon') W.creatures--; rmEnt(e); owBar(); } }
 }
+/* ---------- online combat (Server Combat v1): the server swings and strikes; the client shows what it was told ---------- */
+const owEnt = nid => nid === (ONW && ONW.nid) ? P : ONW && ONW.remotes.get(nid);
+function owVitals(y) {
+  const W = ONW, was = P.ghost; P.hp = y.hp; if (y.hpMax) P.max = y.hpMax; P.ghost = !!y.ghost; P.armed = !!y.armed;
+  if (P.armed && (!P.sel || P.sel.nid !== y.armed)) { const e = W.remotes.get(y.armed); if (e) P.sel = e; }
+  if (P.ghost !== was) { W.ctx = Object.assign(SF_MOVEMENT.ctxFor(SF, P), { ghost: P.ghost }); if (!P.ghost) { P.ghostAt = 0; log('You are restored to life at 25% health.', '#ffe08a'); try { snd('player.revive'); } catch (e) { } } else P.ghostAt = GT; owBar(); refreshHud(); }
+}
+function owCombat(p) {
+  const W = ONW, a = owEnt(p.a), t = owEnt(p.t), me = t === P, mine = a === P;
+  if (p.k === 'refused') { log(p.reason || 'Not now.', '#ffb070'); return; }
+  if (p.k === 'tele' && a && a.kind === 'mon') { a.state = 'tele'; a.st = GT; a.atkSt = GT; a.atkRow = a.sect || 0; a.mode = 'melee'; a.recUntil = GT + (p.dur || .6) + 2; return; }
+  if (p.k === 'hit' || p.k === 'miss' || p.k === 'parry' || p.k === 'whiff') {
+    if (a && a.kind === 'mon') { a.state = 'rec'; a.st = GT; a.impactT = GT; a.recUntil = GT + ((MON[a.type] && MON[a.type].rec) || 1); }
+    else if (mine) { try { playOnce((p.w || 'Unarmed') + '_Attack', 0); P.lunge = .001; P.drawn = true; P.lastCombat = GT; SF.swingSpend(P.sw, GT); snd('swing.' + String(p.w || 'Unarmed').toLowerCase(), { key: 'P' }); } catch (e) { } }
+    else if (a) a.lunge = .001;
+    if (p.k === 'whiff' || !t) return;
+    if (t.kind === 'mon') { if (p.hp !== undefined) t.hp = p.hp; if (p.max) t.max = p.max; if (p.k === 'hit') { t.hitT = GT; floater(t.x, t.y, String(p.dmg), '#ffd27a'); } else floater(t.x, t.y, 'miss', '#c8c8c8'); if (mine) t.nameUntil = GT + 3; }
+    else if (me) { P.lastCombat = GT; if (p.k === 'hit' && p.dmg > 0) { P.hp = p.hp; floater(P.x, P.y, '-' + p.dmg, '#ff6a5a'); try { hurtVoice(.8); } catch (e) { } } else floater(P.x, P.y, p.k === 'parry' ? 'parry' : 'dodge', p.k === 'parry' ? '#cfe8ff' : '#c8c8c8'); refreshHud(); }
+    else if (p.k === 'hit') floater(t.x, t.y, '-' + p.dmg, '#ff9a8a');
+    return;
+  }
+  if (p.k === 'death') {
+    if (me) { P.hp = 0; P.ghost = true; P.armed = false; P.sel = null; P.ghostAt = GT; W.ctx = Object.assign(SF_MOVEMENT.ctxFor(SF, P), { ghost: true }); log(`You have died${p.by ? ' to a ' + p.by : ''}. Online your belongings stay with you. Walk to a shrine to be restored, or use Return to shrine.`, '#ff6a5a'); try { snd('player.death'); } catch (e) { } owBar(); refreshHud(); }
+    else if (t && t.kind === 'mon') { t.hp = 0; if (p.by === W.nid) { log('You have slain the ' + (p.name || t.name) + '.', '#ffe08a'); if (P.sel === t) P.sel = null; P.armed = false; } }
+    else if (t) log(`${p.name || t.name} has died${p.by ? ' to a ' + p.by : ''}.`, '#ffb070');
+    return;
+  }
+  if (p.k === 'res' && t && t !== P) log(`${p.name || t.name} is restored to life.`, '#ffe08a');
+}
+function owGain(p) {
+  const k = p.skill; if (P.skills[k] && Number.isFinite(p.value) && !p.stat) { const d = p.value - P.skills[k].v; P.skills[k].v = p.value; if (d > 0) { log(`${SF.SKILL[k].n} +${f1(d)} (${f1(p.value)})`, '#7fd4ff', 'skill'); if (GT - SND.gainAt > 1.5) { SND.gainAt = GT; try { snd('skill.gain'); } catch (e) { } } } }
+  if (p.stat && Number.isFinite(p.statValue)) { P[p.stat] = p.statValue; log(`Your ${STAT_NAME[p.stat]} rises to ${p.statValue}.`, '#ffe08a', 'skill'); ONW.ctx = Object.assign(SF_MOVEMENT.ctxFor(SF, P), { ghost: P.ghost }); refreshHud(); }
+}
+/* Attack (or Space): arm on the selected creature, else the nearest one in sight; again to stand down. The server decides the rest. */
+function owToggleArm() {
+  if (!ONW || !ONW.combat) return; if (P.ghost) return log('You cannot fight now.', '#ffb070');
+  if (P.armed) { P.armed = false; owSend('target', { nid: null }); log('Attack disarmed.'); refreshHud(); return; }
+  let t = P.sel && P.sel.kind === 'mon' && P.sel.online && ONW.remotes.get(P.sel.nid) === P.sel ? P.sel : null;
+  if (!t) { let bd = 15; for (const e of ONW.remotes.values()) { if (e.kind !== 'mon' || !(e.hp > 0)) continue; const d = dist(e, P); if (d < bd && los(P, e)) { bd = d; t = e; } } }
+  if (!t) return log('No creature in sight to attack.', '#ffb070');
+  P.sel = t; t.nameUntil = GT + 3; P.armed = true; owSend('target', { nid: t.nid }); log('Attack armed on ' + t.name + '.'); refreshHud();
+}
+/* a tap online: select a creature or person under the finger (the offline tap does much more; online only selection exists) */
+const owNearShrine = () => SHRINES.some(z => Math.hypot(z.x + .5 - P.x, z.y + .5 - P.y) <= 2.5);   // the server's reach (world.ts COMBAT.shrineReach)
+function owTap(sx, sy) { const w = screenToWorld(sx, sy), hits = hitEnts(w.wx, w.wy).filter(e => e.kind === 'mon' || e.kind === 'remote'); if (!hits.length) return false; P.sel = hits[0]; P.sel.nameUntil = GT + 3; return true; }
 function drawRemote(g, e, x, y) {
   const mv = e.speed > .3, k = mv ? 'Walk' : 'Idle', im = tinted(animSheet(k), e.look, k);
   if (!im) { drawScout(g, e, x, y, e.look); return true; }
@@ -394,7 +448,7 @@ function owBar() {
   if (!ONW) return; let el = $('#owbar');
   if (!el) { el = document.createElement('div'); el.id = 'owbar'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
   const L = ONW.L, st = L.status === 'connected' ? 'Online' : L.status === 'ended' ? 'Disconnected' : 'Reconnecting…';
-  el.innerHTML = `<span class="ondot ${onEsc(L.status)}"></span><b>${st}</b><span class="owalpha">Alpha</span><span>${ONW.remotes.size - (ONW.creatures || 0)} nearby</span>${L.rtt != null ? `<span>${L.rtt} ms</span>` : ''}<button type="button" class="ccb sm" data-ow="leave">Leave world</button>`;
+  el.innerHTML = `<span class="ondot ${onEsc(L.status)}"></span><b>${st}</b><span class="owalpha">Alpha</span><span>${ONW.remotes.size - (ONW.creatures || 0)} nearby</span>${L.rtt != null ? `<span>${L.rtt} ms</span>` : ''}${P && P.ghost ? `<span class="owghost">Ghost</span>${owNearShrine() ? '<button type="button" class="ccb sm pri" data-ow="res-shrine">Restore at shrine</button>' : ''}` : ''}<button type="button" class="ccb sm" data-ow="leave">Leave world</button>`;
 }
 function owEnded(note) {
   if (!ONW) return; owBar(); let el = $('#owend');
@@ -403,12 +457,15 @@ function owEnded(note) {
 }
 function owLeave() { const L = ONW && ONW.L; if (L) { L.stop = true; try { if (L.ws) L.ws.close(1000, 'leave'); } catch (e) { } } location.assign('/?online=roster'); }
 /* online, only walking is live: other keys and HUD actions are held back here, before the offline handlers see them */
-addEventListener('keydown', e => { if (!ONW || e.target.matches('input,select,textarea')) return; if (!OW_KEYS.has(e.key)) { e.stopImmediatePropagation(); } }, true);
+addEventListener('keydown', e => { if (!ONW || e.target.matches('input,select,textarea')) return; if (ONW.combat && OW_KEYS_FIGHT.has(e.key)) { e.stopImmediatePropagation(); e.preventDefault(); if (e.key === ' ' && !e.repeat) owToggleArm(); else if (e.key === 'Escape') { P.sel = null; } return; } if (!OW_KEYS.has(e.key)) { e.stopImmediatePropagation(); } }, true);
 document.addEventListener('click', e => {
-  if (!ONW) return; const ow = e.target.closest('[data-ow]'); if (ow) { e.preventDefault(); e.stopImmediatePropagation(); if (ow.dataset.ow === 'leave') owLeave(); return; }
-  const b = e.target.closest('[data-a]'); if (b && !OW_ACTIONS.has(b.dataset.a)) { e.preventDefault(); e.stopImmediatePropagation(); if (GT - (ONW.heldMsg || -99) > 3) { ONW.heldMsg = GT; log('Not available online yet: only walking is live on the server.', '#ffb070'); } }
+  if (!ONW) return; const ow = e.target.closest('[data-ow]'); if (ow) { e.preventDefault(); e.stopImmediatePropagation(); if (ow.dataset.ow === 'leave') owLeave(); else if (ow.dataset.ow === 'res-shrine') owSend('resurrect', { at: 'shrine' }); else if (ow.dataset.ow === 'res-bound') owSend('resurrect', { at: 'bound' }); return; }
+  const fb = e.target.closest('[data-a]'); if (fb && fb.dataset.a === 'atk' && ONW.combat) { e.preventDefault(); e.stopImmediatePropagation(); owToggleArm(); return; }
+  if (fb && fb.dataset.a === 'desel' && ONW.combat) { e.preventDefault(); e.stopImmediatePropagation(); if (P.armed) owSend('target', { nid: null }); P.sel = null; P.armed = false; refreshHud(); return; }
+  if (fb && fb.dataset.a === 'ghostret' && ONW.combat) { e.preventDefault(); e.stopImmediatePropagation(); owSend('resurrect', { at: 'bound' }); return; }   // the game's ghost panel: the server decides
+  const b = e.target.closest('[data-a]'); if (b && !OW_ACTIONS.has(b.dataset.a)) { e.preventDefault(); e.stopImmediatePropagation(); if (GT - (ONW.heldMsg || -99) > 3) { ONW.heldMsg = GT; log(ONW.combat ? 'Not available online yet: walking and fighting are live on the server.' : 'Not available online yet: only walking is live on the server.', '#ffb070'); } }
 }, true);
 
-const ONLINE = { worldSource: onWorldSource, open: onOpen, html: onHtml, click: onClick, submit: onSubmit, bootFromUrl: onBootFromUrl, create: onCreateFromWizard, leaveWizard: onLeaveWizard, paintLobby: onLobbyPaint, drawPortraits: onDrawPortraits,
-  realm: id => { ON.realm = id; onLoadRoster(); }, get state() { return ON; }, get world() { return ONW; } };
+const ONLINE = { worldSource: onWorldSource, tap: owTap, arm: owToggleArm, open: onOpen, html: onHtml, click: onClick, submit: onSubmit, bootFromUrl: onBootFromUrl, create: onCreateFromWizard, leaveWizard: onLeaveWizard, paintLobby: onLobbyPaint, drawPortraits: onDrawPortraits,
+  realm: id => { ON.realm = id; onLoadRoster(); }, get state() { return ON; }, get world() { return ONW; }, get player() { return ONW ? P : null; } };
 window.__ONLINE = ONLINE;   // test hook (the browser flow suite); not a security boundary — the server checks everything

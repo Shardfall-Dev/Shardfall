@@ -10,8 +10,11 @@
      · senses and choices (every ~0.45 s): sight and hearing by the rules (SIM.senseRange / SIM.detect: darkness, night vision,
        sleep), line of sight on the game's own sight-blocking tiles; timid animals bolt from players who come too close;
        hostile and territorial creatures (SIM factions) notice players and stalk them — chase to striking distance and hold —
-       until the player leaves the pursuit limit, the leash or their sight, then walk home; nobody is attacked: combat is the
-       next server phase, and when it arrives the stalk becomes the game's telegraph and strike;
+       until the player leaves the pursuit limit, the leash or their sight, then walk home;
+     · combat (Server Combat v1, aiMon): at striking distance the stalk becomes the game's telegraph (the species' wind-up time),
+       strike (resolved by server/src/world/combat.ts through the host) and recovery; a struck creature turns on its attacker
+       (timid ones bolt), one with a retreat rule runs when badly hurt, a creature that gets home unhurt for a while heals, and
+       a creature at 0 health dies once and leaves its spawner a vacancy; ghosts are ignored;
      · tiers: only creatures near a player think and move (the cells within ACTIVE_RADIUS of someone); the rest wait unchanged.
    Movement is the game's creature step: the axis-separated slide on the shared collision plus protected ground, with the
    sidestep when blocked, MOVE_SCALE and the game's 8-way facing. Creatures are not saved: a server restart repopulates the world
@@ -27,6 +30,8 @@ import type { Terrain } from './terrain';
 
 export interface Species {
   n: string; size: number; hp: number; speed: number; aggro: number; leash: number; reach?: number;
+  atk?: number; def?: number; dmg?: number[]; tele?: number; rec?: number; armor?: number; ar?: number; str?: number; dex?: number; diff?: number;
+  ward?: number; ranged?: number; keep?: number; aoe?: number;
   f?: string; hours?: string; temper?: string; hear?: number; terr?: number; pur?: number; flight?: number; social?: string; grp?: number[];
   resp?: number; cour?: number; nv?: number; night?: boolean; flee?: number; boss?: boolean;
 }
@@ -46,7 +51,7 @@ export function loadPopulation(repoRoot: string, terrain: Terrain): PopulationDa
 }
 
 /* what the creature system needs from the world loop */
-export interface PlayerView { nid: number; s: { x: number; y: number }; speed: number }
+export interface PlayerView { nid: number; s: { x: number; y: number }; speed: number; ghost: boolean }
 export interface CreatureHost {
   nextNid(): number;
   place(c: Creature): void;
@@ -55,15 +60,19 @@ export interface CreatureHost {
   playerByNid(nid: number): PlayerView | null;
   creaturesNear(realmId: string, x: number, y: number, r: number, fn: (c: Creature) => void): void;
   activeCreatures(realmId: string, r: number, fn: (c: Creature) => void): void;
+  /* combat: a creature's blow lands on a character (resolved by the world with the shared rules); events go to those in view */
+  creatureStrikes(c: Creature, playerNid: number): void;
+  event(realmId: string, x: number, y: number, payload: object): void;
 }
 
-export type CreatureState = 'idle' | 'stalk' | 'flee' | 'return';
+export type CreatureState = 'idle' | 'stalk' | 'tele' | 'rec' | 'flee' | 'return';
 export interface Creature {
   kind: 'creature'; nid: number; realmId: string; type: string; sp: Spawner; d: Species;
   s: { x: number; y: number; sect: number }; home: { x: number; y: number };
   hp: number; max: number; speed: number; changed: boolean; cell: number;
   state: CreatureState; act: string; target: number; threat: number; fleeUntil: number; fleeT0: number;
   wx: number; wy: number; wt: number; wStuck: number; thinkAt: number; leader: Creature | null; seenAt: number; why: string;
+  st: number; lastHurt: number; ward: number; fleeDone: boolean; dead: boolean;
 }
 interface Spawner extends SpawnerDef { n: number; next: number }
 
@@ -87,12 +96,14 @@ const isNight = (period: string) => period === 'night' || period === 'deepnight'
 
 export class Population {
   readonly creatures = new Set<Creature>();
+  readonly byNid = new Map<number, Creature>();
   readonly spawners: Spawner[];
   private rng: () => number;
   private factions: SimFactions;
   private t = 0;           // simulation seconds since this population started
   private ticks = 0;
-  stats = { spawned: 0, sunk: 0, active: 0, thinks: 0, stalking: 0, fleeing: 0 };
+  stats = { spawned: 0, sunk: 0, active: 0, thinks: 0, stalking: 0, fleeing: 0, strikes: 0, killed: 0 };
+  get now() { return this.t; }
 
   constructor(readonly realmId: string, private terrain: Terrain, private data: PopulationData, private SIM: SimApi, private clock: Clock, private host: CreatureHost, seed = 1999) {
     this.rng = SIM.stream(seed, 'creatures:' + realmId);
@@ -164,9 +175,10 @@ export class Population {
         const px = x + i * .8, py = y + i * .5, ok = this.stand(px, py);
         const c: Creature = { kind: 'creature', nid: this.host.nextNid(), realmId: this.realmId, type: s.type, sp: s, d,
           s: { x: ok ? px : x, y: ok ? py : y, sect: Math.floor(this.rng() * 8) }, home: { x, y }, hp: d.hp, max: d.hp, speed: 0, changed: true, cell: -1,
-          state: 'idle', act: 'idle', target: 0, threat: 0, fleeUntil: 0, fleeT0: 0, wx: x, wy: y, wt: 0, wStuck: 0, thinkAt: 0, leader, seenAt: -99, why: '' };
+          state: 'idle', act: 'idle', target: 0, threat: 0, fleeUntil: 0, fleeT0: 0, wx: x, wy: y, wt: 0, wStuck: 0, thinkAt: 0, leader, seenAt: -99, why: '',
+          st: 0, lastHurt: -99, ward: d.ward || 0, fleeDone: false, dead: false };
         if (!leader && n > 1) leader = c;
-        this.creatures.add(c); this.host.place(c); s.n++; this.stats.spawned++;
+        this.creatures.add(c); this.byNid.set(c.nid, c); this.host.place(c); s.n++; this.stats.spawned++;
       }
     }
   }
@@ -174,13 +186,13 @@ export class Population {
   spawnAt(key: string, x: number, y: number): Creature | null {
     const s = this.spawners.find(o => o.key === key); if (!s || !this.stand(x, y)) return null; const d = this.data.species[s.type];
     const c: Creature = { kind: 'creature', nid: this.host.nextNid(), realmId: this.realmId, type: s.type, sp: s, d, s: { x, y, sect: 0 }, home: { x, y }, hp: d.hp, max: d.hp, speed: 0, changed: true, cell: -1,
-      state: 'idle', act: 'idle', target: 0, threat: 0, fleeUntil: 0, fleeT0: 0, wx: x, wy: y, wt: 0, wStuck: 0, thinkAt: 0, leader: null, seenAt: -99, why: '' };
-    this.creatures.add(c); this.host.place(c); s.n++; return c;
+      state: 'idle', act: 'idle', target: 0, threat: 0, fleeUntil: 0, fleeT0: 0, wx: x, wy: y, wt: 0, wStuck: 0, thinkAt: 0, leader: null, seenAt: -99, why: '', st: 0, lastHurt: -99, ward: d.ward || 0, fleeDone: false, dead: false };
+    this.creatures.add(c); this.byNid.set(c.nid, c); this.host.place(c); s.n++; return c;
   }
   clear() { for (const c of [...this.creatures]) this.remove(c); }
   /* boot: fill every spawner (the game's boot fill), a few passes so packs and crowded spawners settle */
   fill() { for (let k = 0; k < 4; k++) this.spawnTick(true); }
-  private remove(c: Creature) { this.creatures.delete(c); c.sp.n--; this.host.unplace(c); for (const o of this.creatures) if (o.leader === c) o.leader = null; }
+  private remove(c: Creature) { this.creatures.delete(c); this.byNid.delete(c.nid); c.sp.n--; this.host.unplace(c); for (const o of this.creatures) if (o.leader === c) o.leader = null; }
   /* at dawn the extra dead that rose for the night sink, out of everyone's sight (ecoSinkTick) */
   private sinkTick() {
     if (isNight(this.clock.period())) return;
@@ -225,8 +237,9 @@ export class Population {
     const ctx = { dark, activity: act, alert: this.t - c.seenAt < 8 };
     const rng = this.SIM.senseRange(sense, ctx); const reach = Math.max(rng.sight, rng.hear, d.flight || 0) + .5;
     const enemy = this.enemyOfPlayers(d); let fleeFrom: PlayerView | null = null, fleeD = Infinity, chase: PlayerView | null = null, chaseD = Infinity;
+    if (c.state === 'tele' || c.state === 'rec') return;   // an attack in progress runs its course
     this.host.playersNear(this.realmId, c.s.x, c.s.y, reach, p => {
-      const dd = Math.hypot(p.s.x - c.s.x, p.s.y - c.s.y);
+      if (p.ghost) return; const dd = Math.hypot(p.s.x - c.s.x, p.s.y - c.s.y);
       const sensed = this.SIM.detect(sense, ctx, dd, { los: dd <= rng.sight && this.los(c.s.x, c.s.y, p.s.x, p.s.y), moving: p.speed > 1.2, noisy: false, hidden: false });
       if (!sensed) return; c.seenAt = this.t;
       if (d.temper === 'timid' && dd < (d.flight || 6) && dd < fleeD) { fleeFrom = p; fleeD = dd; }
@@ -240,7 +253,7 @@ export class Population {
     const L = c.leader || c;
     for (const o of this.creatures) {
       if (o === c || (o.leader !== L && o !== L)) continue;
-      if (p && o.state !== 'flee') { o.state = 'stalk'; o.target = p.nid; o.why = 'with its pack'; }
+      if (p && o.state !== 'flee' && o.state !== 'tele' && o.state !== 'rec') { o.state = 'stalk'; o.target = p.nid; o.why = 'with its pack'; }
       else if (!p && c.state === 'flee' && o.state === 'idle') { o.state = 'flee'; o.threat = c.threat; o.fleeT0 = this.t; o.fleeUntil = this.t + 5 + this.rng() * 3; o.why = 'its herd bolted'; }
     }
   }
@@ -251,12 +264,29 @@ export class Population {
       case 'stalk': {
         const p = this.host.playerByNid(c.target);
         const pursuit = d.pur || d.leash;
-        if (!p || homeD > pursuit || this.prot(p.s.x, p.s.y)) { c.state = 'return'; c.target = 0; c.why = !p ? 'lost its quarry' : homeD > pursuit ? 'too far from home' : 'its quarry reached safe ground'; break; }
-        const dd = Math.hypot(p.s.x - c.s.x, p.s.y - c.s.y);
+        if (!p || p.ghost || homeD > pursuit || this.prot(p.s.x, p.s.y)) { c.state = 'return'; c.target = 0; c.why = !p ? 'lost its quarry' : p.ghost ? 'its quarry died' : homeD > pursuit ? 'too far from home' : 'its quarry reached safe ground'; break; }
+        const dd = Math.hypot(p.s.x - c.s.x, p.s.y - c.s.y), reach = d.reach || 1.2;
         if (!(dd < d.leash) || !this.los(c.s.x, c.s.y, p.s.x, p.s.y)) { c.state = 'return'; c.target = 0; c.why = 'lost sight'; break; }
-        const hold = (d.reach || 1.2) * .9;
-        if (dd > hold) this.stepTo(c, p.s.x, p.s.y, d.speed); else this.face(c, p.s.x, p.s.y);   // at striking distance: holds and faces (no attack before server combat)
-        c.act = 'stalking'; break;
+        if (d.ranged && d.keep && dd < d.keep - .5) { this.stepTo(c, p.s.x, p.s.y, d.speed, true); c.act = 'keeping its distance'; break; }
+        if (dd <= reach * .92) {   // aiMon: in reach and in sight, the wind-up starts
+          c.state = 'tele'; c.st = this.t; this.face(c, p.s.x, p.s.y); c.act = 'winding up';
+          this.host.event(this.realmId, c.s.x, c.s.y, { k: 'tele', a: c.nid, t: p.nid, dur: d.tele || .6 }); break;
+        }
+        this.stepTo(c, p.s.x, p.s.y, d.speed); c.act = 'chasing'; break;
+      }
+      case 'tele': {
+        const p = this.host.playerByNid(c.target); if (p) this.face(c, p.s.x, p.s.y);
+        if (this.t - c.st >= (d.tele || .6)) {
+          c.state = 'rec'; c.st = this.t; c.act = 'striking';
+          // the blow lands only on a target still alive, in reach (with the game's small grace) and in sight: a sidestep beats it
+          if (p && !p.ghost && Math.hypot(p.s.x - c.s.x, p.s.y - c.s.y) <= (d.reach || 1.2) + .35 && this.los(c.s.x, c.s.y, p.s.x, p.s.y)) { this.stats.strikes++; this.host.creatureStrikes(c, p.nid); }
+          else this.host.event(this.realmId, c.s.x, c.s.y, { k: 'whiff', a: c.nid, t: c.target });
+        }
+        break;
+      }
+      case 'rec': {   // recovery: the species' recover time (a creature fights at its natural stamina, so the stamina term is 1)
+        if (this.t - c.st >= (d.rec || 1.2)) { const p = this.host.playerByNid(c.target); c.state = p && !p.ghost ? 'stalk' : 'return'; if (c.state === 'return') c.target = 0; }
+        c.act = 'recovering'; break;
       }
       case 'flee': {
         const p = this.host.playerByNid(c.threat); const safe = (d.flight || 6) + 6;
@@ -268,7 +298,7 @@ export class Population {
         c.act = 'fleeing'; break;
       }
       case 'return': {
-        if (homeD < 1.2) { c.state = 'idle'; c.act = 'idle'; c.why = ''; break; }
+        if (homeD < 1.2) { c.state = 'idle'; c.act = 'idle'; c.why = ''; c.fleeDone = false; if (this.t - c.lastHurt > 8) { c.hp = c.max; c.ward = c.d.ward || 0; } break; }
         const x0 = c.s.x, y0 = c.s.y; this.stepTo(c, c.home.x, c.home.y, d.speed);
         if (Math.hypot(c.s.x - x0, c.s.y - y0) < .002) { c.wStuck += STEP; if (c.wStuck > 4) { c.home = { x: c.s.x, y: c.s.y }; c.wStuck = 0; } }   // cannot get home from here: this is home now
         c.act = 'returning'; break;
@@ -296,5 +326,22 @@ export class Population {
     else c.act = act === 'active' ? 'idle' : 'resting';
   }
 
+  /* damage from a character's blow (game.js damageMon / killMon / provoke / ecoHurt). Returns true when it killed the creature. */
+  hurt(c: Creature, dmg: number, from: PlayerView): boolean {
+    if (c.dead) return false; c.lastHurt = this.t; c.seenAt = this.t;
+    c.hp -= dmg;
+    if (c.hp <= 0) { c.hp = 0; c.dead = true; this.stats.killed++; this.remove(c); return true; }   // dies once; the spawner refills at its pace
+    const d = c.d;
+    if (d.temper === 'timid' || (d.flee && c.hp / c.max < d.flee && !c.fleeDone)) {   // prey bolts; a creature with a retreat rule runs when badly hurt
+      if (c.state === 'tele') return false;
+      if (d.temper !== 'timid') c.fleeDone = true;
+      if (c.state !== 'flee') { c.fleeT0 = this.t; c.fleeUntil = this.t + 5 + this.rng() * 3; }
+      c.state = 'flee'; c.threat = from.nid; c.target = 0; c.why = d.temper === 'timid' ? 'hurt and frightened' : 'badly wounded (' + Math.round(c.hp / c.max * 100) + '%)'; return false;
+    }
+    if (c.state !== 'tele' && c.state !== 'rec') { c.state = 'stalk'; c.target = from.nid; c.why = 'attacked'; this.callPack(c, from); }
+    else if (!c.target) c.target = from.nid;
+    return false;
+  }
+  rand() { return this.rng(); }
   count() { let stalking = 0, fleeing = 0; for (const c of this.creatures) { if (c.state === 'stalk') stalking++; else if (c.state === 'flee') fleeing++; } this.stats.stalking = stalking; this.stats.fleeing = fleeing; return this.creatures.size; }
 }

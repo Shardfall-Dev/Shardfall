@@ -98,17 +98,17 @@ test('a timid hare bolts from a player who comes close, then calms down and goes
   assert.equal(hare.state, 'idle'); assert.ok(Math.hypot(hare.s.x - o.x, hare.s.y - o.y) < 1.3, 'back home');
 });
 
-test('a hostile hound stalks a player it sees, holds at striking distance without attacking, and gives up past its leash', () => {
+test('a hostile hound stalks a player it sees, closes to striking distance, and gives up past its leash (a world without combat: its blows land on nobody)', () => {
   const { w } = world(20); const o = openPatch(w, 14); const a = join(w, 'Prey', o.x + 6, o.y); const p = pop(w); p.clear();
   const hound = p.spawnAt(keyOf('hound'), o.x, o.y)!; const d = DATA.species.hound;
   for (let i = 0; i < 80; i++) w.step();
-  assert.equal(hound.state, 'stalk', hound.why); assert.equal(hound.target, a.nid);
+  assert.ok(['stalk', 'tele', 'rec'].includes(hound.state), hound.state + ': ' + hound.why); assert.equal(hound.target, a.nid);
   assert.ok(dist(hound, a) <= (d.reach || 1.2) * .9 + .2, 'closed to striking distance: ' + dist(hound, a).toFixed(2));
   for (let i = 0; i < 40; i++) w.step(); assert.ok(dist(hound, a) >= .5, 'holds, does not walk through the player');
   assert.equal(hound.hp, hound.max);
   // the player walks away: past the leash the hound turns back for home
-  let s = 0; for (let i = 0; i < 1600 && hound.state === 'stalk'; i++) { if (i % 1 === 0) w.input('Prey', [{ s: s++, x: 1, y: 0, w: 1, r: true }]); w.step(); }
-  assert.notEqual(hound.state, 'stalk', 'gave up'); assert.ok(Math.hypot(hound.s.x - o.x, hound.s.y - o.y) <= (d.pur || d.leash) + 1, 'never farther from home than its pursuit limit');
+  let s = 0; for (let i = 0; i < 1600 && ['stalk', 'tele', 'rec'].includes(hound.state); i++) { if (i % 1 === 0) w.input('Prey', [{ s: s++, x: 1, y: 0, w: 1, r: true }]); w.step(); }
+  assert.ok(!['stalk', 'tele', 'rec'].includes(hound.state), 'gave up'); assert.ok(Math.hypot(hound.s.x - o.x, hound.s.y - o.y) <= (d.pur || d.leash) + 1, 'never farther from home than its pursuit limit');
 });
 
 test('protected ground is safe: a player standing in town is never stalked, and a creature never follows onto it', () => {

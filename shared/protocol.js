@@ -15,14 +15,19 @@
    v3 (Server Creatures v1): creatures live on the server and share the interest grid. actor.enter carries kind: 'player'
    (a character, as in v2) or 'creature' ({ nid, type, name, x, y, sect, speed, hp, max }); creatures move in state like
    characters and leave with actor.leave. welcome carries the world clock ({ hour, dayMinutes, period }). Clients still send
-   only hello, ping, resync and move. */
+   only hello, ping, resync and move.
+   v4 (Server Combat v1): fights are the server's. A client may arm on a creature (target { nid }) or stand down (target
+   { nid: null }), and as a ghost ask to be restored (resurrect { at: 'shrine' | 'bound' }); it never sends a swing, a hit or
+   damage. The server swings when the timer, reach and sight allow and tells everyone in view what happened (combat
+   { k: 'tele' | 'hit' | 'miss' | 'parry' | 'whiff' | 'death' | 'res' | 'refused', a, t, dmg, hp, … }); you learn what you
+   learned (gain { skill, value, stat?, statValue? }); state.you carries hp, hpMax, ghost and armed. */
 (function (root, factory) {
   const P = factory();
   if (typeof module !== 'undefined' && module.exports) module.exports = P; else root.SF_PROTOCOL = P;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
   const P = {};
-  P.PROTOCOL_VERSION = 3;
+  P.PROTOCOL_VERSION = 4;
   P.MAX_MESSAGE_BYTES = 16 * 1024;     // a single frame, client → server
   P.TICK_MS = 50;                      // the server tick: the same 50 ms fixed step as the game's world simulation (src/world.js)
   P.HEARTBEAT_MS = 15000;              // the server pings; a connection that misses two heartbeats is closed
@@ -33,8 +38,8 @@
   P.CLOSE = { NORMAL: 1000, GOING_AWAY: 1001, POLICY: 1008, TOO_BIG: 1009, TRY_LATER: 1013,
     UNAUTHORIZED: 4001, FORBIDDEN: 4003, TAKEN_OVER: 4004, PROTOCOL: 4005, RATE_LIMIT: 4008, SESSION_ENDED: 4010 };
 
-  P.CLIENT = ['hello', 'ping', 'resync', 'move'];
-  P.SERVER = ['welcome', 'snapshot', 'presence.join', 'presence.leave', 'pong', 'error', 'kicked', 'state', 'actor.enter', 'actor.leave'];
+  P.CLIENT = ['hello', 'ping', 'resync', 'move', 'target', 'resurrect'];
+  P.SERVER = ['welcome', 'snapshot', 'presence.join', 'presence.leave', 'pong', 'error', 'kicked', 'state', 'actor.enter', 'actor.leave', 'combat', 'gain'];
   P.RESERVED = ['teleport', 'position', 'attack', 'cast', 'use', 'equip', 'unequip', 'pickup', 'drop', 'trade', 'gold', 'skill', 'stat', 'inventory', 'damage', 'craft', 'loot', 'say'];
 
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -49,6 +54,8 @@
       : has(p, 'lastSeq') && !(Number.isSafeInteger(p.lastSeq) && p.lastSeq >= 0) ? 'lastSeq must be a whole number' : null,
     ping: p => !onlyKeys(p, ['t']) ? 'unexpected field' : has(p, 't') && !(typeof p.t === 'number' && Number.isFinite(p.t)) ? 't must be a number' : null,
     resync: p => !onlyKeys(p, []) ? 'unexpected field' : null,
+    target: p => !onlyKeys(p, ['nid']) || !has(p, 'nid') ? 'nid required' : p.nid === null || (Number.isSafeInteger(p.nid) && p.nid > 0) ? null : 'nid must be a positive whole number or null',
+    resurrect: p => !onlyKeys(p, ['at']) || (p.at !== 'shrine' && p.at !== 'bound') ? "at must be 'shrine' or 'bound'" : null,
     move: p => {
       if (!onlyKeys(p, ['inputs']) || !Array.isArray(p.inputs)) return 'inputs must be an array';
       if (p.inputs.length < 1 || p.inputs.length > P.MAX_INPUTS) return 'between 1 and ' + P.MAX_INPUTS + ' inputs';

@@ -7,13 +7,13 @@ import { audit } from '../auth/sessions';
 import { fail } from '../auth/guard';
 import type { RulesApi } from '../../../shared/game-rules-adapter';
 
-export const CHAR_COLUMNS = `id, realm_id, name, body, appearance, str, dex, int, stat_locks, skills, skill_pool, template, starting_town, bound_shrine,
+export const CHAR_COLUMNS = `id, realm_id, name, body, appearance, str, dex, int, stat_locks, skills, skill_pool, template, starting_town, bound_shrine, ghost,
   hp, stam, mana, position, hotbar, rules_version, state_version, created_at, updated_at, last_played_at, deleted_at, purge_after`;
 
 export function publicCharacter(r: any, rules: RulesApi, items?: any[]) {
   const out: any = { id: r.id, realmId: r.realm_id, name: r.name, body: r.body, appearance: r.appearance, stats: { str: r.str, dex: r.dex, int: r.int },
     statLocks: r.stat_locks, skills: r.skills, skillPool: r.skill_pool, template: r.template, startingTown: r.starting_town, startingTownName: rules.townName(r.starting_town),
-    boundShrine: r.bound_shrine, vitals: { hp: r.hp, stam: r.stam, mana: r.mana }, position: r.position, hotbar: r.hotbar, rulesVersion: r.rules_version, stateVersion: r.state_version,
+    boundShrine: r.bound_shrine, vitals: { hp: r.hp, stam: r.stam, mana: r.mana }, ghost: !!r.ghost, position: r.position, hotbar: r.hotbar, rulesVersion: r.rules_version, stateVersion: r.state_version,
     title: rules.title({ skills: r.skills }), createdAt: r.created_at, lastPlayedAt: r.last_played_at, deletedAt: r.deleted_at, purgeAfter: r.purge_after };
   if (items) out.items = items.map(i => ({ id: i.id, container: i.container, slot: i.slot, position: i.position, itemDef: i.item_def, name: rules.itemName(i.item_def), qty: i.qty, props: i.props, stateVersion: i.state_version }));
   return out;
@@ -123,8 +123,16 @@ export class Characters {
   }
 
   /* save where characters are (the world loop's dirty list): one statement for the batch, live characters only */
-  async savePositions(list: { id: string; x: number; y: number; sect: number; town: string; stam: number }[]) {
+  async savePositions(list: { id: string; x: number; y: number; sect: number; town: string; stam: number; combat?: { hp: number; mana: number; ghost: boolean; skills: any; str: number; dex: number; int: number } }[]) {
     if (!list.length) return 0;
+    const fought = list.filter(a => a.combat);
+    if (fought.length) {   // Server Combat v1: health, mana, death and what the fights taught (one statement for the batch)
+      await this.db.query(`update game.characters c set hp = v.hp, mana = v.mana, ghost = v.ghost, skills = v.skills, str = v.str, dex = v.dex, int = v.int, updated_at = now()
+        from (select unnest($1::uuid[]) as id, unnest($2::int[]) as hp, unnest($3::int[]) as mana, unnest($4::boolean[]) as ghost, unnest($5::jsonb[]) as skills,
+          unnest($6::smallint[]) as str, unnest($7::smallint[]) as dex, unnest($8::smallint[]) as int) v where c.id = v.id and c.deleted_at is null`,
+        [fought.map(a => a.id), fought.map(a => Math.max(0, a.combat!.hp)), fought.map(a => Math.max(0, a.combat!.mana)), fought.map(a => a.combat!.ghost), fought.map(a => JSON.stringify(a.combat!.skills)),
+          fought.map(a => a.combat!.str), fought.map(a => a.combat!.dex), fought.map(a => a.combat!.int)]);
+    }
     const r = await this.db.query(`update game.characters c set position = v.position, stam = v.stam, updated_at = now(), state_version = c.state_version + 1
       from (select unnest($1::uuid[]) as id, unnest($2::jsonb[]) as position, unnest($3::int[]) as stam) v where c.id = v.id and c.deleted_at is null`,
       [list.map(a => a.id), list.map(a => JSON.stringify({ map: 'anniabreen', town: a.town, x: Math.round(a.x * 1000) / 1000, y: Math.round(a.y * 1000) / 1000, sect: a.sect })), list.map(a => Math.max(0, Math.round(a.stam)))]);
