@@ -1,0 +1,35 @@
+{
+  "name": "shardfall-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shardfall game server: accounts (Supabase Auth), online character roster and the realtime gateway. The browser game itself is built by build.sh.",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22.12 <25"
+  },
+  "scripts": {
+    "dev": "node --import tsx --watch server/src/index.ts",
+    "start": "node --import tsx server/src/index.ts",
+    "typecheck": "tsc -p server/tsconfig.json",
+    "migrate": "node --import tsx server/src/db/migrate.ts",
+    "test:unit": "node --import tsx --test tests/server/unit/*.test.ts",
+    "test:server": "node --import tsx --test --test-concurrency=1 tests/server/*.test.ts",
+    "test": "npm run test:unit && npm run test:server"
+  },
+  "dependencies": {
+    "@fastify/cookie": "11.0.2",
+    "@fastify/rate-limit": "10.3.0",
+    "@fastify/static": "8.2.0",
+    "@fastify/websocket": "11.2.0",
+    "fastify": "5.8.5",
+    "pg": "8.16.3",
+    "tsx": "4.23.12",
+    "ws": "8.21.3"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.30",
+    "@types/pg": "8.15.5",
+    "@types/ws": "8.18.1",
+    "typescript": "5.9.3"
+  }
+}

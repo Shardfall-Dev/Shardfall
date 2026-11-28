@@ -4,3 +4,7 @@ node_modules/
 .sfx_embed.tmp
 Shardfall_v*_offline.html
 _site/
+.env
+.env.*
+!.env.example
+server/dist/
