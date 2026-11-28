@@ -10,7 +10,7 @@ export declare const CLOSE: { NORMAL: number; GOING_AWAY: number; POLICY: number
 export declare const CLIENT: string[];
 export declare const SERVER: string[];
 export declare const RESERVED: string[];
-export interface ClientMessage { type: 'hello' | 'ping' | 'resync' | 'move'; id?: string; p: Record<string, any> }
+export interface ClientMessage { type: 'hello' | 'ping' | 'resync' | 'move' | 'target' | 'resurrect'; id?: string; p: Record<string, any> }
 export declare function isUuid(s: unknown): s is string;
 export declare function parseClient(text: unknown): { ok: true; msg: ClientMessage } | { ok: false; code: string; message: string; id?: string };
 export declare function parseServer(text: string): { ok: true; msg: any } | { ok: false; code: string };

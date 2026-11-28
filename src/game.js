@@ -2938,7 +2938,8 @@ function screenToWorld(sx, sy) { const wx = sx * CAM.f + CAM.x, wy = sy * CAM.f 
 function hitEnts(wx, wy) { const out = []; for (const e of ents) { if (e === P || e.gone || e.hidden) continue; const X = SX(e.x, e.y), Y = SY(e.x, e.y); const h = e.kind === 'corpse' ? 0 : e.type && MON[e.type] ? MON[e.type].h : 66; const cy = Y - h * .5, r = e.kind === 'corpse' ? 16 : Math.max(18, h * .55); const d = Math.hypot(wx - X, wy - cy); if (d < r) out.push({ e, d: d + (e.kind === 'corpse' ? 12 : 0) }); } return out.sort((a, b) => a.d - b.d).map(o => o.e); }
 function tallAt(wx, wy) { const fx = (wx / HW + wy / HH) / 2, fy = (wy / HH - wx / HW) / 2; for (let k = 3; k >= 0; k--) { const x0 = Math.floor(fx) + k, y0 = Math.floor(fy) + k; for (const [ax, ay] of [[x0, y0], [x0 + 1, y0], [x0, y0 + 1]]) { const t = tAt(ax, ay); const hh = { [T.TR]: 80, [T.RK]: 46, [T.RB]: 30 }[t]; if (!hh) continue; const cx = SX(ax + .5, ay + .5), cy = SY(ax + .5, ay + .5); if (Math.abs(wx - cx) < HW * .8 && wy > cy - hh && wy < cy + HH * .7) return { x: ax, y: ay }; } } return null; }
 function tapWorld(sx, sy) {
-  if (!P || ONW) return; const w = screenToWorld(sx, sy);
+  if (ONW) { if (P) owTap(sx, sy); return; }   // online: selection only (src/online.js)
+  if (!P) return; const w = screenToWorld(sx, sy);
   if (AIM) { const pt = { x: w.x, y: w.y }; if (Math.hypot(pt.x - P.x, pt.y - P.y) > AIM.range) return log('Out of range.', '#ffb070'); return AIM.fn(pt); }
   if (P.ghost) return;
   const hits = hitEnts(w.wx, w.wy);

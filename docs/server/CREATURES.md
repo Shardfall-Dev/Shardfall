@@ -91,5 +91,6 @@ brings v3. `WORLD_CREATURES=false` turns creatures off (diagnosis only); the wel
 
 - **Next: combat.** The stalk becomes the game's telegraph → strike → recover against players (`aiMon`), with health, damage,
   death and corpses on the server, then players attacking creatures (server-validated swings and spells), then loot and items.
+  Combat arrived in v0.42: [COMBAT.md](COMBAT.md).
 - NPCs (townsfolk, guards, merchants, adventurers) come after combat, on the same population and interest machinery.
 - One server process: creatures, presence and the world live in memory.
