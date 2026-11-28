@@ -275,9 +275,10 @@ function lifeDev() {
    Positions are not saved: a load places everyone where the clock says (lifeResume). */
 function lifeSave() {
   const npcs = {}; for (const e of LIFE.npcs) { if (!e.actorId || e.gone) continue; const L = e.life; npcs[e.actorId] = { needs: L.needs, mem: L.mem.save(), carry: L.carry || 0, gold: L.gold ?? null }; const f = npcSave(e); if (f) npcs[e.actorId].fight = f; }
-  const t = LIFE.trader && LIFE.trader.life; return { v: 1, npcs, stock: LIFE.stock, trader: t ? { town: t.town, legs: t.legs, gold: t.gold } : null };
+  const t = LIFE.trader && LIFE.trader.life; return { v: 1, npcs, stock: LIFE.stock, trader: t ? { town: t.town, legs: t.legs, gold: t.gold } : null, law: lawSave() };   // law: v0.34, additive
 }
 function lifeLoad(saved) {
+  lawLoad(saved && saved.law);   // a new character starts with a clean record
   if (!saved || !saved.npcs) return;
   for (const e of LIFE.npcs) { const r = e.actorId && saved.npcs[e.actorId]; if (!r) continue; const L = e.life; L.needs = SIM.newNeeds(r.needs); L.mem = SIM.newMemory(8, r.mem); if (r.carry !== undefined) L.carry = r.carry; if (r.gold !== null && r.gold !== undefined) L.gold = r.gold; if (r.fight) npcLoad(e, r.fight); }
   if (saved.stock) for (const k in saved.stock) LIFE.stock[k] = Object.assign(LIFE.stock[k] || {}, saved.stock[k]);

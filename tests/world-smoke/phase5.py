@@ -1,8 +1,8 @@
 # Living World phase 5, step 1 in the built game (Playwright + Chrome): NPCs as combatants.
 # Every townsperson with a life gets a fighting profile; creatures target townsfolk outside protected ground through the shared
 # resolver; inside protected ground nobody is targetable; guards leave their patrol to fight a creature attacking someone in their
-# jurisdiction, and go back; a townsperson at 0 health is knocked down once (not killed) and gets up later; you cannot hurt
-# townsfolk yet; health and knock-downs survive a reload; NPC gear never touches the player's uid counter; a seeded day of fights.
+# jurisdiction, and go back; a townsperson at 0 health is knocked down once (not killed) and gets up later; your blows reach
+# townsfolk (v0.34; the law is in phase5_law.py); health and knock-downs survive a reload; NPC gear never touches the player's uid counter; a seeded day of fights.
 # usage: python3 tests/world-smoke/phase5.py Shardfall_v0.30.html [/path/to/chrome]   (also run by world-smoke/run.py)
 import sys, json, os
 from playwright.sync_api import sync_playwright
@@ -91,7 +91,7 @@ with sync_playwright() as p:
     const st = { down: !!e.downed, hp: e.hp, mTarget: m.target === e, targetable: S.ecoTargetable(m, e), alive: !e.gone };
     T.run(S.NPC_DOWN_TIME - 5); const still = !!e.downed; T.run(7); [u1, u2].forEach(u => u && u());
     return { playerHit, st, kills: kills.length, downs, still, up: !e.downed, hp: [e.hp, e.max], downsN: S.NPCF.downs }; }""")
-  check(r['playerHit'] == 0, 'you cannot hurt a townsperson yet (law and criminal flags come next)', r)
+  check(r['playerHit'] == 5, 'since v0.34 your blows reach a townsperson (the law that follows is tested in phase5_law.py)', r)
   check(r['st']['down'] and r['st']['hp'] == 0 and not r['st']['mTarget'] and r['st']['targetable'] is False and r['st']['alive'] and r['kills'] == 0 and r['downs'] == ['downed'], 'at 0 health a townsperson is knocked down exactly once (no death, no ActorKilled); the creature loses interest', r)
   check(r['still'] and r['up'] and round(r['hp'][1] / 3) <= r['hp'][0] < round(r['hp'][1] / 3) + 3, f"he stays down for the down time, then gets up with a third of his health ({round(r['hp'][0])}/{r['hp'][1]} two seconds later)", r)
 

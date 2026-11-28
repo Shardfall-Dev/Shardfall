@@ -69,7 +69,7 @@ SIM.newRegistry = newRegistry;
    without bound. Movement is transient: it is never kept. */
 SIM.EVENT_TYPES = ['ActorSpawned', 'ActorRemoved', 'ActorMoved', 'ActorDamaged', 'ActorHealed', 'ActorKilled', 'CombatStarted', 'CombatEnded',
   'ItemTransferred', 'ItemCrafted', 'CrimeCommitted', 'CrimeWitnessed', 'ResourceGathered', 'MerchantArrived', 'CampCleared', 'PopulationReplenished', 'AppearanceChanged',
-  'StatChanged', 'CharacterCreated'];   // AppearanceChanged: v0.25 equipment, for the future layered sprites; StatChanged, CharacterCreated: v0.30 natural attributes and creation
+  'StatChanged', 'CharacterCreated', 'AggressionRecorded', 'MurderReported', 'NotorietyChanged'];   // the last three: v0.34 law (phase 5 step 2); AppearanceChanged: v0.25 equipment, for the future layered sprites; StatChanged, CharacterCreated: v0.30 natural attributes and creation
 SIM.TRANSIENT = { ActorMoved: 1 };
 function newBus(opt) {
   opt = opt || {}; const cap = opt.cap || 256, clock = opt.clock || (() => 0), known = new Set(SIM.EVENT_TYPES);
@@ -421,6 +421,68 @@ SIM.newMemory = (cap, saved) => {
       const r = { t, what, who: who || null, where: where || null }; list.push(r); if (list.length > cap) list.shift(); return r; },
     recent: k => list.slice(-(k || cap)), knows: (what, who) => list.some(r => r.what === what && (!who || r.who === who)),
     save: () => list.map(r => Object.assign({}, r)), get size() { return list.length; } };
+};
+
+/* ================= Phase 5 step 2: law — notoriety, aggression, criminal flags and murder counts (master spec §19) =================
+   Pure and deterministic: actors are ids, time is simulation seconds (it only runs while the game runs, so "active time").
+   · Notoriety: innocent (blue), criminal (grey, a timed flag), murderer (red: `red` or more long-term counts). Wildlife and
+     monsters have no notoriety at all (SIM.hasComponent(…, 'notoriety')); the game never asks for one.
+   · Aggression records { attacker, victim, owner, victimOwner, t, region, lawful, selfDefence, expires }. Attacking an innocent is lawful only
+     with a right over them: they attacked you (or your pet / summon) first and that record has not expired. Attacking a
+     criminal or a murderer is always lawful. A pet's or summon's attack is the owner's responsibility.
+   · An unlawful attack, a theft or another crime sets the criminal flag on the responsible actor for `criminal` seconds.
+   · A murder (an innocent killed by someone with no right over them) adds one count to the killer, once per victim death
+     (the caller names the death with a key). Each count stays short-term for `shortDecay` and long-term for `longDecay`. */
+SIM.LAW_DEFAULTS = { criminal: 120, aggression: 120, shortDecay: 8 * 3600, longDecay: 40 * 3600, red: 5, maxRecords: 96, maxDeaths: 256 };
+SIM.NOTORIETY = { innocent: 'blue', criminal: 'grey', murderer: 'red', ally: 'green', enemy: 'orange' };
+SIM.newLaw = (saved, cfg) => {
+  const C = Object.assign({}, SIM.LAW_DEFAULTS, cfg || {}); saved = saved || {};
+  let recs = (saved.recs || []).map(r => Object.assign({}, r)); const flags = Object.assign({}, saved.flags || {}), counts = {}, deaths = (saved.deaths || []).slice(-C.maxDeaths);
+  for (const k in saved.counts || {}) counts[k] = saved.counts[k].filter(Number.isFinite).slice(-64);
+  const stats = Object.assign({ aggressions: 0, unlawful: 0, crimes: 0, murders: 0, reports: 0 }, saved.stats || {});
+  const fin = v => Number.isFinite(v) ? v : 0;
+  const L = {
+    cfg: C, stats,
+    flagged: (id, t) => fin(flags[id]) > t,
+    flagLeft: (id, t) => Math.max(0, fin(flags[id]) - t),
+    counts(id, t) { const c = counts[id] || []; return { short: c.filter(x => t - x < C.shortDecay).length, long: c.filter(x => t - x < C.longDecay).length }; },
+    notoriety(id, t) { if (L.counts(id, t).long >= C.red) return 'murderer'; return L.flagged(id, t) ? 'criminal' : 'innocent'; },
+    /* does `a` have a right over `v` right now? (v attacked a, or a's pet or summon, and that record has not expired) */
+    rights(a, v, t) { return recs.some(r => (r.attacker === v || r.owner === v) && (r.victim === a || r.victimOwner === a) && t < r.expires); },
+    lawfulAttack(a, v, t, owner) { const who = owner || a; return L.notoriety(v, t) !== 'innocent' || L.rights(who, v, t) || (!!owner && L.rights(a, v, t)); },
+    /* record an attack; o: { owner, victimOwner, region, human } — human:false (a creature) is never a crime. Returns { rec, crime, fresh }. */
+    aggress(a, v, t, o) {
+      o = o || {}; if (!a || !v || a === v) return null; const owner = o.owner && o.owner !== a ? o.owner : null, who = owner || a;
+      const lawful = o.human === false || L.lawfulAttack(a, v, t, owner), selfDefence = o.human !== false && L.rights(who, v, t);
+      let rec = recs.find(r => r.attacker === a && r.victim === v && t < r.expires), fresh = !rec;
+      if (rec) { rec.expires = t + C.aggression; rec.t = t; if (!lawful && rec.lawful) { rec.lawful = false; fresh = true; } }
+      else { rec = { attacker: a, victim: v, owner, victimOwner: o.victimOwner || null, t, region: o.region || null, lawful, selfDefence, expires: t + C.aggression }; recs.push(rec); if (recs.length > C.maxRecords) recs.shift(); }
+      stats.aggressions += fresh ? 1 : 0;
+      if (!lawful) { if (fresh) stats.unlawful++; flags[who] = Math.max(fin(flags[who]), t + C.criminal); }
+      return { rec, crime: !lawful, fresh };
+    },
+    crime(id, t, what) { if (!id) return false; flags[id] = Math.max(fin(flags[id]), t + C.criminal); stats.crimes++; return true; },
+    /* would killing `v` be a murder by `k` (or k's owner) right now? */
+    isMurder(k, v, t, owner) { return !!k && !!v && k !== v && !L.lawfulAttack(k, v, t, owner); },
+    /* count a murder once per victim death (key). Returns { counted, short, long, red } — red: this count made them a murderer. */
+    murder(k, v, t, key, owner) {
+      if (!key || deaths.includes(key)) return { counted: false, dup: true };
+      if (!L.isMurder(k, v, t, owner)) { deaths.push(key); if (deaths.length > C.maxDeaths) deaths.shift(); return { counted: false }; }
+      return L.count(owner || k, t, key);
+    },
+    /* add one count for a death already judged a murder (a report); once per key */
+    count(who, t, key) {
+      if (!who || !key || deaths.includes(key)) return { counted: false, dup: true }; deaths.push(key); if (deaths.length > C.maxDeaths) deaths.shift();
+      const was = L.notoriety(who, t); (counts[who] = counts[who] || []).push(t); if (counts[who].length > 64) counts[who].shift(); stats.murders++;
+      return Object.assign({ counted: true, red: was !== 'murderer' && L.notoriety(who, t) === 'murderer' }, L.counts(who, t));
+    },
+    reported() { stats.reports++; },
+    records: id => recs.filter(r => !id || r.attacker === id || r.victim === id || r.owner === id).map(r => Object.assign({}, r)),
+    /* drop what has expired; counts older than the long-term decay are gone for good */
+    prune(t) { recs = recs.filter(r => t < r.expires); for (const k in flags) if (!(flags[k] > t)) delete flags[k]; for (const k in counts) { counts[k] = counts[k].filter(x => t - x < C.longDecay); if (!counts[k].length) delete counts[k]; } },
+    clear(id) { delete flags[id]; delete counts[id]; recs = recs.filter(r => r.attacker !== id && r.victim !== id); },
+    save(t) { if (Number.isFinite(t)) L.prune(t); return { v: 1, recs: recs.map(r => Object.assign({}, r)), flags: Object.assign({}, flags), counts: JSON.parse(JSON.stringify(counts)), deaths: deaths.slice(), stats: Object.assign({}, stats) }; } };
+  return L;
 };
 
 /* ---------------- debug view of one actor (developer tools; no gameplay depends on it) ---------------- */

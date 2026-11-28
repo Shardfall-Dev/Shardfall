@@ -266,7 +266,7 @@ function devRender() {
   paths: queue ${NAV.jobs.length} · cache ${NAV.cache.size} · searched ${NAV.searches} · failed ${NAV.failed} · cache hits ${NAV.hits}<br>
   AI ${DEV.aiMs.toFixed(3)} ms/step · audio voices ${SFXA.stats.voices} · save ${saveKB} · last save ${ls ? (ls.ok ? 'ok' : 'FAILED') + ' at ' + Math.round(ls.at) + ' s' : '—'}<br>
   ${devEco()}<br>
-  ${lifeDev()}<br>${npcFightDev()}
+  ${lifeDev()}<br>${npcFightDev()}<br>${lawDev()}
   <hr style="border-color:#334">
   ${B('hour', 'Dawn', 'data-h="5.5"')}${B('hour', 'Noon', 'data-h="12"')}${B('hour', 'Dusk', 'data-h="17.8"')}${B('hour', 'Midnight', 'data-h="0"')}${B('shift', '−1 h', 'data-h="-1"')}${B('shift', '+1 h', 'data-h="1"')}${B('daynight', 'Day/night')}<br>
   ${B('pause', SIMPAUSE ? 'Resume' : 'Pause')}${B('step', 'Step')}${B('adv', 'Run +1 min', 'data-s="60"')}${B('adv', 'Run +10 min', 'data-s="600"')}${DEV.advance ? ' running… ' + Math.ceil(DEV.advance) + ' s' : ''}${B('save', 'Save now')}<br>
@@ -292,7 +292,7 @@ function devInspect(e) {
   return SIM.inspect(e, Object.assign({ goal: n ? (n.goal.name || Math.round(n.goal.x) + ',' + Math.round(n.goal.y)) + ' · ' + n.state + (n.reason ? ' (' + n.reason + ')' : '') : null,
     destination: n && n.legs && n.legs[n.li] ? Math.round(n.legs[n.li].x) + ',' + Math.round(n.legs[n.li].y) + ' leg ' + (n.li + 1) + '/' + n.legs.length : null,
     territory: d ? 'territory ' + ecoP(e.type).terr + ' m, pursuit ' + (ecoP(e.type).pur || d.leash) + ' m, aggro ' + d.aggro + ' m' : null, reason: e.state ? 'state ' + e.state + (e.target ? ' → ' + aidOf(e.target) : '') : null,
-    criminal: SIM.hasComponent(e.archetype, 'notoriety') ? 'innocent (law: phase 5)' : null }, ecoInspect(e), lifeInspect(e), e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null));
+    notoriety: notoOf(e), murderCounts: lawHuman(e) ? LAW.counts(aidOf(e), GT) : null }, ecoInspect(e), lifeInspect(e), e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null));
 }
 /* world-space debug overlays, drawn after the light so they read at night */
 function devDraw(camX, camY) {

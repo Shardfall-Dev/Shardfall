@@ -216,4 +216,41 @@ const allIn = SIM.needsTick(SIM.newNeeds(), 500, 'walk'); eq(['hunger', 'fatigue
 const nmem = SIM.newMemory(4); nmem.note(0, 'saw', 'mon:wolf:1'); nmem.note(10, 'saw', 'mon:wolf:1'); eq([nmem.size, nmem.recent(1)[0].n], [1, 2], 'a repeated encounter updates the newest record');
 for (let i = 0; i < 9; i++) nmem.note(100 + i * 100, 'talked with', 'npc:x' + i); eq([nmem.size, nmem.recent(1)[0].who], [4, 'npc:x8'], 'memory keeps only the newest records');
 const nmem2 = SIM.newMemory(4, nmem.save()); eq([nmem2.size, nmem2.knows('talked with', 'npc:x8'), nmem2.knows('saw')], [4, true, false], 'memory survives save and load');
+// ---- phase 5 step 2: law — notoriety, aggression records, criminal flags, murder counts (master spec §19)
+{ const D = SIM.LAW_DEFAULTS; eq([D.criminal, D.shortDecay, D.longDecay, D.red], [120, 8 * 3600, 40 * 3600, 5], 'law defaults: 120 s criminal flag, 8 h / 40 h decay, red at five');
+  const L = SIM.newLaw(), Pp = 'player:p1', T = 'npc:old-tomas', G = 'npc:vespar-guard';
+  eq([L.notoriety(Pp, 0), L.notoriety(T, 0)], ['innocent', 'innocent'], 'everyone starts innocent');
+  eq(L.aggress(Pp, 'mon:rat:1', 0, { human: false }).crime, false, 'attacking a creature is never a crime');
+  let r = L.aggress(Pp, T, 10, { region: 'vespar' });
+  eq([r.crime, r.fresh, r.rec.lawful, r.rec.selfDefence, r.rec.region, r.rec.expires], [true, true, false, false, 'vespar', 130], 'an attack on an innocent is unlawful and recorded with region and expiry');
+  eq([L.notoriety(Pp, 10), L.notoriety(Pp, 129.9), L.notoriety(Pp, 130.1)], ['criminal', 'criminal', 'innocent'], 'the criminal flag lasts 120 s of simulation time');
+  eq(L.aggress(Pp, T, 20).fresh, false, 'further swings refresh the same record instead of adding one');
+  eq(L.rights(T, Pp, 20), true, 'the victim now has a right of self-defence over the attacker');
+  r = L.aggress(T, Pp, 21); eq([r.crime, r.rec.selfDefence], [false, true], 'fighting back is lawful self-defence');
+  eq(L.aggress(G, Pp, 22).crime, false, 'anyone may attack a criminal lawfully');
+  eq(L.rights(Pp, G, 22), true, 'a guard who attacks you gives you a right to fight him back');
+  eq(L.aggress(Pp, G, 23).crime, false, 'so hitting back at the guard is not another crime');
+  const L2 = SIM.newLaw(); L2.aggress('npc:a', Pp, 0); eq([L2.rights(Pp, 'npc:a', 119), L2.rights(Pp, 'npc:a', 121)], [true, false], 'aggression rights expire');
+  L2.aggress('pet:boar:9', 'npc:b', 5, { owner: Pp }); eq([L2.notoriety(Pp, 6), L2.notoriety('pet:boar:9', 6)], ['criminal', 'innocent'], "a pet's unlawful attack flags its owner");
+  L2.aggress('npc:c', 'pet:boar:9', 7, { victimOwner: Pp }); eq(L2.aggress('pet:boar:9', 'npc:c', 8, { owner: Pp }).crime, false, 'an NPC who attacks your pet may be fought back by it');
+  const L3 = SIM.newLaw(); eq(L3.crime(Pp, 50, 'theft'), true, 'theft is a crime'); eq(L3.notoriety(Pp, 60), 'criminal', 'theft makes you grey');
+  // murders
+  const M = SIM.newLaw(); M.aggress(Pp, 'npc:v1', 0);
+  let k = M.murder(Pp, 'npc:v1', 1, 'npc:v1@1'); eq([k.counted, k.short, k.long, k.red], [true, 1, 1, false], 'killing an innocent with no right is a murder: one short- and one long-term count');
+  eq(M.murder(Pp, 'npc:v1', 1, 'npc:v1@1').counted, false, 'the same death never counts twice');
+  M.aggress('npc:w', Pp, 2); eq(M.murder(Pp, 'npc:w', 3, 'npc:w@3').counted, false, 'killing someone who attacked you is not murder');
+  const crim = SIM.newLaw(); crim.crime('npc:thief', 0); eq(crim.murder(Pp, 'npc:thief', 1, 'k').counted, false, 'killing a criminal is not murder');
+  for (let i = 2; i <= 5; i++) { M.aggress(Pp, 'npc:v' + i, i * 10); k = M.murder(Pp, 'npc:v' + i, i * 10, 'npc:v' + i + '@' + i); }
+  eq([k.long, k.red, M.notoriety(Pp, 60)], [5, true, 'murderer'], 'the fifth long-term count makes you red');
+  eq(M.notoriety(Pp, 500), 'murderer', 'red lasts after the criminal flag is gone');
+  eq(M.counts(Pp, 8 * 3600 + 100), { short: 0, long: 5 }, 'short-term counts fade after 8 active hours');
+  eq([M.notoriety(Pp, 40 * 3600 + .5), M.notoriety(Pp, 40 * 3600 + 60)], ['murderer', 'innocent'], 'long-term counts fade after 40 active hours, and red with them');
+  eq(M.count('npc:k', 0, 'player:p1@0').counted && !M.count('npc:k', 0, 'player:p1@0').counted, true, 'a reported murder counts once');
+  // save / load
+  const S = SIM.newLaw(); S.aggress(Pp, T, 100); S.aggress(Pp, 'npc:v', 100); S.murder(Pp, 'npc:v', 100, 'npc:v@100');
+  const blob = JSON.parse(JSON.stringify(S.save(150))), S2 = SIM.newLaw(blob);
+  eq([S2.notoriety(Pp, 150), S2.counts(Pp, 150), S2.rights(T, Pp, 150), S2.murder(Pp, 'npc:v', 150, 'npc:v@100').counted, S2.stats.murders], ['criminal', { short: 1, long: 1 }, true, false, 1], 'flags, counts, records and handled deaths survive save and load');
+  eq(SIM.newLaw(S.save(1e6)).records().length, 0, 'expired records are not saved');
+  eq(SIM.newLaw({ flags: { x: 'nonsense' }, counts: { y: [1, 'a', null] } }).counts('y', 2), { short: 1, long: 1 }, 'a damaged law save is cleaned on load');
+  eq(SIM.EVENT_TYPES.includes('MurderReported') && SIM.EVENT_TYPES.includes('NotorietyChanged') && SIM.EVENT_TYPES.includes('AggressionRecorded'), true, 'law event types are known'); }
 console.log(fails ? fails + ' FAILED' : 'ALL PASS'); process.exit(fails ? 1 : 0);
