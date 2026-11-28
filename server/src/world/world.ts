@@ -38,11 +38,11 @@ export class World {
   private nextNid = 1;
   private sink: Sink = () => {};
   readonly viewRadius: number;
-  stats = { ticks: 0, overruns: 0, lastStepMs: 0, maxStepMs: 0, inputsApplied: 0, inputsDropped: 0, inputsLate: 0, actors: 0 };
+  stats = { ticks: 0, overruns: 0, lastStepMs: 0, maxStepMs: 0, totalStepMs: 0, inputsApplied: 0, inputsDropped: 0, inputsLate: 0, actors: 0 };
 
   constructor(public terrain: Terrain | null, opts: { viewRadius?: number } = {}) { this.viewRadius = opts.viewRadius || P.VIEW_RADIUS; }
 
-  start() { if (this.timer) return; let next = Date.now() + P.TICK_MS; const loop = () => { const t0 = performance.now(); this.step(); const dt = performance.now() - t0; this.stats.lastStepMs = dt; if (dt > this.stats.maxStepMs) this.stats.maxStepMs = dt; if (dt > P.TICK_MS) this.stats.overruns++; next += P.TICK_MS; const wait = Math.max(0, next - Date.now()); if (wait === 0) next = Date.now(); this.timer = setTimeout(loop, wait); }; this.timer = setTimeout(loop, P.TICK_MS); }
+  start() { if (this.timer) return; let next = Date.now() + P.TICK_MS; const loop = () => { const t0 = performance.now(); this.step(); const dt = performance.now() - t0; this.stats.lastStepMs = dt; this.stats.totalStepMs += dt; if (dt > this.stats.maxStepMs) this.stats.maxStepMs = dt; if (dt > P.TICK_MS) this.stats.overruns++; next += P.TICK_MS; const wait = Math.max(0, next - Date.now()); if (wait === 0) next = Date.now(); this.timer = setTimeout(loop, wait); }; this.timer = setTimeout(loop, P.TICK_MS); }
   stop() { if (this.timer) clearTimeout(this.timer); this.timer = null; }
   onFlush(f: () => void) { this.flushers.add(f); return () => this.flushers.delete(f); }
   setSink(s: Sink) { this.sink = s; }

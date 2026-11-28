@@ -43,6 +43,8 @@ jobs:
         run: npm run migrate && npm run migrate
       - name: Integration tests (auth, characters, realtime)
         run: npm run test:server
+      - name: World loop under load (150 bots walking for 20 s)
+        run: BOTS=150 DURATION=20 node --import tsx tests/server/load/bots.ts
       - name: Browser flow (desktop and phone)
         env:
           E2E_SHOTS: ${{ runner.temp }}/e2e-shots
