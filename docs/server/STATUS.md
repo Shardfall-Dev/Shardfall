@@ -45,7 +45,7 @@ server-authoritative, and nothing in the game or these docs claims otherwise.
     within grace without a leave, leave after it; character deletion ends its presence; tick rate ≈ 50 ms.
 - `python3 tests/e2e/online_flow.py` — two accounts in Chrome, one desktop and one iPhone-sized touch browser (Safari user
   agent): register, confirm from the inbox, roster, the creator, the lobby with each other present, leave, account page, sign out;
-  offline save identical; no page errors. Screenshots are uploaded as the `server-foundation-screenshots` artifact.
+  offline save identical; no page errors. Screenshots are uploaded as the `server-foundation-screenshots` artifact; the copies in [shots/](shots/) come from the CI run of this branch.
 - The production image is built and loads the game rules.
 
 Not covered by automated tests: a real Google or Apple account signing in (needs credentials), real iOS Safari on a device
