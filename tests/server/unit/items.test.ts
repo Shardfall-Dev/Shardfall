@@ -43,7 +43,7 @@ const units = (items: any[]) => { const m: Record<string, number> = {}; for (con
 test('protocol v5: item commands are validated; nothing but the server id, a slot, a quantity and the remains id is accepted', () => {
   const ok = (p: any) => P.parseClient(JSON.stringify({ v: P.PROTOCOL_VERSION, type: 'item', p }));
   const id = '11111111-1111-4111-8111-111111111111';
-  assert.equal(P.PROTOCOL_VERSION, 5);
+  assert.ok(P.PROTOCOL_VERSION >= 5);   // v5 introduced items; later stages keep them
   for (const p of [{ op: 'equip', item: id }, { op: 'equip', item: id, slot: 'weapon' }, { op: 'unequip', slot: 'helm' }, { op: 'drop', item: id, qty: 3 }, { op: 'take', item: id, from: 9 }, { op: 'takeall', from: 9 }, { op: 'split', item: id, qty: 2 }, { op: 'merge', item: id, into: id }, { op: 'mergeall' }])
     assert.ok(ok(p).ok, JSON.stringify(p));
   for (const p of [{ op: 'give', item: id }, { op: 'equip', item: 'sword' }, { op: 'equip', item: 7 }, { op: 'drop', item: id, qty: 0 }, { op: 'drop', item: id, qty: 1.5 }, { op: 'take', item: id }, { op: 'equip', item: id, uid: 3 }, { op: 'equip', item: id, slot: 'Weapon!' }, { op: 'split', item: id }, { op: 'equip', item: id, gold: 5 }])

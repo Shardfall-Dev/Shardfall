@@ -1,5 +1,21 @@
 # Server status
 
+## Phase 6 — Server Economy v1 (branch `feature/server-economy-v1`, build v0.45)
+
+Banks and shops are the server's: the build's 24 bankers and shopkeepers at their posts, buying and selling at the build's
+prices, one bank account at every bank, gold as saved items. Details: [ECONOMY.md](ECONOMY.md).
+
+| Area | State |
+| --- | --- |
+| Keepers | Exported from the build (`server/data/economy.json`, checked by `tools/export-world.py --check`); bodies in the interest grid (`actor.enter` kind `npc`) |
+| Commands | open, buy, sell, deposit, deposit all gold, deposit a worn piece, withdraw — `game.js` counter rules on `SF.addItem` / `SF.removeQty` / `SF.transfer` / `SF.EQ` |
+| Safety | No price or gold from clients; reach, realm, kind of keeper, ghost, stock, quantity, gold and carrying capacity re-checked on every command; saved at once; logged |
+| Protocol | v6: `counter` from clients; `counter` views from the server |
+| Client | The game's own bank and shop panels, opened by tapping a keeper, every button a counter command |
+| Not yet | Player trading, crafting, repairs, trainer lessons, using items, the travelling merchant, keepers' daily lives online |
+
+---
+
 ## Phase 5 — Server Items v1 (branch `feature/server-items-v1`, build v0.44)
 
 Items are the server's: backpack, equipment and bank held and saved by the server, every change through the shared `SF.EQ`
@@ -12,7 +28,7 @@ commands, creature remains with loot, a dead character's body, dropped piles, we
 | Saving | At once after every command, in one ordered queue; wear and arrows with the periodic save; the ground is not saved |
 | Protocol | v5: `item` from clients; `inv`, `remains`, remains in `actor.enter`; look / broke / arrow events |
 | Client | The game's backpack, paper doll and loot panel routed to the server; B / C keys and Bag / Gear in the online bar |
-| Not yet | Banker, vendors, crafting, repair, using items, skinning, trading, looting others' bodies |
+| Not yet | Banker, vendors (since v0.45: [ECONOMY.md](ECONOMY.md)), crafting, repair, using items, skinning, trading, looting others' bodies |
 
 ---
 
