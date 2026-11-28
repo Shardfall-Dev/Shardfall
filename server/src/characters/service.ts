@@ -138,6 +138,20 @@ export class Characters {
       [list.map(a => a.id), list.map(a => JSON.stringify({ map: 'anniabreen', town: a.town, x: Math.round(a.x * 1000) / 1000, y: Math.round(a.y * 1000) / 1000, sect: a.sect })), list.map(a => Math.max(0, Math.round(a.stam)))]);
     return r.rowCount || 0;
   }
+  /* save a character's items exactly as the world holds them (Server Items v1): in one transaction its rows are replaced by the
+     current list; an item that arrived from someone else (a looted body, a pile) moves to this character by its id */
+  async saveInventory(characterId: string, rows: { id: string; container: string; slot: string | null; position: number; item_def: string; qty: number; props: Record<string, unknown> }[]) {
+    await tx(this.db, async c => {
+      await c.query('delete from game.items where character_id = $1', [characterId]);
+      if (!rows.length) return;
+      await c.query(`insert into game.items (id, character_id, container, slot, position, item_def, qty, props)
+        select v.id, $1, v.container, v.slot, v.position, v.item_def, v.qty, v.props from unnest($2::uuid[], $3::text[], $4::text[], $5::smallint[], $6::text[], $7::int[], $8::jsonb[])
+          as v(id, container, slot, position, item_def, qty, props)
+        on conflict (id) do update set character_id = excluded.character_id, container = excluded.container, slot = excluded.slot, position = excluded.position,
+          item_def = excluded.item_def, qty = excluded.qty, props = excluded.props, state_version = game.items.state_version + 1, updated_at = now()`,
+        [characterId, rows.map(r => r.id), rows.map(r => r.container), rows.map(r => r.slot), rows.map(r => Math.min(32767, r.position)), rows.map(r => r.item_def), rows.map(r => r.qty), rows.map(r => JSON.stringify(r.props))]);
+    });
+  }
   /* a rules-shaped character from a snapshot (for stamina, carrying weight and armour speed) */
   rulesCharacter(snap: any) {
     return this.rules.characterFromRows({ name: snap.name, str: snap.stats.str, dex: snap.stats.dex, int: snap.stats.int, skills: snap.skills, stat_locks: snap.statLocks, appearance: snap.appearance },

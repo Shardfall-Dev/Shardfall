@@ -20,14 +20,20 @@
    { nid: null }), and as a ghost ask to be restored (resurrect { at: 'shrine' | 'bound' }); it never sends a swing, a hit or
    damage. The server swings when the timer, reach and sight allow and tells everyone in view what happened (combat
    { k: 'tele' | 'hit' | 'miss' | 'parry' | 'whiff' | 'death' | 'res' | 'refused', a, t, dmg, hp, … }); you learn what you
-   learned (gain { skill, value, stat?, statValue? }); state.you carries hp, hpMax, ghost and armed. */
+   learned (gain { skill, value, stat?, statValue? }); state.you carries hp, hpMax, ghost and armed.
+   v5 (Server Items v1): items are the server's. A client names an item by its server id (a UUID) in one command,
+   item { op: 'equip' | 'unequip' | 'drop' | 'take' | 'takeall' | 'split' | 'merge' | 'mergeall', item?, into?, slot?, qty?, from? }
+   (from: the nid of remains); refusals come back as combat { k: 'refused', what: 'item', reason } with the request id. The server
+   answers with your inventory (inv { pack, equip, bank }), announces remains (actor.enter kind 'remains' with their items),
+   updates them (remains { nid, items }), and tells those in view about a changed look (combat { k: 'look', t, equip }), a broken
+   piece (k: 'broke') and arrows (k: 'shot' | 'wide' | 'blocked'). */
 (function (root, factory) {
   const P = factory();
   if (typeof module !== 'undefined' && module.exports) module.exports = P; else root.SF_PROTOCOL = P;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
   const P = {};
-  P.PROTOCOL_VERSION = 4;
+  P.PROTOCOL_VERSION = 5;
   P.MAX_MESSAGE_BYTES = 16 * 1024;     // a single frame, client → server
   P.TICK_MS = 50;                      // the server tick: the same 50 ms fixed step as the game's world simulation (src/world.js)
   P.HEARTBEAT_MS = 15000;              // the server pings; a connection that misses two heartbeats is closed
@@ -38,8 +44,9 @@
   P.CLOSE = { NORMAL: 1000, GOING_AWAY: 1001, POLICY: 1008, TOO_BIG: 1009, TRY_LATER: 1013,
     UNAUTHORIZED: 4001, FORBIDDEN: 4003, TAKEN_OVER: 4004, PROTOCOL: 4005, RATE_LIMIT: 4008, SESSION_ENDED: 4010 };
 
-  P.CLIENT = ['hello', 'ping', 'resync', 'move', 'target', 'resurrect'];
-  P.SERVER = ['welcome', 'snapshot', 'presence.join', 'presence.leave', 'pong', 'error', 'kicked', 'state', 'actor.enter', 'actor.leave', 'combat', 'gain'];
+  P.CLIENT = ['hello', 'ping', 'resync', 'move', 'target', 'resurrect', 'item'];
+  P.ITEM_OPS = ['equip', 'unequip', 'drop', 'take', 'takeall', 'split', 'merge', 'mergeall'];
+  P.SERVER = ['welcome', 'snapshot', 'presence.join', 'presence.leave', 'pong', 'error', 'kicked', 'state', 'actor.enter', 'actor.leave', 'combat', 'gain', 'inv', 'remains'];
   P.RESERVED = ['teleport', 'position', 'attack', 'cast', 'use', 'equip', 'unequip', 'pickup', 'drop', 'trade', 'gold', 'skill', 'stat', 'inventory', 'damage', 'craft', 'loot', 'say'];
 
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -55,6 +62,16 @@
     ping: p => !onlyKeys(p, ['t']) ? 'unexpected field' : has(p, 't') && !(typeof p.t === 'number' && Number.isFinite(p.t)) ? 't must be a number' : null,
     resync: p => !onlyKeys(p, []) ? 'unexpected field' : null,
     target: p => !onlyKeys(p, ['nid']) || !has(p, 'nid') ? 'nid required' : p.nid === null || (Number.isSafeInteger(p.nid) && p.nid > 0) ? null : 'nid must be a positive whole number or null',
+    item: p => {
+      if (!onlyKeys(p, ['op', 'item', 'into', 'slot', 'qty', 'from']) || !P.ITEM_OPS.includes(p.op)) return 'op must be one of ' + P.ITEM_OPS.join(', ');
+      for (const k of ['item', 'into']) if (has(p, k) && !P.isUuid(p[k])) return k + ' must be an item id';
+      if (has(p, 'slot') && !(typeof p.slot === 'string' && /^[a-z_]{1,20}$/.test(p.slot))) return 'slot must be a slot name';
+      if (has(p, 'qty') && !(Number.isSafeInteger(p.qty) && p.qty >= 1 && p.qty <= 1e9)) return 'qty must be a whole number from 1';
+      if (has(p, 'from') && !(Number.isSafeInteger(p.from) && p.from > 0)) return 'from must be the remains id';
+      const need = { equip: ['item'], unequip: ['slot'], drop: ['item'], take: ['item', 'from'], takeall: ['from'], split: ['item', 'qty'], merge: ['item', 'into'], mergeall: [] }[p.op];
+      for (const k of need) if (!has(p, k)) return p.op + ' needs ' + k;
+      return null;
+    },
     resurrect: p => !onlyKeys(p, ['at']) || (p.at !== 'shrine' && p.at !== 'bound') ? "at must be 'shrine' or 'bound'" : null,
     move: p => {
       if (!onlyKeys(p, ['inputs']) || !Array.isArray(p.inputs)) return 'inputs must be an array';

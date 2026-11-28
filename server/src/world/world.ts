@@ -15,6 +15,8 @@
    on a creature (target), and whenever its swing timer is ready and the creature is in reach and sight it swings; creatures strike
    back from their own loop. Health, death (a ghost), resurrection at a shrine, regeneration and the skills and stats learned in a
    fight are the server's; 'combat' events go to everyone in view.
+   Since Server Items v1 the characters' items are the server's too (item commands on the shared SF.EQ rules), and remains
+   (creature loot, a dead character's body, dropped piles) are bodies in the interest grid (actor.enter kind 'remains').
    Nothing a client sends sets a position, a speed or a stamina value. Combat, NPCs, items and the rest are not simulated here
    yet; they will arrive as further systems in this loop, one at a time. */
 import P = require('../../../shared/protocol');
@@ -24,6 +26,7 @@ import type { Terrain } from './terrain';
 import { Population, type Creature, type CreatureHost, type PopulationData, type Clock } from './creatures';
 import type { SimApi } from '../../../shared/game-rules-adapter';
 import { playerSwing, creatureBlow, weaponOf, type Learned } from './combat';
+import { ITEMS, stamp, allItems, findSid, inventoryOf, publicItem, rollLoot, wornOf, type Remains } from './items';
 
 export interface Input { s: number; x: number; y: number; w: number; r?: boolean }
 export interface ActorInfo { characterId: string; name: string; body: string; appearance: any; title: string | null; town: string; equip: Record<string, any> }
@@ -35,12 +38,14 @@ export interface Actor {
   /* combat (null ch: no combat for this character, e.g. a world without rules) */
   ch: any | null; hp: number; mana: number; ghost: boolean; ghostAt: number; bound: string | null;
   sw: { t: number; ready: boolean }; armed: number; lastCombat: number;
+  movedAt: number; invDirty: boolean;
 }
+export interface Shot { a: Actor; nid: number; at: number; x0: number; y0: number; reach: number; r: ReturnType<typeof playerSwing> }
 export interface CombatOpts { SF: any; seed?: number }
 export const COMBAT = { inCombat: 6, regenPerSec: .1, shrineReach: 2.5, ghostReturn: 12 };   // game.js inCombat, the unfed regeneration, nearestRes reach, ghostret wait
 export type Sink = (a: Actor, type: string, payload: object) => void;
 /* anything with a place in the interest grid: a character or a creature */
-export type Body = Actor | Creature;
+export type Body = Actor | Creature | Remains;
 export interface CreatureOpts { data: PopulationData; sim: SimApi; clock: Clock; seed?: number }
 
 const CELL = 16, LEAVE_MARGIN = 4, MAX_CREDIT = 3, SELF_KEEPALIVE_TICKS = 20;
@@ -54,6 +59,10 @@ export class World {
   private byNid = new Map<number, Actor>();
   private grid = new Map<number, Set<Body>>();
   readonly populations = new Map<string, Population>();
+  readonly remains = new Map<number, Remains>();
+  private shots: Shot[] = [];
+  /* called when a character's items changed and must be saved now (the gateway writes them) */
+  onInventory: (a: Actor) => void = () => {};
   private creatureOpts: CreatureOpts | null;
   private host: CreatureHost;
   private SF: any = null;
@@ -135,7 +144,8 @@ export class World {
     const a: Actor = { kind: 'player', nid: this.nextNid++, characterId: o.characterId, accountId: o.accountId, realmId: o.realmId, info: o.info,
       s: { x: p.x, y: p.y, sect: p.sect, stam: Math.min(o.stam, o.ctx.stamMax), lastDrain: -99, t: 0 }, ctx: o.ctx, speed: 0, changed: true,
       inputs: [], lastSeq: -1, credit: 0, acked: -1, viewing: true, known: new Set(), cell: -1, dirty: false, lastSentSelf: '',
-      ch: this.SF && o.ch ? o.ch : null, hp: 0, mana: o.mana ?? 0, ghost: !!o.ghost, ghostAt: this.now, bound: o.bound ?? null, sw: { t: -1e9, ready: true }, armed: 0, lastCombat: -99 };
+      ch: this.SF && o.ch ? o.ch : null, hp: 0, mana: o.mana ?? 0, ghost: !!o.ghost, ghostAt: this.now, bound: o.bound ?? null, sw: { t: -1e9, ready: true }, armed: 0, lastCombat: -99, movedAt: -99, invDirty: false };
+    if (a.ch) stamp(this.SF, allItems(a.ch));
     if (a.ch) { const mx = this.SF.maxHp(a.ch); a.hp = Math.min(mx, Math.max(a.ghost ? 0 : 1, o.hp ?? mx)); if (a.ghost) { a.hp = 0; a.ctx = Object.assign({}, a.ctx, { ghost: true }); } }
     this.actors.set(o.characterId, a); this.byNid.set(a.nid, a); this.place(a); this.stats.actors = this.actors.size;
     this.population(o.realmId);   // the realm's creatures, filled out of this first character's sight
@@ -162,7 +172,8 @@ export class World {
   }
   setCtx(characterId: string, ctx: MV.MoveCtx) { const a = this.actors.get(characterId); if (a) { a.ctx = ctx; a.s.stam = Math.min(a.s.stam, ctx.stamMax); } }
   /* the public face of an actor for actor.enter */
-  enterPayload(b: Body) { return b.kind === 'creature' ? this.creaturePayload(b) : this.playerPayload(b); }
+  enterPayload(b: Body) { return b.kind === 'creature' ? this.creaturePayload(b) : b.kind === 'remains' ? this.remainsPayload(b) : this.playerPayload(b); }
+  remainsPayload(r: Remains) { return { kind: 'remains', nid: r.nid, x: r3(r.s.x), y: r3(r.s.y), sect: r.s.sect, name: r.name, mon: r.mon, pile: r.pile, owner: r.owner, ownerName: r.ownerName, left: Math.max(0, Math.round(r.expires - this.now)), items: r.cont.items.map(publicItem) }; }
   creaturePayload(c: Creature) { return { kind: 'creature', nid: c.nid, type: c.type, name: c.d.n, x: r3(c.s.x), y: r3(c.s.y), sect: c.s.sect, speed: r3(c.speed), hp: c.hp, max: c.max }; }
   playerPayload(a: Actor) { return { kind: 'player', nid: a.nid, characterId: a.characterId, name: a.info.name, body: a.info.body, appearance: a.info.appearance, title: a.info.title, town: a.info.town, equip: a.info.equip, x: r3(a.s.x), y: r3(a.s.y), sect: a.s.sect ?? 0, speed: r3(a.speed) }; }
   selfPayload(a: Actor) { return { nid: a.nid, x: a.s.x, y: a.s.y, sect: a.s.sect ?? 0, stam: a.s.stam, stamMax: a.ctx.stamMax, ack: a.acked, t: a.s.t, ld: a.s.lastDrain,
@@ -185,10 +196,10 @@ export class World {
         if (!steps) MV.step(t.world, a.s, zero, a.ctx, COL);   // standing still: stamina recovers
         a.speed = moved / (P.TICK_MS / 1000);
         a.changed = a.s.x !== x0 || a.s.y !== y0 || a.s.sect !== s0 || (a.speed === 0) !== (moved === 0);
-        if (moved) { a.dirty = true; this.place(a); }
+        if (moved) { a.dirty = true; a.movedAt = this.now; this.place(a); }
       }
-      // 1a. characters fight
-      if (this.SF) for (const a of this.actors.values()) this.fightStep(a);
+      // 1a. characters fight; arrows in flight land; remains decay
+      if (this.SF) { for (const a of this.actors.values()) this.fightStep(a); this.shotsStep(); if (this.tick % 20 === 0) this.decayStep(); }
       // 1b. creatures
       if (this.populations.size) { const c0 = performance.now(); let act = 0; for (const p of this.populations.values()) { p.step(); act += p.stats.active; } this.stats.creaturesActive = act; this.stats.creatures = this.creatureCount(); this.stats.creatureMs += performance.now() - c0; }
       // 2. interest management and state
@@ -228,7 +239,7 @@ export class World {
     if (nid === null) { a.armed = 0; return null; }
     if (a.ghost) return 'You cannot fight now.';
     if (!this.creatureOf(a, nid)) return 'No valid target.';
-    const w = weaponOf(this.SF, a.ch).w; if (w.ammo) return 'Bows and crossbows need arrows, and items are not online yet.';
+    const w = weaponOf(this.SF, a.ch).w; if (w.ammo && !this.SF.count(a.ch.pack, w.ammo)) return 'You have no ' + w.ammo + 's.';
     a.armed = nid; return null;
   }
   /* one tick of a character's fight (game.js attackTick → swingAt): the swing timer runs; an armed character swings when ready, in reach and in sight */
@@ -242,16 +253,43 @@ export class World {
     if (!t) { a.armed = 0; return; }
     const { p, c } = t, dd = Math.hypot(c.s.x - a.s.x, c.s.y - a.s.y);
     if (!a.sw.ready || dd > w.reach + .05 || !p.los(a.s.x, a.s.y, c.s.x, c.s.y)) return;   // out of reach or sight: stays armed, the swing waits
+    if (w.ammo) {   // game.js swingAt for a bow: stand still to aim, one projectile per release, hit or miss
+      if (this.now - a.movedAt < SF.ARCHERY.aim) return;
+      if (!SF.count(a.ch.pack, w.ammo)) { a.armed = 0; this.sink(a, 'combat', { k: 'refused', what: 'shot', reason: 'You have no ' + w.ammo + 's.' }); return; }
+      SF.removeQty(a.ch.pack, w.ammo, 1); this.inventoryChanged(a, false);
+    }
     SF.swingSpend(a.sw, now); a.lastCombat = now;
     const dx = c.s.x - a.s.x, dy = c.s.y - a.s.y, l = Math.hypot(dx, dy) || 1; a.s.sect = MV.facing(a.s.sect, dx / l, dy / l) ?? a.s.sect; a.changed = true;
     const r = playerSwing(SF, a.ch, c.d, c.ward, this.crng, now, 'c' + c.nid);
+    this.learned(a, r.learned); this.wornOut(a, r.worn, r.broke);
+    if (w.ammo) {   // the arrow lands a second later (SF.ARCHERY.flight)
+      this.event(a.realmId, a.s.x, a.s.y, { k: 'shot', a: a.nid, t: c.nid, w: w.fam || 'Bow', flight: SF.ARCHERY.flight });
+      this.shots.push({ a, nid: c.nid, at: now + SF.ARCHERY.flight, x0: a.s.x, y0: a.s.y, reach: w.reach, r }); return;
+    }
+    this.resolveSwing(a, p, c, r, w.fam || 'Unarmed');
+  }
+  private resolveSwing(a: Actor, p: Population, c: Creature, r: ReturnType<typeof playerSwing>, fam: string) {
     if (r.ward) c.ward = Math.max(0, c.ward - r.ward);
     const hpAfter = Math.max(0, c.hp - r.dmg);
-    this.event(a.realmId, c.s.x, c.s.y, { k: r.hit ? 'hit' : 'miss', a: a.nid, t: c.nid, dmg: r.dmg, ward: r.ward || undefined, hp: hpAfter, max: c.max, w: w.fam || 'Unarmed' });
+    this.event(a.realmId, c.s.x, c.s.y, { k: r.hit ? 'hit' : 'miss', a: a.nid, t: c.nid, dmg: r.dmg, ward: r.ward || undefined, hp: hpAfter, max: c.max, w: fam });
     if (r.hit && hpAfter <= 0) this.event(a.realmId, c.s.x, c.s.y, { k: 'death', t: c.nid, by: a.nid, name: c.d.n });
+    const x = c.s.x, y = c.s.y, sect = c.s.sect, d = c.d, type = c.type;
     const killed = p.hurt(c, r.hit ? r.dmg : 0, a);
-    if (killed) a.armed = 0;
-    this.learned(a, r.learned);
+    if (killed) { if (a.armed === c.nid) a.armed = 0; this.creatureRemains(a.realmId, type, d, x, y, sect, a.info.name); }
+  }
+  /* arrows land (game.js arrowLands): the archer must not have moved, the target must still be alive, in range and in sight */
+  private shotsStep() {
+    if (!this.shots.length) return; const now = this.now, keep: Shot[] = [];
+    for (const sh of this.shots) {
+      if (sh.at > now) { keep.push(sh); continue; }
+      const a = sh.a; if (!this.actors.has(a.characterId) || a.ghost) continue;
+      const t = this.creatureOf(a, sh.nid); if (!t) continue;
+      const { p, c } = t;
+      if (Math.hypot(a.s.x - sh.x0, a.s.y - sh.y0) > this.SF.ARCHERY.drift) { this.event(a.realmId, c.s.x, c.s.y, { k: 'wide', a: a.nid, t: c.nid }); continue; }
+      if (Math.hypot(c.s.x - a.s.x, c.s.y - a.s.y) > sh.reach + .5 || !p.los(a.s.x, a.s.y, c.s.x, c.s.y)) { this.event(a.realmId, c.s.x, c.s.y, { k: 'blocked', a: a.nid, t: c.nid }); continue; }
+      this.resolveSwing(a, p, c, sh.r, 'Bow');
+    }
+    this.shots = keep;
   }
   /* a creature's blow lands (or misses) on a character */
   private creatureHits(c: Creature, nid: number) {
@@ -261,7 +299,7 @@ export class World {
     const hpAfter = Math.max(0, Math.ceil(a.hp - r.dmg));
     this.event(a.realmId, a.s.x, a.s.y, { k: !r.hit ? 'miss' : r.parried ? 'parry' : 'hit', a: c.nid, t: a.nid, dmg: r.dmg, hp: hpAfter, region: r.region || undefined });
     if (r.hit && r.dmg > 0) this.damagePlayer(a, r.dmg, c.d.n);
-    this.learned(a, r.learned);
+    this.learned(a, r.learned); this.wornOut(a, r.worn, r.broke);
   }
   private damagePlayer(a: Actor, dmg: number, by: string) {
     if (a.ghost || dmg <= 0) return; a.hp -= dmg; a.lastCombat = this.now; a.dirty = true;
@@ -272,6 +310,13 @@ export class World {
     if (a.ghost) return; a.hp = 0; a.ghost = true; a.ghostAt = this.now; a.armed = 0; a.dirty = true;
     a.ctx = Object.assign({}, a.ctx, { ghost: true });
     this.event(a.realmId, a.s.x, a.s.y, { k: 'death', t: a.nid, name: a.info.name, by });
+    // game.js playerDies: away from protected ground the tradeable belongings stay on the body (SF.deathTransaction)
+    const pop = this.populations.get(a.realmId);
+    if (!(pop && pop.prot(a.s.x, a.s.y))) {
+      const corpse = this.SF.deathTransaction(a.ch, this.now, { x: a.s.x, y: a.s.y });
+      this.addRemains(a.realmId, { name: a.info.name + "'s body", items: corpse.items, x: a.s.x, y: a.s.y, sect: a.s.sect ?? 0, life: this.SF.CORPSE_LIFE, owner: a.characterId, ownerName: a.info.name });
+      this.inventoryChanged(a, true);
+    }
   }
   /* resurrect(): at a shrine within reach ('shrine'), or back at the bound shrine after the wait ('bound') — game.js interact / ghostret → resurrect */
   resurrect(characterId: string, at: 'shrine' | 'bound'): string | null {
@@ -298,6 +343,107 @@ export class World {
     for (const l of list) { if (l.stat) stat = true; this.sink(a, 'gain', l.stat ? { skill: l.skill, value: l.value, stat: l.stat, statValue: a.ch[l.stat] } : { skill: l.skill, value: l.value }); }
     if (stat) { const g = a.ctx.ghost; a.ctx = Object.assign(MV.ctxFor(this.SF, a.ch), { ghost: g }); }
   }
+  /* ---------- items (Server Items v1) ---------- */
+  private addRemains(realmId: string, o: { name: string; items: any[]; x: number; y: number; sect: number; life: number; mon?: string | null; owner?: string | null; ownerName?: string | null; pile?: boolean; killer?: string | null }) {
+    stamp(this.SF, o.items);
+    const r: Remains = { kind: 'remains', nid: this.nextNid++, realmId, s: { x: o.x, y: o.y, sect: o.sect }, speed: 0, changed: false, cell: -1,
+      cont: { cid: 'r' + this.nextNid, kind: o.pile ? 'pile' : 'corpse', items: o.items, ver: 0 }, name: o.name, mon: o.mon ?? null, owner: o.owner ?? null, ownerName: o.ownerName ?? null,
+      expires: this.now + o.life, pile: !!o.pile, killer: o.killer ?? null };
+    this.remains.set(r.nid, r); this.place(r); return r;
+  }
+  private creatureRemains(realmId: string, type: string, d: any, x: number, y: number, sect: number, killer: string) {
+    const items = rollLoot(this.SF, d, this.crng);
+    this.addRemains(realmId, { name: d.n + ' remains', items, x, y, sect, life: d.boss ? ITEMS.bossCorpseLife : ITEMS.corpseLife, mon: type, killer });
+  }
+  private removeRemains(r: Remains) { this.remains.delete(r.nid); this.unplace(r); }
+  private decayStep() { const now = this.now; for (const r of [...this.remains.values()]) if (now >= r.expires || (r.pile && !r.cont.items.length)) this.removeRemains(r); }
+  /* the remains' contents changed: everyone in view gets the new list; an emptied pile goes */
+  private remainsChanged(r: Remains) {
+    r.cont.ver++;
+    if (r.pile && !r.cont.items.length) { this.removeRemains(r); return; }
+    const r2 = this.viewRadius * this.viewRadius;
+    for (const v of this.actors.values()) if (v.viewing && v.realmId === r.realmId && v.known.has(r.nid) && (v.s.x - r.s.x) ** 2 + (v.s.y - r.s.y) ** 2 <= r2) this.sink(v, 'remains', { nid: r.nid, items: r.cont.items.map(publicItem) });
+  }
+  /* after any change to a character's items: identities fixed, movement follows the weight, the owner gets the new inventory,
+     others see the new look if a worn piece changed, and the items are saved (now, or with the next save for wear and arrows) */
+  inventoryChanged(a: Actor, now: boolean, lookChanged = false) {
+    stamp(this.SF, allItems(a.ch));
+    const g = a.ctx.ghost; a.ctx = Object.assign(MV.ctxFor(this.SF, a.ch), { ghost: g }); a.s.stam = Math.min(a.s.stam, a.ctx.stamMax);
+    this.sink(a, 'inv', inventoryOf(a.ch));
+    if (lookChanged) { a.info = Object.assign({}, a.info, { equip: wornOf(a.ch) }); this.event(a.realmId, a.s.x, a.s.y, { k: 'look', t: a.nid, equip: a.info.equip }); }
+    if (now) { a.invDirty = false; this.onInventory(a); } else a.invDirty = true;
+  }
+  private wornOut(a: Actor, worn: boolean, broke: any[]) {
+    if (!worn) return; a.invDirty = true;
+    if (broke.length) { for (const it of broke) this.sink(a, 'combat', { k: 'broke', t: a.nid, item: it.sid, itemDef: it.id }); this.inventoryChanged(a, true, true); }
+  }
+  /* item(): one item command from a character, validated by the shared rules. Returns a refusal reason or null. */
+  item(characterId: string, cmd: { op: string; item?: string; into?: string; slot?: string; qty?: number; from?: number }): string | null {
+    const a = this.actors.get(characterId); if (!a || !a.ch) return 'Items are not available.';
+    const SF = this.SF, EQ = SF.EQ, ch = a.ch, cap1 = (r: any) => { const m = String(r && r.reason || 'not possible'); return m.charAt(0).toUpperCase() + m.slice(1) + '.'; };
+    if (a.ghost) return 'Ghosts cannot handle items.';
+    const own = (sid?: string) => sid ? findSid(allItems(ch), sid) : null;
+    const remainsNear = () => {
+      const r = cmd.from !== undefined ? this.remains.get(cmd.from) : undefined;
+      if (!r || r.realmId !== a.realmId) return { err: 'Those remains are gone.' };
+      if (Math.hypot(r.s.x - a.s.x, r.s.y - a.s.y) > ITEMS.reach) return { err: 'Move within 2 m.' };
+      if (r.owner && r.owner !== a.characterId) return { err: `That is ${r.ownerName || 'someone'}'s body; only they can take from it.` };
+      return { r };
+    };
+    switch (cmd.op) {
+      case 'equip': {
+        const it = own(cmd.item); if (!it) return 'That item is gone.';
+        const r = EQ.equipItem(ch, { uid: it.uid, slot: cmd.slot }); if (!r.ok) return cap1(r);
+        this.inventoryChanged(a, true, true); return null;
+      }
+      case 'unequip': {
+        if (!cmd.slot || !EQ.SLOT[cmd.slot]) return 'No such slot.';
+        const r = EQ.unequipItem(ch, { slot: cmd.slot }); if (!r.ok) return cap1(r);
+        this.inventoryChanged(a, true, true); return null;
+      }
+      case 'drop': {
+        const it = own(cmd.item); if (!it) return 'That item is gone.'; const worn = Object.values(ch.equip).includes(it);
+        let pile: Remains | null = null;
+        for (const r of this.remains.values()) if (r.pile && r.realmId === a.realmId && Math.hypot(r.s.x - a.s.x, r.s.y - a.s.y) < ITEMS.pileJoin) { pile = r; break; }
+        const res = EQ.dropItem(ch, { uid: it.uid, qty: cmd.qty }, (out: any) => {
+          if (pile) { pile.cont.items.push(out); pile.expires = this.now + ITEMS.pileLife; }
+          else pile = this.addRemains(a.realmId, { name: 'dropped items', items: [out], x: a.s.x, y: a.s.y, sect: 0, life: ITEMS.pileLife, pile: true });
+          return true;
+        });
+        if (!res.ok) return cap1(res);
+        stamp(this.SF, pile!.cont.items, new Set(allItems(ch).map((i: any) => i.sid)));   // a split-off stack gets its own id
+        this.inventoryChanged(a, true, worn); this.remainsChanged(pile!); return null;
+      }
+      case 'take': case 'takeall': {
+        const n = remainsNear(); if (n.err) return n.err; const r = n.r!;
+        const list = cmd.op === 'takeall' ? r.cont.items.slice() : [findSid(r.cont.items, cmd.item || '')].filter(Boolean);
+        if (!list.length) return cmd.op === 'takeall' ? 'Nothing left to take.' : 'That item is gone.';
+        let took = 0, why = '';
+        for (const it of list) {
+          const q = cmd.op === 'take' && cmd.qty !== undefined ? cmd.qty : it.qty;
+          const res = EQ.pickupItem(ch, r.cont, { uid: it.uid, qty: q }); if (!res.ok) { why = cap1(res); break; } took++;
+        }
+        if (took) { this.inventoryChanged(a, true); this.remainsChanged(r); }
+        return took ? (why && cmd.op === 'takeall' ? 'Stopped: ' + why : null) : why || 'Not possible.';
+      }
+      case 'split': {
+        const it = own(cmd.item); if (!it || !ch.pack.items.includes(it)) return 'That item is not in your backpack.';
+        const r = EQ.splitStack(ch.pack, { uid: it.uid, qty: cmd.qty }); if (!r.ok) return cap1(r);
+        this.inventoryChanged(a, true); return null;
+      }
+      case 'merge': {
+        const f = own(cmd.item), t = own(cmd.into); if (!f || !t) return 'That item is gone.';
+        const r = EQ.mergeStacks(ch.pack, { from: f.uid, into: t.uid }); if (!r.ok) return cap1(r);
+        this.inventoryChanged(a, true); return null;
+      }
+      case 'mergeall': { const n = EQ.mergeAll(ch.pack); if (n) this.inventoryChanged(a, true); return n ? null : 'Nothing to merge.'; }
+      default: return 'Unknown item command.';
+    }
+  }
+  /* the live inventory for a character that just (re)joined: the welcome's snapshot comes from the database, which can trail memory */
+  sendInventory(characterId: string) { const a = this.actors.get(characterId); if (a && a.ch) this.sink(a, 'inv', inventoryOf(a.ch)); }
+  /* characters whose items changed through wear or arrows since they were last saved */
+  takeInvDirty(): Actor[] { const out: Actor[] = []; for (const a of this.actors.values()) if (a.invDirty) { a.invDirty = false; out.push(a); } return out; }
   /* characters whose position changed since they were last saved */
   takeDirty(): Actor[] { const out: Actor[] = []; for (const a of this.actors.values()) if (a.dirty) { a.dirty = false; out.push(a); } return out; }
 }

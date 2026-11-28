@@ -37,9 +37,9 @@ const pop = (w: World) => w.populations.get('realm')!;
 const keyOf = (type: string) => DATA.spawners.find(o => o.type === type)!.key;
 const events = (out: [Actor, string, any][], who: Actor) => out.filter(m => m[0] === who && m[1] === 'combat').map(m => m[2]);
 
-test('protocol v4: target and resurrect are the only new client messages; swings, damage and loot stay refused', () => {
+test('protocol v4+: target and resurrect from clients; swings, damage and loot stay refused', () => {
   const ok = (type: string, p: any) => P.parseClient(JSON.stringify({ v: P.PROTOCOL_VERSION, type, p }));
-  assert.equal(P.PROTOCOL_VERSION, 4);
+  assert.ok(P.PROTOCOL_VERSION >= 4);
   assert.ok(ok('target', { nid: 12 }).ok); assert.ok(ok('target', { nid: null }).ok);
   for (const bad of [{}, { nid: 0 }, { nid: -3 }, { nid: 1.5 }, { nid: '7' }, { nid: 3, dmg: 99 }]) assert.equal(ok('target', bad).ok, false, JSON.stringify(bad));
   assert.ok(ok('resurrect', { at: 'shrine' }).ok); assert.ok(ok('resurrect', { at: 'bound' }).ok); assert.equal(ok('resurrect', { at: 'anywhere' }).ok, false);

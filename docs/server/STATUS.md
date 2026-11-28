@@ -1,5 +1,21 @@
 # Server status
 
+## Phase 5 — Server Items v1 (branch `feature/server-items-v1`, build v0.44)
+
+Items are the server's: backpack, equipment and bank held and saved by the server, every change through the shared `SF.EQ`
+commands, creature remains with loot, a dead character's body, dropped piles, wear and arrows. Details: [ITEMS.md](ITEMS.md).
+
+| Area | State |
+| --- | --- |
+| Commands | equip, unequip, drop, take, take all, split, merge, merge all — `SF.EQ` / `SF.transfer`, items named by server id |
+| Remains | Creature loot (tables exported from the build), death bodies (`SF.deathTransaction`, owner only online), piles; decay |
+| Saving | At once after every command, in one ordered queue; wear and arrows with the periodic save; the ground is not saved |
+| Protocol | v5: `item` from clients; `inv`, `remains`, remains in `actor.enter`; look / broke / arrow events |
+| Client | The game's backpack, paper doll and loot panel routed to the server; B / C keys and Bag / Gear in the online bar |
+| Not yet | Banker, vendors, crafting, repair, using items, skinning, trading, looting others' bodies |
+
+---
+
 ## Phase 4 — Server Combat v1 (branch `feature/server-combat-v1`, build v0.42)
 
 Characters and creatures fight online, and the server decides every blow with the game's rules: arming, the swing timer, hit
