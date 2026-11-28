@@ -1,0 +1,12 @@
+.git
+node_modules
+.env
+.env.*
+*_offline.html
+tests
+docs
+asset-packs
+tools
+assets/bestiary
+assets/humans
+assets/audio/*.json

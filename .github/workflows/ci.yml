@@ -1,10 +1,11 @@
 # Checks for every push and pull request, and the gate in front of every Pages deployment (pages.yml calls this workflow).
 #   build:  every script block compiles, the committed build equals ./build.sh output, assets and manifests are complete,
 #           and every node rules suite passes against the built game.
-#   smoke:  every browser suite in Chrome (desktop and phone sizes), including the stabilization save/reload checks.
-#           Blocking on pushes and pull requests. When pages.yml calls this with smoke_advisory: true, a smoke failure is
-#           reported but does not stop the deploy (timing-sensitive browser checks must not keep a build that passed every
-#           rules suite offline); build failures always block.
+#   smoke:  every browser suite in Chrome (desktop and phone sizes), including the stabilization save/reload checks and the
+#           real v0.28.1 save migration. Always blocking (v0.33.1): pages.yml no longer deploys past a failed browser suite.
+#           The smoke_advisory input is kept only for a manual diagnostic run (workflow_dispatch); nothing passes it by default.
+#   soak:   one game day of the long-duration world simulation (tests/soak/run.py): blocking on errors, failed requests and
+#           unbounded growth. Its step and draw times are reported as diagnostics in the log and the uploaded JSON report.
 name: Checks
 
 on:
@@ -24,8 +25,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
       - name: Find the build
@@ -36,7 +37,7 @@ jobs:
         run: python3 tests/check-build.py "$GAME"
       - name: Rules suites
         run: |
-          for t in rules skills stats creation magery equipment combat world inventory gear painted wardrobe; do
+          for t in rules skills stats creation magery equipment combat world persist adventurers inventory gear painted wardrobe; do
             echo "::group::$t"; node "tests/$t.test.js" "$GAME"; echo "::endgroup::"
           done
 
@@ -46,10 +47,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-      - name: Fetch the old builds the save-migration tests load (v0.16, v0.22)
-        run: git fetch --depth=1 origin 70c5d60336a9a341b3350ef416d0e77dfec4c78c e59be0201e7a80393453d469ddf46ef0e115241c
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - name: Fetch the old builds the save-migration tests load (v0.16, v0.22, v0.28.1)
+        run: |
+          git fetch --depth=1 origin 70c5d60336a9a341b3350ef416d0e77dfec4c78c e59be0201e7a80393453d469ddf46ef0e115241c b362b46b440634b797b49f65d8ec07ca1acbede7
+          git cat-file -e b362b46b440634b797b49f65d8ec07ca1acbede7:Shardfall_v0.28.1.html   # required: the v0.28.1 migration check fails without it
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
       - name: Install Playwright (uses the runner's Google Chrome)
@@ -59,6 +62,7 @@ jobs:
           GAME=$(ls Shardfall_v*.html | grep -v _offline | sort -V | tail -n 1); G="$PWD/$GAME"; fail=0
           run() { echo "::group::$1"; shift; if ! "$@"; then fail=1; echo "::error::$* failed"; fi; echo "::endgroup::"; }
           run stability   python3 tests/stability-smoke/run.py "$G"
+          run durability  python3 tests/stability-smoke/durability.py "$G"
           run equipment   python3 tests/equipment-smoke/run.py "$G"
           run combat      python3 tests/combat-smoke/run.py "$G"
           run magery      python3 tests/magery-smoke/run.py "$G"
@@ -75,3 +79,25 @@ jobs:
           run gear        python3 tests/gear-smoke/run.py "$G"
           run painted     python3 tests/painted-smoke/run.py "$G"
           exit $fail
+
+  soak:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install Playwright (uses the runner's Google Chrome)
+        run: pip install playwright
+      - name: Soak (one game day, save and reload half way)
+        run: |
+          GAME=$(ls Shardfall_v*.html | grep -v _offline | sort -V | tail -n 1)
+          python3 tests/soak/run.py "$GAME" --days 1 --report soak-report.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: soak-report
+          path: soak-report.json
+          if-no-files-found: ignore

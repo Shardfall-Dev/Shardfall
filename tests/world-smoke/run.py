@@ -41,7 +41,7 @@ with sync_playwright() as p:
   check(set(r['by']) >= {'player', 'merchant', 'civilian', 'guard', 'animal', 'monster', 'criminal', 'hireling'}, 'archetypes: ' + json.dumps(r['by']), r)
 
   # 2. controller dispatch drives the same behaviour as before; townsfolk stay put; taming re-derives the controller and keeps the id
-  r = J(pg, """() => { const S = __SF, P = S.P; const far = e => Math.hypot(e.x - P.x, e.y - P.y) > 40;
+  r = J(pg, """() => { const S = __SF, P = S.P; const far = e => { const d = Math.hypot(e.x - P.x, e.y - P.y); return d > 40 && d < S.TIER.radii.b; };   // away from the player, but not in distant tier C, where creatures hold (phase 6)
     const m = S.ents.find(e => e.kind === 'mon' && e.type === 'boar' && far(e)); const n = S.ents.find(e => e.role === 'smith');
     const m0 = [m.x, m.y], n0 = [n.x, n.y]; m.state = 'idle'; m.wt = 0; for (let i = 0; i < 200; i++) S.update(.05);
     const moved = Math.hypot(m.x - m0[0], m.y - m0[1]) > .2, npcStill = n.x === n0[0] && n.y === n0[1];
@@ -79,13 +79,15 @@ with sync_playwright() as p:
   # 5. save → reload → continue: the same named ids, the counter continues, save v5
   r1 = J(pg, """() => { const S = __SF; const named = S.ents.filter(e => e.kind === 'npc' || e.kind === 'ally').map(e => e.actorId).sort();
     const nums = S.ents.filter(e => e.kind === 'mon').map(e => +e.actorId.split(':').pop()); S.save(); const sv = JSON.parse(localStorage.getItem('shardfall.save.v1'));
-    return { named, maxNum: Math.max(...nums), v: sv.v, sim: sv.sim } }""")
+    return { named, maxNum: Math.max(...nums), v: sv.v, sim: sv.sim, monIds: S.ents.filter(e => e.kind === 'mon' && !e.gone).map(e => e.actorId) } }""")
   pg.reload(); pg.wait_for_timeout(400); pg.click('[data-c=cont]'); pg.wait_for_timeout(300)
   r2 = J(pg, """() => { const S = __SF; const named = S.ents.filter(e => e.kind === 'npc' || e.kind === 'ally').map(e => e.actorId).sort();
-    const nums = S.ents.filter(e => e.kind === 'mon').map(e => +e.actorId.split(':').pop()); return { named, minNum: Math.min(...nums), player: S.P.actorId, seed: S.WS.seed } }""")
+    const mons = S.ents.filter(e => e.kind === 'mon' && !e.gone); return { named, monIds: mons.map(e => e.actorId), player: S.P.actorId, seed: S.WS.seed } }""")
   check(r1['v'] >= 5 and r1['sim'] and r1['sim']['seed'] == 1999 and r1['sim']['ids']['next'] > r1['maxNum'], 'the save (v5+) carries the world seed and id counter', r1)
   check(r2['named'] == r1['named'] and r2['player'] == 'player:p1', f"{len(r2['named'])} townsfolk and Wren keep their ids across a reload", {'a': r1['named'][:5], 'b': r2['named'][:5]})
-  check(r2['minNum'] > r1['maxNum'], 'creatures spawned after the reload never reuse an id', [r1['maxNum'], r2['minNum']])
+  # since v0.35 (phase 6) saved creatures come back with their own ids; any creature that is new after the reload takes a fresh number
+  old = set(r1['monIds']); kept = [i for i in r2['monIds'] if i in old]; new = [int(i.split(':')[-1]) for i in r2['monIds'] if i not in old]
+  check(len(kept) > 0 and len(set(r2['monIds'])) == len(r2['monIds']) and all(n > r1['maxNum'] for n in new), f"after the reload {len(kept)} creatures keep their ids; the {len(new)} new ones never reuse a number", [r1['maxNum'], min(new) if new else None])
 
   # 6. a v4 save (Anniabreen build) migrates to v5 and plays on
   r = J(pg, """() => { const S = __SF; const s = JSON.parse(localStorage.getItem('shardfall.save.v1')); s.v = 4; delete s.sim; const keep = JSON.stringify(s.char.pack);
@@ -116,7 +118,7 @@ with sync_playwright() as p:
   r = J(pg, "() => ({ gt: __SF.GT, n: __SF.WS.reg.size, sz: __SF.WS.bus.size })")
   check(r['gt'] > 2 and r['n'] > 100 and not errs, 'the live loop runs with the new dispatch', {'r': r, 'errs': errs[:5]}); ctx.close()
   b.close()
-import subprocess   # phase 2: clock, light, navigation, developer panel; the world expansion; phase 3: the monster ecosystem; phase 4: living NPCs
-for extra in ['phase2.py', 'expansion.py', 'phase3.py', 'phase4.py', 'phase5.py']:
+import subprocess   # phase 2: clock, light, navigation, developer panel; the world expansion; phase 3: the monster ecosystem; phase 4: living NPCs; phase 5: NPC combat and the law; phase 6: simulation tiers and population persistence
+for extra in ['phase2.py', 'expansion.py', 'phase3.py', 'phase4.py', 'phase5.py', 'phase5_law.py', 'phase5_adv.py', 'phase6.py']:
   r = subprocess.run([sys.executable, os.path.join(here, extra), f, chrome], capture_output=True, text=True); print(r.stdout.strip() or r.stderr[-800:]); fails += r.returncode != 0
 print('ALL PASS' if not fails else f'{fails} FAILED'); sys.exit(1 if fails else 0)

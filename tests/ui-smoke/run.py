@@ -29,6 +29,24 @@ TGT = "() => { const e = document.querySelector('#tgt'); if (!e || e.hidden) ret
 STEP = "n => { for (let i = 0; i < n; i++) { __SF.update(.05); __SF.refreshHud(); } }"
 HOLD = "([D, n]) => { const S = __SF, m = S.P.sel; for (let i = 0; i < n; i++) { if (S.P.sel === m) { S.P.x = m.x - D; S.P.y = m.y; } S.update(.05); S.refreshHud(); } }"   # keeps the player D tiles from a wandering creature
 PLACE = "([dx, dy]) => { const P = __SF.P; P.x += dx; P.y += dy; }"
+# v0.33.1 combat fixture: clear ground (no other actor within 30 tiles, not protected), full health, damage recorded with its source
+CLEAR_GROUND = """() => { const S = __SF, P = S.P; for (let r = 20; r < 400; r += 4) for (let a = 0; a < 24; a++) { const x = P.x + Math.cos(a / 12 * Math.PI) * r, y = P.y + Math.sin(a / 12 * Math.PI) * r;
+    if (!S.canStand(P, x, y) || !S.canStand({ kind: 'mon', type: 'boar' }, x + 1.2, y) || !S.canStand({ kind: 'mon', type: 'boar' }, x + 5, y) || S.protAt(x, y) || !S.los(P, { x: x + 5, y })) continue;
+    if (S.ents.some(e => e !== P && (e.kind === 'npc' || e.kind === 'mon' || e.kind === 'pet' || e.kind === 'ally') && !e.gone && Math.hypot(e.x - x, e.y - y) < 30)) continue;
+    P.x = x; P.y = y; P.sel = null; P.armed = false; P.hp = S.SF.maxHp(P); S.update(.05); S.refreshHud(); return [Math.round(x), Math.round(y)]; } return null; }"""
+ARM_BOAR = """() => { const S = __SF, P = S.P; P.hp = S.SF.maxHp(P); const m = S.spawnMon('boar', 1.2, 0); m.state = 'chase'; m.target = P; P.sel = m; window.__b = m;
+    if (!window.__dmgOn) { window.__dmgOn = true; window.__dmg = []; S.WS.bus.on('ActorDamaged', e => window.__dmg.push({ seq: e.seq, actor: e.actor, source: e.source, amount: e.amount })); }
+    S.toggleArm(); S.refreshHud(); }"""
+MARK_CLOSE = "() => { window.__closeSeq = __SF.WS.bus.seq; window.__closeGT = __SF.GT; return { hp: window.__b.hp, seq: window.__closeSeq }; }"
+AFTER_CLOSE = """() => { const S = __SF, P = S.P, b = window.__b, id = S.aidOf(b), me = S.aidOf(P), on = window.__dmg.filter(e => e.seq > window.__closeSeq && e.actor === id);
+    return { mine: on.filter(e => e.source === me).length, other: on.filter(e => e.source !== me).map(e => e.source), swung: !!(P.once && P.once.t0 > window.__closeGT && /_Attack$/.test(P.once.clip)), hp: b.hp, tgtP: b.target === P, st: b.state, alive: !P.ghost && P.hp > 0 }; }"""
+GUARD_GROUND = """() => { const S = __SF, P = S.P, g = S.LIFE.npcs.find(e => e.life.prof === 'guard' && e.life.town === 'vespar' && !e.downed); if (!g) return null; const c = S.lifeTownGeo('vespar').center;
+    for (let r = 18; r <= 56; r++) for (let k = 0; k < 48; k++) { const a = k / 48 * Math.PI * 2, x = c.x + Math.cos(a) * r, y = c.y + Math.sin(a) * r;   // just outside protected ground, inside the guards' jurisdiction
+      if (S.protAt(x, y) || S.protAt(x + 1.2, y) || !S.canStand(P, x, y) || !S.canStand({ kind: 'mon', type: 'boar' }, x + 1.2, y)) continue;
+      for (let q = 0; q < 40; q++) { const b = q / 40 * Math.PI * 2, gx = x + Math.cos(b) * 7, gy = y + Math.sin(b) * 7; if (!S.canStand(g, gx, gy) || !S.los({ x: gx, y: gy }, { x: x + 1.2, y })) continue;
+        for (const m of S.ents.slice()) if (m.kind === 'mon' && Math.hypot(m.x - x, m.y - y) < 30) S.rmEnt(m);
+        P.x = x; P.y = y; P.sel = null; P.armed = false; g.x = gx; g.y = gy; g._px = gx; g._py = gy; g.nav = null; g.foe = null; g.life.goal = null; g.life.thinkAt = S.GT + 1e9;
+        S.update(.05); S.refreshHud(); window.__guard = S.aidOf(g); return [S.aidOf(g), Math.round(x), Math.round(y)]; } } return null; }"""
 
 def start(pg, errs, n=0):
     pg.on('pageerror', lambda e: errs.append(str(e)))
@@ -93,8 +111,14 @@ with sync_playwright() as p:
     pg.evaluate("() => { const pb = document.querySelector('#panel .pb'); pb.scrollTop = 0; }"); pg.wait_for_timeout(200)
     pg.click('#panel [data-a=bagsort][data-s="Name"]'); pg.wait_for_timeout(150)
     bb = pg.locator(cell('Iron Quay sword')).bounding_box(); r = [bb['x'] + 20, bb['y'] + 20]
+    # v0.33.1: timed in the page (the pointer entering the tile → the moment #itip appears), so a slow runner between Playwright calls cannot make
+    # the check fail (or pass) by accident; the tooltip must never appear sooner than its 300 ms delay after the pointer enters the tile
+    pg.evaluate("""() => { const el = document.querySelector('#itip'); window.__tipMove = 0; window.__tipShown = 0;
+      addEventListener('pointerover', e => { if (e.target.closest && e.target.closest('[data-tip]')) { window.__tipMove = performance.now(); window.__tipShown = 0; } }, true);
+      new MutationObserver(() => { if (!el.hidden && !window.__tipShown) window.__tipShown = performance.now(); }).observe(el, { attributes: true, attributeFilter: ['hidden'] }); }""")
     pg.mouse.move(*r); pg.wait_for_timeout(120)
-    check(pg.evaluate("document.querySelector('#itip').hidden") is True, 'no tooltip before the hover delay')
+    w = pg.evaluate("() => ({ over: window.__tipMove > 0, hidden: document.querySelector('#itip').hidden, since: performance.now() - window.__tipMove, shownAfter: window.__tipShown ? window.__tipShown - window.__tipMove : null })")
+    check(w['over'] and (w['hidden'] if w['since'] < 295 else True) and (w['shownAfter'] is None or w['shownAfter'] >= 295), 'no tooltip before the hover delay', w)
     pg.wait_for_timeout(350)
     tip = pg.evaluate("() => { const e = document.querySelector('#itip'); return e.hidden ? null : e.innerText; }")
     check(tip is not None and 'Damage' in tip and 'Speed' in tip and 'Weight' in tip, 'about 300 ms of hover shows the weapon tooltip', tip)
@@ -124,6 +148,16 @@ with sync_playwright() as p:
     pg.click(cell('Bandage')); pg.wait_for_timeout(100); pg.click('#ipop button:text-is("Split 1")'); pg.wait_for_timeout(150)
     check(pg.evaluate("() => __SF.P.pack.items.filter(i => i.id === 'bandage').map(i => i.qty).sort()") == [1, 4], 'Split 1 splits the stack', pg.evaluate("() => __SF.P.pack.items.filter(i => i.id === 'bandage').map(i => i.qty)"))
     # ---- compare and equip ----
+    # v0.33.1: the bandage popup opens beside the bandage tile and, depending on the scroll position left by the checks above, can
+    # cover the tunic tile. Playwright then retries the click with other scroll positions, racing the virtualized grid's redraw on
+    # scroll, and the click could miss (seen in 1 of 16 and 1 of 9 runs; a diagnostic run showed the popup's close button over the
+    # tunic). Close the popup first, as a player would, after the grid shows both bandage stacks.
+    settled = True
+    try: pg.wait_for_function("() => [...document.querySelectorAll('#panel .bagcell small')].filter(s => s.textContent === 'Bandage').length === 2", timeout=5000)
+    except Exception: settled = False
+    check(settled, 'the backpack shows the split stack (two bandage tiles)')
+    pg.keyboard.press('Escape'); pg.wait_for_timeout(80)
+    check(pg.evaluate(IPOP) is None and pg.evaluate("__SF.PANEL") == 'bag', 'Escape closes the bandage popup (backpack stays open)')
     pg.click(cell('Iron chainmail tunic')); pg.wait_for_timeout(120)
     pop = pg.evaluate(IPOP)
     check(pop and all(k in pop['kv'] for k in ['Armor family', 'Material', 'Armor protection', 'Weight', 'Quality']) and ('Durability' in pop['kv']) == pg.evaluate("() => __SF.P.pack.items.find(i => i.id === 'chain_tunic').cond !== undefined") and 'Equip' in pop['acts'] and 'Inspect' in pop['acts'], 'armor popup: family, material, protection, weight, quality (durability only when tracked), Equip, Inspect', pop)
@@ -243,14 +277,23 @@ with sync_playwright() as p:
     check(pg.evaluate("__SF.P.sel !== window.__k") and (t is None or 'Loot' in t['acts']), 'killing the target never leaves the dead creature selected; its remains offer Loot', t)
     if t: pg.screenshot(path=os.path.join(shots, 'desktop-target-corpse.png'))
     check(t is None or not any('NaN' in c for c in t['chips'] + [t['sub']]), 'creature remains: no meaningless loot-rights line', t)
-    # closing during combat
-    pg.evaluate("() => { const S = __SF; const m = S.spawnMon('boar', 1.2, 0); m.state = 'chase'; m.target = S.P; S.P.sel = m; window.__b = m; S.toggleArm(); S.refreshHud(); }")
+    # closing during combat (v0.33.1 isolated fixture). Reproduced cause of the old intermittent failure: the player's health was left
+    # to the random fights before this block, and the real game loop keeps running between Playwright calls, so the boar could kill
+    # the player inside the window and drop its fight; guards and other creatures nearby could also hurt or retarget it. Now: clear
+    # ground with no other actor within 30 tiles and outside protected ground, the player at full health, and every hit on the
+    # boar recorded with its source. "No attack" means no damage from the player and no new swing after the close; the boar's own
+    # AI is checked separately, and a guard's independent fight is checked further down.
+    clear = pg.evaluate(CLEAR_GROUND)
+    check(clear is not None, 'combat fixture: found clear ground with no other actors within 30 tiles', clear)
+    pg.evaluate(ARM_BOAR)
     check(pg.evaluate("__SF.P.armed") is True and 'Attacking' in ' '.join(pg.evaluate(TGT)['chips']), 'armed attack shows on the frame')
-    hp0 = pg.evaluate("window.__b.hp")
     pg.click('#tgt .tf-x'); pg.wait_for_timeout(50)
+    closed = pg.evaluate(MARK_CLOSE)
     check(pg.evaluate("[__SF.P.armed, __SF.P.sel]") == [False, None] and pg.evaluate(TGT) is None, 'closing the frame during combat clears the target and stops the armed swing')
     pg.evaluate(STEP, 40)
-    check(pg.evaluate("window.__b.hp") == hp0 and pg.evaluate("window.__b.target === __SF.P"), 'no attack after closing; the creature keeps its own fight (unchanged AI)')
+    r = pg.evaluate(AFTER_CLOSE)
+    check(r['mine'] == 0 and not r['swung'] and r['hp'] == closed['hp'] and not r['other'], 'no attack after closing: no damage from you, no new swing, the creature\'s health unchanged', [closed, r])
+    check(r['tgtP'] and r['st'] in ('chase', 'tele', 'strike', 'rec') and r['alive'], 'the creature keeps its own fight against you (unchanged AI)', r)
     # Escape order: popup first, then cancel, then target
     pg.evaluate("() => { __SF.P.sel = window.__b; __SF.toggleArm(); __SF.refreshHud(); __SF.ACT.bag(); }"); pg.wait_for_timeout(100)
     pg.click('#panel .bagcell >> nth=0'); pg.wait_for_timeout(80)
@@ -263,6 +306,33 @@ with sync_playwright() as p:
     pg.keyboard.press('Escape'); pg.wait_for_timeout(50)
     check(pg.evaluate("__SF.P.sel") is None and pg.evaluate(TGT) is None, 'Escape 4: clears the target')
     pg.evaluate("() => __SF.rmEnt(window.__b)")
+    # a bow shot already in flight when the frame closes still lands (the release was committed, src/game.js arrowLands); no new
+    # shot is released afterwards
+    pg.evaluate(CLEAR_GROUND)
+    pg.evaluate("""() => { const S = __SF, P = S.P, SF = S.SF; window.__oldW = P.equip.weapon; P.equip.weapon = SF.newItem('shortbow', 1); SF.addItem(P.pack, SF.newItem('arrow', 20)); P.skills.archery.v = 1000; P.drawn = false; S.weaponChanged(); P.movedAt = -99; }""")
+    pg.evaluate(ARM_BOAR.replace("spawnMon('boar', 1.2, 0)", "spawnMon('boar', 5, 0)"))
+    # v0.33.1 follow-up: the loops below keep the player 5 tiles behind the boar, so a charging boar drags the player along. Like
+    # STEP and HOLD they refresh the HUD every step: without it, a slow shot (about 135 steps on a loaded runner) moved the player
+    # 8-16 tiles between two HUD refreshes, past TARGET_RETAIN.jump (6), and the target frame correctly dropped the target as
+    # "travel", so the close button below never appeared (seen 1 in 14 full runs; 2 in 60 isolated repeats under CPU load).
+    shot = pg.evaluate("() => { for (let i = 0; i < 200 && !__SF.P.shots; i++) { __SF.P.x = window.__b.x - 5; __SF.P.y = window.__b.y; __SF.P.movedAt = -99; __SF.update(.05); __SF.refreshHud(); } return __SF.P.shots || 0; }")
+    arrows0 = pg.evaluate("__SF.SF.count(__SF.P.pack, 'arrow')")
+    t = pg.evaluate(TGT)
+    check(t is not None and pg.evaluate("__SF.P.sel === window.__b"), 'bow fixture: the boar is still the target when its arrow is in flight', t)
+    pg.click('#tgt .tf-x'); pg.wait_for_timeout(50); closed = pg.evaluate(MARK_CLOSE)
+    pg.evaluate("() => { for (let i = 0; i < 60; i++) { __SF.P.x = window.__b.x - 5; __SF.P.y = window.__b.y; __SF.update(.05); __SF.refreshHud(); } }")
+    r = pg.evaluate(AFTER_CLOSE); arrows1 = pg.evaluate("__SF.SF.count(__SF.P.pack, 'arrow')")
+    check(shot == 1 and arrows1 == arrows0 and pg.evaluate("__SF.P.shots || 0") == 0 and r['mine'] <= 1, 'a shot in flight when the frame closes may still land; no new arrow is released', [shot, arrows0, arrows1, r['mine']])
+    pg.evaluate("() => { const S = __SF, P = S.P; S.rmEnt(window.__b); P.equip.weapon = window.__oldW || null; S.weaponChanged(); }")
+    # guard AI is independent of the player's frame: after you close it, a guard still steps in and its hits are the guard's
+    g = pg.evaluate(GUARD_GROUND)
+    check(g is not None, 'combat fixture: found ground beside a town guard, outside protected ground, in his sight and jurisdiction', g)
+    if g:
+        pg.evaluate(ARM_BOAR); pg.click('#tgt .tf-x'); pg.wait_for_timeout(50); closed = pg.evaluate(MARK_CLOSE)
+        gr = pg.evaluate("""() => { const S = __SF, b = window.__b; for (let i = 0; i < 900; i++) { S.P.hp = S.SF.maxHp(S.P); S.update(.05); if (window.__dmg.some(e => e.seq > window.__closeSeq && e.source === window.__guard)) break; }
+          return { guard: window.__dmg.filter(e => e.seq > window.__closeSeq && e.source === window.__guard).length, mine: window.__dmg.filter(e => e.seq > window.__closeSeq && e.source === S.aidOf(S.P)).length, engaged: !!S.ents.find(e => S.aidOf(e) === window.__guard && e.foe === b) || !b || b.gone || b.dead }; }""")
+        check(gr['guard'] > 0 and gr['mine'] == 0, 'after you close the frame a guard still fights the creature; every hit after the close is the guard\'s, none yours', gr)
+        pg.evaluate("() => { if (window.__b && !window.__b.gone) __SF.rmEnt(window.__b); }")
     # ally and self
     pg.evaluate("() => { const S = __SF; const a = S.allyOf && S.allyOf(); if (a) { S.P.x = a.x - 2; S.P.y = a.y; S.P.sel = a; } S.refreshHud(); }")
     t = pg.evaluate(TGT)

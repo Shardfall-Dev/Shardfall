@@ -1,6 +1,6 @@
-// usage: node tests/wardrobe.test.js Shardfall_v0.33.html — the NPC wardrobe (SF.WARDROBE) drawn by SF.GEAR (the layered renderer), with no browser.
+// usage: node tests/wardrobe.test.js Shardfall_v0.33.1.html — the NPC wardrobe (SF.WARDROBE) drawn by SF.GEAR (the layered renderer), with no browser.
 // Data validation, determinism, real-equipment fidelity, two-handed rules, cosmetic isolation and rig coverage.
-const fs = require('fs'); const html = fs.readFileSync(process.argv[2] || 'Shardfall_v0.33.html', 'utf8');
+const fs = require('fs'); const html = fs.readFileSync(process.argv[2] || 'Shardfall_v0.33.1.html', 'utf8');
 const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
 const load = () => { const g = {}; const m = { exports: {} };
   new Function('module', 'globalThis', scripts.find(t => t.includes('SF.METALS')))(m, g); g.SF = m.exports;

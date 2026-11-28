@@ -11,7 +11,8 @@
        the guards; the merchant hurries on.
      · At 0 health an NPC is knocked down, not killed: creatures lose interest, and after NPC_DOWN_TIME they get up with a
        third of their health and go home to recover. Real NPC death, corpses and looting are phase 5 step 4.
-     · You cannot hurt townsfolk yet: unlawful aggression, criminal flags and murder counts are phase 5 step 2.
+     · Since v0.34 (phase 5 step 2, src/law.js) you can attack townsfolk: it is a crime unless they are grey or red or you have
+       a right over them, witnesses call the guards, and the guards fight you inside their jurisdiction like any creature.
    Pure numbers live here as data; the game's existing functions call in through npcFighter / damageNpc / npcCombatTick. */
 
 const NPC_DOWN_TIME = 60;          // seconds lying wounded before getting up
@@ -43,49 +44,57 @@ function npcArm(e) {
   e.eqMig = SF.EQ.MIGRATION; e.max = Math.round(SF.maxHp(e) * F.hp); e.hp = e.max; e.stam = e.dex; e.sw = SF.newSwing(); e.downed = false; e.downAt = 0; e.foe = null;
 }
 const npcCombatant = e => !!e && e.kind === 'npc' && !!e.npcFight;
-const npcUp = e => npcCombatant(e) && !e.gone && !e.downed;
+const npcUp = e => npcCombatant(e) && !e.gone && !e.downed && !e.ghost;   // ghost: a dead NPC adventurer (v0.36)
 
 /* ---------- taking a blow (damageActor routes every NPC here) ---------- */
 function damageNpc(e, amt, kind, src, hx) {
+  if (e.adv) return advDamaged(e, amt, kind, src, hx);   // NPC adventurers take blows, fight back and die by the player's rules (src/adventurers.js)
   if (!npcUp(e) || !(amt > 0)) return;
-  if (src && (src === P || src.kind === 'ally' || src.kind === 'pet' || src.summon || (src.owner && src.owner === P))) return;   // the law comes in phase 5 step 2: until then you cannot harm townsfolk
+  if (src && lawSide(src)) lawAggress(src, e);   // the law (src/law.js): the swing already recorded it; this catches every other path
   e.hp -= amt; e.lastHit = GT; e.lastCombat = GT; NPCF.hitsTaken++;
   simEmit('ActorDamaged', { actor: aidOf(e), source: aidOf(src), amount: amt, kind: kind || 'phys', x: e.x, y: e.y });
   floater(e.x, e.y, '-' + Math.round(amt), kind === 'poison' ? '#7be07b' : '#ff8a6a'); hitSound(e, kind, src, hx, e.hp <= 0);
   if (src && src.kind === 'mon' && alive(src)) {
-    if (e.npcFight.fights) { if (!e.foe || !alive(e.foe)) npcEngage(e, src, 'attacked by ' + src.name); }
+    if (e.npcFight.fights) { if (!e.foe || !fighterAlive(e.foe)) npcEngage(e, src, 'attacked by ' + src.name); }
     else npcFlee(e, src);
     npcCallGuards(e, src);
+  } else if (src && lawResponsible(src) && lawResponsible(src) !== e) {   // a person attacked them: a guard fights back when the law allows, everyone else runs and shouts
+    const who = lawResponsible(src);
+    if (e.npcFight.fights) { if ((!e.foe || !fighterAlive(e.foe)) && lawGuardTarget(e, who)) npcEngage(e, who, 'attacked by ' + (who === P ? 'you' : who.name)); }
+    else npcFlee(e, who);
+    npcCallGuards(e, who);
   }
   if (e.hp <= 0) npcDown(e, src);
 }
 /* a townsperson under attack runs for shelter at once and remembers why */
-function npcFlee(e, src) {
-  const L = e.life; if (!L) return; SIM.frighten(L.needs, 1); L.needs.safety = 1;
-  if (L.prof === 'trader') { L.hurry = true; L.mind.why = 'attacked by a ' + src.name + ' on the road'; }
+function npcFlee(e, src, what) {
+  const L = e.life; if (!L) return; SIM.frighten(L.needs, 1); L.needs.safety = 1; const who = src === P ? P.name : 'a ' + src.name;
+  if (what === 'looting') what = 'theft';   // a looted body is theft to the onlookers (v0.36)
+  if (L.prof === 'trader') { L.hurry = true; L.mind.why = (what === 'theft' ? 'robbed by ' : 'attacked by ') + who + ' on the road'; }
   else { L.mind.act = null; L.thinkAt = 0; L.goal = null; }
-  if (!L.mem.knows('attacked by', aidOf(src))) L.mem.note(GT, 'attacked by', aidOf(src), { x: Math.round(e.x), y: Math.round(e.y) }, 300);
-  if (GT > (e.helpAt || 0)) { e.helpAt = GT + 6; say(e, pick(['Help! Guards!', 'Guards! Guards!', 'Get it off me!'])); }
+  if (what !== 'theft' && !L.mem.knows('attacked by', aidOf(src))) L.mem.note(GT, 'attacked by', aidOf(src), { x: Math.round(e.x), y: Math.round(e.y) }, 300);
+  if (GT > (e.helpAt || 0)) { e.helpAt = GT + 6; say(e, pick(src.kind === 'mon' ? ['Help! Guards!', 'Guards! Guards!', 'Get it off me!'] : what === 'theft' ? ['Thief!', 'Guards! A thief!', 'Stop, thief!'] : ['Help! Murder!', 'Guards! Guards!', 'Stop! Help!'])); }
 }
 /* guards near the victim (and of the victim's town) hear the cry */
 function npcCallGuards(victim, foe) {
-  if (!foe || foe.kind !== 'mon' || !alive(foe)) return; let n = 0;
+  if (!foe || (foe.kind === 'mon' ? !alive(foe) : !lawGuardTarget(null, foe))) return; let n = 0;   // a creature, or you when the law makes you a target
   const near = LIFE.npcs.filter(g => npcUp(g) && g.npcFight.fights && g !== victim).sort((a, b) => dist(a, victim) - dist(b, victim));   // the nearest answer first
   for (const g of near) {
-    if (g.foe && alive(g.foe) && dist(g, g.foe) < 8) continue;   // already busy close by
+    if (g.foe && fighterAlive(g.foe) && dist(g, g.foe) < 8) continue;   // already busy close by
     const d = dist(g, victim); if (d > NPC_CALL_RANGE && !(victim.life && victim.life.town === g.life.town && d < NPC_CALL_RANGE * 1.6)) continue;
     if (!npcInJurisdiction(g, foe, 0)) continue;
     if (npcEngage(g, foe, 'answered ' + (victim === P ? 'your' : (victim.name || 'a').split(',')[0] + '\'s') + ' cry for help')) n++; if (n >= 2) break; }
-  if (n) NPCF.calls++;
+  if (n) { NPCF.calls++; if (foe === P) LAWF.guardCalls++; }
 }
 /* knocked down: out of the fight, lying where they fell, until NPC_DOWN_TIME has passed */
 function npcDown(e, src) {
   if (e.downed) return; e.downed = true; e.downAt = GT; e.hp = 0; e.poison = null; e.nav = null; e.speed = 0; e.foe = null; NPCF.downs++;
   if (e.life) { e.life.goal = null; e.life.mind.act = null; e.life.mind.why = 'knocked down'; e.life.hurry = false; if (src) e.life.mem.note(GT, 'knocked down by', aidOf(src), { x: Math.round(e.x), y: Math.round(e.y) }, 600); }
   simEmit('CombatEnded', { actor: aidOf(e), source: aidOf(src), x: e.x, y: e.y, detail: { outcome: 'downed' } });
+  lawDowned(e, src);   // an innocent knocked down unlawfully reports a murder (src/law.js)
   for (const o of ents) if (o.target === e) { o.target = null; if (o.kind === 'mon' && o.state !== 'flee') o.state = 'return'; if (o.mind) o.mind.act = null; }
   for (const g of LIFE.npcs) if (g.foe === e) g.foe = null;
-  if (P && dist(e, P) < 24) log(`${(e.name || 'A townsperson').split(',')[0]} is knocked down${src && src.name ? ' by a ' + src.name : ''}!`, '#ff8a6a');
+  if (P && dist(e, P) < 24) log(`${(e.name || 'A townsperson').split(',')[0]} is knocked down${src === P ? ' by you' : src && src.kind === 'npc' ? ' by ' + src.name.split(',')[0] : src && src.name ? ' by a ' + src.name : ''}!`, '#ff8a6a');
   sndAt('player.death', e, { gain: .5 });
 }
 function npcRise(e) {
@@ -117,8 +126,9 @@ function npcThreat(g, c) {
   return dist(g, c) < 5 && (ecoEnemy(c, g) || c.target === g);
 }
 function npcEngage(g, c, why) {
-  if (!npcUp(g) || !g.npcFight.fights || !c || !alive(c)) return false;
-  if (g.foe !== c) { NPCF.guardFights++; simEmit('CombatStarted', { actor: aidOf(g), target: aidOf(c), x: g.x, y: g.y, detail: { why } }); if (P && dist(g, P) < 22) say(g, pick(['Halt, beast!', 'For the town!', 'Stand back, I have it!'])); }
+  if (!npcUp(g) || !g.npcFight.fights || !c || !fighterAlive(c)) return false;
+  if (c.kind !== 'mon' && !lawGuardTarget(g, c)) return false;   // people only when the law allows it
+  if (g.foe !== c) { NPCF.guardFights++; simEmit('CombatStarted', { actor: aidOf(g), target: aidOf(c), x: g.x, y: g.y, detail: { why } }); if (P && dist(g, P) < 22) say(g, pick(c === P ? (notoOf(P) === 'murderer' ? ['Murderer! You will hang!', 'There is the killer!'] : ['Halt, criminal!', 'Stop in the name of the law!', 'You there! Halt!']) : ['Halt, beast!', 'For the town!', 'Stand back, I have it!'])); }
   g.foe = c; g.foeSeen = GT; g.nav = null; if (g.life) { g.life.mind.why = why; g.life.doing = 'fight'; }
   return true;
 }
@@ -128,13 +138,15 @@ function guardFightTick(g, dt) {
     g.scanAt = GT + .5; let best = null, bd = NPC_GUARD_SIGHT;
     ECOS.grid.query(g.x, g.y, NPC_GUARD_SIGHT, c => { if (!npcThreat(g, c)) return; const d = dist(g, c); if (d < bd && npcInJurisdiction(g, c, 0) && los(g, c)) { bd = d; best = c; } });
     if (best) npcEngage(g, best, 'defending ' + (best.target === P ? 'you' : best.target && best.target.name ? best.target.name.split(',')[0] : 'the town') + ' from a ' + best.name);
+    else if (lawGuardTarget(g, P) && !P.hidden && dist(g, P) < NPC_GUARD_SIGHT && npcInJurisdiction(g, P, 0) && los(g, P)) npcEngage(g, P, notoOf(P) === 'murderer' ? 'a murderer in town' : notoOf(P) === 'criminal' ? 'a criminal in town' : 'you attacked him');
   }
   const c = g.foe; if (!c) return false;
-  const lost = !alive(c) || c.hidden || c.pacified > GT || !npcInJurisdiction(g, c, 12) || dist(g, c) > NPC_GUARD_SIGHT * 1.5;
+  const pardoned = c.kind !== 'mon' && fighterAlive(c) && !lawGuardTarget(g, c);   // you stopped being a lawful target (the flag ran out)
+  const lost = !fighterAlive(c) || c.hidden || pardoned || (c.kind === 'mon' && c.pacified > GT) || !npcInJurisdiction(g, c, 12) || dist(g, c) > NPC_GUARD_SIGHT * 1.5;
   if (!lost && los(g, c)) g.foeSeen = GT;
   if (lost || GT - g.foeSeen > 6 || g.hp < g.max * .2) {   // won, lost it, or too hurt: back to the patrol
-    if (c && !alive(c)) NPCF.guardKills++;
-    simEmit('CombatEnded', { actor: aidOf(g), target: aidOf(c), x: g.x, y: g.y, detail: { outcome: !alive(c) ? 'won' : g.hp < g.max * .2 ? 'withdrew' : 'lost sight' } });
+    if (c && c.kind === 'mon' && !alive(c)) NPCF.guardKills++;
+    simEmit('CombatEnded', { actor: aidOf(g), target: aidOf(c), x: g.x, y: g.y, detail: { outcome: !fighterAlive(c) ? 'won' : pardoned ? 'pardoned' : g.hp < g.max * .2 ? 'withdrew' : 'lost sight' } });
     g.foe = null; g.nav = null; if (L) { L.goal = null; L.mind.why = 'back to the patrol'; L.thinkAt = 0; } return false; }
   const w = weaponOfActor(g), d = dist(g, c);
   if (d > w.reach * .9 || !los(g, c)) { allyStep(g, c.x, c.y, dt); return true; }
@@ -146,5 +158,5 @@ function guardFightTick(g, dt) {
 /* ---------- save: health and the knock-down timer by actor id (life save carries it) ---------- */
 function npcSave(e) { if (!npcCombatant(e)) return null; if (e.hp >= e.max && !e.downed) return null; return { hp: Math.round(e.hp), down: e.downed ? Math.max(1e-3, NPC_DOWN_TIME - (GT - e.downAt)) : 0 }; }
 function npcLoad(e, r) { if (!npcCombatant(e) || !r) return; e.hp = cl(Math.round(r.hp) || 0, 0, e.max); if (r.down > 0) { e.downed = true; e.downAt = GT - (NPC_DOWN_TIME - r.down); e.hp = 0; e.nav = null; } else if (e.hp <= 0) e.hp = 1; }
-function npcFightDev() { const up = LIFE.npcs.filter(npcUp), dn = LIFE.npcs.filter(e => e.downed).length, fighting = LIFE.npcs.filter(e => e.foe && alive(e.foe)).length, hurt = up.filter(e => e.hp < e.max).length;
+function npcFightDev() { const up = LIFE.npcs.filter(npcUp), dn = LIFE.npcs.filter(e => e.downed).length, fighting = LIFE.npcs.filter(e => e.foe && fighterAlive(e.foe)).length, hurt = up.filter(e => e.hp < e.max).length;
   return `npc combat: ${fighting} guards fighting · ${dn} knocked down · ${hurt} hurt · hits taken ${NPCF.hitsTaken}, downs ${NPCF.downs}, rises ${NPCF.rises}, guard fights ${NPCF.guardFights}, guard kills ${NPCF.guardKills}, calls ${NPCF.calls}`; }

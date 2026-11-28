@@ -119,7 +119,7 @@ function ccStepHtml() {
     <div class="ccrow">${ccBtn('reset', 'Reset to ' + esc(CR.TEMPLATE[CCD.tpl].n))}</div>`;
   }
   // step 3: town and review
-  const v = ccValidate(); const val = v.ok ? v.value : null; const kit = val ? CR.kit(val) : null; const sv0 = ccSaved();
+  const v = ccValidate(); const val = v.ok ? v.value : null; const kit = val ? CR.kit(val) : null; const sv0 = CCD.online ? null : ccSaved();
   return `<h2>Starting town &amp; review</h2>
     <div class="cctowns" role="radiogroup" aria-label="Starting town">${CR.TOWNS.map(t => { const on = CCD.town === t.id, rec = CR.TEMPLATES.filter(x => x.town === t.id && !x.advanced).map(x => x.n);
       return `<button type="button" role="radio" aria-checked="${on}" class="cctown ${on ? 'on' : ''}" data-c="town" data-t="${t.id}"><b>${esc(t.n)}</b>${t.tutorial ? '<span class="ccbadge">Tutorial · recommended</span>' : ''}<span class="ccnote">${esc(t.d)}</span><span class="cctk">${t.services.map(esc).join(' · ')}</span>${rec.length ? `<span class="ccnote">Suits: ${esc(rec.join(', '))}</span>` : ''}</button>`; }).join('')}</div>
@@ -156,28 +156,33 @@ function ccRecoverHtml() {
 }
 function ccHomeHtml() {
   const sv0 = CC.bootErr ? null : ccSaved();
+  // two modes: Offline (the single-player game, saved in this browser, unchanged) and Online (src/online.js, alpha)
   return `<div class="cchome"><div class="ccbrand"><h1>Shardfall</h1><div class="ccsub">A Second Age sandbox · Anniabreen</div></div>${ccRecoverHtml()}
+    <div class="ccmodes"><section class="ccmode" aria-labelledby="ccm-off"><h3 id="ccm-off">Play Offline</h3>
     <div class="ccmenu">${sv0 ? ccBtn('cont', `Continue as ${esc(sv0.char.name)}${sv0.char.ghost ? ' (ghost)' : ''}`, {}, 'pri big') : ''}${ccBtn('new', 'New character', {}, (sv0 ? '' : 'pri ') + 'big')}</div>
-    ${sv0 ? '<p class="ccnote">Your character saves in this browser. Starting a new one asks before it replaces the old one.</p>' : '<p class="ccnote">Your character saves in this browser.</p>'}</div>`;
+    ${sv0 ? '<p class="ccnote">Your character saves in this browser. Starting a new one asks before it replaces the old one.</p>' : '<p class="ccnote">Your character saves in this browser.</p>'}</section>
+    <section class="ccmode" aria-labelledby="ccm-on"><h3 id="ccm-on">Play Online <span class="ccbadge">Alpha</span></h3><div class="ccmenu">${ccBtn('online', 'Play Online', {}, 'big')}</div>
+    <p class="ccnote">An account and characters kept on the Shardfall server. Separate from your offline save, which is never uploaded.</p></section></div></div>`;
 }
 function ccWizHtml() {
   const v = ccValidate();
-  return `<div class="ccwiz"><header class="cctop"><b class="ccmark">Shardfall</b><nav class="ccsteps" aria-label="Creation steps">${CC_STEPS.map((n, i) => `<button type="button" class="${i === CCD.step ? 'on' : ''}${i < CCD.step ? ' done' : ''}" data-c="step" data-s="${i}" aria-current="${i === CCD.step ? 'step' : 'false'}"><i>${i + 1}</i><span>${n}</span></button>`).join('')}</nav></header>
+  return `<div class="ccwiz"><header class="cctop"><b class="ccmark">Shardfall</b>${CCD.online ? '<span class="ccbadge">Online</span>' : ''}<nav class="ccsteps" aria-label="Creation steps">${CC_STEPS.map((n, i) => `<button type="button" class="${i === CCD.step ? 'on' : ''}${i < CCD.step ? ' done' : ''}" data-c="step" data-s="${i}" aria-current="${i === CCD.step ? 'step' : 'false'}"><i>${i + 1}</i><span>${n}</span></button>`).join('')}</nav></header>
     <div class="ccbody"><aside class="ccprev" aria-label="Preview"><div class="ccfig"><canvas id="ccdoll" width="150" height="300" role="img" aria-label="Portrait of your character"></canvas><div class="ccws"><canvas id="ccsprite" width="80" height="104" role="img" aria-label="Your character as seen in the world"></canvas><div class="ccrot">${ccBtn('face', '⟲', { d: 1 }, 'pm', ' aria-label="Turn left"')}${ccBtn('face', '⟳', { d: -1 }, 'pm', ' aria-label="Turn right"')}</div></div></div>
       <div class="ccpinfo"><b id="ccpname"></b><span id="ccptpl" class="ccnote"></span><div id="ccderived" class="ccderived"></div><p id="ccwnote" class="ccnote"></p></div></aside>
       <main class="ccmain" id="ccmain">${ccStepHtml()}</main></div>
-    <footer class="ccnav">${ccBtn('back', CCD.step ? '← Back' : '← Title', {}, '')}<span class="ccnote ccwhy" id="ccwhy">${CCD.step === 3 && !v.ok ? esc(v.errors[0]) : ''}</span>${CCD.step < 3 ? ccBtn('next', 'Next →', {}, 'pri') : ccBtn('go', 'Begin your journey', {}, 'pri', ccGoBlocked(v) ? ' disabled aria-disabled="true"' : '')}</footer></div>`;
+    <footer class="ccnav">${ccBtn('back', CCD.step ? '← Back' : '← Title', {}, '')}<span class="ccnote ccwhy" id="ccwhy">${CCD.step === 3 && !v.ok ? esc(v.errors[0]) : ''}</span>${CCD.step < 3 ? ccBtn('next', 'Next →', {}, 'pri') : ccBtn('go', CCD.online ? 'Create character' : 'Begin your journey', {}, 'pri', ccGoBlocked(v) ? ' disabled aria-disabled="true"' : '')}</footer></div>`;
 }
-const ccGoBlocked = v => !v.ok || CCD.creating || (ccSaved() && !CCD.replace);
+const ccGoBlocked = v => !v.ok || CCD.creating || (!CCD.online && ccSaved() && !CCD.replace);
 function ccRender(focusSel) {
-  const el = $('#ccin'); el.innerHTML = CCD.screen === 'home' ? ccHomeHtml() : ccWizHtml(); el.className = CCD.screen;
+  const el = $('#ccin'); el.innerHTML = CCD.screen === 'home' ? ccHomeHtml() : CCD.screen === 'online' ? ONLINE.html() : ccWizHtml(); el.className = CCD.screen;
+  if (CCD.screen === 'online') { ONLINE.drawPortraits(); ONLINE.paintLobby(); }
   if (CCD.screen === 'wiz') { ccPreview(); ccStartAnim(); ccNameErr(); }
   const f = focusSel && el.querySelector(focusSel); if (f) f.focus();
 }
 function ccRenderStep(focusSel) { const m = $('#ccmain'); if (!m) return ccRender(focusSel); const st = m.scrollTop; m.innerHTML = ccStepHtml(); m.scrollTop = st; ccRefreshNav(); ccPreview(); ccNameErr(); const f = focusSel && m.querySelector(focusSel); if (f) f.focus(); }
 function ccRefreshNav() {
   const v = ccValidate(), go = $('#ccin [data-c=go]'); if (go) { const b = ccGoBlocked(v); go.disabled = b; go.setAttribute('aria-disabled', String(b)); }
-  const w = $('#ccwhy'); if (w) w.textContent = CCD.step === 3 ? (!v.ok ? v.errors[0] : ccSaved() && !CCD.replace ? 'Tick “Replace” to start a new character.' : '') : '';
+  const w = $('#ccwhy'); if (w) w.textContent = CCD.step === 3 ? (!v.ok ? v.errors[0] : !CCD.online && ccSaved() && !CCD.replace ? 'Tick “Replace” to start a new character.' : '') : '';
   document.querySelectorAll('#ccin .ccsteps button').forEach((b, i) => { b.classList.toggle('on', i === CCD.step); b.classList.toggle('done', i < CCD.step); b.setAttribute('aria-current', i === CCD.step ? 'step' : 'false'); });
 }
 function ccNameErr() { const e = $('#ccn-err'); if (!e) return; const m = CR.checkName(CCD.name); e.textContent = CCD.tried || CCD.name ? (m || '') : ''; }
@@ -195,7 +200,7 @@ function ccSetStat(i, v) { if (!Number.isFinite(v)) return; v = Math.round(v); c
 function ccSetSkill(i, v) { const r = CCD.skills[i]; if (!r || !r[0] || !Number.isFinite(v)) return; v = Math.round(v); const room = SF.CREATE_SKILLS - (ccSkillTotal() - r[1]); r[1] = cl(v, 0, Math.min(SF.CREATE_SKILL_MAX, Math.max(0, room))); ccMarkEdited(); }
 function ccGoStep(s) { CCD.step = cl(s, 0, 3); CCD.err = ''; ccRender(); const m = $('#ccmain'); if (m) { m.scrollTop = 0; const h = m.querySelector('h2'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); } } }
 function ccExport() {
-  const raw = localStorage.getItem(SAVEKEY); if (!raw) return; const s = ccSaved(); const name = (s && s.char.name || 'character').replace(/[^\p{L}\p{N}_-]+/gu, '_');
+  let raw = null; try { raw = localStorage.getItem(SAVEKEY); } catch (e) { } if (!raw) return; const s = ccSaved(); const name = (s && s.char.name || 'character').replace(/[^\p{L}\p{N}_-]+/gu, '_');
   try { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([raw], { type: 'application/json' })); a.download = `Shardfall_${name}_save.json`; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); } catch (e) { console.error(e); }
 }
 /* commit: the one path from the creator into the game (also __CC.quick for tests). Validates, keeps a copy of a replaced save,
@@ -203,9 +208,12 @@ function ccExport() {
 function ccCommit() {
   if (CCD.creating || P) return false; CCD.tried = true; const v = ccValidate();
   if (!v.ok) { CCD.err = ''; if (CCD.step !== 3) ccGoStep(3); else ccRenderStep(); const e = $('#ccerrs'); if (e) e.focus(); return false; }
+  if (CCD.online) { ONLINE.create(ccPayload()); return true; }
   let old = null; try { old = localStorage.getItem(SAVEKEY); } catch (e) { } if (old && ccSaved() && !CCD.replace) { CCD.err = 'Tick “Replace” to start a new character.'; ccRenderStep(); return false; }
   CCD.creating = true; ccRefreshNav();
-  let ok = false; try { if (old) backupRaw(readSave().problem ? '.damaged' : '.replaced', old); ok = boot(null, ccPayload()); } catch (e) { console.error(e); ok = false; }
+  // v0.33.1: the save being replaced is copied aside first; if that copy cannot be written (storage full or blocked) nothing changes
+  if (old && !backupRaw(readSave().problem ? '.damaged' : '.replaced', old)) { CCD.creating = false; CCD.err = 'Your current save could not be copied aside (browser storage is full or blocked), so nothing was changed. Export it first or free some space, then try again.'; ccRender(); return false; }
+  let ok = false; try { ok = boot(null, ccPayload()); } catch (e) { console.error(e); ok = false; }
   if (!ok) { CCD.creating = false; if (!P) { CCD.err = 'The character could not be created. Nothing was changed.'; ccRender(); } return false; }
   cancelAnimationFrame(CC_RAF); CC_RAF = 0; return true;
 }
@@ -215,8 +223,10 @@ function ccContinue() { const rs = readSave(); if (P) return; if (rs.save) bootS
 $('#cc').addEventListener('click', ev => {
   const b = ev.target.closest('[data-c]'); if (!b || b.disabled || b.tagName === 'SELECT' || b.tagName === 'INPUT') return; const c = b.dataset.c; const d = b.dataset;
   if (c === 'cont') return ccContinue();
+  if (c === 'online') { snd('ui.page'); ONLINE.open(); return; }
+  if (c.startsWith('on-')) { if (c !== 'on-prov') ev.preventDefault(); ONLINE.click(c, d); return; }
   if (c === 'new') { CCD.screen = 'wiz'; CCD.step = 0; CCD.replace = false; CCD.err = ''; ccRender('#ccn'); snd('ui.page'); return; }
-  if (c === 'back') { if (CCD.step) ccGoStep(CCD.step - 1); else { CCD.screen = 'home'; ccRender('[data-c=new]'); } return; }
+  if (c === 'back') { if (CCD.step) ccGoStep(CCD.step - 1); else if (CCD.online) ONLINE.leaveWizard(); else { CCD.screen = 'home'; ccRender('[data-c=new]'); } return; }
   if (c === 'next') { if (CCD.step === 0) { CCD.tried = true; ccNameErr(); if (CR.checkName(CCD.name) || CR.checkLook(CCD.look).length) { const n = $('#ccn'); if (n) n.focus(); return; } } ccGoStep(CCD.step + 1); snd('ui.page'); return; }
   if (c === 'step') { ccGoStep(+d.s); return; }
   if (c === 'go') { ccCommit(); return; }
@@ -251,8 +261,10 @@ $('#cc').addEventListener('change', ev => {
   if (c === 'kvn') { const v = parseInt(t.value, 10); if (Number.isFinite(v)) ccSetSkill(+t.dataset.i, v); t.value = CCD.skills[+t.dataset.i][1]; ccLiveNumbers(); return; }
   if (c === 'sk') { const i = +t.dataset.i, k = t.value || null; if (k && (!CR.creatable(k) || CCD.skills.some((r, j) => j !== i && r[0] === k))) { t.value = CCD.skills[i][0] || ''; return; }   // atomic: a duplicate is refused, nothing changes
     const keep = CCD.skills[i][0] ? CCD.skills[i][1] : 0; CCD.skills[i] = [k, k ? keep : 0]; if (k) ccSetSkill(i, keep); ccMarkEdited(); ccRenderStep(`select[data-i="${i}"]`); return; }
+  if (c === 'on-realm') { ONLINE.realm(t.value); return; }
   if (c === 'replace') { CCD.replace = t.checked; CCD.err = ''; ccRefreshNav(); const e = $('#ccerr'); if (e) e.textContent = ''; return; }
 });
+$('#cc').addEventListener('submit', ev => { const f = ev.target.closest('form[data-f]'); if (!f) return; ev.preventDefault(); ONLINE.submit(f); });
 $('#cc').addEventListener('keydown', ev => {
   if (ev.key === 'Enter' && ev.target.id === 'ccn') { ev.preventDefault(); const n = $('#ccin [data-c=next]'); if (n) n.click(); }
   if (ev.key === 'Enter' && ev.target.classList && ev.target.classList.contains('ccnum')) ev.target.blur();
@@ -266,4 +278,4 @@ window.__CC = {
     if (o.stats) CCD.stats = o.stats.slice(); if (o.skills) { CCD.skills = o.skills.map(r => r.slice()); while (CCD.skills.length < SF.CREATE_SKILL_SLOTS) CCD.skills.push([null, 0]); ccMarkEdited(); }
     CCD.town = o.town || 'quay'; CCD.replace = o.replace !== false; CCD.step = 3; ccRender(); return ccCommit(); } };
 
-loadScout(SCOUT_SRC); ccRender(); resize(); requestAnimationFrame(loop);
+loadScout(SCOUT_SRC); if (!ONLINE.bootFromUrl()) ccRender(); resize(); requestAnimationFrame(loop);

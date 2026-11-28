@@ -69,7 +69,7 @@ SIM.newRegistry = newRegistry;
    without bound. Movement is transient: it is never kept. */
 SIM.EVENT_TYPES = ['ActorSpawned', 'ActorRemoved', 'ActorMoved', 'ActorDamaged', 'ActorHealed', 'ActorKilled', 'CombatStarted', 'CombatEnded',
   'ItemTransferred', 'ItemCrafted', 'CrimeCommitted', 'CrimeWitnessed', 'ResourceGathered', 'MerchantArrived', 'CampCleared', 'PopulationReplenished', 'AppearanceChanged',
-  'StatChanged', 'CharacterCreated'];   // AppearanceChanged: v0.25 equipment, for the future layered sprites; StatChanged, CharacterCreated: v0.30 natural attributes and creation
+  'StatChanged', 'CharacterCreated', 'AggressionRecorded', 'MurderReported', 'NotorietyChanged', 'SpellCast', 'ActorResurrected', 'CorpseLooted'];   // SpellCast, ActorResurrected, CorpseLooted: v0.36 NPC adventurers (phase 5 step 3); AggressionRecorded … NotorietyChanged: v0.34 law (phase 5 step 2); AppearanceChanged: v0.25 equipment, for the future layered sprites; StatChanged, CharacterCreated: v0.30 natural attributes and creation
 SIM.TRANSIENT = { ActorMoved: 1 };
 function newBus(opt) {
   opt = opt || {}; const cap = opt.cap || 256, clock = opt.clock || (() => 0), known = new Set(SIM.EVENT_TYPES);
@@ -423,6 +423,69 @@ SIM.newMemory = (cap, saved) => {
     save: () => list.map(r => Object.assign({}, r)), get size() { return list.length; } };
 };
 
+/* ================= Phase 5 step 2: law — notoriety, aggression, criminal flags and murder counts (master spec §19) =================
+   Pure and deterministic: actors are ids, time is simulation seconds (it only runs while the game runs, so "active time").
+   · Notoriety: innocent (blue), criminal (grey, a timed flag), murderer (red: `red` or more long-term counts). Wildlife and
+     monsters have no notoriety at all (SIM.hasComponent(…, 'notoriety')); the game never asks for one.
+   · Aggression records { attacker, victim, owner, victimOwner, t, region, lawful, selfDefence, expires }. Attacking an innocent is lawful only
+     with a right over them: they attacked you (or your pet / summon) first and that record has not expired. Attacking a
+     criminal or a murderer is always lawful. A pet's or summon's attack is the owner's responsibility.
+   · An unlawful attack, a theft or another crime sets the criminal flag on the responsible actor for `criminal` seconds.
+   · A murder (an innocent killed by someone with no right over them) adds one count to the killer, once per victim death
+     (the caller names the death with a key). Each count stays short-term for `shortDecay` and long-term for `longDecay`. */
+SIM.LAW_DEFAULTS = { criminal: 120, aggression: 120, shortDecay: 8 * 3600, longDecay: 40 * 3600, red: 5, maxRecords: 96, maxDeaths: 256 };
+SIM.NOTORIETY = { innocent: 'blue', criminal: 'grey', murderer: 'red', ally: 'green', enemy: 'orange' };
+SIM.newLaw = (saved, cfg) => {
+  const C = Object.assign({}, SIM.LAW_DEFAULTS, cfg || {}); saved = saved || {};
+  let recs = (saved.recs || []).map(r => Object.assign({}, r)); const flags = Object.assign({}, saved.flags || {}), counts = {}, deaths = (saved.deaths || []).slice(-C.maxDeaths);
+  for (const k in saved.counts || {}) counts[k] = saved.counts[k].filter(Number.isFinite).slice(-64);
+  const stats = Object.assign({ aggressions: 0, unlawful: 0, crimes: 0, murders: 0, reports: 0 }, saved.stats || {});
+  const fin = v => Number.isFinite(v) ? v : 0;
+  const L = {
+    cfg: C, stats,
+    flagged: (id, t) => fin(flags[id]) > t,
+    flagLeft: (id, t) => Math.max(0, fin(flags[id]) - t),
+    counts(id, t) { const c = counts[id] || []; return { short: c.filter(x => t - x < C.shortDecay).length, long: c.filter(x => t - x < C.longDecay).length }; },
+    notoriety(id, t) { if (L.counts(id, t).long >= C.red) return 'murderer'; return L.flagged(id, t) ? 'criminal' : 'innocent'; },
+    /* does `a` have a right over `v` right now? (v attacked a, or a's pet or summon, and that record has not expired). A record of v
+       fighting back in self-defence gives the aggressor no right (v0.36): an innocent who defends itself stays protected, as in UO. */
+    rights(a, v, t) { return recs.some(r => !r.selfDefence && (r.attacker === v || r.owner === v) && (r.victim === a || r.victimOwner === a) && t < r.expires); },
+    lawfulAttack(a, v, t, owner) { const who = owner || a; return L.notoriety(v, t) !== 'innocent' || L.rights(who, v, t) || (!!owner && L.rights(a, v, t)); },
+    /* record an attack; o: { owner, victimOwner, region, human } — human:false (a creature) is never a crime. Returns { rec, crime, fresh }. */
+    aggress(a, v, t, o) {
+      o = o || {}; if (!a || !v || a === v) return null; const owner = o.owner && o.owner !== a ? o.owner : null, who = owner || a;
+      const lawful = o.human === false || L.lawfulAttack(a, v, t, owner), selfDefence = o.human !== false && L.rights(who, v, t);
+      let rec = recs.find(r => r.attacker === a && r.victim === v && t < r.expires), fresh = !rec;
+      if (rec) { rec.expires = t + C.aggression; rec.t = t; if (!lawful && rec.lawful) { rec.lawful = false; fresh = true; } }
+      else { rec = { attacker: a, victim: v, owner, victimOwner: o.victimOwner || null, t, region: o.region || null, lawful, selfDefence, expires: t + C.aggression }; recs.push(rec); if (recs.length > C.maxRecords) recs.shift(); }
+      stats.aggressions += fresh ? 1 : 0;
+      if (!lawful) { if (fresh) stats.unlawful++; flags[who] = Math.max(fin(flags[who]), t + C.criminal); }
+      return { rec, crime: !lawful, fresh };
+    },
+    crime(id, t, what) { if (!id) return false; flags[id] = Math.max(fin(flags[id]), t + C.criminal); stats.crimes++; return true; },
+    /* would killing `v` be a murder by `k` (or k's owner) right now? */
+    isMurder(k, v, t, owner) { return !!k && !!v && k !== v && !L.lawfulAttack(k, v, t, owner); },
+    /* count a murder once per victim death (key). Returns { counted, short, long, red } — red: this count made them a murderer. */
+    murder(k, v, t, key, owner) {
+      if (!key || deaths.includes(key)) return { counted: false, dup: true };
+      if (!L.isMurder(k, v, t, owner)) { deaths.push(key); if (deaths.length > C.maxDeaths) deaths.shift(); return { counted: false }; }
+      return L.count(owner || k, t, key);
+    },
+    /* add one count for a death already judged a murder (a report); once per key */
+    count(who, t, key) {
+      if (!who || !key || deaths.includes(key)) return { counted: false, dup: true }; deaths.push(key); if (deaths.length > C.maxDeaths) deaths.shift();
+      const was = L.notoriety(who, t); (counts[who] = counts[who] || []).push(t); if (counts[who].length > 64) counts[who].shift(); stats.murders++;
+      return Object.assign({ counted: true, red: was !== 'murderer' && L.notoriety(who, t) === 'murderer' }, L.counts(who, t));
+    },
+    reported() { stats.reports++; },
+    records: id => recs.filter(r => !id || r.attacker === id || r.victim === id || r.owner === id).map(r => Object.assign({}, r)),
+    /* drop what has expired; counts older than the long-term decay are gone for good */
+    prune(t) { recs = recs.filter(r => t < r.expires); for (const k in flags) if (!(flags[k] > t)) delete flags[k]; for (const k in counts) { counts[k] = counts[k].filter(x => t - x < C.longDecay); if (!counts[k].length) delete counts[k]; } },
+    clear(id) { delete flags[id]; delete counts[id]; recs = recs.filter(r => r.attacker !== id && r.victim !== id); },
+    save(t) { if (Number.isFinite(t)) L.prune(t); return { v: 1, recs: recs.map(r => Object.assign({}, r)), flags: Object.assign({}, flags), counts: JSON.parse(JSON.stringify(counts)), deaths: deaths.slice(), stats: Object.assign({}, stats) }; } };
+  return L;
+};
+
 /* ---------------- debug view of one actor (developer tools; no gameplay depends on it) ---------------- */
 SIM.inspect = (e, extra) => {
   if (!e) return null; const a = e.archetype, has = c => SIM.hasComponent(a, c), r1 = v => Math.round(v * 100) / 100;
@@ -432,6 +495,176 @@ SIM.inspect = (e, extra) => {
   if (has('home') && e.home) o.home = { x: r1(e.home.x), y: r1(e.home.y) };
   return Object.assign(o, extra || {});
 };
+
+/* ================= Phase 6: simulation tiers and world-state persistence (master spec §25–26) =================
+   Tiers. Every actor away from the player gets one of three levels of detail:
+     A — local: every 50 ms step (full movement, collision, combat, perception, animation, sound).
+     B — regional: one step in `bEvery`, with the skipped time handed over (reduced decisions, coarser movement, never drawn).
+     C — distant: not stepped at all. Creatures hold where they are; townsfolk follow their schedule abstractly and are
+         placed where the day has taken them when they come back into range (src/tiers.js). Populations, camps, the clock
+         and saving carry on for the whole world.
+   Radius A follows the camera (§25: "adjusted to actual camera scale"): it is never smaller than the farthest corner of the
+   screen plus a margin, so nothing on screen ever runs at the reduced rate. A small hysteresis keeps an actor on the
+   boundary from flipping tier every step. Pure: the game measures the screen and distances. */
+SIM.TIER = { A: 40, B: 120, gapB: 60, margin: 8, hyst: 6, bEvery: 4 };
+/* the distance in metres from the player to the farthest visible corner, for a screen of halfW × halfH world pixels and the
+   isometric projection SX = (x − y)·hw, SY = (x + y)·hh */
+SIM.viewRadius = (halfW, halfH, hw, hh) => { const a = halfW / (hw || 32), b = halfH / (hh || 16); return Math.sqrt((a * a + b * b) / 2); };
+SIM.tierRadii = (viewR, cfg) => { cfg = cfg || SIM.TIER; const a = Math.max(cfg.A, (viewR || 0) + cfg.margin); return { a, b: Math.max(cfg.B, a + cfg.gapB) }; };
+SIM.tierOf = (d, prev, radii, hyst) => {
+  const h = hyst === undefined ? SIM.TIER.hyst : hyst;
+  if (d <= radii.a + (prev === 'A' ? h : 0)) return 'A';
+  if (d <= radii.b + (prev === 'A' || prev === 'B' ? h : 0)) return 'B';
+  return 'C';
+};
+/* is this the step an actor of this tier runs? Tier B actors are staggered by id so a quarter of them run each step */
+SIM.tierDue = (tier, stepN, id, every) => tier === 'A' ? true : tier === 'B' ? ((stepN + (id | 0)) % (every || SIM.TIER.bEvery)) === 0 : false;
+
+/* Population persistence. Spawned creatures are saved one by one (§26: regional populations, actor identity), as compact
+   rows, so a region the player thinned out stays thin after a reload and every creature keeps its id:
+     [actorId, type, spawnerKey, x, y, hp, homeX, homeY, packId, flags, purse, fedAgo]   flags: 1 pack leader · 2 hidden
+   unpackCreatures validates rows before anything is spawned from them: unknown species or spawners, broken numbers, a
+   repeated id and more creatures than a spawner can hold are dropped (and counted), never duplicated. */
+SIM.POP_VERSION = 1;
+const r1 = v => Math.round(v * 10) / 10;
+SIM.packCreatures = list => list.map(c => [c.id, c.type, c.sp, r1(c.x), r1(c.y), Math.max(1, Math.round(c.hp)), r1(c.hx), r1(c.hy), c.pack | 0, (c.lead ? 1 : 0) | (c.hidden ? 2 : 0), c.purse | 0, Math.max(0, Math.round(c.fedAgo || 0))]);
+SIM.unpackCreatures = (rows, o) => {
+  const out = [], seen = new Set(), per = new Map(); let dropped = 0; const why = {};
+  const drop = k => { dropped++; why[k] = (why[k] || 0) + 1; };
+  const fin = v => typeof v === 'number' && Number.isFinite(v);
+  for (const r of Array.isArray(rows) ? rows : []) {
+    if (!Array.isArray(r) || r.length < 8) { drop('shape'); continue; }
+    const [id, type, sp, x, y, hp, hx, hy, pack, flags, purse, fedAgo] = r;
+    if (typeof id !== 'string' || !id) { drop('id'); continue; }
+    if (seen.has(id)) { drop('duplicate'); continue; }
+    if (!o.validType(type)) { drop('species'); continue; }
+    const cap = o.capOf(sp); if (!cap) { drop('spawner'); continue; }
+    if (![x, y, hp, hx, hy].every(fin)) { drop('number'); continue; }
+    if ((per.get(sp) || 0) >= cap) { drop('over cap'); continue; }
+    seen.add(id); per.set(sp, (per.get(sp) || 0) + 1);
+    const max = o.maxHp(type);
+    out.push({ id, type, sp, x, y, hp: Math.min(max, Math.max(1, hp)), hx, hy, pack: fin(pack) ? pack | 0 : 0, lead: !!((flags | 0) & 1), hidden: !!((flags | 0) & 2), purse: fin(purse) ? Math.max(0, purse | 0) : 0, fedAgo: fin(fedAgo) ? Math.max(0, fedAgo) : 0 });
+  }
+  return { list: out, dropped, why };
+};
+
+/* ---------------- NPC adventurers (§8, Living World phase 5 step 3) ----------------
+   Simulated players: named, persistent, with the same skills, items, combat, First Aid, Magery and death rules as you. The
+   game side is src/adventurers.js; here are the data and the pure decisions it asks for, so they can be tested in node.
+   Skills are UO values (0–100) on the existing 49-skill registry: no parallel skill system. */
+SIM.ADV_VERSION = 1;
+SIM.ADV_CFG = {
+  res: 'healer',          // resurrection policy: 'healer' (the ghost walks to a healer, returns at 25 %), 'replace' (a successor takes the place), 'none' (death is final)
+  ghostWait: 240,         // seconds a ghost may take to reach a healer before one finds it
+  replaceAfter: 600,      // 'replace': seconds before the successor arrives in town
+  fleeAt: .3,             // health fraction that sends a brave (courage 1) adventurer running; cautious ones run earlier (×(1.6 − courage))
+  bandageAt: .7, potionAt: .4, healSpellAt: .6,
+  returnValue: 300,       // loot worth this much (gold and goods at shop price) sends them home to sell and bank
+  stock: { bandage: 12, draught: 2, arrow: 80, reagent: 10 },   // what they buy up to in town
+  short: { bandage: 2, arrow: 12, reagent: 3 },                 // below this they go home to restock
+  repairBelow: .55,       // worst piece at this fraction of its durability: repair in town
+  hunt: { min: 30, max: 180 }, sight: 14, leash: 24, searchFor: 40, grounds: 4,
+  dayStart: 6, nightAt: 21 };
+/* archetypes from the spec's list, mapped onto existing skills, weapons and armour. courage 0–1; style picks the combat routine */
+SIM.ADV_STYLES = {
+  swordsman: { style: 'melee', str: 80, dex: 65, int: 35, skills: { swordsmanship: 72, tactics: 70, anatomy: 62, healing: 62, parrying: 55, resistingspells: 35, wrestling: 40 },
+    weapon: 'sword', shield: 'buckler', wear: ['leather_cap', 'ringmail_tunic', 'ringmail_sleeves', 'ringmail_gloves', 'ringmail_leggings', 'boots', 'shirt', 'trousers'], kit: { bandage: 12, draught: 1 }, cloth: 'navy' },
+  macer:     { style: 'melee', str: 85, dex: 55, int: 30, skills: { macefighting: 72, tactics: 72, anatomy: 60, healing: 60, parrying: 40, resistingspells: 40, wrestling: 45 },
+    weapon: 'mace', shield: 'metal_shield', wear: ['chain_coif', 'chain_tunic', 'chain_leggings', 'leather_gloves', 'boots', 'shirt', 'trousers'], kit: { bandage: 12, draught: 1 }, cloth: 'wine' },
+  fencer:    { style: 'melee', str: 65, dex: 85, int: 35, skills: { fencing: 72, tactics: 68, anatomy: 58, healing: 58, resistingspells: 30, wrestling: 40, hiding: 30 },
+    weapon: 'kryss', shield: null, wear: ['leather_cap', 'studded_tunic', 'studded_sleeves', 'studded_gloves', 'studded_leggings', 'boots', 'shirt', 'trousers'], kit: { bandage: 12, draught: 1 }, cloth: 'forest' },
+  archer:    { style: 'archer', str: 65, dex: 85, int: 35, skills: { archery: 72, tactics: 68, anatomy: 55, healing: 55, resistingspells: 30, wrestling: 35, tracking: 40 },
+    weapon: 'shortbow', shield: null, wear: ['leather_cap', 'leather_tunic', 'leather_sleeves', 'leather_gloves', 'leather_leggings', 'boots', 'shirt', 'trousers'], kit: { bandage: 10, arrow: 80, draught: 1 }, cloth: 'forest' },
+  mage:      { style: 'mage', str: 45, dex: 35, int: 90, skills: { magery: 72, evaluatingintelligence: 65, meditation: 60, resistingspells: 55, wrestling: 45, inscription: 30 },
+    weapon: null, shield: null, wear: ['robe', 'shoes', 'shirt', 'trousers'], kit: { reagent: 15, draught: 1, spellbook: 1 }, cloth: 'plum',
+    spells: ['magery.42', 'magery.30', 'magery.18', 'magery.05', 'magery.29', 'magery.04', 'magery.11', 'magery.15'] },
+  healer:    { style: 'healer', str: 60, dex: 45, int: 75, skills: { magery: 58, healing: 70, anatomy: 65, macefighting: 50, tactics: 50, meditation: 45, resistingspells: 45, evaluatingintelligence: 40 },
+    weapon: 'mace', shield: 'buckler', wear: ['leather_cap', 'leather_tunic', 'leather_sleeves', 'leather_leggings', 'boots', 'robe', 'shirt', 'trousers'], kit: { bandage: 12, reagent: 15, draught: 1, spellbook: 1 }, cloth: 'oatmeal',
+    spells: ['magery.29', 'magery.04', 'magery.11', 'magery.15', 'magery.18', 'magery.05'] } };
+/* the first adventurers: name (the part after the comma is what the target frame shows), archetype, home town, courage, body.
+   Nobody starts in Skara Bryn: the town stands in its woods and few hunting grounds around it can be walked to (they may still move there) */
+SIM.ADV_ROSTER = [
+  ['Aldric, sellsword', 'swordsman', 'vespar', .75, 'male'], ['Brenna, mace fighter', 'macer', 'mynoc', .85, 'female'], ['Corvin, fencer', 'fencer', 'mynoc', .6, 'male'],
+  ['Dara, archer', 'archer', 'moonglen', .5, 'female'], ['Elsbeth, mage', 'mage', 'moonglen', .55, 'female'], ['Fenwick, healer', 'healer', 'vespar', .45, 'male']];
+SIM.ADV_SUCCESSORS = ['Garet', 'Hild', 'Isolde', 'Joss', 'Kael', 'Lysa', 'Merrick', 'Nessa', 'Orrin', 'Pell', 'Quinn', 'Rowan'];
+
+/* what to do next (the strategic layer, re-decided about once a second). s: plain numbers, no actors:
+     { hpF, manaF, style, courage, inTown, night, bandages, draughts, arrows, reagents, value, worst, foe: { ratio } | null, cur, skip }
+   skip: { shop, repair } — errands it just tried and could not pay for: it goes out with what it has instead of waiting forever.
+   Returns { act, why[] }: 'flee' (run for town), 'town' (rest, sell, bank, restock, repair), 'return' (walk home), 'hunt'. */
+SIM.advNeeds = (s, cfg) => {
+  cfg = cfg || SIM.ADV_CFG; const why = [], skip = s.skip || {};
+  const caster = s.style === 'mage' || s.style === 'healer', canHeal = s.bandages > 0 || s.draughts > 0 || (caster && s.reagents > 0);
+  if (s.hpF < .5 && !canHeal) why.push('hurt and out of healing');
+  if (!skip.shop && s.style !== 'mage' && s.bandages < cfg.short.bandage) why.push('low on bandages');
+  if (!skip.shop && s.style === 'archer' && s.arrows < cfg.short.arrow) why.push('low on arrows');
+  if (!skip.shop && caster && s.reagents < cfg.short.reagent) why.push('low on reagents');
+  if (s.value >= cfg.returnValue) why.push('pack full of loot');
+  if (!skip.repair && s.worst < cfg.repairBelow) why.push('gear needs repair');
+  if (s.night && s.courage < .8) why.push('night is falling');
+  return why;
+};
+SIM.advChoose = (s, cfg) => {
+  cfg = cfg || SIM.ADV_CFG;
+  if (s.foe) {
+    const fleeAt = cfg.fleeAt * (1.6 - s.courage), outmatched = s.foe.ratio > 1.4 + s.courage * 2.2;
+    if (s.hpF < fleeAt || outmatched) return { act: 'flee', why: [s.hpF < fleeAt ? 'badly hurt' : 'outmatched'] };
+    return { act: 'fight', why: ['in a fight'] };
+  }
+  const need = SIM.advNeeds(s, cfg);
+  if (s.inTown) {
+    const town = [], skip = s.skip || {};
+    if (s.hpF < .95 || (s.manaF !== null && s.manaF < .9)) town.push('resting');
+    if (s.value > 0) town.push('selling loot');
+    if (s.worst < .95 && !skip.repair) town.push('repairs');
+    if (!skip.shop) {
+      if (s.bandages < cfg.stock.bandage * .75 && s.style !== 'mage') town.push('buying bandages');
+      if (s.style === 'archer' && s.arrows < cfg.stock.arrow * .75) town.push('buying arrows');
+      if ((s.style === 'mage' || s.style === 'healer') && s.reagents < cfg.stock.reagent * .75) town.push('buying reagents'); }
+    if (s.night && s.courage < .8) town.push('waiting for daylight');
+    return town.length ? { act: 'town', why: town } : { act: 'hunt', why: ['rested and stocked'] };
+  }
+  if (need.length) return { act: 'return', why: need };
+  return { act: 'hunt', why: [s.cur === 'hunt' ? 'still hunting' : 'setting out'] };
+};
+/* which creature to fight (§18: threat, distance, vulnerability, faction). cands: [{ id, dist, hpF, ratio, onMe, onFriend, hostile }] */
+SIM.advTarget = (cands, courage, sight) => {
+  let best = null, bs = -1e9;
+  for (const c of cands) {
+    if (!c.onMe && c.ratio > 1 + courage * 2) continue;                 // never start a fight it expects to lose
+    const s = (c.onMe ? .8 : 0) + (c.onFriend ? .35 : 0) + (c.hostile ? .15 : 0) + .6 * (1 - Math.min(1, c.dist / (sight || 14))) + .3 * (1 - c.hpF) - .4 * Math.max(0, c.ratio - 1);
+    if (s > bs || (s === bs && best && String(c.id) < String(best.id))) { bs = s; best = c; }
+  }
+  return best;
+};
+/* which spell, if any. s: { style, M, mana, hpF, poisoned, foe: { dist } | null, has(id) → reagents in the pack, chance(id) → book chance }
+   Healing first (self), then the strongest attack it is likely to cast; mages fight with spells, healers mostly heal. */
+SIM.advSpell = (s, spells, info) => {
+  const ok = id => spells.includes(id) && info(id) && s.mana >= info(id).mp && s.has(id) && s.chance(id) >= .5;
+  const heal = big => big && ok('magery.29') ? { id: 'magery.29', self: true } : ok('magery.04') ? { id: 'magery.04', self: true } : ok('magery.29') ? { id: 'magery.29', self: true } : null;
+  if (s.poisoned && ok('magery.11')) return { id: 'magery.11', self: true };
+  if (!s.foe) return s.hpF < .95 ? heal(s.hpF < .5) : null;               // between fights: top up
+  // in a fight a mage keeps casting at its foe and heals only when it must; a healer heals sooner
+  if (s.hpF < (s.style === 'healer' ? SIM.ADV_CFG.healSpellAt : .4)) { const h = heal(s.hpF < .5); if (h) return h; }
+  if (s.foe.dist > 9) return null;
+  if (!s.warded && ok('magery.15') && s.style === 'healer') return { id: 'magery.15', self: true };
+  const attacks = s.style === 'mage' ? ['magery.42', 'magery.30', 'magery.18', 'magery.05'] : ['magery.18', 'magery.05'];
+  if (s.style === 'healer' && s.mana < 25) return null;                    // a healer keeps its mana for healing
+  for (const id of attacks) if (ok(id)) return { id, self: false };
+  return null;
+};
+/* what to buy, in priority order, within the purse. have: { id: qty }, prices: { id: gold }, reagents: [ids] */
+SIM.advShopping = (style, have, gold, prices, reagents, cfg) => {
+  cfg = cfg || SIM.ADV_CFG; const out = []; let left = Math.max(0, gold | 0);
+  const want = (id, target) => { const p = prices[id]; if (!(p > 0)) return; const n = Math.min(Math.max(0, target - (have[id] || 0)), Math.floor(left / p)); if (n > 0) { out.push({ id, qty: n, cost: n * p }); left -= n * p; } };
+  if (style !== 'mage') want('bandage', cfg.stock.bandage);
+  if (style === 'archer') want('arrow', cfg.stock.arrow);
+  if (style === 'mage' || style === 'healer') for (const r of reagents) want(r, cfg.stock.reagent);
+  want('draught', cfg.stock.draught);
+  return { buys: out, left };
+};
+/* the resurrection policy for a dead adventurer */
+SIM.advAfterDeath = cfg => { const p = (cfg || SIM.ADV_CFG).res; return p === 'replace' || p === 'none' ? p : 'healer'; };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = SIM; else root.SIM = SIM;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

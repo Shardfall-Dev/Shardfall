@@ -217,8 +217,8 @@ function wdAppearance(e) {
   const look = wdLook(D), equip = wdEquip(D); return e._wdA = { R: GEAR.resolve(equip, look), rl: rigLook(look), preset: true, equip, look, wardrobe: D.role + (D.rank ? '/' + D.rank : '') + (D.region ? '@' + D.region : '') };
 }
 function gearOfActor(e) {
-  const ghost = !!((e === P && P.ghost) || (e.kind === 'ally' && e.ghost));
-  if (e.kind === 'player' || (e.kind === 'ally' && e.equip)) {
+  const ghost = !!((e === P && P.ghost) || (e.kind === 'ally' && e.ghost) || (e.adv && e.ghost));
+  if (e.kind === 'player' || (e.kind === 'ally' && e.equip) || (e.adv && e.equip)) {   // NPC adventurers wear their real equipment (v0.36)
     if (e.kind === 'ally' && !e._gLook) e._gLook = GEAR.npcLook(e.aid || e.name, { body: 'female', cloth: 'forest' });
     const look = e.kind === 'player' ? e.look : e._gLook, sig = EQ.signature(e) + '|' + (SF.CREATION ? SF.CREATION.lookKey(look) : '');
     if (e._gSig !== sig) { e._gSig = sig; e._gA = { R: GEAR.resolve(e.equip, look), rl: rigLook(look) }; }
@@ -253,11 +253,12 @@ function drawGearActor(g, e, x, y) {
   let strip = grStrip(A, act, dir, A.ghost, e === P), fr = f;
   if (!strip) { strip = GR.strips.get(A.R.key + '#idle#' + dir + (A.ghost ? '#g' : '')); fr = 0; }
   if (!strip) return false;
-  if (e.kind === 'ally' && e.ghost) g.globalAlpha = .75;
+  if ((e.kind === 'ally' || e.adv) && e.ghost) g.globalAlpha = .75;
   grDraw(g, strip, fr, x, y); return true;
 }
 /* corpses keep their owner's look: the snapshot taken at death, falling in the death animation, then lying still */
 function gearSnapOf(e) {
+  if (e.adv) return GEAR.snapshot({ equip: e.equip, look: e._gLook || GEAR.npcLook(e.actorId || e.name, null) });
   if (e === P || e.kind === 'ally') return GEAR.snapshot(e.kind === 'ally' ? { equip: e.equip, look: e._gLook || GEAR.npcLook(e.aid || e.name, { body: 'female', cloth: 'forest' }) } : e);
   if (e.kind === 'npc' || (e.kind === 'mon' && MON[e.type] && MON[e.type].scout)) { const A = gearOfActor(e); return GEAR.snapshot({ equip: A.equip, look: A.look }); }
   return null;

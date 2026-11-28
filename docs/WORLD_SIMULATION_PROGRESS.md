@@ -4,7 +4,7 @@ The roadmap is `docs/WORLD_SIMULATION_MASTER.md` (the full specification, unchan
 
 **Status words:** **Tested** — implemented and covered by an automated test that passes. **Implemented** — in the build, checked by hand only. **Partial** — some of the item is in; the rest is listed. **Planned** — not started. **Blocked** — waiting on something named.
 
-**Current build:** v0.30 (`Shardfall_v0.30.html`), branch `feature/living-world-phase5a`, from `integration/v0.29.2` (every open branch merged: stabilization #27, backpack popups and target frame #25, wildlife sheets #26). Phase 5, step 1: NPCs as combatants.
+**Current build:** v0.36 (`Shardfall_v0.36.html`), branch `feature/living-world-phase5c`, on top of v0.35 (`feature/living-world-phase6a`, phase 6 step 1, itself on v0.34 `feature/living-world-phase5b`): phase 5, step 3 — NPC adventurers and NPC spellcasting.
 
 ---
 
@@ -19,8 +19,8 @@ The spec's development sequence (§29, phases A–G) is numbered 1–7 here. Eac
 | 2½ | — | **World expansion** (asked for between phases 2 and 3): Anniabreen stretched ×1.35 between rigid towns, the Southern Reach, 8 camps, 5 sealed dungeon mouths, world 2620 × 1520 | 2 | **Tested** (v0.23) |
 | 3 | C | Population and monster ecosystem: regions and habitats, species profiles as data, roaming, territories, predator/prey, monster-vs-monster factions, creature audio | 1, 2 | **Tested** (v0.25) |
 | 4 | D | Living NPCs: named townsfolk with homes, workplaces and schedules; guards patrolling; merchants travelling; resource workers; basic adventurers | 1, 2, 3 (factions) | **Tested** (v0.27); adventurers moved to phase 5, which gives NPCs combat |
-| 5 | E | Shared combat and law: NPC-vs-NPC and NPC-vs-monster combat, NPC spellcasting through Magery, actor death and looting, criminal flags, murder counts, guards, witnesses | 1, 3, 4 | **Partial**: step 1 (NPCs as combatants, guards fight creatures) **Tested** (v0.30); law, adventurers, NPC death and looting planned |
-| 6 | F | Persistence and optimisation: world-state save (regions, camps, corpses, cargo), simulation tiers A/B/C, spatial index, mobile profiling, regression tests | 1–5 | Planned |
+| 5 | E | Shared combat and law: NPC-vs-NPC and NPC-vs-monster combat, NPC spellcasting through Magery, actor death and looting, criminal flags, murder counts, guards, witnesses | 1, 3, 4 | **Partial**: step 1 (NPCs as combatants, guards fight creatures) **Tested** (v0.30); step 2 (notoriety, aggression, criminal flags, witnesses, guards against you, murder counts) **Tested** (v0.34); adventurers, NPC death and looting planned |
+| 6 | F | Persistence and optimisation: world-state save (regions, camps, corpses, cargo), simulation tiers A/B/C, spatial index, mobile profiling, regression tests | 1–5 | **Partial**: step 1 (tiers A/B/C, the population saved creature by creature, phone profiling, tier and persistence tests) **Tested** (v0.35, built alongside phase 5 step 2); corpses, cargo and NPC-adventurer state wait for phase 5 steps 3–4 |
 | 7 | G | Emergent gameplay: merchant ambushes, dungeon expeditions, camp patrols, NPC healing and recovery, basic economy, encounters | 1–6 | Planned |
 
 Spatial indexing (phase 6 in the spec) is needed earlier: phase 3 adds dozens of roaming actors with perception, and `aiMon` already checks every entity against every other for push-apart (see Performance). Plan to pull a chunk index into phase 3.
@@ -451,6 +451,179 @@ Requested on 2026-11-26: bigger distances, more camps, and places for dungeons. 
 - **Creatures respawn on load as before; camp clearance is the one thing saved now.** Saving every creature is phase 6 (§26).
 - **The quarter-rate tier for distant idle creatures** is a stopgap so the larger population costs less than the old one did. Phase 6 replaces it with the spec's tiers A/B/C.
 
+## Phase 5, step 3 — NPC adventurers and NPC spellcasting (v0.36) — **Tested**
+
+Built on `feature/living-world-phase6a` (v0.35, which already carries v0.34's law), so it uses the tiers and the law as they are. Master spec §8 (NPC adventurers — simulated players), §18 (NPC weapon attacks, archery, spellcasting, bandaging, potions, retreat, target changes, group assistance) and §20 for the adventurers' own deaths.
+
+### What was built
+
+- **Pure decisions in `src/world.js`** (tested in node, `tests/adventurers.test.js`):
+  - `SIM.ADV_STYLES`: six archetypes from the spec's list (swordsman, mace fighter, fencer, archer, mage, healer) mapped onto the existing 49-skill registry, existing weapons and armour, a kit, a cloth colour and (casters) a spell list. No parallel skill system: every value is a UO skill on `SF.newSkills()`, inside the 700 skill and 225 stat caps.
+  - `SIM.ADV_ROSTER`: Aldric (sellsword, Vespar), Brenna (mace fighter, Mynoc), Corvin (fencer, Mynoc), Dara (archer, Moonglen), Elsbeth (mage, Moonglen), Fenwick (healer, Vespar), each with a courage from 0.45 to 0.85.
+  - `SIM.advChoose`: the strategic layer, about once a second. It returns `fight`, `flee` (hurt below `fleeAt × (1.6 − courage)`, or outmatched by `1.4 + 2.2 × courage`), `return` (out of bandages, arrows or reagents, hurt with nothing to heal with, a pack worth 300 gold, gear below 55 %, nightfall for the cautious), `town` (rest, sell, repair, restock; the cautious wait for daylight) or `hunt`. Errands it cannot pay for are skipped instead of waited on forever (`skip`).
+  - `SIM.advTarget`: which creature, by threat (attacking it, attacking someone else), distance, vulnerability (wounded) and faction; it never starts a fight it expects to lose but always defends itself; ties break by id.
+  - `SIM.advSpell`: Cure when poisoned; in a fight a mage keeps attacking (Energy Bolt → Lightning → Fireball → Magic Arrow, the strongest it will likely cast) and heals only below 40 %, a healer heals below 60 %, wards itself with Protection and keeps 25 mana for healing; between fights both top up with Heal or Greater Heal.
+  - `SIM.advShopping` (what to buy within the purse, in priority order) and `SIM.advAfterDeath` (the resurrection policy).
+  - Three event types: `SpellCast`, `ActorResurrected`, `CorpseLooted`.
+- **`src/adventurers.js`** (new, built after `src/law.js`): the `AdventurerAI` controller.
+  - **Actors.** Adventurers are people (`kind: 'npc'`, role `adventurer`, archetype `adventurer`), so everything built for people applies: the shared resolver, notoriety, witnesses, guards defending them, creatures targeting them by faction (`adventurers`, like you). Ids come from their names (`npc:aldric-sellsword`). Their items are real items with real uids (`SF.newItem` / `SF.EQ.fields`), so they can end up on a body and in your pack.
+  - **Fighting.** Melee walks in and swings (`swingAt`); the archer stops to aim, uses arrows from its pack and gives ground when a creature closes in; the mage keeps 2–8 m away and wrestles only when cornered. They help you only when you are below 60 % health (your fights are yours) and never claim a creature you have hit. Ten seconds without a blow either way ends a fight it cannot reach (water, a wall, a creature that fled); it leaves that creature alone for a minute.
+  - **Learning.** Every swing teaches its weapon skill by the player's rule (the hit chance is the challenge, `SF.SK.use`), each landed blow Tactics and Anatomy, parries Parrying, bandages Healing and Anatomy, casts Magery (in the circle's window) and Evaluating Intelligence, resisted spells Resisting Spells. Stats rise with them.
+  - **First Aid and draughts.** Below 70 % (or poisoned, with 60/60) it applies a bandage with `SF.firstAidCheck` / `SF.firstAidResolve`: the same delays (15 s on yourself at these skills), slips when struck, the bandage spent at the start, the treatment re-checked at the end. Below 40 % it drinks a healing draught, then waits out its 16 s cooldown.
+  - **Magery.** The book chance (`SF.MAGERY.bookChance`), the spell's mana and one of each reagent from the pack are reserved at the start of the cast; the cast time is the spell's; a blow interrupts it (reagents back, half the mana spent, `SF.MAGERY.interruptCost`, as for you). Direct spells fly with the spell's delivery delay and roll `SF.MAGERY.resolveHit` against the recipient's Resisting Spells with the caster's Evaluating Intelligence; heals, Cure and Protection use the same rolls as yours. A failed roll fizzles. Mana regenerates with Meditation (`SF.SK.manaRegen`), faster resting in town.
+  - **The day.** Hunt → fight → loot → return → town → hunt. Hunting grounds are picked from living, non-boss creatures 30–180 m from its town that it can handle (creature difficulty ≤ its best skill + 5), preferring game that fights back, away from grounds other adventurers work, and never within 50 m of you (§17: off-screen adventurers must not strip the world). It searches each ground for 40 s, tries up to four, and remembers places it could not find a way to for half an hour. Twice without game in ten minutes, or every third trip with even odds, it moves on to another town (§8: travelling between cities).
+  - **Looting.** Only its own kills (lawful): gold, its supplies and small goods worth at least 2 gold, within 60 kg. Bodies of creatures you damaged are never claimed.
+  - **In town.** One errand every 2.5 s at the market: sell loot at half price, repair worn pieces (40 % of the price for the missing durability), buy back missing kit pieces, restock (`SIM.advShopping`), bank everything above 60 gold in the pocket. It rests until healed. The cautious sleep at the hall until 06:00.
+  - **Death (§8, §20).** `SF.deathTransaction` moves everything tradeable onto one body (the snapshot of its look is taken first); creatures let go; the ghost cannot be targeted. Policy `ADV.cfg.res`:
+    - `healer` (default): the ghost walks to the nearest healer and returns at 25 % health (after 240 s a healer finds it), walks back to its body and takes everything back. A body that is gone (decayed or looted) or out of reach for 150 s means the gear is lost: it buys a new kit from the bank.
+    - `replace`: the ghost leaves the world; 600 s later a successor of the same calling (Garet, Hild, …) arrives in town.
+    - `none`: death is final.
+    Items only move, so resurrection never duplicates equipment.
+  - **The law.** Adventurers are innocent. Attacking one is a crime (a swing that misses counts); it fights back while the law gives it the right, and the guards come for you. Killing one reports a murder. Taking from its body inside the loot-rights window (`SF.lootStatus`, 90 s) is a crime, logged as looting.
+  - **Talking** gives a line about what it is doing; criminals and murderers get turned away.
+  - **Saving.** The save's new `adv` block (additive; the save version is unchanged) holds every adventurer by id: position, vitals, stats, skills, equipment, pack, bank, record, poison, ghost state and its body with what is on it, plus the successors on their way and the ids gone for good. Their item uids count towards the save's uid counter. A save from before v0.36 starts with the six fresh. Positions are kept (they are individuals, not schedules).
+  - **Cost and navigation.** Their journeys are single local searches sliced over steps, like the travelling merchant's, never the continent travel graph (its first build stalled the live loop for 3.5 s in this container). Tiers: never below B, like the guards. Measured on a fresh world in this container: 0.75 ms per step with them against 0.48 without (tiers on), 2.83 against 2.38 (tiers off). `?adv=off` leaves them out.
+  - **Developer panel and inspector** show their mode and reasons, ground, vitals, top skills, purse, bank, supplies, record, what they are casting or tending; the panel adds a line of totals. The target frame shows their calling and what they are doing (and Ghost).
+- **Small fixes in shared code:**
+  - **Law core:** a record of someone fighting back in self-defence no longer gives the aggressor a right over them (`SIM.newLaw().rights`). Before, an innocent who defended itself became lawful prey for the one who attacked it. This is the UO rule and what the v0.34 doc describes ("they attacked you first").
+  - **Wear messages:** only your own gear reports "badly worn" or "broken" in your log (`wear(it, amt, quiet)`); guards' and adventurers' armour used to write to it.
+
+### Tests
+
+- `node tests/adventurers.test.js Shardfall_v0.36.html` (new, in CI): roster and archetypes on the real skill registry and caps; every `advChoose` branch (fight, flee by courage, outmatched, each reason to go home, each town errand, waiting for daylight, unaffordable errands skipped); target choice (nearest, attacker first, wounded, helping, never a losing fight, self-defence, deterministic ties); spell choice (strongest likely spell, mana, chance, reagents, heal thresholds, Cure, range, the healer's ward and mana reserve); shopping; policies.
+- `python3 tests/world-smoke/phase5_adv.py Shardfall_v0.36.html` (new; `world-smoke/run.py` runs it), 40 checks in Chrome: the roster at boot; 150 s of hunting (kills, both directions through the shared damage entry, lawful looting, skill gains); a bandage with a slip and a draught; the mage's casts, reservation and interruption; the healer healing itself; flight; the town errands; a death with one body and nothing left on the ghost, the ghost finding a healer and the body reclaimed with the same item uids; a lost body and a new kit from the bank; the law (crime, self-defence, murder, looting); save and reload of everything including a ghost and its body; an older save; the replace and none policies across a reload; `?adv=off`; tiers.
+- Existing tests updated for the new rules: `phase6.py` exempts adventurers (never below B) from the distant-tier check, as it already did for the guards and the merchant. `phase3.py` and `phase4.py` (the ecosystem and town life on their own, with `?tiers=off`) now also open with `adv=off`: adventurers hunt those creatures and would change what they measure.
+- `tests/soak/run.py --days 1` with adventurers: all checks pass (heap, actors, path queue and cache, logs bounded; no errors).
+- **Regression in this container.** Every node suite and `check-build.py` pass, and every browser suite in the CI list passes except two timing checks with `?tiers=off`: phase 3's three-day "under 3 ms per step" (3.5 ms) and phase 4's "under 3 ms with town life" (3.7 ms). Both fail the same way on the unchanged v0.35 build in the same container (3.51 ms and 3.02 ms), so the machine is slower today than when v0.35 was measured; they now run with `adv=off`, so adventurers are not in those numbers.
+- **Navigation:** adventurers' searches use a new background lane in `navTick` (`o.low`): it runs after the main queue with what is left of the step's budget, at most 800 nodes. Without it, a long adventurer search held up the creatures' and townsfolk's paths (phase 3's predator, return-home and leash scenarios failed); with it they pass.
+
+### Decisions
+
+- **Adventurers die like you, townsfolk are still knocked down.** The spec asks for adventurers to "lose appropriate equipment under the same death and loot rules that apply to the player", and those rules exist (Wren uses them). Townsfolk death, their corpses and looting stay in step 4.
+- **Lawful only.** The thief and murderer archetypes need NPC crime (an NPC attacking you or a townsperson unlawfully, theft); that is step 4 / phase 7. Adventurers never start a fight with a person.
+- **No dungeons yet.** The dungeon mouths are sealed until their interiors are built; adventurers hunt the wilds.
+- **Economy as a ledger.** They buy and sell at shop prices without changing shop stock, like the townsfolk's hauls; prices and supply are phase 7.
+- **Nobody starts in Skara Bryn**: few grounds around it can be walked to through its woods. They may still move there, and leave again if they find nothing.
+
+### Not done yet
+
+- Gathering resources, training at trainers, crafting and treasure hunting (archetypes from the spec's list that need those loops for NPCs).
+- Pets for the animal tamer, songs for the bard.
+- Recall and gates for long trips; boats.
+- Adventurers fighting each other or grouping up.
+
+## Phase 6, step 1 — Simulation tiers, the population saved, phone profiling (v0.35) — **Tested**
+
+Built on a branch of its own (`feature/living-world-phase6a`) while phase 5 step 2 (criminality, v0.34) was being built elsewhere, then merged onto it. It touches neither law nor combat, adds its save data inside the existing `eco` block (the save version is unchanged), and leaves corpses, merchant cargo and NPC adventurers to phase 5 steps 3–4.
+
+### What was built
+
+- **Simulation tiers A/B/C (§25)**, replacing the phase 3 stopgap (idle creatures beyond 80 m thought at a quarter rate).
+  - Pure rules in `src/world.js`: `SIM.TIER` (A 40 m, B 120 m, B at least A + 60 m, 6 m hysteresis, B runs one step in four), `SIM.viewRadius`, `SIM.tierRadii`, `SIM.tierOf`, `SIM.tierDue`.
+  - **`src/tiers.js`** (new, built between NPC combat and the game). `tierStep(e, dt)` runs inside the controller dispatch in `update()` and returns the time the controller should simulate this step:
+    - **A, local:** every step, as before. Radius A follows the camera: it is never smaller than the distance to the screen's farthest corner (with the renderer's culling margins) plus 8 m, so nothing on screen ever runs at a reduced rate. On a phone that is the 40 m minimum; on a 2560 × 1440 desktop it grows to 56 m.
+    - **B, regional:** one step in four, staggered by id, with the skipped time handed over (at most 0.5 s at once).
+    - **C, distant:** not stepped. A creature holds where it is; its spawner, camp and region books, the clock, populations and saving carry on for the whole world. A townsperson's day goes on abstractly: when it comes back into range its needs catch up on the hours it missed and it stands where its schedule has taken it (`lifeResume`, the rule used after a load). If that spot is near the player, it walks there instead, so nobody appears on screen.
+    - **Always A:** the player, pets, summons, Wren, quest creatures, developer travellers, and anyone busy. A creature is busy when it is fighting, chasing, fleeing, hurt, poisoned, on a camp sortie or following one. An NPC is busy when it is knocked down, fighting, hurt or poisoned. A fight never runs at a reduced rate.
+    - **Never below B:** the guards, who must answer a fight in their town, and the travelling merchant, whose journey is the content.
+    - An actor's id, state and position never change on a tier change except by that schedule rule, so nothing is duplicated or lost.
+  - The developer panel's tier line (left as "phase 6" in v0.22) now shows actors per tier, the radii and the wake-ups. `?tiers=off` runs every actor every step, for comparison.
+- **The population is saved creature by creature (§26: regional populations, actor identity).**
+  - Every creature a spawner made is one compact row in `eco.pop` (`SIM.packCreatures`): id, species, spawner, position, health, home, pack and leader, hidden, purse, last meal. About 80 bytes each: 923 creatures took 73 KB of an 86 KB save. Browser storage allows about 5 MB, so localStorage is still enough and IndexedDB is not needed yet.
+  - Spawners get a stable key from species and position (`ecoSpawnKeys`), independent of the order they are built in.
+  - On load, `populate()` calls `ecoRestore()` instead of the boot fill. The rows are validated first (`SIM.unpackCreatures`): an unknown species or spawner, a broken number, a repeated id or more creatures than a spawner holds are dropped and counted, never duplicated. Each creature comes back with its own id (`restoreId` → `WS.adopt` claims it), its pack and leader, and counted back into its spawner and camp. A creature whose ground is no longer walkable goes back to its spawner.
+  - A region the player thinned out stays thin: vacancies refill at each spawner's own pace, out of sight, as always, not all at once on load.
+  - Creatures in a fight are saved where they stand, calm (a reload ends fights, as before). Pets, summons and quest creatures keep their own save paths.
+  - A save from before v0.35 has no rows and boots with a fresh population, as before. Older builds ignore the rows.
+- **Phone profiling** (`tests/perf/phone.py`, a measurement, not a CI gate): phone screens (390 × 844 portrait and 844 × 390 landscape, device pixel ratio 3, touch), CPU slowed 4× and 6× through the DevTools protocol, Saltmarsh Quay and Vespar, noon and night, tiers on and off. Results under Performance.
+
+### Tests
+
+- `node tests/persist.test.js Shardfall_v0.35.html` (new, in CI), 27 checks. Tier radii from the screen; tier by distance; hysteresis at both boundaries (a walk out and back changes tier exactly four times; wobbling on a boundary never flips); B runs one step in four for every id, spread evenly. Population rows: the row format, a JSON round trip, stable re-packing, every kind of bad row dropped and counted, health clamped, 2000 rows for one spawner restoring only its capacity, the size of 1000 rows.
+- `python3 tests/world-smoke/phase6.py Shardfall_v0.35.html` (new; `world-smoke/run.py` runs it), in Chrome at phone size:
+  1. Tiers by distance (at the Quay: about 14 local, 38 regional, 966 distant); radius A covers the screen plus the margin; guards and the merchant never go distant; Wren is always local; a distant creature in a fight runs every step and drops back when calm.
+  2. On a 2560 × 1440 screen radius A grows to 56 m.
+  3. A distant boar holds for 10 s; with the player 60 m away it roams again. The player visits six places across the world: at every stop each actor is registered once, every spawner and camp count matches its live creatures, and no named actor is lost (about 200 wake-ups).
+  4. Vespar's townsfolk, distant while you are at the Quay, wake when you come within regional range at noon: they stand where the noon schedule took them (all placed out of view), with six hours of needs caught up. Arriving in the middle of town at dusk, those whose evening place is near you set off on foot instead. The town carries on with every book straight.
+  5. Persistence. One wild region is cleared and 25 creatures wounded, then the game is saved and reloaded:
+     - all 923 creatures are back with the same ids, species, positions and health;
+     - the cleared region is still empty;
+     - 171 packs keep their members and leaders, and every camp keeps its count;
+     - the books are straight and nothing is dropped;
+     - vacancies refill gradually, and five minutes later the books are still straight;
+     - the same save loaded twice gives the same creatures.
+  6. A save with four bad rows (a repeated id, an unknown species, an unknown spawner, a broken number) drops exactly those. A save from before v0.35 boots with a fresh population.
+  7. Cost on a seeded world at the Quay: 0.41 ms per step with tiers, 2.26 ms without (desktop, this container).
+- **Long run** (`tests/soak/run.py`, 3 game days with tiers on, the player moved between towns, camps and the wilds, saved and reloaded half way, so the population went through a restore): all checks pass. Step mean 0.43 ms (worst hourly p95 1.1 ms; earlier soaks without tiers ran around 1.3–1.8 ms). Actors stay at 1,020–1,027 (945–951 creatures). The heap does not grow (first quarter 87 MB, last 85 MB). Path queue, cache, log and effects stay bounded. No page errors (the only failures are Google Fonts requests this machine cannot reach).
+- **Regression on v0.35** (phase 6 merged onto v0.34). Every node suite and `check-build.py` pass. Every browser suite in the CI list passes in this container: world-smoke has 209 ok, including phase 5's law suite with tiers on and phase 6's 31 checks.
+  - creation-smoke failed once, then passed 2/2 reruns. The check "fighting raises Strength or Dexterity naturally" counts every "rises to" line in the journal, including one the scenario before it may write after its unseeded rat fight. That is a test flake, not a tiers issue.
+- Existing scenarios that test whole-world rules wherever the player stands (`world-smoke` phases 3, 4 and 5: three-day ecosystem runs, a whole town's day watched from the Quay, guards fighting in Vespar while the player is elsewhere) now open with `?tiers=off`. What they test runs at full rate around the player, where tier A changes nothing. Phase 1's wandering boar is now picked inside regional range, and its reload check now expects saved creatures to keep their ids while new ones take fresh numbers.
+
+### Decisions
+
+- **Distant creatures hold rather than move abstractly.** Their idle roaming is invisible, and their hunger, camp and sortie timers run on world time, so nothing piles up. Distant predator and prey encounters, and fights between camps, wait for phase 7's bounded encounter resolution.
+- **Townsfolk follow the schedule, not their path.** A townsperson coming back into range is placed by the clock, as after a load, which is cheap and always consistent.
+- **Guards and the merchant are never distant.** There are only ten of them, and they are the ones whose absence a player would notice.
+- **Tier A is the screen, not a fixed radius**, so a big monitor never shows stepped movement.
+- **No save version bump.** The creature rows are additive inside `eco` (v2), like the camp clearances in v0.25. This also keeps phase 6 clear of phase 5 step 2's save changes.
+- **Corpses, cargo and NPC adventurer state** are left for when phase 5 steps 3–4 create them. Player corpses and dropped piles were already saved.
+
+### Not done yet (phase 6)
+
+- World-state save of NPC corpses and merchant cargo (after phase 5 steps 3–4); significant world events in the save.
+- Rendering on phones: see Performance. The simulation is no longer the cost; drawing is.
+- Tier C encounter resolution for creatures (phase 7 overlaps).
+
+## Phase 5, step 2 — Criminality and murder (v0.34) — **Tested**
+
+### What was built
+
+- **The pure law core, `SIM.newLaw` (`src/world.js`)**, deterministic and tested in node. Actors are ids and time is simulation seconds, which only run while the game runs, so every duration is *active* time.
+  - **Notoriety** (`notoriety(id, t)`): innocent (blue), criminal (grey: a timed flag), murderer (red: five or more long-term counts). Green and orange are reserved in `SIM.NOTORIETY` for guilds and legal enemies.
+  - **Aggression records** `{ attacker, victim, owner, victimOwner, t, region, lawful, selfDefence, expires }`. Repeated swings refresh one record. An attack is lawful when the victim is grey or red, or when the attacker has a **right** over the victim: the victim attacked them (or their pet or summon) and that record has not expired (120 s). A pet's or summon's unlawful attack flags its owner.
+  - **Crimes**: an unlawful attack or `crime(id, t, what)` (theft) sets the criminal flag for 120 s (`LAW_DEFAULTS.criminal`).
+  - **Murder counts**: `murder(killer, victim, t, key)` counts only if the killer had no right over an innocent victim, and only once per death key. A count is short-term for 8 h and long-term for 40 h (`shortDecay`, `longDecay`); `red` (5) long-term counts make a murderer. `count()` adds a count for a death judged earlier (a report).
+  - Save and load (expired records dropped, damaged values cleaned), `prune`, counters. Every number is in `SIM.LAW_DEFAULTS` and can be overridden per law (`SIM.newLaw(saved, cfg)`).
+- **`src/law.js`** (new, after NPC combat) connects it to the game:
+  - **Who has notoriety:** you and the 37 townsfolk with a life. The camp fence (outlaw role) stays red, as the target frame already showed. Creatures, pets and Wren have none.
+  - **Every swing at a person** (`swingAt`, before the hit roll, after legality and ammunition) records aggression; `damageNpc` records it again for any other path. `AggressionRecorded`, `CrimeCommitted`, `CrimeWitnessed`, `MurderReported` and `NotorietyChanged` events carry actor ids.
+  - **Theft:** the existing `crime()` (Stealing caught in the act) now goes through the law. Quay folk, who have no life yet, still only shout.
+  - **Witnesses:** a townsperson up and within 14 m in sight of the offender (and always the victim) remembers "saw a crime by", flees (the phase 4 danger response) and shouts; one cry brings the two nearest free guards (`npcCallGuards`, now for you as well as creatures). Victims and witnesses refuse to talk or trade with you for 10 minutes (`lawRefuses`, called first in `talk`).
+  - **Guards against you:** `guardFightTick` treats you like a creature when the law allows it (`lawGuardTarget`: you are grey or red, or you attacked that guard). He engages when he sees you inside his jurisdiction (16 m, line of sight) or is called, fights with the shared resolver, and stops with `CombatEnded` `won` (you died), `lost sight` (hidden, out of sight 6 s, out of the jurisdiction) or `pardoned` (your flag ran out and you are not red).
+  - **Murder:** until step 4 gives townsfolk real death, an NPC knocked down by someone with no right over them reports a murder at once (`lawDowned`; key = actor id + time of the fall, so two killing blows on one fall count once).
+  - **Murderers:** guards attack them on sight in town even with no criminal flag; every townsperson with a life refuses them. Long-term counts fade after 40 hours of play, and red with them.
+  - **Murder reports for you:** if an NPC kills you with no right over you, the ghost window shows *Report murder by …*; it counts once. No NPC can do that yet (guards only attack lawfully); the path is tested by staging the record.
+  - **UI:** names over heads and the target frame use notoriety colours; the target frame adds *Criminal* / *Murderer* and *⚔ Attacking* chips. Your name under the portrait turns grey with the seconds left (*Tess · criminal 87 s*) or red (*Tess · murderer*). **Attack** on an innocent warns and arms only on a second press within 4 s; aim assist never picks a person. The help page has a Law paragraph.
+  - **Developer panel:** a law line (your notoriety, counts, records, aggressions, crimes, murders, reports, witnesses, refusals, pardons); inspecting an actor shows its notoriety and counts.
+- **Saved** in the life block as `law` (records, flags, counts, handled deaths, counters), additive; the save version is unchanged. A new character starts with a clean record. A pending ghost report is saved with the character.
+
+### Tests
+
+- `node tests/world.test.js Shardfall_v0.34.html`: 29 new law checks (defaults, flags and their expiry, merged records, self-defence and its expiry, pets and owners, theft, murder once per death, no murder in self-defence or of a criminal, red at five, short and long decay, reports, save and load, damaged saves, event types).
+- `python3 tests/world-smoke/phase5_law.py Shardfall_v0.34.html` (also run by `world-smoke/run.py`), 20 checks in Chrome at phone size:
+  1. Everyone starts innocent and blue; the fence is red; creatures have no notoriety.
+  2. Attack on an innocent warns, then arms on the second press; arming alone is no crime; aim assist never picks a person.
+  3. A swing at Old Tomas is an unlawful record (region Vespar) and a crime; you are grey for 120 s with the time on your name; he flees and remembers; Lise, 4 m away, witnesses it; a guard comes and his lawful blows land on you (about 1.2 s).
+  4. Hiding: the guard reports `lost sight` and returns to the patrol. After 120 s you are innocent again (event and log line) and a guard beside you leaves you alone.
+  5. Hitting back at someone who attacked you: no warning, lawful self-defence, no flag.
+  6. Caught stealing from Merrin: criminal; she refuses to trade.
+  7. Five innocents knocked down: five reports, one count each even with two killing blows; red, with a log line and a red name.
+  8. 130 s later (no flag left) a guard still attacks the murderer on sight (`a murderer in town`) and a shopkeeper refuses.
+  9. Counts and red survive save and reload.
+  10. Killing a rat records no aggression and no crime.
+  11. Killed unlawfully by a guard (staged): the ghost window offers the report, it counts once and the button goes.
+- `tests/world-smoke/phase5.py` check 4 now expects your blow to reach the townsperson (it asserted the old "you cannot hurt townsfolk").
+- Regression on v0.34: `check-build.py`, all 12 node suites and all 16 browser suites of CI pass (world-smoke 178 ok, including phase5_law.py).
+
+### Decisions
+
+- **A knock-down is the death, for now.** Murder counts need deaths, and townsfolk only fall until step 4. When they can die, `lawDowned` moves to the death transaction unchanged.
+- **Attacks on townsfolk are allowed inside towns.** Protected ground still keeps creatures from targeting anyone and keeps your gear on death; it never made you immune to the law. Guards answer only inside a town's jurisdiction (60 m of its centre).
+- **Only townsfolk with a life can be attacked.** The Quay wardens, healers and other placed NPCs have no fighting profile yet.
+- **Spells and pets do not reach townsfolk yet.** Spell targeting (`isLiving` in `src/magic.js`) and the pet *attack* order still accept creatures only, so an area spell cannot make you a criminal by accident. The law already handles owners (`owner` on the record) for when they do.
+- **Guards are strong, not instant.** They fight criminals with the shared rules (halberd, 90 skill, 147 hp); a guard you attacked first may be fought back lawfully (his attack gives you no new flag).
+- **The victim reports at once.** Every melee victim saw the attacker; witness-based reporting for deaths with no living victim comes with real death in step 4.
+
 ## Phase 5, step 1 — NPCs as combatants (v0.30) — **Tested**
 
 ### What was built
@@ -645,7 +818,7 @@ v0.26 merges phase 3 with the equipment and paper doll work (#19, which already 
 | 5 | World clock | `hourOfDay()` = `(GT/60 + 9) % 24`: a 24-minute day, starting at 09:00. `GT` is saved, so time already persists. HUD clock exists. | **Tested** (phase 2): 120-minute day, periods, saved, HUD | Offline progression stays off (spec) |
 | 6 | Day/night visuals | `darkness()` overlay with radial holes for the player, `LIGHTS` and blasts. Night Sight sets darkness to 0. Dungeons fixed at 0.8. | **Tested** (phase 2): tinted periods, local lights and glow, partial Night Sight, dungeons apart | Torch items and spell light radii when those exist; night gameplay in phase 3 |
 | 7 | NPC life | 58 static NPCs (Saltmarsh + Anniabreen towns), roles, shops, dialogue lines; no movement or schedules | **Tested** (phase 4; all four towns since v0.28, with memory of the player and saved state): homes, workplaces, schedules, needs, memory, nine residents, resource workers on real nodes, shop hours, shelter from danger; guard patrols in all four towns; a travelling merchant | Saltmarsh Quay residents; the economy behind the stores (phase 7) |
-| 8 | NPC adventurers | Wren: one hireling with skills, equipment, bandaging, ghost/resurrection, follow/wait | Classified (hireling) | Phase 5 (they need NPC combat) |
+| 8 | NPC adventurers | Wren: one hireling with skills, equipment, bandaging, ghost/resurrection, follow/wait | **Tested** (v0.36): six persistent adventurers (swordsman, mace fighter, fencer, archer, mage, healer) that hunt, fight, loot, bank, repair, restock, flee, travel between towns, die by the player's rules and come back | Gathering, training, crafting, tamers, bards, thieves and murderers |
 | 9–10 | Monster ecosystem | `MON` table (23 types) with aggro, leash, speed, loot, skin; `SPAWNS` point spawners with caps and respawn timers; `aiMon` idle/chase/telegraph/strike/recover/return | **Tested** (phase 3): 27 species profiles as data, temperaments, hours, prey, packs and herds, retreat, feeding; deer, hares and bears added | Goblins, zombies, dragons when art exists; orc roles and lich commands with NPC Magery (phase 5) |
 | 11 | Factions | None; creatures target only the player, pets or Wren (or a provoked creature) | **Tested** (phase 3): 20 factions, five levels, symmetric table; creatures fight creatures; hostility is not a crime | Law and notoriety: phase 5 |
 | 12 | Utility AI + state machines | `aiMon` state machine; no utility scoring, personality or hysteresis | **Tested** (phase 3) for creatures: scored options, commitment, hysteresis, forced retreat, reasons in the inspector | Townsfolk and adventurers: phase 4 |
@@ -655,7 +828,7 @@ v0.26 merges phase 3 with the equipment and paper doll work (#19, which already 
 | 16 | Camps | Ashfen outlaw camp (static vendors, smugglers spawner) | **Tested** (phase 3): 8 camps and 2 guarded mouths as persistent populations; clearance saved, gradual recovery; orc patrols, bandit road watches, wolf hunting trips | Supplies, treasure, leadership: phases 5 and 7 |
 | 17 | Dungeons | Sunken Bell, 3 levels, seeded rooms, Bellkeeper boss, chests, stairs; Mynoc mine first chamber | **Partial** (v0.23): 5 sealed mouths placed and reachable; interiors **Planned** | One step per dungeon interior |
 | 18 | Combat between actors | Creatures ↔ player/pets/Wren; provoked creature ↔ creature | Shared entry **Tested** | Phase 5 |
-| 19 | Criminality | Protected zones (`PROT`, guarded towns); theft/pickpocket and snooping exist for the player; no notoriety | Planned | Phase 5 |
+| 19 | Criminality | Protected zones (`PROT`, guarded towns); theft/pickpocket and snooping exist for the player; no notoriety | **Tested** (v0.34): notoriety, aggression records with self-defence and expiry, criminal flag, theft, witnesses, guards in jurisdiction, murder counts with decay and reports, red restrictions | Illegal looting (step 4); NPC criminals and murderers (step 3+); green and orange (guilds) |
 | 20 | Corpses, death, loot | `SF.deathTransaction` for player and Wren, creature corpses with loot rolls, decay timers, skinning, the player's corpse saved | Death once **Tested** | Phase 5 (NPC looting), phase 6 (persist all corpses) |
 | 21 | Economy | Shops with fixed prices, resource nodes deplete/refill and persist, crafting consumes materials | Planned | Phase 7 |
 | 23 | Sound | `SFXA` Web Audio player: buses, positional pan, priorities, area music, ambience per zone, footsteps by surface; volume/mute settings | **Implemented** (phase 3): alert on first sight of prey or enemy for every species with takes, documented stand-ins, rare idle calls, night howls; silent where no take exists | Separate volume sliders and environment profiles (birds, insects, owls, groans) when takes exist |
@@ -713,6 +886,9 @@ v0.26 merges phase 3 with the equipment and paper doll work (#19, which already 
 | v0.28.1 (≈1,020 entities, ≈945 creatures; update only, one run of 1,000 steps after boot, v0.28 in the same run: 1.04 ms) | 1.84 ms | — | — |
 | v0.30 (≈1,050 entities; update only, 3 runs of 2,000 steps after 400 warm-up steps; v0.29.2 in the same run: 1.28 ms) | 1.39 ms | — | — |
 
+| v0.35, tiers on (≈1,020 entities; seeded, 2,000 steps after 400 at the Quay; phase6.py) | 0.41 ms | — | — |
+| v0.35, `?tiers=off` (the same run) | 2.26 ms | — | — |
+
 - Each figure is the average of 3 runs of 4,000 updates and 200 renders.
 - **v0.23 update cost.** It rose from 0.80 to 1.20 ms per step. This is the creature push-apart in `aiMon`, which compares every entity with every other: with 256 entities instead of 212 that is 1.46× the pairs, which matches the measurement. It is still far inside the 50 ms step, but it is the first sign of the quadratic cost the audit flagged. The phase 3 spatial index removes it.
 - **v0.23 start-up:** 1.66 s to enter the world (was 1.0 s); about 72 MB of heap (was about 31 MB).
@@ -721,15 +897,31 @@ v0.26 merges phase 3 with the equipment and paper doll work (#19, which already 
 - **The travel graph** is built once, in about 250 ms.
 - **v0.25 update cost.** It fell from 1.21 to 0.49 ms per step although there are more than twice as many actors. Push-apart, perception and calls for help go through the spatial index, and idle creatures more than 80 m away think at a quarter rate. Near a busy camp everything runs at full rate; the seeded three-day run averaged about 0.5 ms per step.
 - **v0.25 start-up:** 1.92 s to enter the world (v0.24 measured again: 1.65 s). The habitat survey and the larger first population add about 0.3 s. Heap after start: about 52 MB (v0.24: about 49 MB in the same run).
-- **Phones are not measured yet.** That is phase 6, but the night pass and the graph build are the two numbers to watch.
+- **Phones (v0.35, `tests/perf/phone.py`).** These are emulated phones: Chrome in this container at device pixel ratio 3, with the CPU slowed down 4× and 6× through the DevTools protocol. There is no GPU here, so drawing is done in software and costs more than on a real phone. Each figure is the mean over Saltmarsh Quay and Vespar at noon and at night; p95 is the worst case seen.
 
-## Next task (phase 5, step 2)
+| CPU | Screen | Step, tiers on | Step, tiers off | Draw | Frame rate |
+|---|---|---|---|---|---|
+| 4× | portrait 390 × 844 | 2.7 ms (p95 ≤ 8.8) | 11.8 ms (p95 ≤ 33) | 46–62 ms | 11–18 fps |
+| 4× | landscape 844 × 390 | 2.7 ms (p95 ≤ 13.5) | 10.5 ms (p95 ≤ 30) | 50–64 ms | 12–18 fps |
+| 6× | portrait | 3.8 ms (p95 ≤ 18.6) | 16.1 ms (p95 ≤ 41) | 68–103 ms | 6–13 fps |
+| 6× | landscape | 3.6 ms (p95 ≤ 13.6) | 15.9 ms (p95 ≤ 47) | 76–102 ms | 6–11 fps |
 
-Criminality and murder (§19), now that NPCs can be hurt and guards can fight:
+  - **The simulation is now cheap on a phone.** With tiers, a 50 ms step costs about 3 ms even at 6×; without them it cost 10–17 ms, with spikes to 47 ms.
+  - **Drawing is now the cost**, and it depends on how many pixels the back buffer has. The back buffer is the screen divided by `DP = round(ZOOM × devicePixelRatio)`. At the default zoom 0.7, a pixel-ratio-3 phone draws at ⅔ resolution (DP 2). A pixel-ratio-2 phone draws at full resolution (DP 1), which has the most pixels of the three.
+  - Drawing one portrait frame at 4× costs 18 ms at pixel ratio 1, 73 ms at ratio 2 and 49 ms at ratio 3 (noon; 25, 95 and 69 ms at night).
+  - Next step for phones: choose DP from a budget of back-buffer pixels instead of from the pixel ratio alone, then measure on a real device. The night tint and the light pass are the next numbers to watch.
+  - Heap: 61–76 MB with tiers, 69–105 MB without. The save is about 86 KB.
 
-1. Notoriety (blue innocent, grey criminal, red murderer) on names and the target frame, for the player and humanoid NPCs.
-2. Aggression records (attacker, victim, time, region, lawful or not, self-defence, expiry) and the criminal flag (120 s of simulation time, configurable).
-3. Let the player attack townsfolk: an unlawful attack makes you a criminal; guards inside their jurisdiction respond to you with the same `guardFightTick`; witnesses who see it call them.
-4. Short- and long-term murder counts with decay, saved; five make you red.
+## Next task (phase 5, step 4)
 
-Then step 3 (the first NPC adventurers) and step 4 (NPC death, corpses and looting under the player's rules).
+NPC death, corpses and looting under the player's rules, for townsfolk and guards (§20), now that adventurers already die that way:
+
+1. `lawDowned` moves into a death transaction for townsfolk; knock-downs become deaths where the spec wants them (outside protected ground), with bodies, decay and looting rights.
+2. Illegal looting by NPCs (an outlaw or a thief archetype) as a crime the law already knows (`lawCrime(…, 'looting')`).
+3. The first NPC criminals (thief, murderer) using the adventurer controller with unlawful targets, so guards and witnesses react to NPC crime.
+
+## Next in phase 6 (step 2, after phase 5 steps 3–4)
+
+1. Save NPC corpses with their contents and remaining lifetime and merchant cargo through the same validated-rows path as the creatures (no duplicates on load). NPC adventurers are already saved whole (v0.36, the `adv` block).
+2. Phone drawing: pick the back-buffer divisor from a pixel budget (see Performance), then profile on a real phone.
+3. A seeded long-run check with tiers on (the soak), added to the browser suites with the spec's long-running checks: no population explosion or extinction, no infinite loot or gold, no stuck NPCs, a bounded event log and memory.

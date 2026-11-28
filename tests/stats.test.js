@@ -1,5 +1,5 @@
-// usage: node tests/stats.test.js Shardfall_v0.33.html — attribute locks (SF.STATS) and the stat gains in src/skills.js (SF.SK), no browser
-const fs = require('fs'); const html = fs.readFileSync(process.argv[2] || 'Shardfall_v0.33.html', 'utf8');
+// usage: node tests/stats.test.js Shardfall_v0.33.1.html — attribute locks (SF.STATS) and the stat gains in src/skills.js (SF.SK), no browser
+const fs = require('fs'); const html = fs.readFileSync(process.argv[2] || 'Shardfall_v0.33.1.html', 'utf8');
 const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
 const g = {}; const m = { exports: {} };
 new Function('module', 'globalThis', scripts.find(t => t.includes('SF.METALS')))(m, g); g.SF = m.exports;
