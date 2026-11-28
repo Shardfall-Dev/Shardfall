@@ -5,7 +5,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="screen-orientation" content="landscape">
-<title>Shardfall v0.33</title>
+<title>Shardfall v0.36</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=Alegreya+Sans:wght@400;500;700&family=Cinzel:wght@600;700&display=swap" rel="stylesheet">
 <style>
@@ -162,6 +162,43 @@ button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 @media (max-width:760px){.ccsteps span{display:none}.ccsteps button.on span{display:inline}.ccbody{grid-template-columns:170px 1fr;gap:8px;padding:8px}#ccdoll{width:96px;height:192px}#ccsprite{width:64px;height:83px}.ccfig{flex-direction:column;align-items:center}.ccderived{grid-template-columns:auto 1fr}.ccstat{grid-template-columns:5.5em 44px minmax(40px,1fr) 3.6em 44px;gap:4px}.ccstat.sm{grid-template-columns:44px minmax(40px,1fr) 3.6em 44px}}
 @media (max-width:560px){.ccbody{grid-template-columns:1fr;grid-template-rows:auto 1fr}.ccprev{flex-direction:row;align-items:center;max-height:150px;padding:6px}.ccfig{flex-direction:row;padding:0}#ccdoll{width:60px;height:120px}#ccsprite{width:56px;height:73px}.ccrot .ccb.pm{width:36px;min-width:36px;min-height:36px}.ccpinfo #ccwnote{display:none}.ccmark{display:none}.ccstat{grid-template-columns:1fr 44px 3.6em 44px}.ccstat label{grid-column:1/-1}.ccstat input[type=range]{display:none}.ccstat.sm{grid-template-columns:44px 1fr 3.6em 44px}.ccstat.sm input[type=range]{display:block}.ccnav .ccb{min-width:90px}}
 @media (max-height:500px){.cctop{padding:4px 10px}.ccsteps button{min-height:34px}.ccbody{padding:6px 8px;gap:8px}#ccdoll{width:64px;height:128px}#ccsprite{width:64px;height:83px}.ccfig{flex-direction:row}.ccmain{padding:8px 12px 14px}.ccmain h2{font-size:18px;margin-bottom:6px}.ccfield{margin:6px 0}.ccnav{padding:4px 10px calc(4px + env(safe-area-inset-bottom))}.ccderived{grid-template-columns:auto 1fr auto 1fr}}
+/* ---- title screen modes and online play (src/online.js): the creator's wood, brass and parchment ---- */
+.cchome{max-width:760px}
+.ccmodes{display:grid;grid-template-columns:1fr 1fr;gap:14px;text-align:left}
+.ccmode{padding:14px 16px;border:1px solid var(--brass);border-radius:8px;background:linear-gradient(rgba(58,40,24,.85),rgba(23,13,7,.9));box-shadow:inset 0 1px 0 rgba(255,230,170,.12),0 4px 14px rgba(0,0,0,.45)}
+.ccmode h3{margin:0 0 10px;font:700 19px var(--gothic);color:var(--brass2);letter-spacing:.05em;display:flex;align-items:center;gap:8px}
+.ccmode .ccnote{color:#b9a47e;margin-top:10px}
+@media (max-width:620px){.ccmodes{grid-template-columns:1fr}.cchome{padding:14px}}
+.onwrap{height:100%;display:flex;flex-direction:column;max-width:620px;width:100%;margin:0 auto}.onwrap.wide{max-width:1000px}
+.ontop{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:2px solid var(--brass);background:linear-gradient(var(--wood),var(--wood2))}
+.onmode{font:700 12px var(--px);color:#cdb88f;letter-spacing:.12em;text-transform:uppercase}.onsp{flex:1}
+.onpage{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;margin:12px;padding:16px 20px 22px;border-radius:6px;color:var(--inkp);border:2px solid #6a4a26;
+  background:radial-gradient(ellipse at 20% 0%,rgba(255,255,255,.35),transparent 55%),linear-gradient(var(--parch),var(--parch2));box-shadow:inset 0 0 30px rgba(90,60,20,.35)}
+.onpage h2{margin:0 0 10px;color:#4a2e12}.onpage h3{font:700 15px var(--gothic);color:#4a2e12;margin:4px 0 8px}
+.onform{display:flex;flex-direction:column;gap:2px;margin:6px 0}.onform .ccfield{margin-bottom:8px}.onform input{width:100%}
+.onform.onreauth,.ccsec .onform{flex-direction:row;flex-wrap:wrap;align-items:flex-end;gap:8px}.ccsec .onform .ccfield{flex:1;min-width:180px;margin:0}
+.onmsg{padding:8px 12px;border:2px solid #4a6a2a;border-radius:6px;background:#e4efcc;color:#23380f}
+.onerr{padding:8px 12px;border:2px solid #9a2a14;border-radius:6px;background:#f8dccc;color:#5a1408}
+.onalpha{padding:8px 12px;border:1px dashed #8a6a3a;border-radius:6px;background:rgba(255,248,228,.6);font-size:14px}
+.onor{display:flex;align-items:center;gap:10px;margin:12px 0;color:var(--dimp);font:12px var(--px)}.onor::before,.onor::after{content:'';flex:1;border-top:1px solid rgba(106,74,38,.45)}
+a.ccb{display:flex;align-items:center;justify-content:center;text-decoration:none}.onprov{min-height:48px}.onapple{background:linear-gradient(#222,#000);border-color:#777}
+.onlinks{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.onrealm{max-width:340px;margin-bottom:10px}.onrealm select{width:100%}
+.oncards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.oncard{display:flex;gap:10px;padding:10px;border:2px solid #a08458;border-radius:8px;background:#f6ecd4;color:var(--inkp);text-align:left;min-height:140px}
+.oncard .oninfo{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}.oncard b{font:700 17px var(--gothic);color:#4a2e12;overflow-wrap:anywhere}
+.onnew{flex-direction:column;align-items:center;justify-content:center;border-style:dashed;cursor:pointer;font:inherit}.onnew b{font-size:16px}
+.onport{width:60px;height:120px;flex:none;image-rendering:pixelated;background:radial-gradient(ellipse at 50% 85%,rgba(74,46,18,.25),transparent 60%)}
+.ondel input{width:100%}
+.onstat{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:8px 0 12px}.ondot{width:12px;height:12px;border-radius:50%;background:#999;box-shadow:0 0 0 2px #4a2e12}
+.ondot.connected{background:#3c9a3a}.ondot.connecting,.ondot.reconnecting{background:#d8a020}.ondot.ended{background:#9a2a14}
+.onlobby{display:grid;grid-template-columns:minmax(200px,1fr) 2fr;gap:14px}.onlobby section{padding:10px 12px;border:1px solid rgba(106,74,38,.45);border-radius:6px;background:rgba(255,250,235,.45)}
+.onpeople{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
+.onperson{display:flex;gap:8px;align-items:center;padding:6px;border:1px solid #a08458;border-radius:6px;background:#fbf3df}.onperson.me{border-width:2px}
+.onperson .onport{width:48px;height:96px}.onperson div{display:flex;flex-direction:column;min-width:0}.onperson b{font:700 15px var(--gothic);color:#4a2e12;overflow-wrap:anywhere}
+.ondanger{border-color:#9a2a14}
+@media (max-width:620px){.onpage{margin:6px;padding:12px}.onlobby{grid-template-columns:1fr}.ontop{gap:6px;padding:6px 8px}.ontop .ccmark{display:none}}
+@media (max-height:500px){.onpage{margin:6px}.oncard{min-height:110px}.onport{width:48px;height:96px}}
 /* attribute lock buttons (Character page and paper doll) */
 .lk{min-width:30px;min-height:30px;padding:0 4px;border-radius:5px;border:1px solid var(--edge);background:#14203a;color:var(--ink);font:12px var(--px);vertical-align:middle;cursor:pointer}
 .lk-hold{color:#f0c040}.lk-lower{color:#ff8a6a}

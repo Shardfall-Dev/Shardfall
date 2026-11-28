@@ -30,7 +30,7 @@ jobs:
         run: npm run test:unit
       - name: Start PostgreSQL, Supabase Auth and Mailpit
         run: docker compose -f server/dev/docker-compose.yml up -d --wait
-      - name: Migrations on a fresh database (twice: the second run must be a no-op)
+      - name: Migrations on a fresh database, twice (the second run must be a no-op)
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:54329/postgres
         run: npm run migrate && npm run migrate

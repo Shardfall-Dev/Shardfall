@@ -5,7 +5,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="screen-orientation" content="landscape">
-<title>Shardfall v0.33</title>
+<title>Shardfall v0.36</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=Alegreya+Sans:wght@400;500;700&family=Cinzel:wght@600;700&display=swap" rel="stylesheet">
 <style>
@@ -162,6 +162,43 @@ button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 @media (max-width:760px){.ccsteps span{display:none}.ccsteps button.on span{display:inline}.ccbody{grid-template-columns:170px 1fr;gap:8px;padding:8px}#ccdoll{width:96px;height:192px}#ccsprite{width:64px;height:83px}.ccfig{flex-direction:column;align-items:center}.ccderived{grid-template-columns:auto 1fr}.ccstat{grid-template-columns:5.5em 44px minmax(40px,1fr) 3.6em 44px;gap:4px}.ccstat.sm{grid-template-columns:44px minmax(40px,1fr) 3.6em 44px}}
 @media (max-width:560px){.ccbody{grid-template-columns:1fr;grid-template-rows:auto 1fr}.ccprev{flex-direction:row;align-items:center;max-height:150px;padding:6px}.ccfig{flex-direction:row;padding:0}#ccdoll{width:60px;height:120px}#ccsprite{width:56px;height:73px}.ccrot .ccb.pm{width:36px;min-width:36px;min-height:36px}.ccpinfo #ccwnote{display:none}.ccmark{display:none}.ccstat{grid-template-columns:1fr 44px 3.6em 44px}.ccstat label{grid-column:1/-1}.ccstat input[type=range]{display:none}.ccstat.sm{grid-template-columns:44px 1fr 3.6em 44px}.ccstat.sm input[type=range]{display:block}.ccnav .ccb{min-width:90px}}
 @media (max-height:500px){.cctop{padding:4px 10px}.ccsteps button{min-height:34px}.ccbody{padding:6px 8px;gap:8px}#ccdoll{width:64px;height:128px}#ccsprite{width:64px;height:83px}.ccfig{flex-direction:row}.ccmain{padding:8px 12px 14px}.ccmain h2{font-size:18px;margin-bottom:6px}.ccfield{margin:6px 0}.ccnav{padding:4px 10px calc(4px + env(safe-area-inset-bottom))}.ccderived{grid-template-columns:auto 1fr auto 1fr}}
+/* ---- title screen modes and online play (src/online.js): the creator's wood, brass and parchment ---- */
+.cchome{max-width:760px}
+.ccmodes{display:grid;grid-template-columns:1fr 1fr;gap:14px;text-align:left}
+.ccmode{padding:14px 16px;border:1px solid var(--brass);border-radius:8px;background:linear-gradient(rgba(58,40,24,.85),rgba(23,13,7,.9));box-shadow:inset 0 1px 0 rgba(255,230,170,.12),0 4px 14px rgba(0,0,0,.45)}
+.ccmode h3{margin:0 0 10px;font:700 19px var(--gothic);color:var(--brass2);letter-spacing:.05em;display:flex;align-items:center;gap:8px}
+.ccmode .ccnote{color:#b9a47e;margin-top:10px}
+@media (max-width:620px){.ccmodes{grid-template-columns:1fr}.cchome{padding:14px}}
+.onwrap{height:100%;display:flex;flex-direction:column;max-width:620px;width:100%;margin:0 auto}.onwrap.wide{max-width:1000px}
+.ontop{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:2px solid var(--brass);background:linear-gradient(var(--wood),var(--wood2))}
+.onmode{font:700 12px var(--px);color:#cdb88f;letter-spacing:.12em;text-transform:uppercase}.onsp{flex:1}
+.onpage{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;margin:12px;padding:16px 20px 22px;border-radius:6px;color:var(--inkp);border:2px solid #6a4a26;
+  background:radial-gradient(ellipse at 20% 0%,rgba(255,255,255,.35),transparent 55%),linear-gradient(var(--parch),var(--parch2));box-shadow:inset 0 0 30px rgba(90,60,20,.35)}
+.onpage h2{margin:0 0 10px;color:#4a2e12}.onpage h3{font:700 15px var(--gothic);color:#4a2e12;margin:4px 0 8px}
+.onform{display:flex;flex-direction:column;gap:2px;margin:6px 0}.onform .ccfield{margin-bottom:8px}.onform input{width:100%}
+.onform.onreauth,.ccsec .onform{flex-direction:row;flex-wrap:wrap;align-items:flex-end;gap:8px}.ccsec .onform .ccfield{flex:1;min-width:180px;margin:0}
+.onmsg{padding:8px 12px;border:2px solid #4a6a2a;border-radius:6px;background:#e4efcc;color:#23380f}
+.onerr{padding:8px 12px;border:2px solid #9a2a14;border-radius:6px;background:#f8dccc;color:#5a1408}
+.onalpha{padding:8px 12px;border:1px dashed #8a6a3a;border-radius:6px;background:rgba(255,248,228,.6);font-size:14px}
+.onor{display:flex;align-items:center;gap:10px;margin:12px 0;color:var(--dimp);font:12px var(--px)}.onor::before,.onor::after{content:'';flex:1;border-top:1px solid rgba(106,74,38,.45)}
+a.ccb{display:flex;align-items:center;justify-content:center;text-decoration:none}.onprov{min-height:48px}.onapple{background:linear-gradient(#222,#000);border-color:#777}
+.onlinks{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.onrealm{max-width:340px;margin-bottom:10px}.onrealm select{width:100%}
+.oncards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.oncard{display:flex;gap:10px;padding:10px;border:2px solid #a08458;border-radius:8px;background:#f6ecd4;color:var(--inkp);text-align:left;min-height:140px}
+.oncard .oninfo{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}.oncard b{font:700 17px var(--gothic);color:#4a2e12;overflow-wrap:anywhere}
+.onnew{flex-direction:column;align-items:center;justify-content:center;border-style:dashed;cursor:pointer;font:inherit}.onnew b{font-size:16px}
+.onport{width:60px;height:120px;flex:none;image-rendering:pixelated;background:radial-gradient(ellipse at 50% 85%,rgba(74,46,18,.25),transparent 60%)}
+.ondel input{width:100%}
+.onstat{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:8px 0 12px}.ondot{width:12px;height:12px;border-radius:50%;background:#999;box-shadow:0 0 0 2px #4a2e12}
+.ondot.connected{background:#3c9a3a}.ondot.connecting,.ondot.reconnecting{background:#d8a020}.ondot.ended{background:#9a2a14}
+.onlobby{display:grid;grid-template-columns:minmax(200px,1fr) 2fr;gap:14px}.onlobby section{padding:10px 12px;border:1px solid rgba(106,74,38,.45);border-radius:6px;background:rgba(255,250,235,.45)}
+.onpeople{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
+.onperson{display:flex;gap:8px;align-items:center;padding:6px;border:1px solid #a08458;border-radius:6px;background:#fbf3df}.onperson.me{border-width:2px}
+.onperson .onport{width:48px;height:96px}.onperson div{display:flex;flex-direction:column;min-width:0}.onperson b{font:700 15px var(--gothic);color:#4a2e12;overflow-wrap:anywhere}
+.ondanger{border-color:#9a2a14}
+@media (max-width:620px){.onpage{margin:6px;padding:12px}.onlobby{grid-template-columns:1fr}.ontop{gap:6px;padding:6px 8px}.ontop .ccmark{display:none}}
+@media (max-height:500px){.onpage{margin:6px}.oncard{min-height:110px}.onport{width:48px;height:96px}}
 /* attribute lock buttons (Character page and paper doll) */
 .lk{min-width:30px;min-height:30px;padding:0 4px;border-radius:5px;border:1px solid var(--edge);background:#14203a;color:var(--ink);font:12px var(--px);vertical-align:middle;cursor:pointer}
 .lk-hold{color:#f0c040}.lk-lower{color:#ff8a6a}
@@ -10418,6 +10455,339 @@ function paintedAtlas(k) {
 }
 if (DEV.on) { const t = setInterval(() => { if (document.body) { paintedPanel(); clearInterval(t); } }, 200); }
 globalThis.__PAINTED = { state: PNT, why: paintedWhy, set: setPaintedMode, atlas: paintedAtlas, panel: paintedPanel };
+/* Shardfall realtime protocol v1 — one definition for the game server (server/src/realtime) and the browser client
+   (src/online.js; build.sh puts this file into the game). Pure, no DOM, no network: UMD (CommonJS in node, SF_PROTOCOL in
+   the browser).
+   Envelope (JSON text frames): { v: PROTOCOL_VERSION, type, id?, seq?, p }
+     v     protocol version; a mismatch is refused with 'protocol_mismatch'
+     type  message type (below)
+     id    client request id (1–64 chars), echoed on the reply
+     seq   server → client: a per-connection sequence number, +1 per message, so the client can detect a gap and resync
+     p     payload object
+   This phase is a presence lobby: the server owns the character snapshot, the client only says hello, pings and asks for a
+   resync. Messages that would make the client authoritative (movement, combat, items, gold, skills, stats) are reserved and
+   refused with 'not_authoritative' until the server simulates them. */
+(function (root, factory) {
+  const P = factory();
+  if (typeof module !== 'undefined' && module.exports) module.exports = P; else root.SF_PROTOCOL = P;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
+  const P = {};
+  P.PROTOCOL_VERSION = 1;
+  P.MAX_MESSAGE_BYTES = 16 * 1024;     // a single frame, client → server
+  P.TICK_MS = 50;                      // the server tick: the same 50 ms fixed step as the game's world simulation (src/world.js)
+  P.HEARTBEAT_MS = 15000;              // the server pings; a connection that misses two heartbeats is closed
+  P.RECONNECT_GRACE_MS = 10000;        // a dropped character stays present this long, so a quick reconnect is not a leave + join
+  P.CLOSE = { NORMAL: 1000, GOING_AWAY: 1001, POLICY: 1008, TOO_BIG: 1009, TRY_LATER: 1013,
+    UNAUTHORIZED: 4001, FORBIDDEN: 4003, TAKEN_OVER: 4004, PROTOCOL: 4005, RATE_LIMIT: 4008, SESSION_ENDED: 4010 };
+
+  P.CLIENT = ['hello', 'ping', 'resync'];
+  P.SERVER = ['welcome', 'snapshot', 'presence.join', 'presence.leave', 'pong', 'error', 'kicked'];
+  P.RESERVED = ['move', 'stop', 'attack', 'cast', 'use', 'equip', 'unequip', 'pickup', 'drop', 'trade', 'gold', 'skill', 'stat', 'inventory', 'damage', 'craft', 'loot', 'say'];
+
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+  P.isUuid = s => typeof s === 'string' && UUID.test(s);
+  const isObj = o => !!o && typeof o === 'object' && !Array.isArray(o);
+  const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  const onlyKeys = (o, keys) => Object.keys(o).every(k => keys.includes(k));
+
+  /* payload validators for client messages: each returns null when valid, else a short reason */
+  const V = {
+    hello: p => !onlyKeys(p, ['characterId', 'lastSeq']) ? 'unexpected field' : !P.isUuid(p.characterId) ? 'characterId must be a UUID'
+      : has(p, 'lastSeq') && !(Number.isSafeInteger(p.lastSeq) && p.lastSeq >= 0) ? 'lastSeq must be a whole number' : null,
+    ping: p => !onlyKeys(p, ['t']) ? 'unexpected field' : has(p, 't') && !(typeof p.t === 'number' && Number.isFinite(p.t)) ? 't must be a number' : null,
+    resync: p => !onlyKeys(p, []) ? 'unexpected field' : null };
+
+  /* parseClient(text) → { ok: true, msg } or { ok: false, code, message, id? }. Never throws. */
+  P.parseClient = text => {
+    if (typeof text !== 'string') return { ok: false, code: 'bad_frame', message: 'text frames only' };
+    if (text.length > P.MAX_MESSAGE_BYTES) return { ok: false, code: 'too_big', message: 'message too large' };
+    let m; try { m = JSON.parse(text); } catch (e) { return { ok: false, code: 'bad_json', message: 'not JSON' }; }
+    if (!isObj(m)) return { ok: false, code: 'bad_envelope', message: 'envelope must be an object' };
+    const id = typeof m.id === 'string' && m.id.length >= 1 && m.id.length <= 64 ? m.id : undefined;
+    if (has(m, 'id') && id === undefined) return { ok: false, code: 'bad_envelope', message: 'id must be a string of 1–64 characters' };
+    if (m.v !== P.PROTOCOL_VERSION) return { ok: false, code: 'protocol_mismatch', message: 'protocol version ' + P.PROTOCOL_VERSION + ' required', id };
+    if (!onlyKeys(m, ['v', 'type', 'id', 'p'])) return { ok: false, code: 'bad_envelope', message: 'unexpected envelope field', id };
+    if (typeof m.type !== 'string') return { ok: false, code: 'bad_envelope', message: 'type missing', id };
+    if (P.RESERVED.includes(m.type)) return { ok: false, code: 'not_authoritative', message: m.type + ' is not accepted from clients in this phase', id };
+    if (!P.CLIENT.includes(m.type)) return { ok: false, code: 'unknown_type', message: 'unknown message type', id };
+    const p = has(m, 'p') ? m.p : {};
+    if (!isObj(p)) return { ok: false, code: 'bad_payload', message: 'payload must be an object', id };
+    const why = V[m.type](p); if (why) return { ok: false, code: 'bad_payload', message: why, id };
+    return { ok: true, msg: { type: m.type, id, p } };
+  };
+
+  /* encode(type, payload, opts) → JSON text. opts: { id, seq } */
+  P.encode = (type, payload, opts) => {
+    const o = opts || {}; const m = { v: P.PROTOCOL_VERSION, type, p: payload || {} };
+    if (o.id !== undefined) m.id = o.id; if (o.seq !== undefined) m.seq = o.seq;
+    return JSON.stringify(m);
+  };
+
+  /* parseServer(text) → { ok, msg } — the client's check of what the server sent */
+  P.parseServer = text => {
+    let m; try { m = JSON.parse(text); } catch (e) { return { ok: false, code: 'bad_json' }; }
+    if (!isObj(m) || m.v !== P.PROTOCOL_VERSION || typeof m.type !== 'string' || !P.SERVER.includes(m.type) || !isObj(m.p)) return { ok: false, code: 'bad_envelope' };
+    if (has(m, 'seq') && !Number.isSafeInteger(m.seq)) return { ok: false, code: 'bad_envelope' };
+    return { ok: true, msg: m };
+  };
+
+  /* presence entry: the public face of a connected character (no account id, no email) */
+  P.presenceOf = c => ({ characterId: c.id, name: c.name, body: c.body, appearance: c.appearance, town: c.startingTown || c.town, title: c.title || null });
+  return P;
+});
+/* ---------- online play (Server Foundation v1): accounts, the online roster and the alpha presence lobby ----------
+   The title screen offers Play Offline (the single-player game, saved in this browser, exactly as before) and Play Online.
+   Online talks to the Shardfall server on the same origin (server/; docs/server/). It never reads or writes the offline save
+   (localStorage) and never uploads offline progress: online characters are created by the server from the creator's choices.
+   Honesty rule: online play is an alpha foundation. The lobby shows who is connected; the world itself is not simulated on
+   the server yet, and this screen says so. On a static host (GitHub Pages) there is no server: Play Online explains that. */
+const ONP = typeof SF_PROTOCOL !== 'undefined' ? SF_PROTOCOL : null;
+const ON = { view: 'loading', cfg: null, session: null, realm: 'anniabreen', realms: [], roster: null, account: null, busy: false, msg: '', err: '', confirmDel: null, del: '',
+  lobby: null, returnTo: 'roster' };
+const onEsc = s => esc(s == null ? '' : s);
+
+/* ---- HTTP: same-origin cookie session; mutations carry the CSRF token and the client header ---- */
+async function onApi(method, path, body, extra) {
+  const h = { 'x-shardfall': '1', accept: 'application/json' };
+  if (body !== undefined) h['content-type'] = 'application/json';
+  if (ON.session && ON.session.csrfToken && method !== 'GET') h['x-csrf-token'] = ON.session.csrfToken;
+  Object.assign(h, extra || {});
+  let res; try { res = await fetch(path, { method, headers: h, credentials: 'same-origin', body: body === undefined ? undefined : JSON.stringify(body), cache: 'no-store' }); }
+  catch (e) { throw { status: 0, code: 'offline', message: 'Cannot reach the Shardfall server. Check your connection.' }; }
+  let j = null; try { j = await res.json(); } catch (e) { j = null; }
+  if (!res.ok) throw { status: res.status, code: j && j.error && j.error.code || 'http_' + res.status, message: j && j.error && j.error.message || 'The server answered ' + res.status + '.', details: j && j.error && j.error.details };
+  if (j && j.csrfToken && ON.session) ON.session.csrfToken = j.csrfToken;
+  return j;
+}
+
+const ON_AUTH_MSG = { cancelled: 'Sign-in was cancelled.', link_expired: 'That link has expired or was already used. Ask for a new one.', failed: 'Sign-in did not complete. Try again.',
+  unavailable: 'The sign-in service is unreachable. Try again shortly.', account_unavailable: 'This account cannot sign in.', different_account: 'That sign-in belongs to a different account; nothing was linked.',
+  open_in_same_browser: 'If you were confirming your email, it is confirmed — sign in below. Password reset links must be opened in the browser where you asked for them.', link_invalid: 'That link is not valid any more.' };
+
+/* ---- entering online play ---- */
+async function onOpen(view, note) {
+  CCD.screen = 'online'; ON.view = 'loading'; ON.err = ''; ON.msg = note || ''; ccRender();
+  try { ON.cfg = await onApi('GET', '/api/config'); }
+  catch (e) { ON.view = 'unavailable'; ON.err = e.status === 404 || e.status === 0 || e.status === 405 ? '' : e.message; return ccRender(); }
+  await onRefreshSession();
+  if (view && (view !== 'roster' && view !== 'account' || ON.session)) ON.view = view;
+  else ON.view = ON.session ? (ON.session.kind === 'recovery' ? 'reset' : 'roster') : 'signin';
+  if (ON.view === 'roster') return onLoadRoster();
+  if (ON.view === 'account') return onLoadAccount();
+  ccRender(onFocusFor());
+}
+async function onRefreshSession() { try { const s = await onApi('GET', '/api/session'); ON.session = s.authenticated ? s : null; } catch (e) { ON.session = null; } }
+const onFocusFor = () => ({ signin: '#on-email', register: '#on-email', forgot: '#on-email', reset: '#on-pw' })[ON.view] || null;
+/* links back from email and provider sign-in land on /?online=… — open the matching screen, then clean the address bar */
+function onBootFromUrl() {
+  let q; try { q = new URLSearchParams(location.search); } catch (e) { return false; }
+  const st = q.get('online'); if (!st) return false;
+  const err = q.get('auth_error'), notice = q.get('auth_notice'), linked = q.get('linked');
+  try { const u = new URL(location.href); ['online', 'auth_error', 'auth_notice', 'linked', 'reauth'].forEach(k => u.searchParams.delete(k)); history.replaceState(null, '', u.pathname + u.search + u.hash); } catch (e) { }
+  const note = err ? '' : notice ? ON_AUTH_MSG[notice] || '' : st === 'verified' ? 'Your email address is confirmed. Welcome to Shardfall.' : linked ? 'Sign-in method linked.' : '';
+  onOpen({ verified: 'roster', roster: 'roster', reset: 'reset', account: 'account', signin: 'signin' }[st] || 'signin', note).then(() => { if (err) { ON.err = ON_AUTH_MSG[err] || ON_AUTH_MSG.failed; ccRender(); } });
+  return true;
+}
+
+async function onLoadRoster() {
+  ON.view = 'roster'; ON.busy = true; ccRender();
+  try { const r = await onApi('GET', '/api/realms'); ON.realms = r.realms; if (!ON.realms.some(x => x.id === ON.realm) && ON.realms[0]) ON.realm = ON.realms[0].id;
+    ON.roster = await onApi('GET', `/api/realms/${encodeURIComponent(ON.realm)}/characters`); }
+  catch (e) { if (e.status === 401) { ON.session = null; ON.view = 'signin'; ON.err = 'Your session ended. Please sign in again.'; } else ON.err = e.message; }
+  ON.busy = false; ccRender(); onDrawPortraits();
+}
+async function onLoadAccount() {
+  ON.view = 'account'; ON.busy = true; ccRender();
+  try { ON.account = await onApi('GET', '/api/account'); } catch (e) { if (e.status === 401) { ON.session = null; ON.view = 'signin'; } ON.err = e.message; }
+  ON.busy = false; ccRender();
+}
+
+/* ---- the creator, reused: same wizard, same validator; the server makes the character ---- */
+function onNewCharacter() {
+  CCD.online = true; CCD.screen = 'wiz'; CCD.step = 0; CCD.name = ''; CCD.look = CR.defaultLook('male'); CCD.town = 'quay'; CCD.err = ''; CCD.tried = false; CCD.replace = false; CCD.creating = false;
+  ccSetTemplate('swordsman'); ccRender('#ccn'); snd('ui.page');
+}
+async function onCreateFromWizard(payload) {
+  if (CCD.creating) return false; CCD.creating = true; CCD.err = ''; ccRefreshNav();
+  const key = (crypto.randomUUID && crypto.randomUUID()) || null;
+  try {
+    const r = await onApi('POST', `/api/realms/${encodeURIComponent(ON.realm)}/characters`, payload, key ? { 'idempotency-key': key } : {});
+    CCD.creating = false; CCD.online = false; CCD.screen = 'online';
+    ON.msg = `${r.character.name} has been created on ${ON.roster && ON.roster.realm ? ON.roster.realm.name : 'the realm'}.` + (r.notes && r.notes.length ? ' ' + r.notes.join(' ') : '');
+    await onLoadRoster(); return true;
+  } catch (e) {
+    CCD.creating = false;
+    if (e.status === 401) { CCD.online = false; CCD.screen = 'online'; ON.session = null; ON.view = 'signin'; ON.err = 'Your session ended. Sign in again; your choices were not saved.'; ccRender(); return false; }
+    CCD.err = e.message; if (e.code === 'name_taken') { CCD.step = 0; ccRender('#ccn'); const n = $('#ccn-err'); if (n) n.textContent = e.message; } else ccRenderStep(); return false;
+  }
+}
+function onLeaveWizard() { CCD.online = false; CCD.screen = 'online'; onLoadRoster(); }
+
+/* ---- the lobby: one authenticated WebSocket, the server's snapshot, who else is here ---- */
+function onPlay(id) {
+  const ch = ON.roster && ON.roster.characters.find(c => c.id === id); if (!ch || !ONP) return;
+  onLobbyClose(true);
+  ON.lobby = { id, ch, character: null, presence: new Map(), status: 'connecting', note: '', rtt: null, tick: null, seq: 0, tries: 0, ws: null, timer: 0, pingT: 0, stop: false, joinedAt: 0 };
+  ON.view = 'lobby'; ccRender(); onConnect();
+}
+function onConnect() {
+  const L = ON.lobby; if (!L || L.stop) return;
+  L.status = L.tries ? 'reconnecting' : 'connecting'; onLobbyPaint();
+  let ws; try { ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws'); } catch (e) { return onRetry(); }
+  L.ws = ws; L.seq = 0;
+  ws.onopen = () => { ws.send(JSON.stringify({ v: ONP.PROTOCOL_VERSION, type: 'hello', id: 'hello', p: { characterId: L.id } })); };
+  ws.onmessage = ev => {
+    if (ON.lobby !== L) return; const r = ONP.parseServer(ev.data); if (!r.ok) return; const m = r.msg;
+    if (typeof m.seq === 'number') { if (L.seq && m.seq !== L.seq + 1 && L.character) ws.send(JSON.stringify({ v: ONP.PROTOCOL_VERSION, type: 'resync', p: {} })); L.seq = m.seq; }
+    if (m.type === 'welcome' || m.type === 'snapshot') { L.character = m.p.character; L.tick = m.p.tick; L.presence = new Map((m.p.presence || []).map(x => [x.characterId, x])); L.status = 'connected'; L.tries = 0; L.note = m.p.notice || L.note; if (m.type === 'welcome') L.joinedAt = Date.now(); }
+    else if (m.type === 'presence.join') L.presence.set(m.p.character.characterId, Object.assign({ connected: true }, m.p.character));
+    else if (m.type === 'presence.leave') L.presence.delete(m.p.characterId);
+    else if (m.type === 'pong') { if (typeof m.p.t === 'number') L.rtt = Math.round(performance.now() - m.p.t); L.tick = m.p.tick; }
+    else if (m.type === 'kicked') { L.stop = true; L.status = 'ended'; L.note = ({ taken_over: 'This character was opened in another window or device.', another_character: 'Another of your characters joined this realm.', session_ended: 'You were signed out.', character_deleted: 'This character was deleted.', account_closed: 'This account was closed.', server_restart: 'The server is restarting. Try again in a moment.' })[m.p.reason] || 'Disconnected by the server.'; if (m.p.reason === 'server_restart') L.stop = false; }
+    else if (m.type === 'error' && m.id === 'hello') { L.stop = true; L.status = 'ended'; L.note = m.p.message; }
+    onLobbyPaint();
+  };
+  ws.onclose = ev => {
+    if (ON.lobby !== L) return; L.ws = null;
+    if (ev.code === ONP.CLOSE.UNAUTHORIZED || ev.code === 1006 && !L.character && L.tries > 2) { L.stop = true; L.status = 'ended'; L.note = L.note || 'Could not connect. Your session may have ended.'; }
+    if ([ONP.CLOSE.FORBIDDEN, ONP.CLOSE.TAKEN_OVER, ONP.CLOSE.SESSION_ENDED, ONP.CLOSE.PROTOCOL].includes(ev.code)) L.stop = true;
+    if (L.stop) { L.status = 'ended'; onLobbyPaint(); return; }
+    onRetry();
+  };
+  clearInterval(L.pingT); L.pingT = setInterval(() => { if (L.ws && L.ws.readyState === 1 && L.character) L.ws.send(JSON.stringify({ v: ONP.PROTOCOL_VERSION, type: 'ping', p: { t: performance.now() } })); }, 5000);
+}
+function onRetry() { const L = ON.lobby; if (!L || L.stop) return; L.tries++; L.status = 'reconnecting'; onLobbyPaint(); clearTimeout(L.timer); L.timer = setTimeout(onConnect, Math.min(15000, 500 * 2 ** Math.min(5, L.tries)) + Math.random() * 300); }
+function onLobbyClose(quiet) { const L = ON.lobby; if (!L) return; L.stop = true; clearTimeout(L.timer); clearInterval(L.pingT); try { if (L.ws) L.ws.close(1000, 'leave'); } catch (e) { } ON.lobby = null; if (!quiet) onLoadRoster(); }
+
+/* ---- markup ---- */
+const onField = (id, label, type, extra) => `<div class="ccfield"><label class="cclab" for="${id}">${label}</label><input id="${id}" name="${id}" type="${type}" ${extra || ''}></div>`;
+function onProvidersHtml() {
+  const p = ON.cfg && ON.cfg.providers || {}; const b = [];
+  if (p.google) b.push(`<a class="ccb onprov" href="/api/auth/oauth/google" data-c="on-prov">Continue with Google</a>`);
+  if (p.apple) b.push(`<a class="ccb onprov onapple" href="/api/auth/oauth/apple" data-c="on-prov">Sign in with Apple</a>`);
+  return b.length ? `<div class="onor"><span>or</span></div><div class="ccmenu">${b.join('')}</div>` : '';
+}
+const onBanner = () => `${ON.msg ? `<p class="onmsg" role="status">${onEsc(ON.msg)}</p>` : ''}${ON.err ? `<p class="onerr" role="alert">${onEsc(ON.err)}</p>` : ''}`;
+const onAlpha = () => `<p class="onalpha"><b>Alpha.</b> ${onEsc((ON.cfg && ON.cfg.notice) || 'Online play is an early test.')}</p>`;
+function onFrame(title, body, wide) {
+  return `<div class="onwrap${wide ? ' wide' : ''}"><header class="ontop"><button type="button" class="ccb sm" data-c="on-home">← Title</button><b class="ccmark">Shardfall</b><span class="onmode">Online</span>
+    ${ON.session && ON.view !== 'reset' ? `<span class="onsp"></span>${ON.view !== 'account' ? ccBtn('on-account', 'Account', {}, 'sm') : ccBtn('on-roster', 'Characters', {}, 'sm')}${ccBtn('on-logout', 'Sign out', {}, 'sm')}` : ''}</header>
+    <main class="onpage" id="onpage"><h2>${title}</h2>${onBanner()}${body}</main></div>`;
+}
+function onHtml() {
+  const v = ON.view, busy = ON.busy ? ' disabled' : '';
+  if (v === 'loading') return onFrame('Connecting…', '<p class="ccnote">Reaching the Shardfall server.</p>');
+  if (v === 'unavailable') return onFrame('Online play is not available here', `<p>${ON.err ? onEsc(ON.err) : 'This copy of the game is not connected to a Shardfall server (for example the GitHub Pages build). Online play needs the server.'}</p>
+    <p class="ccnote">Offline play works exactly as before and your saved character is untouched.</p><div class="ccmenu">${ccBtn('on-home', 'Back to the title', {}, 'pri big')}</div>`);
+  if (v === 'signin') return onFrame('Sign in', `${onAlpha()}<form class="onform" data-f="signin" novalidate>${onField('on-email', 'Email', 'email', 'autocomplete="username" inputmode="email" required maxlength="254"')}
+    ${onField('on-pw', 'Password', 'password', 'autocomplete="current-password" required maxlength="72"')}<div class="ccmenu"><button class="ccb pri big" type="submit"${busy}>Sign in</button></div></form>
+    ${onProvidersHtml()}<div class="onlinks">${ccBtn('on-view', 'Create an account', { v: 'register' }, 'sm')}${ccBtn('on-view', 'Forgot your password?', { v: 'forgot' }, 'sm')}</div>
+    <p class="ccnote">Your offline character stays in this browser and is never uploaded. Online characters are made new, on the server.</p>`);
+  if (v === 'register') return onFrame('Create an account', `${onAlpha()}<form class="onform" data-f="register" novalidate>${onField('on-name', 'Display name <span class="ccnote">(optional)</span>', 'text', 'autocomplete="nickname" maxlength="32"')}
+    ${onField('on-email', 'Email', 'email', 'autocomplete="email" inputmode="email" required maxlength="254"')}${onField('on-pw', 'Password <span class="ccnote">(at least 10 characters)</span>', 'password', 'autocomplete="new-password" required minlength="10" maxlength="72"')}
+    ${onField('on-pw2', 'Repeat the password', 'password', 'autocomplete="new-password" required minlength="10" maxlength="72"')}<div class="ccmenu"><button class="ccb pri big" type="submit"${busy}>Create account</button></div></form>
+    ${onProvidersHtml()}<div class="onlinks">${ccBtn('on-view', 'I already have an account', { v: 'signin' }, 'sm')}</div>`);
+  if (v === 'sent') return onFrame('Check your email', `<p>We sent a link to confirm your address. Open it <b>in this browser</b> to finish; it signs you in.</p><p class="ccnote">No email after a few minutes? Check the spam folder, or try again.</p><div class="onlinks">${ccBtn('on-view', 'Back to sign in', { v: 'signin' }, 'sm')}</div>`);
+  if (v === 'forgot') return onFrame('Reset your password', `<form class="onform" data-f="forgot" novalidate>${onField('on-email', 'Email', 'email', 'autocomplete="email" inputmode="email" required maxlength="254"')}<div class="ccmenu"><button class="ccb pri big" type="submit"${busy}>Send a reset link</button></div></form><div class="onlinks">${ccBtn('on-view', 'Back to sign in', { v: 'signin' }, 'sm')}</div>`);
+  if (v === 'reset') return onFrame('Choose a new password', `<form class="onform" data-f="reset" novalidate>${onField('on-pw', 'New password <span class="ccnote">(at least 10 characters)</span>', 'password', 'autocomplete="new-password" required minlength="10" maxlength="72"')}${onField('on-pw2', 'Repeat it', 'password', 'autocomplete="new-password" required minlength="10" maxlength="72"')}<div class="ccmenu"><button class="ccb pri big" type="submit"${busy}>Save the new password</button></div></form>`);
+  if (v === 'roster') return onFrame('Your characters', onRosterHtml(), true);
+  if (v === 'account') return onFrame('Account', onAccountHtml(), true);
+  if (v === 'lobby') return onFrame('Test lobby', '<div id="onlobby"></div>', true);
+  return '';
+}
+function onRosterHtml() {
+  const R = ON.roster; if (!R) return ON.busy ? '<p class="ccnote">Loading your characters…</p>' : '';
+  const realmSel = `<div class="onrealm"><label class="cclab" for="on-realm">Realm</label><select id="on-realm" data-c="on-realm">${ON.realms.map(r => `<option value="${onEsc(r.id)}"${r.id === ON.realm ? ' selected' : ''}>${onEsc(r.name)}${r.status !== 'open' ? ' (' + onEsc(r.status) + ')' : ''} — ${r.slots.used}/${r.slots.max}</option>`).join('')}</select></div>`;
+  const cards = R.characters.map(c => {
+    const del = ON.confirmDel === c.id;
+    return `<article class="oncard"><canvas class="onport" width="60" height="120" data-look="${onEsc(JSON.stringify(c.appearance))}" role="img" aria-label="Portrait of ${onEsc(c.name)}"></canvas>
+      <div class="oninfo"><b>${onEsc(c.name)}</b><span class="ccnote">${onEsc(c.title)} · ${onEsc(c.startingTownName)}</span><span class="cctk">STR ${c.stats.str} · DEX ${c.stats.dex} · INT ${c.stats.int}</span>
+      ${del ? `<form class="ondel" data-f="delete" data-id="${c.id}"><label class="cclab" for="on-delname">Type <b>${onEsc(c.name)}</b> to delete. It can be restored for ${ON_PURGE} days.</label><input id="on-delname" autocomplete="off" maxlength="40"><div class="ccrow"><button class="ccb sm" type="submit">Delete</button>${ccBtn('on-delno', 'Keep', {}, 'sm')}</div></form>`
+        : `<div class="ccrow">${ccBtn('on-play', 'Enter lobby', { id: c.id }, 'pri')}${ccBtn('on-del', 'Delete…', { id: c.id }, 'sm')}</div>`}</div></article>`; }).join('');
+  const free = R.slots.max - R.slots.used;
+  const empty = free > 0 ? `<button type="button" class="oncard onnew" data-c="on-new"${R.realm.status !== 'open' ? ' disabled' : ''}><b>+ New character</b><span class="ccnote">${free} of ${R.slots.max} slots free</span></button>` : `<p class="ccnote">All ${R.slots.max} slots are in use.</p>`;
+  const gone = R.deleted.length ? `<details class="ccguide"><summary>Recently deleted (${R.deleted.length})</summary>${R.deleted.map(c => `<div class="ccgi"><b>${onEsc(c.name)}</b> <span class="ccnote">restorable until ${onEsc(new Date(c.purgeAfter).toLocaleDateString())}</span> ${ccBtn('on-restore', 'Restore', { id: c.id }, 'sm')}</div>`).join('')}</details>` : '';
+  return `${onAlpha()}${realmSel}<div class="oncards">${cards}${empty}</div>${gone}`;
+}
+const ON_PURGE = 7;
+function onAccountHtml() {
+  const A = ON.account; if (!A) return ON.busy ? '<p class="ccnote">Loading…</p>' : '';
+  const prov = A.providers || {}; const linked = new Set(A.identities.map(i => i.provider));
+  const reauth = A.recentAuth ? '<p class="ccnote">You signed in recently: sensitive changes are unlocked for a few minutes.</p>'
+    : `<form class="onform onreauth" data-f="reauth">${linked.has('email') ? onField('on-repw', 'Confirm it is you: current password', 'password', 'autocomplete="current-password" maxlength="72"') + '<button class="ccb sm" type="submit">Confirm</button>' : ''}${[...linked].filter(p => p !== 'email' && prov[p]).map(p => ccBtn('on-reauthp', 'Confirm with ' + (p === 'google' ? 'Google' : 'Apple'), { p }, 'sm')).join('')}</form>`;
+  const pv = ['google', 'apple'].filter(p => prov[p] || linked.has(p)).map(p => `<div class="ccgi"><b>${p === 'google' ? 'Google' : 'Apple'}</b> ${linked.has(p) ? `<span class="ccbadge">linked</span> ${A.canUnlink ? ccBtn('on-unlink', 'Unlink', { p }, 'sm', A.recentAuth ? '' : ' disabled') : ''}` : ccBtn('on-link', 'Link', { p }, 'sm', A.recentAuth ? '' : ' disabled')}</div>`).join('');
+  return `<div class="ccsec"><div class="cchd"><span>Profile</span></div><form class="onform" data-f="profile">${onField('on-dname', 'Display name', 'text', `maxlength="32" value="${onEsc(A.displayName || '')}"`)}<button class="ccb sm" type="submit">Save</button></form>
+      <div class="cckv"><span>Email</span><b>${onEsc(A.email || '—')} ${A.emailVerified ? '<span class="ccbadge">verified</span>' : '<span class="ccbadge">not verified</span>'}</b>${A.emailIsRelay ? '<span></span><b class="ccnote">An Apple private relay address: mail reaches you through Apple.</b>' : ''}<span>Character slots</span><b>${A.characterSlots} per realm</b></div></div>
+    <div class="ccsec"><div class="cchd"><span>Security</span></div>${reauth}
+      <div class="ccgi"><b>Email and password</b> ${linked.has('email') ? '<span class="ccbadge">linked</span>' : '<span class="ccnote">not set</span>'}</div>${pv}
+      ${linked.has('email') ? `<form class="onform" data-f="password">${onField('on-npw', 'New password', 'password', 'autocomplete="new-password" minlength="10" maxlength="72"')}<button class="ccb sm" type="submit"${A.recentAuth ? '' : ' disabled'}>Change password</button></form>` : ''}
+      <div class="ccrow">${ccBtn('on-logoutall', 'Sign out on every device', {}, 'sm')}<a class="ccb sm" href="/api/account/export" download>Download my data</a></div></div>
+    <div class="ccsec ondanger"><div class="cchd"><span>Delete account</span></div><p class="ccnote">Deletes your online characters, their items and your sign-in for good. Offline saves in this browser are not affected.</p>
+      ${A.canDelete ? `<form class="onform" data-f="delacct">${onField('on-delphrase', 'Type DELETE MY ACCOUNT', 'text', 'autocomplete="off" maxlength="40"')}<button class="ccb sm" type="submit"${A.recentAuth ? '' : ' disabled'}>Delete my account</button></form>` : '<p class="ccnote">Account deletion is not configured on this server yet.</p>'}</div>`;
+}
+function onLobbyPaint() {
+  const el = $('#onlobby'); const L = ON.lobby; if (!el || !L) return;
+  const me = L.character, others = [...L.presence.values()].sort((a, b) => a.name.localeCompare(b.name));
+  const st = { connecting: 'Connecting…', reconnecting: 'Reconnecting…', connected: 'Connected', ended: 'Disconnected' }[L.status];
+  el.innerHTML = `<p class="onalpha"><b>Alpha test lobby.</b> ${onEsc(L.note || 'You can see who else is online. The world is not simulated on the server yet: no movement, combat or trading here.')}</p>
+    <div class="onstat"><span class="ondot ${L.status}"></span><b>${st}</b>${L.rtt != null ? `<span class="ccnote">${L.rtt} ms</span>` : ''}${L.tick != null ? `<span class="ccnote">tick ${L.tick}</span>` : ''}${ccBtn('on-leave', 'Leave lobby', {}, 'sm')}${L.status === 'ended' && !L.stop ? '' : L.status === 'ended' ? ccBtn('on-play', 'Reconnect', { id: L.id }, 'sm') : ''}</div>
+    <div class="onlobby"><section><h3>You</h3>${me ? onPresenceCard({ name: me.name, appearance: me.appearance, town: me.startingTown, title: me.title }, true) + `<p class="ccnote">${me.items ? me.items.length : 0} items held by the server · ${onEsc(me.startingTownName || '')}</p>` : '<p class="ccnote">…</p>'}</section>
+      <section><h3>Also here (${others.length})</h3><div class="onpeople" id="onpeople">${others.length ? others.map(p => onPresenceCard(p, false)).join('') : '<p class="ccnote">Nobody else is in the lobby right now.</p>'}</div></section></div>`;
+  onDrawPortraits();
+}
+const onPresenceCard = (p, me) => `<div class="onperson${me ? ' me' : ''}" data-name="${onEsc(p.name)}"><canvas class="onport" width="48" height="96" data-look="${onEsc(JSON.stringify(p.appearance || {}))}" role="img" aria-label="${onEsc(p.name)}"></canvas><div><b>${onEsc(p.name)}</b><span class="ccnote">${onEsc(p.title || '')}${p.town && CR.TOWN[p.town] ? ' · ' + onEsc(CR.TOWN[p.town].n) : ''}</span>${p.connected === false ? '<span class="ccnote">reconnecting…</span>' : ''}</div></div>`;
+function onDrawPortraits() { document.querySelectorAll('#ccin canvas.onport').forEach(cv => { try { const look = CR.normalizeLook(JSON.parse(cv.dataset.look || '{}')); drawDoll(cv, look); } catch (e) { } }); }
+
+/* ---- events (delegated from the title screen's listeners in src/creation-ui.js) ---- */
+async function onClick(c, d) {
+  if (c === 'on-prov') return;   // a plain link to the provider start: the browser navigates
+  if (c === 'on-home') { onLobbyClose(true); CCD.screen = 'home'; ccRender('[data-c=online]'); return; }
+  if (c === 'on-view') { ON.view = d.v; ON.err = ''; ON.msg = ''; ccRender(onFocusFor()); return; }
+  if (c === 'on-roster') { ON.err = ''; ON.msg = ''; return onLoadRoster(); }
+  if (c === 'on-account') { ON.err = ''; ON.msg = ''; return onLoadAccount(); }
+  if (c === 'on-new') return onNewCharacter();
+  if (c === 'on-play') return onPlay(d.id);
+  if (c === 'on-leave') return onLobbyClose(false);
+  if (c === 'on-del') { ON.confirmDel = d.id; ccRender('#on-delname'); onDrawPortraits(); return; }
+  if (c === 'on-delno') { ON.confirmDel = null; ccRender(); onDrawPortraits(); return; }
+  return onAct(async () => {
+    if (c === 'on-logout') { onLobbyClose(true); await onApi('POST', '/api/auth/logout', {}); ON.session = null; ON.view = 'signin'; ON.msg = 'Signed out.'; ON.roster = null; ON.account = null; return; }
+    if (c === 'on-logoutall') { await onApi('POST', '/api/auth/logout-all', {}); ON.session = null; ON.view = 'signin'; ON.msg = 'Signed out on every device.'; return; }
+    if (c === 'on-restore') { await onApi('POST', `/api/characters/${d.id}/restore`, {}); ON.msg = 'Character restored.'; return onLoadRoster(); }
+    if (c === 'on-link' || c === 'on-reauthp') { const r = await onApi('POST', `/api/auth/oauth/${d.p}/${c === 'on-link' ? 'link' : 'reauth'}`, {}); location.assign(r.url); return; }
+    if (c === 'on-unlink') { await onApi('POST', `/api/account/unlink/${d.p}`, {}); ON.msg = 'Sign-in method removed.'; return onLoadAccount(); }
+  });
+}
+async function onAct(fn) {
+  if (ON.busy) return; ON.busy = true; ON.err = ''; const keepMsg = ON.msg;
+  try { await fn(); } catch (e) { ON.msg = ''; ON.err = e.message || 'Something went wrong.'; if (e.status === 401 && ON.view !== 'signin') { ON.session = null; ON.view = 'signin'; } }
+  ON.busy = false; if (ON.msg === keepMsg && ON.err) ON.msg = ''; if (CCD.screen === 'online') { ccRender(); onDrawPortraits(); if (ON.view === 'lobby') onLobbyPaint(); }
+}
+async function onSubmit(form) {
+  const f = form.dataset.f, v = id => { const el = form.querySelector('#' + id); return el ? el.value : ''; };
+  await onAct(async () => {
+    ON.msg = '';
+    if (f === 'signin') { if (!v('on-email') || !v('on-pw')) throw { message: 'Enter your email and password.' }; const r = await onApi('POST', '/api/auth/login', { email: v('on-email'), password: v('on-pw') }); await onRefreshSession(); if (r.csrfToken && ON.session) ON.session.csrfToken = r.csrfToken; return onLoadRoster(); }
+    if (f === 'register') {
+      if (v('on-pw').length < 10) throw { message: 'The password needs at least 10 characters.' }; if (v('on-pw') !== v('on-pw2')) throw { message: 'The two passwords differ.' };
+      const body = { email: v('on-email'), password: v('on-pw') }; if (v('on-name').trim()) body.displayName = v('on-name').trim();
+      await onApi('POST', '/api/auth/register', body); ON.view = 'sent'; return;
+    }
+    if (f === 'forgot') { const r = await onApi('POST', '/api/auth/recover', { email: v('on-email') }); ON.msg = r.message; ON.view = 'signin'; return; }
+    if (f === 'reset' || f === 'password') {
+      const pw = v(f === 'reset' ? 'on-pw' : 'on-npw'); if (pw.length < 10) throw { message: 'The password needs at least 10 characters.' }; if (f === 'reset' && pw !== v('on-pw2')) throw { message: 'The two passwords differ.' };
+      await onApi('POST', '/api/auth/password', { password: pw }); await onRefreshSession(); ON.msg = 'Your password has been changed.'; return f === 'reset' ? onLoadRoster() : onLoadAccount();
+    }
+    if (f === 'reauth') { await onApi('POST', '/api/auth/reauth', { password: v('on-repw') }); return onLoadAccount(); }
+    if (f === 'profile') { const n = v('on-dname').trim(); await onApi('PATCH', '/api/account', { displayName: n || null }); ON.msg = 'Saved.'; return onLoadAccount(); }
+    if (f === 'delete') { await onApi('POST', `/api/characters/${form.dataset.id}/delete`, { confirmName: v('on-delname') }); ON.confirmDel = null; ON.msg = 'Character deleted. You can restore it for ' + ON_PURGE + ' days.'; return onLoadRoster(); }
+    if (f === 'delacct') { await onApi('DELETE', '/api/account', { confirm: v('on-delphrase') }); ON.session = null; ON.account = null; ON.roster = null; ON.view = 'signin'; ON.msg = 'Your account has been deleted.'; return; }
+  });
+}
+const ONLINE = { open: onOpen, html: onHtml, click: onClick, submit: onSubmit, bootFromUrl: onBootFromUrl, create: onCreateFromWizard, leaveWizard: onLeaveWizard, paintLobby: onLobbyPaint, drawPortraits: onDrawPortraits,
+  realm: id => { ON.realm = id; onLoadRoster(); }, get state() { return ON; } };
+window.__ONLINE = ONLINE;   // test hook (the browser flow suite); not a security boundary — the server checks everything
 /* ---------- character creation v2.0 (docs/design/character-creation-v2.md) ----------
    The title screen and the four-step creator: Identity & Appearance → Starting Profession → Stats & Skills → Starting Town &
    Review. The draft (CCD) is transient and separate from the game: nothing in the world is generated or ticks behind the
@@ -10539,7 +10909,7 @@ function ccStepHtml() {
     <div class="ccrow">${ccBtn('reset', 'Reset to ' + esc(CR.TEMPLATE[CCD.tpl].n))}</div>`;
   }
   // step 3: town and review
-  const v = ccValidate(); const val = v.ok ? v.value : null; const kit = val ? CR.kit(val) : null; const sv0 = ccSaved();
+  const v = ccValidate(); const val = v.ok ? v.value : null; const kit = val ? CR.kit(val) : null; const sv0 = CCD.online ? null : ccSaved();
   return `<h2>Starting town &amp; review</h2>
     <div class="cctowns" role="radiogroup" aria-label="Starting town">${CR.TOWNS.map(t => { const on = CCD.town === t.id, rec = CR.TEMPLATES.filter(x => x.town === t.id && !x.advanced).map(x => x.n);
       return `<button type="button" role="radio" aria-checked="${on}" class="cctown ${on ? 'on' : ''}" data-c="town" data-t="${t.id}"><b>${esc(t.n)}</b>${t.tutorial ? '<span class="ccbadge">Tutorial · recommended</span>' : ''}<span class="ccnote">${esc(t.d)}</span><span class="cctk">${t.services.map(esc).join(' · ')}</span>${rec.length ? `<span class="ccnote">Suits: ${esc(rec.join(', '))}</span>` : ''}</button>`; }).join('')}</div>
@@ -10576,28 +10946,33 @@ function ccRecoverHtml() {
 }
 function ccHomeHtml() {
   const sv0 = CC.bootErr ? null : ccSaved();
+  // two modes: Offline (the single-player game, saved in this browser, unchanged) and Online (src/online.js, alpha)
   return `<div class="cchome"><div class="ccbrand"><h1>Shardfall</h1><div class="ccsub">A Second Age sandbox · Anniabreen</div></div>${ccRecoverHtml()}
+    <div class="ccmodes"><section class="ccmode" aria-labelledby="ccm-off"><h3 id="ccm-off">Play Offline</h3>
     <div class="ccmenu">${sv0 ? ccBtn('cont', `Continue as ${esc(sv0.char.name)}${sv0.char.ghost ? ' (ghost)' : ''}`, {}, 'pri big') : ''}${ccBtn('new', 'New character', {}, (sv0 ? '' : 'pri ') + 'big')}</div>
-    ${sv0 ? '<p class="ccnote">Your character saves in this browser. Starting a new one asks before it replaces the old one.</p>' : '<p class="ccnote">Your character saves in this browser.</p>'}</div>`;
+    ${sv0 ? '<p class="ccnote">Your character saves in this browser. Starting a new one asks before it replaces the old one.</p>' : '<p class="ccnote">Your character saves in this browser.</p>'}</section>
+    <section class="ccmode" aria-labelledby="ccm-on"><h3 id="ccm-on">Play Online <span class="ccbadge">Alpha</span></h3><div class="ccmenu">${ccBtn('online', 'Play Online', {}, 'big')}</div>
+    <p class="ccnote">An account and characters kept on the Shardfall server. Separate from your offline save, which is never uploaded.</p></section></div></div>`;
 }
 function ccWizHtml() {
   const v = ccValidate();
-  return `<div class="ccwiz"><header class="cctop"><b class="ccmark">Shardfall</b><nav class="ccsteps" aria-label="Creation steps">${CC_STEPS.map((n, i) => `<button type="button" class="${i === CCD.step ? 'on' : ''}${i < CCD.step ? ' done' : ''}" data-c="step" data-s="${i}" aria-current="${i === CCD.step ? 'step' : 'false'}"><i>${i + 1}</i><span>${n}</span></button>`).join('')}</nav></header>
+  return `<div class="ccwiz"><header class="cctop"><b class="ccmark">Shardfall</b>${CCD.online ? '<span class="ccbadge">Online</span>' : ''}<nav class="ccsteps" aria-label="Creation steps">${CC_STEPS.map((n, i) => `<button type="button" class="${i === CCD.step ? 'on' : ''}${i < CCD.step ? ' done' : ''}" data-c="step" data-s="${i}" aria-current="${i === CCD.step ? 'step' : 'false'}"><i>${i + 1}</i><span>${n}</span></button>`).join('')}</nav></header>
     <div class="ccbody"><aside class="ccprev" aria-label="Preview"><div class="ccfig"><canvas id="ccdoll" width="150" height="300" role="img" aria-label="Portrait of your character"></canvas><div class="ccws"><canvas id="ccsprite" width="80" height="104" role="img" aria-label="Your character as seen in the world"></canvas><div class="ccrot">${ccBtn('face', '⟲', { d: 1 }, 'pm', ' aria-label="Turn left"')}${ccBtn('face', '⟳', { d: -1 }, 'pm', ' aria-label="Turn right"')}</div></div></div>
       <div class="ccpinfo"><b id="ccpname"></b><span id="ccptpl" class="ccnote"></span><div id="ccderived" class="ccderived"></div><p id="ccwnote" class="ccnote"></p></div></aside>
       <main class="ccmain" id="ccmain">${ccStepHtml()}</main></div>
-    <footer class="ccnav">${ccBtn('back', CCD.step ? '← Back' : '← Title', {}, '')}<span class="ccnote ccwhy" id="ccwhy">${CCD.step === 3 && !v.ok ? esc(v.errors[0]) : ''}</span>${CCD.step < 3 ? ccBtn('next', 'Next →', {}, 'pri') : ccBtn('go', 'Begin your journey', {}, 'pri', ccGoBlocked(v) ? ' disabled aria-disabled="true"' : '')}</footer></div>`;
+    <footer class="ccnav">${ccBtn('back', CCD.step ? '← Back' : '← Title', {}, '')}<span class="ccnote ccwhy" id="ccwhy">${CCD.step === 3 && !v.ok ? esc(v.errors[0]) : ''}</span>${CCD.step < 3 ? ccBtn('next', 'Next →', {}, 'pri') : ccBtn('go', CCD.online ? 'Create character' : 'Begin your journey', {}, 'pri', ccGoBlocked(v) ? ' disabled aria-disabled="true"' : '')}</footer></div>`;
 }
-const ccGoBlocked = v => !v.ok || CCD.creating || (ccSaved() && !CCD.replace);
+const ccGoBlocked = v => !v.ok || CCD.creating || (!CCD.online && ccSaved() && !CCD.replace);
 function ccRender(focusSel) {
-  const el = $('#ccin'); el.innerHTML = CCD.screen === 'home' ? ccHomeHtml() : ccWizHtml(); el.className = CCD.screen;
+  const el = $('#ccin'); el.innerHTML = CCD.screen === 'home' ? ccHomeHtml() : CCD.screen === 'online' ? ONLINE.html() : ccWizHtml(); el.className = CCD.screen;
+  if (CCD.screen === 'online') { ONLINE.drawPortraits(); ONLINE.paintLobby(); }
   if (CCD.screen === 'wiz') { ccPreview(); ccStartAnim(); ccNameErr(); }
   const f = focusSel && el.querySelector(focusSel); if (f) f.focus();
 }
 function ccRenderStep(focusSel) { const m = $('#ccmain'); if (!m) return ccRender(focusSel); const st = m.scrollTop; m.innerHTML = ccStepHtml(); m.scrollTop = st; ccRefreshNav(); ccPreview(); ccNameErr(); const f = focusSel && m.querySelector(focusSel); if (f) f.focus(); }
 function ccRefreshNav() {
   const v = ccValidate(), go = $('#ccin [data-c=go]'); if (go) { const b = ccGoBlocked(v); go.disabled = b; go.setAttribute('aria-disabled', String(b)); }
-  const w = $('#ccwhy'); if (w) w.textContent = CCD.step === 3 ? (!v.ok ? v.errors[0] : ccSaved() && !CCD.replace ? 'Tick “Replace” to start a new character.' : '') : '';
+  const w = $('#ccwhy'); if (w) w.textContent = CCD.step === 3 ? (!v.ok ? v.errors[0] : !CCD.online && ccSaved() && !CCD.replace ? 'Tick “Replace” to start a new character.' : '') : '';
   document.querySelectorAll('#ccin .ccsteps button').forEach((b, i) => { b.classList.toggle('on', i === CCD.step); b.classList.toggle('done', i < CCD.step); b.setAttribute('aria-current', i === CCD.step ? 'step' : 'false'); });
 }
 function ccNameErr() { const e = $('#ccn-err'); if (!e) return; const m = CR.checkName(CCD.name); e.textContent = CCD.tried || CCD.name ? (m || '') : ''; }
@@ -10623,6 +10998,7 @@ function ccExport() {
 function ccCommit() {
   if (CCD.creating || P) return false; CCD.tried = true; const v = ccValidate();
   if (!v.ok) { CCD.err = ''; if (CCD.step !== 3) ccGoStep(3); else ccRenderStep(); const e = $('#ccerrs'); if (e) e.focus(); return false; }
+  if (CCD.online) { ONLINE.create(ccPayload()); return true; }
   let old = null; try { old = localStorage.getItem(SAVEKEY); } catch (e) { } if (old && ccSaved() && !CCD.replace) { CCD.err = 'Tick “Replace” to start a new character.'; ccRenderStep(); return false; }
   CCD.creating = true; ccRefreshNav();
   let ok = false; try { if (old) backupRaw(readSave().problem ? '.damaged' : '.replaced', old); ok = boot(null, ccPayload()); } catch (e) { console.error(e); ok = false; }
@@ -10635,8 +11011,10 @@ function ccContinue() { const rs = readSave(); if (P) return; if (rs.save) bootS
 $('#cc').addEventListener('click', ev => {
   const b = ev.target.closest('[data-c]'); if (!b || b.disabled || b.tagName === 'SELECT' || b.tagName === 'INPUT') return; const c = b.dataset.c; const d = b.dataset;
   if (c === 'cont') return ccContinue();
+  if (c === 'online') { snd('ui.page'); ONLINE.open(); return; }
+  if (c.startsWith('on-')) { if (c !== 'on-prov') ev.preventDefault(); ONLINE.click(c, d); return; }
   if (c === 'new') { CCD.screen = 'wiz'; CCD.step = 0; CCD.replace = false; CCD.err = ''; ccRender('#ccn'); snd('ui.page'); return; }
-  if (c === 'back') { if (CCD.step) ccGoStep(CCD.step - 1); else { CCD.screen = 'home'; ccRender('[data-c=new]'); } return; }
+  if (c === 'back') { if (CCD.step) ccGoStep(CCD.step - 1); else if (CCD.online) ONLINE.leaveWizard(); else { CCD.screen = 'home'; ccRender('[data-c=new]'); } return; }
   if (c === 'next') { if (CCD.step === 0) { CCD.tried = true; ccNameErr(); if (CR.checkName(CCD.name) || CR.checkLook(CCD.look).length) { const n = $('#ccn'); if (n) n.focus(); return; } } ccGoStep(CCD.step + 1); snd('ui.page'); return; }
   if (c === 'step') { ccGoStep(+d.s); return; }
   if (c === 'go') { ccCommit(); return; }
@@ -10671,8 +11049,10 @@ $('#cc').addEventListener('change', ev => {
   if (c === 'kvn') { const v = parseInt(t.value, 10); if (Number.isFinite(v)) ccSetSkill(+t.dataset.i, v); t.value = CCD.skills[+t.dataset.i][1]; ccLiveNumbers(); return; }
   if (c === 'sk') { const i = +t.dataset.i, k = t.value || null; if (k && (!CR.creatable(k) || CCD.skills.some((r, j) => j !== i && r[0] === k))) { t.value = CCD.skills[i][0] || ''; return; }   // atomic: a duplicate is refused, nothing changes
     const keep = CCD.skills[i][0] ? CCD.skills[i][1] : 0; CCD.skills[i] = [k, k ? keep : 0]; if (k) ccSetSkill(i, keep); ccMarkEdited(); ccRenderStep(`select[data-i="${i}"]`); return; }
+  if (c === 'on-realm') { ONLINE.realm(t.value); return; }
   if (c === 'replace') { CCD.replace = t.checked; CCD.err = ''; ccRefreshNav(); const e = $('#ccerr'); if (e) e.textContent = ''; return; }
 });
+$('#cc').addEventListener('submit', ev => { const f = ev.target.closest('form[data-f]'); if (!f) return; ev.preventDefault(); ONLINE.submit(f); });
 $('#cc').addEventListener('keydown', ev => {
   if (ev.key === 'Enter' && ev.target.id === 'ccn') { ev.preventDefault(); const n = $('#ccin [data-c=next]'); if (n) n.click(); }
   if (ev.key === 'Enter' && ev.target.classList && ev.target.classList.contains('ccnum')) ev.target.blur();
@@ -10686,7 +11066,7 @@ window.__CC = {
     if (o.stats) CCD.stats = o.stats.slice(); if (o.skills) { CCD.skills = o.skills.map(r => r.slice()); while (CCD.skills.length < SF.CREATE_SKILL_SLOTS) CCD.skills.push([null, 0]); ccMarkEdited(); }
     CCD.town = o.town || 'quay'; CCD.replace = o.replace !== false; CCD.step = 3; ccRender(); return ccCommit(); } };
 
-loadScout(SCOUT_SRC); ccRender(); resize(); requestAnimationFrame(loop);
+loadScout(SCOUT_SRC); if (!ONLINE.bootFromUrl()) ccRender(); resize(); requestAnimationFrame(loop);
 }
 </script>
 </body></html>
