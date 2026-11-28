@@ -151,7 +151,7 @@ const TARGET_RETAIN = { creature: 12, object: 5, slack: 1, grace: .75, jump: 6 }
 const TGT = { ref: null, lim: 0, far: 0, lv: 0, px: 0, py: 0, more: false, h: '', reason: '' };
 const isCreature = t => t && (t.kind === 'mon' || t.kind === 'npc' || t.kind === 'ally' || t.kind === 'pet' || t.kind === 'player');
 const tgtDist = t => t.kind === 'node' ? Math.hypot(t.x + .5 - P.x, t.y + .5 - P.y) : dist(t, P);
-const combatTarget = () => P && P.armed && P.sel && P.sel.kind === 'mon' ? P.sel : null;
+const combatTarget = () => P && P.armed && P.sel && (P.sel.kind === 'mon' || P.sel.kind === 'npc') ? P.sel : null;
 function interactTarget() { const s = P && P.sel; if (!s || s === P) return null; const d = tgtDist(s); return (s.kind === 'npc' && d <= 2.5) || (s.kind === 'corpse' && d <= 2) || (s.kind === 'node' && d <= 2.2) ? s : null; }
 /* why a target stops being valid: gone from the world, dead without a corpse hand-over, hidden, a node whose ground changed */
 function tgtInvalid(t) {
@@ -205,7 +205,7 @@ function tfModel(t) {
     if (ents.some(e => e.kind === 'pet' && !e.gone)) m.acts += btn('petcmd', 'Pets attack', { c: 'attack' }, 'on');
     if (d.tame && !d.boss) m.more += btn('abil', 'Tame', { id: 'tame' }); if (SF.count(P.pack, 'lute') && !d.boss) m.more += btn('abil', 'Lullaby', { id: 'lullaby' }) + btn('abil', 'Discord', { id: 'discord' }) + btn('abil', 'Provoke', { id: 'provoke' });
     if (d.purse && t.target !== P) m.more += btn('abil', 'Pickpocket', { id: 'pick' }); m.more += btn('abil', 'Anatomy', { id: 'anatomy' }); }
-  else if (t.kind === 'npc') { const [nm, role] = npcLabel(t), q = questObjective(); m.dot = t.role === 'outlaw' ? 'red' : 'blue'; m.name = nm; m.sub.push(role); m.sub.push(dm); if (q && q.at === t) m.chips.push(['! Quest', 'quest']); if (t.downed) m.chips.push(['Knocked down', 'warn']); else if (t.npcFight && t.hp < t.max) m.bar = hpBar(t.hp / t.max); if (t.foe && alive(t.foe)) m.chips.push(['⚔ Fighting', 'atk']);
+  else if (t.kind === 'npc') { const [nm, role] = npcLabel(t), q = questObjective(), no = notoOf(t); m.dot = no ? NOTO_DOT[no] : 'blue'; m.name = nm; m.sub.push(role); m.sub.push(dm); if (no === 'criminal') m.chips.push(['Criminal', 'warn']); else if (no === 'murderer' && t.role !== 'outlaw') m.chips.push(['Murderer', 'warn']); if (combatTarget() === t) m.chips.push(['⚔ Attacking', 'atk']); if (q && q.at === t) m.chips.push(['! Quest', 'quest']); if (t.downed) m.chips.push(['Knocked down', 'warn']); else if (t.npcFight && t.hp < t.max) m.bar = hpBar(t.hp / t.max); if (t.foe && alive(t.foe)) m.chips.push(['⚔ Fighting', 'atk']);
     m.acts = `<button class="btn sm ac" data-a="interact">${npcAction(t)}</button>`; }
   else if (t.kind === 'corpse') { m.dot = 'item'; m.name = t.name; const ls = t.cont && Number.isFinite(t.cont.diedAt) ? SF.lootStatus(t.cont, P.id, GT) : null;   // loot rights exist only on bodies that carry them (player bodies today) if (t.cont) m.sub.push(t.cont.items.length ? t.cont.items.length + ' stack' + (t.cont.items.length === 1 ? '' : 's') : 'empty'); m.sub.push(dm);
     if (ls && (t.mine || !ls.lawful)) m.chips.push([cap1(ls.label), ls.lawful ? '' : 'warn']);

@@ -4,7 +4,7 @@ The roadmap is `docs/WORLD_SIMULATION_MASTER.md` (the full specification, unchan
 
 **Status words:** **Tested** — implemented and covered by an automated test that passes. **Implemented** — in the build, checked by hand only. **Partial** — some of the item is in; the rest is listed. **Planned** — not started. **Blocked** — waiting on something named.
 
-**Current build:** v0.30 (`Shardfall_v0.30.html`), branch `feature/living-world-phase5a`, from `integration/v0.29.2` (every open branch merged: stabilization #27, backpack popups and target frame #25, wildlife sheets #26). Phase 5, step 1: NPCs as combatants.
+**Current build:** v0.35 (`Shardfall_v0.35.html`), branch `feature/living-world-phase6a`: phase 6, step 1 (simulation tiers, the population saved, phone profiling) merged onto v0.34 (`feature/living-world-phase5b`, phase 5 step 2: criminality and murder).
 
 ---
 
@@ -19,7 +19,7 @@ The spec's development sequence (§29, phases A–G) is numbered 1–7 here. Eac
 | 2½ | — | **World expansion** (asked for between phases 2 and 3): Anniabreen stretched ×1.35 between rigid towns, the Southern Reach, 8 camps, 5 sealed dungeon mouths, world 2620 × 1520 | 2 | **Tested** (v0.23) |
 | 3 | C | Population and monster ecosystem: regions and habitats, species profiles as data, roaming, territories, predator/prey, monster-vs-monster factions, creature audio | 1, 2 | **Tested** (v0.25) |
 | 4 | D | Living NPCs: named townsfolk with homes, workplaces and schedules; guards patrolling; merchants travelling; resource workers; basic adventurers | 1, 2, 3 (factions) | **Tested** (v0.27); adventurers moved to phase 5, which gives NPCs combat |
-| 5 | E | Shared combat and law: NPC-vs-NPC and NPC-vs-monster combat, NPC spellcasting through Magery, actor death and looting, criminal flags, murder counts, guards, witnesses | 1, 3, 4 | **Partial**: step 1 (NPCs as combatants, guards fight creatures) **Tested** (v0.30); law, adventurers, NPC death and looting planned |
+| 5 | E | Shared combat and law: NPC-vs-NPC and NPC-vs-monster combat, NPC spellcasting through Magery, actor death and looting, criminal flags, murder counts, guards, witnesses | 1, 3, 4 | **Partial**: step 1 (NPCs as combatants, guards fight creatures) **Tested** (v0.30); step 2 (notoriety, aggression, criminal flags, witnesses, guards against you, murder counts) **Tested** (v0.34); adventurers, NPC death and looting planned |
 | 6 | F | Persistence and optimisation: world-state save (regions, camps, corpses, cargo), simulation tiers A/B/C, spatial index, mobile profiling, regression tests | 1–5 | **Partial**: step 1 (tiers A/B/C, the population saved creature by creature, phone profiling, tier and persistence tests) **Tested** (v0.35, built alongside phase 5 step 2); corpses, cargo and NPC-adventurer state wait for phase 5 steps 3–4 |
 | 7 | G | Emergent gameplay: merchant ambushes, dungeon expeditions, camp patrols, NPC healing and recovery, basic economy, encounters | 1–6 | Planned |
 
@@ -453,7 +453,7 @@ Requested on 2026-11-26: bigger distances, more camps, and places for dungeons. 
 
 ## Phase 6, step 1 — Simulation tiers, the population saved, phone profiling (v0.35) — **Tested**
 
-Built on a branch of its own (`feature/living-world-phase6a`, from v0.33) while phase 5 step 2 (criminality) was in progress elsewhere. It touches neither law nor combat, adds its save data inside the existing `eco` block (the save version is unchanged), and leaves corpses, merchant cargo and NPC adventurers to phase 5 steps 3–4.
+Built on a branch of its own (`feature/living-world-phase6a`) while phase 5 step 2 (criminality, v0.34) was being built elsewhere, then merged onto it. It touches neither law nor combat, adds its save data inside the existing `eco` block (the save version is unchanged), and leaves corpses, merchant cargo and NPC adventurers to phase 5 steps 3–4.
 
 ### What was built
 
@@ -511,6 +511,56 @@ Built on a branch of its own (`feature/living-world-phase6a`, from v0.33) while 
 - World-state save of NPC corpses and merchant cargo (after phase 5 steps 3–4); significant world events in the save.
 - Rendering on phones: see Performance. The simulation is no longer the cost; drawing is.
 - Tier C encounter resolution for creatures (phase 7 overlaps).
+
+## Phase 5, step 2 — Criminality and murder (v0.34) — **Tested**
+
+### What was built
+
+- **The pure law core, `SIM.newLaw` (`src/world.js`)**, deterministic and tested in node. Actors are ids and time is simulation seconds, which only run while the game runs, so every duration is *active* time.
+  - **Notoriety** (`notoriety(id, t)`): innocent (blue), criminal (grey: a timed flag), murderer (red: five or more long-term counts). Green and orange are reserved in `SIM.NOTORIETY` for guilds and legal enemies.
+  - **Aggression records** `{ attacker, victim, owner, victimOwner, t, region, lawful, selfDefence, expires }`. Repeated swings refresh one record. An attack is lawful when the victim is grey or red, or when the attacker has a **right** over the victim: the victim attacked them (or their pet or summon) and that record has not expired (120 s). A pet's or summon's unlawful attack flags its owner.
+  - **Crimes**: an unlawful attack or `crime(id, t, what)` (theft) sets the criminal flag for 120 s (`LAW_DEFAULTS.criminal`).
+  - **Murder counts**: `murder(killer, victim, t, key)` counts only if the killer had no right over an innocent victim, and only once per death key. A count is short-term for 8 h and long-term for 40 h (`shortDecay`, `longDecay`); `red` (5) long-term counts make a murderer. `count()` adds a count for a death judged earlier (a report).
+  - Save and load (expired records dropped, damaged values cleaned), `prune`, counters. Every number is in `SIM.LAW_DEFAULTS` and can be overridden per law (`SIM.newLaw(saved, cfg)`).
+- **`src/law.js`** (new, after NPC combat) connects it to the game:
+  - **Who has notoriety:** you and the 37 townsfolk with a life. The camp fence (outlaw role) stays red, as the target frame already showed. Creatures, pets and Wren have none.
+  - **Every swing at a person** (`swingAt`, before the hit roll, after legality and ammunition) records aggression; `damageNpc` records it again for any other path. `AggressionRecorded`, `CrimeCommitted`, `CrimeWitnessed`, `MurderReported` and `NotorietyChanged` events carry actor ids.
+  - **Theft:** the existing `crime()` (Stealing caught in the act) now goes through the law. Quay folk, who have no life yet, still only shout.
+  - **Witnesses:** a townsperson up and within 14 m in sight of the offender (and always the victim) remembers "saw a crime by", flees (the phase 4 danger response) and shouts; one cry brings the two nearest free guards (`npcCallGuards`, now for you as well as creatures). Victims and witnesses refuse to talk or trade with you for 10 minutes (`lawRefuses`, called first in `talk`).
+  - **Guards against you:** `guardFightTick` treats you like a creature when the law allows it (`lawGuardTarget`: you are grey or red, or you attacked that guard). He engages when he sees you inside his jurisdiction (16 m, line of sight) or is called, fights with the shared resolver, and stops with `CombatEnded` `won` (you died), `lost sight` (hidden, out of sight 6 s, out of the jurisdiction) or `pardoned` (your flag ran out and you are not red).
+  - **Murder:** until step 4 gives townsfolk real death, an NPC knocked down by someone with no right over them reports a murder at once (`lawDowned`; key = actor id + time of the fall, so two killing blows on one fall count once).
+  - **Murderers:** guards attack them on sight in town even with no criminal flag; every townsperson with a life refuses them. Long-term counts fade after 40 hours of play, and red with them.
+  - **Murder reports for you:** if an NPC kills you with no right over you, the ghost window shows *Report murder by …*; it counts once. No NPC can do that yet (guards only attack lawfully); the path is tested by staging the record.
+  - **UI:** names over heads and the target frame use notoriety colours; the target frame adds *Criminal* / *Murderer* and *⚔ Attacking* chips. Your name under the portrait turns grey with the seconds left (*Tess · criminal 87 s*) or red (*Tess · murderer*). **Attack** on an innocent warns and arms only on a second press within 4 s; aim assist never picks a person. The help page has a Law paragraph.
+  - **Developer panel:** a law line (your notoriety, counts, records, aggressions, crimes, murders, reports, witnesses, refusals, pardons); inspecting an actor shows its notoriety and counts.
+- **Saved** in the life block as `law` (records, flags, counts, handled deaths, counters), additive; the save version is unchanged. A new character starts with a clean record. A pending ghost report is saved with the character.
+
+### Tests
+
+- `node tests/world.test.js Shardfall_v0.34.html`: 29 new law checks (defaults, flags and their expiry, merged records, self-defence and its expiry, pets and owners, theft, murder once per death, no murder in self-defence or of a criminal, red at five, short and long decay, reports, save and load, damaged saves, event types).
+- `python3 tests/world-smoke/phase5_law.py Shardfall_v0.34.html` (also run by `world-smoke/run.py`), 20 checks in Chrome at phone size:
+  1. Everyone starts innocent and blue; the fence is red; creatures have no notoriety.
+  2. Attack on an innocent warns, then arms on the second press; arming alone is no crime; aim assist never picks a person.
+  3. A swing at Old Tomas is an unlawful record (region Vespar) and a crime; you are grey for 120 s with the time on your name; he flees and remembers; Lise, 4 m away, witnesses it; a guard comes and his lawful blows land on you (about 1.2 s).
+  4. Hiding: the guard reports `lost sight` and returns to the patrol. After 120 s you are innocent again (event and log line) and a guard beside you leaves you alone.
+  5. Hitting back at someone who attacked you: no warning, lawful self-defence, no flag.
+  6. Caught stealing from Merrin: criminal; she refuses to trade.
+  7. Five innocents knocked down: five reports, one count each even with two killing blows; red, with a log line and a red name.
+  8. 130 s later (no flag left) a guard still attacks the murderer on sight (`a murderer in town`) and a shopkeeper refuses.
+  9. Counts and red survive save and reload.
+  10. Killing a rat records no aggression and no crime.
+  11. Killed unlawfully by a guard (staged): the ghost window offers the report, it counts once and the button goes.
+- `tests/world-smoke/phase5.py` check 4 now expects your blow to reach the townsperson (it asserted the old "you cannot hurt townsfolk").
+- Regression on v0.34: `check-build.py`, all 12 node suites and all 16 browser suites of CI pass (world-smoke 178 ok, including phase5_law.py).
+
+### Decisions
+
+- **A knock-down is the death, for now.** Murder counts need deaths, and townsfolk only fall until step 4. When they can die, `lawDowned` moves to the death transaction unchanged.
+- **Attacks on townsfolk are allowed inside towns.** Protected ground still keeps creatures from targeting anyone and keeps your gear on death; it never made you immune to the law. Guards answer only inside a town's jurisdiction (60 m of its centre).
+- **Only townsfolk with a life can be attacked.** The Quay wardens, healers and other placed NPCs have no fighting profile yet.
+- **Spells and pets do not reach townsfolk yet.** Spell targeting (`isLiving` in `src/magic.js`) and the pet *attack* order still accept creatures only, so an area spell cannot make you a criminal by accident. The law already handles owners (`owner` on the record) for when they do.
+- **Guards are strong, not instant.** They fight criminals with the shared rules (halberd, 90 skill, 147 hp); a guard you attacked first may be fought back lawfully (his attack gives you no new flag).
+- **The victim reports at once.** Every melee victim saw the attacker; witness-based reporting for deaths with no living victim comes with real death in step 4.
 
 ## Phase 5, step 1 — NPCs as combatants (v0.30) — **Tested**
 
@@ -716,7 +766,7 @@ v0.26 merges phase 3 with the equipment and paper doll work (#19, which already 
 | 16 | Camps | Ashfen outlaw camp (static vendors, smugglers spawner) | **Tested** (phase 3): 8 camps and 2 guarded mouths as persistent populations; clearance saved, gradual recovery; orc patrols, bandit road watches, wolf hunting trips | Supplies, treasure, leadership: phases 5 and 7 |
 | 17 | Dungeons | Sunken Bell, 3 levels, seeded rooms, Bellkeeper boss, chests, stairs; Mynoc mine first chamber | **Partial** (v0.23): 5 sealed mouths placed and reachable; interiors **Planned** | One step per dungeon interior |
 | 18 | Combat between actors | Creatures ↔ player/pets/Wren; provoked creature ↔ creature | Shared entry **Tested** | Phase 5 |
-| 19 | Criminality | Protected zones (`PROT`, guarded towns); theft/pickpocket and snooping exist for the player; no notoriety | Planned | Phase 5 |
+| 19 | Criminality | Protected zones (`PROT`, guarded towns); theft/pickpocket and snooping exist for the player; no notoriety | **Tested** (v0.34): notoriety, aggression records with self-defence and expiry, criminal flag, theft, witnesses, guards in jurisdiction, murder counts with decay and reports, red restrictions | Illegal looting (step 4); NPC criminals and murderers (step 3+); green and orange (guilds) |
 | 20 | Corpses, death, loot | `SF.deathTransaction` for player and Wren, creature corpses with loot rolls, decay timers, skinning, the player's corpse saved | Death once **Tested** | Phase 5 (NPC looting), phase 6 (persist all corpses) |
 | 21 | Economy | Shops with fixed prices, resource nodes deplete/refill and persist, crafting consumes materials | Planned | Phase 7 |
 | 23 | Sound | `SFXA` Web Audio player: buses, positional pan, priorities, area music, ambience per zone, footsteps by surface; volume/mute settings | **Implemented** (phase 3): alert on first sight of prey or enemy for every species with takes, documented stand-ins, rare idle calls, night howls; silent where no take exists | Separate volume sliders and environment profiles (birds, insects, owls, groans) when takes exist |
@@ -800,16 +850,15 @@ v0.26 merges phase 3 with the equipment and paper doll work (#19, which already 
   - Next step for phones: choose DP from a budget of back-buffer pixels instead of from the pixel ratio alone, then measure on a real device. The night tint and the light pass are the next numbers to watch.
   - Heap: 61–76 MB with tiers, 69–105 MB without. The save is about 86 KB.
 
-## Next task (phase 5, step 2)
+## Next task (phase 5, step 3)
 
-Criminality and murder (§19), now that NPCs can be hurt and guards can fight:
+The first NPC adventurers (§18, §21), now that NPCs can fight and the law can judge them:
 
-1. Notoriety (blue innocent, grey criminal, red murderer) on names and the target frame, for the player and humanoid NPCs.
-2. Aggression records (attacker, victim, time, region, lawful or not, self-defence, expiry) and the criminal flag (120 s of simulation time, configurable).
-3. Let the player attack townsfolk: an unlawful attack makes you a criminal; guards inside their jurisdiction respond to you with the same `guardFightTick`; witnesses who see it call them.
-4. Short- and long-term murder counts with decay, saved; five make you red.
+1. An `AdventurerAI` archetype with a profile (weapons or Magery, skills, armour, a purse) that leaves town for a camp or a hunting ground, fights creatures with the shared resolver and comes back to bank and rest.
+2. NPC spellcasting through the Magery rules (heal self, a direct-damage spell), shared with Wren later.
+3. Notoriety for adventurers (innocent by default); the law already judges NPC attackers, so a grey or red adventurer is fought by guards.
 
-Then step 3 (the first NPC adventurers) and step 4 (NPC death, corpses and looting under the player's rules).
+Then step 4: NPC death, corpses and looting under the player's rules (`lawDowned` moves to the death transaction; illegal looting becomes a crime).
 
 ## Next in phase 6 (step 2, after phase 5 steps 3–4)
 
