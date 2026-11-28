@@ -666,6 +666,40 @@ SIM.advShopping = (style, have, gold, prices, reagents, cfg) => {
 /* the resurrection policy for a dead adventurer */
 SIM.advAfterDeath = cfg => { const p = (cfg || SIM.ADV_CFG).res; return p === 'replace' || p === 'none' ? p : 'healer'; };
 
+/* ---------------- Phase 6 step 2: world-state persistence of remains and cargo, the phone back buffer ----------------
+   Creature remains keep their loot through a reload (§20: "corpse contents resetting after loading" is not allowed, and a reload
+   must not roll the loot again). Rows: [{ key, type, x, y, left, items, skinned, killer, killKind, advKill, sect, gear }].
+   One row per key, known species and items only, never an expired body. Returns { rows, dropped }. */
+SIM.remainsRows = (rows, o) => {
+  const out = [], seen = new Set(), dropped = {}; const drop = k => { dropped[k] = (dropped[k] || 0) + 1; };
+  for (const r of Array.isArray(rows) ? rows : []) {
+    if (!r || typeof r !== 'object') { drop('shape'); continue; }
+    if (typeof r.key !== 'string' || !r.key || seen.has(r.key)) { drop('duplicate'); continue; }
+    if (typeof r.type !== 'string' || !o.validType(r.type)) { drop('species'); continue; }
+    if (![r.x, r.y, r.left].every(Number.isFinite) || r.left <= 0) { drop('number'); continue; }
+    if (!Array.isArray(r.items)) { drop('items'); continue; }
+    seen.add(r.key); out.push(Object.assign({}, r, { items: r.items.filter(it => it && o.validItem(it)), skinned: !!r.skinned }));
+    if (o.max && out.length >= o.max) break;
+  }
+  return { rows: out, dropped };
+};
+/* the travelling merchant's cargo for one leg: goods from his stock list, the dearest first, up to `value` gold at shop prices.
+   rnd() in [0, 1) picks the quantities. Returns [{ id, qty }] */
+SIM.traderCargo = (stock, prices, rnd, value) => {
+  value = value || 160; const ids = stock.filter(id => prices[id] > 0).sort((a, b) => prices[b] - prices[a] || (a < b ? -1 : 1)), out = []; let left = value;
+  for (const id of ids) { if (out.length >= 6 || left <= 0) break; const p = prices[id], n = Math.min(Math.floor(left / p), 1 + Math.floor(rnd() * Math.max(1, Math.floor(40 / p)))); if (n > 0) { out.push({ id, qty: n }); left -= n * p; } }
+  return out;
+};
+/* the back buffer's divisor. The world is drawn into a buffer of (screen pixels / d) and scaled up; d = zoom × pixel ratio would keep
+   the view the same on every screen, but whole numbers keep pixel art crisp. Desktop and small-ratio screens keep the whole number
+   (as before). On a phone, if that buffer would hold more than `budget` pixels, d grows to fit the budget (never below the ideal):
+   fewer pixels to draw, and the view is closer to the intended zoom (a pixel-ratio-2 phone used to round 1.4 down to 1). */
+SIM.backBuffer = (cssW, cssH, dpr, zoom, o) => {
+  o = o || {}; const ideal = zoom * dpr, d0 = Math.max(1, Math.round(ideal)), px = cssW * cssH * dpr * dpr;
+  if (!o.phone || !(o.budget > 0) || px / (d0 * d0) <= o.budget) return d0;
+  return Math.sqrt(px / o.budget);   // > d0, since the whole number was over budget
+};
+
 /* ---------------- NPC death and NPC crime (§19, §20; Living World phase 5 step 4) ----------------
    Townsfolk and guards die at 0 health instead of being knocked down: one death transaction, a body holding what they really
    wore and carried, loot rights, murder reports. Then, like UO's vendors, they come back after a while (the same person, so

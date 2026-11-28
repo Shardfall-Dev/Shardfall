@@ -38,6 +38,7 @@ function npcDies(e, src) {
   // what they wore and carried, and their purse, on a body under the player's rules
   e.pack = SF.newContainer('pack', e.actorId);
   for (const s in e.equip) e.equip[s] = npcdRealItem(e.equip[s]);
+  if (L && Array.isArray(L.cargo) && L.cargo.length) { e.pack.items.push(...L.cargo); L.cargo = []; }   // the merchant's cargo is on his body (v0.43)
   const gold = SIM.npcdPurse(L && L.prof, L && L.gold, R(), NPCD.cfg); if (gold > 0) e.pack.items.push(SF.newItem('gold', gold)); if (L && Number.isFinite(L.gold)) L.gold = 0;
   const body = SF.deathTransaction(e, GT, { x: e.x, y: e.y }); body.owner = e.actorId; body.key = e.actorId + '@' + GT.toFixed(2);
   addEnt({ kind: 'corpse', npcBody: e.actorId, name: npcdFirst(e) + "'s body", x: e.x, y: e.y, cont: body, expires: body.expires, gear: look, t0: GT, sect: e.sect || 0 });
@@ -66,7 +67,7 @@ function npcdReturn(e, p) {
   npcArm(e);   // a fresh outfit, full health (src/npcfight.js)
   const L = e.life; if (L) { L.needs = SIM.newNeeds(); L.mind = {}; L.goal = null; L.thinkAt = 0; L.hurry = false; L.wd = null; L.retryAt = 0;
     if (Number.isFinite(L.gold) || L.gold === 0) L.gold = L.prof === 'trader' ? 120 : 20 + (e.id % 7) * 5;
-    if (L.prof === 'trader') { L.town = e.town = 'mynoc'; L.phase = 'selling'; L.until = 0; L.legs = 0; } }
+    if (L.prof === 'trader') { L.town = e.town = 'mynoc'; L.phase = 'selling'; L.until = 0; L.legs = 0; L.cargo = []; } }
   e.x = p.x; e.y = p.y; if (!canStand(e, e.x, e.y)) { const q = lifeSpot(e, p, 3); if (q) { e.x = q.x; e.y = q.y; } } e._px = e.x; e._py = e.y; e.speed = 0;
   ents.push(e); if (WS && e.archetype) WS.adopt(e, e.archetype);
   NPCD.stats.returns++; simEmit('ActorReturned', { actor: aidOf(e), x: e.x, y: e.y, detail: { after: Math.round(GT - diedAt) } });

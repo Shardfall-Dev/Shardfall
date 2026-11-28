@@ -3,6 +3,9 @@
 # towns, camps and the wilds, saves and reloads half way, and samples: simulation step time (mean, p95, worst per game hour),
 # draw time, JS heap, actor population, path-search queue and cache, the event log, effects, audio caches, console errors,
 # page errors and failed asset requests. Writes a JSON report and fails on unbounded growth, errors or failed requests.
+# Since v0.43 (Living World phase 6 step 2) also the spec's long-running world checks (§27): no species dies out or explodes, gold
+# does not run away, no adventurer is stuck and no dead townsperson stays dead past their time, the law's records and the event
+# bus stay bounded, and creature remains come back through the reload.
 # usage: python3 tests/soak/run.py Shardfall_vX.html [--days 3] [--report /tmp/soak.json]
 import functools, http.server, json, os, sys, threading, time
 from playwright.sync_api import sync_playwright
@@ -24,6 +27,14 @@ SAMPLE = """() => { const S = __SF, P = S.P; const nav = S.NAV, a = window.SFXA 
     navJobs: nav.jobs.length, navCache: nav.cache.size !== undefined ? nav.cache.size : (nav.cache.map ? nav.cache.map.size : -1), navSearches: nav.searches, navFailed: nav.failed,
     log: S.LOG.length, events: S.WS && S.WS.events ? (S.WS.events.length !== undefined ? S.WS.events.length : -1) : -1, audio: a || null,
     heap: performance.memory ? performance.memory.usedJSHeapSize : null, frameErr: S.FRAME_ERR ? S.FRAME_ERR.n : 0, hp: P.hp, ghost: !!P.ghost }; }"""
+WORLD = """() => { const S = __SF, P = S.P, sp = {}; for (const e of S.ents) if (e.kind === 'mon' && !e.gone && e.sp) sp[e.type] = (sp[e.type] || 0) + 1;
+  const g = c => c ? SF.count(c, 'gold') : 0; let gold = g(P.pack) + g(P.bank);
+  for (const a of S.ADV.list) gold += g(a.pack) + (a.adv.bank || 0);
+  for (const e of S.LIFE.npcs) if (!e.gone && Number.isFinite(e.life.gold)) gold += e.life.gold;
+  for (const c of S.ents) if (c.kind === 'corpse' && !c.gone && c.cont) gold += g(c.cont);
+  const C = S.NPCD.cfg; const late = S.NPCD.dead.filter(e => e.npcDead.back && S.GT - e.npcDead.at > C.back + C.unseen + 5).length;
+  return { sp, gold, late, dead: S.NPCD.dead.length, adv: S.ADV.list.map(a => [a.actorId, Math.round(a.x * 2) / 2, Math.round(a.y * 2) / 2, a.adv.mode, !!a.ghost]),
+    law: S.LAW.records().length, bus: S.WS.bus.recent().length, remains: S.ents.filter(c => c.kind === 'corpse' && c.mon && !c.gone && c.expires > S.GT).length }; }"""
 # run the real simulation for `secs` game seconds in 50 ms steps, timing every step (the browser's own frame loop is paused meanwhile)
 RUN = """async ([secs, chunk]) => { const S = __SF; const steps = Math.round(secs / .05), times = []; let done = 0;
   while (done < steps) { const n = Math.min(chunk, steps - done); for (let i = 0; i < n; i++) { const t0 = performance.now(); S.simStep(.05); times.push(performance.now() - t0); } done += n; await new Promise(r => setTimeout(r, 0)); }
@@ -55,12 +66,12 @@ with sync_playwright() as p:
     st = pg.evaluate(RUN, [per_hour, 400])
     if h % 6 == 0: pg.evaluate(gc)
     s = pg.evaluate(SAMPLE); dr = pg.evaluate(DRAW) if h % 4 == 0 else None
-    samples.append({'h': h, 'step': st, 'draw': dr, 's': s})
+    w = pg.evaluate(WORLD); samples.append({'h': h, 'step': st, 'draw': dr, 's': s, 'w': w})
     print('h%-3d gt=%7.0f ents=%4d mons=%4d npcs=%3d corpses=%3d nav=%d/%s log=%d heap=%.1fMB step mean=%.3f p95=%.3f max=%.1f ms%s' % (h, s['gt'], s['ents'], s['mons'], s['npcs'], s['corpses'], s['navJobs'], s['navCache'], s['log'], (s['heap'] or 0) / 1048576, st['mean'], st['p95'], st['max'], ' draw p95=%.2f' % dr['p95'] if dr else ''), flush=True)
     if h == hours // 2:   # save and reload half way: the world resumes from the save
-      size = pg.evaluate("() => { __SF.save(); return localStorage.getItem('shardfall.save.v1').length; }")
+      size = pg.evaluate("() => { __SF.save(); return localStorage.getItem('shardfall.save.v1').length; }"); before_reload = pg.evaluate(WORLD)
       pg.goto(URL); pg.wait_for_selector('[data-c=cont]'); pg.click('[data-c=cont]'); pg.wait_for_function('window.__SF && __SF.P'); pg.wait_for_timeout(800)
-      samples.append({'h': h, 'reload': True, 'saveBytes': size, 's': pg.evaluate(SAMPLE)}); print('  reloaded; save %d KB' % (size // 1024))
+      after_reload = pg.evaluate(WORLD); samples.append({'h': h, 'reload': True, 'saveBytes': size, 's': pg.evaluate(SAMPLE), 'wBefore': before_reload, 'wAfter': after_reload}); print('  reloaded; save %d KB; remains %d -> %d' % (size // 1024, before_reload['remains'], after_reload['remains']))
   # background and foreground: the world waits while hidden, and held input is released
   # (a real hidden tab also stops requestAnimationFrame, which pauses the world; a synthetic event cannot, so only the handlers are checked)
   bg = pg.evaluate("""async () => { const S = __SF; S.JOY.on = true; S.P.sprintOn = false; const t0 = JSON.parse(localStorage.getItem('shardfall.save.v1')).savedAt; await new Promise(r => setTimeout(r, 20));
@@ -91,6 +102,22 @@ local = [f for f in failed if f.startswith('http://127.0.0.1')]; external = sort
 real_errs = [e for e in errs if not (e.startswith('console.error: Failed to load resource') and not local)]
 if external: print('note: external requests that failed (network of this machine, not game assets):', external)
 check(not real_errs, f'no page or console errors over {hours} game hours', real_errs[:5])
+# ---- the world over the long run (§27)
+ws = [x['w'] for x in run if x.get('w')]; w0 = ws[0]['sp'] if ws else {}
+extinct = {k: min(w['sp'].get(k, 0) for w in ws) for k, n in w0.items() if n >= 5 and min(w['sp'].get(k, 0) for w in ws) < max(1, n * .25)}
+boom = {k: max(w['sp'].get(k, 0) for w in ws) for k, n in w0.items() if max(w['sp'].get(k, 0) for w in ws) > n * 1.6 + 10}
+check(ws and not extinct and not boom, f'no species dies out or explodes ({len(w0)} species, {sum(w0.values())} creatures at the start)', {'extinct': extinct, 'boom': boom})
+golds = [w['gold'] for w in ws]; per_hour = max(b - a for a, b in zip(golds, golds[1:])) if len(golds) > 1 else 0
+check(not ws or (golds[-1] - golds[0] <= 2000 * hours and per_hour <= 4000), f'gold does not run away: {golds[0]} at the start, {golds[-1]} at the end, at most +{per_hour} in an hour', golds[:: max(1, len(golds) // 12)])
+stuck = set()
+for i in range(2, len(ws)):
+  for a, b, c in zip(ws[i - 2]['adv'], ws[i - 1]['adv'], ws[i]['adv']):
+    if a[0] == b[0] == c[0] and a[1:3] == b[1:3] == c[1:3] and c[3] not in ('town',) and not c[4]: stuck.add(c[0])
+check(not stuck, 'no adventurer or outlaw stands in the same spot away from home for two game hours', sorted(stuck))
+check(all(w['late'] == 0 for w in ws), 'no dead townsperson stays dead past their time', [w['late'] for w in ws])
+check(max((w['law'] for w in ws), default=0) <= 96 and max((w['bus'] for w in ws), default=0) <= 256, "the law's records and the event bus stay bounded", [max((w['law'] for w in ws), default=0), max((w['bus'] for w in ws), default=0)])
+rl = [x for x in samples if x.get('reload')]
+check(not rl or rl[0]['wAfter']['remains'] >= rl[0]['wBefore']['remains'] * .9, 'creature remains come back through the reload', rl and [rl[0]['wBefore']['remains'], rl[0]['wAfter']['remains']])
 check(not local, 'no failed game asset requests (sounds, music, art)', local[:5])
 check(end['frameErr'] == 0, 'no frame-loop errors', end['frameErr'])
 check(out['heapLastQuarterMB'] is None or out['heapLastQuarterMB'] < out['heapFirstQuarterMB'] * 1.5 + 20, 'JS heap does not keep growing (last quarter vs first quarter)', [out['heapFirstQuarterMB'], out['heapLastQuarterMB']])

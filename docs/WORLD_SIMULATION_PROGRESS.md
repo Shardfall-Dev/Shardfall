@@ -4,7 +4,7 @@ The roadmap is `docs/WORLD_SIMULATION_MASTER.md` (the full specification, unchan
 
 **Status words:** **Tested** — implemented and covered by an automated test that passes. **Implemented** — in the build, checked by hand only. **Partial** — some of the item is in; the rest is listed. **Planned** — not started. **Blocked** — waiting on something named.
 
-**Current build:** v0.39 (`Shardfall_v0.39.html`), branch `feature/living-world-phase5d`, on main at v0.37 (v0.33.1 + v0.34–v0.36 + Server Foundation v1). v0.38 is the server movement work in #57, built in parallel. Phase 5, step 4: NPC death, bodies and looting, and the first NPC outlaws. Phase 5 is complete.
+**Current build:** v0.43 (`Shardfall_v0.43.html`), branch `feature/living-world-phase6b`, on main at v0.39 (phase 5 complete). Phase 6, step 2: remains and cargo through a reload, the phone back-buffer budget, the long-run world checks. (v0.38–v0.42 belong to the server work in #57, #58 and #60.)
 
 ---
 
@@ -20,7 +20,7 @@ The spec's development sequence (§29, phases A–G) is numbered 1–7 here. Eac
 | 3 | C | Population and monster ecosystem: regions and habitats, species profiles as data, roaming, territories, predator/prey, monster-vs-monster factions, creature audio | 1, 2 | **Tested** (v0.25) |
 | 4 | D | Living NPCs: named townsfolk with homes, workplaces and schedules; guards patrolling; merchants travelling; resource workers; basic adventurers | 1, 2, 3 (factions) | **Tested** (v0.27); adventurers moved to phase 5, which gives NPCs combat |
 | 5 | E | Shared combat and law: NPC-vs-NPC and NPC-vs-monster combat, NPC spellcasting through Magery, actor death and looting, criminal flags, murder counts, guards, witnesses | 1, 3, 4 | **Tested**: step 1 (NPCs as combatants, guards fight creatures, v0.30); step 2 (notoriety, aggression, criminal flags, witnesses, guards against you, murder counts, v0.34); step 3 (NPC adventurers and NPC Magery, v0.36); step 4 (NPC death, bodies, looting crimes, the first NPC outlaws, v0.39) |
-| 6 | F | Persistence and optimisation: world-state save (regions, camps, corpses, cargo), simulation tiers A/B/C, spatial index, mobile profiling, regression tests | 1–5 | **Partial**: step 1 (tiers A/B/C, the population saved creature by creature, phone profiling, tier and persistence tests) **Tested** (v0.35, built alongside phase 5 step 2); corpses, cargo and NPC-adventurer state wait for phase 5 steps 3–4 |
+| 6 | F | Persistence and optimisation: world-state save (regions, camps, corpses, cargo), simulation tiers A/B/C, spatial index, mobile profiling, regression tests | 1–5 | **Tested**: step 1 (tiers A/B/C, the population saved creature by creature, phone profiling, v0.35); step 2 (creature remains and merchant cargo through a reload, the phone back-buffer budget, the long-run world checks in the soak, v0.43). NPC adventurers (v0.36) and townsfolk bodies (v0.39) were saved by phase 5 |
 | 7 | G | Emergent gameplay: merchant ambushes, dungeon expeditions, camp patrols, NPC healing and recovery, basic economy, encounters | 1–6 | Planned |
 
 Spatial indexing (phase 6 in the spec) is needed earlier: phase 3 adds dozens of roaming actors with perception, and `aiMon` already checks every entity against every other for push-apart (see Performance). Plan to pull a chunk index into phase 3.
@@ -450,6 +450,45 @@ Requested on 2026-11-26: bigger distances, more camps, and places for dungeons. 
 - **Wolves are the bestiary's dire wolves; bears are drawn in code** until a sheet exists (deer and hares have bestiary v1.1.0 sheets since v0.28.2).
 - **Creatures respawn on load as before; camp clearance is the one thing saved now.** Saving every creature is phase 6 (§26).
 - **The quarter-rate tier for distant idle creatures** is a stopgap so the larger population costs less than the old one did. Phase 6 replaces it with the spec's tiers A/B/C.
+
+## Phase 6, step 2 — Remains and cargo through a reload, phone drawing, the long-run checks (v0.43) — **Tested**
+
+Branch `feature/living-world-phase6b`, on main at v0.39. This finishes phase 6.
+
+### What was built
+
+- **Creature remains through a reload** (`src/tiers.js` `remainsSave` / `remainsLoad`, the save's `remains`, additive). Every creature body still lying in the world is saved with:
+  - its loot (the items themselves, uids included);
+  - whether it was carved;
+  - the time left, its look, the killer, and which adventurer may loot it.
+
+  The rows are validated by `SIM.remainsRows`: one per key, known species and items only, never an expired body, at most 400. A reload neither rolls the loot again (§20 "infinite item regeneration") nor empties a body (§20 "corpse contents resetting after loading"). The save's uid counter counts their items.
+- **The merchant's cargo.** Setting out on a leg, Tobin loads real goods from his stock list (`SIM.traderCargo`: up to six kinds, the dearest first, about 160 gold). Arriving, he sells them (a ledger, +25 % to his purse, capped at 400). The cargo is saved with him, counted by the uid counter, and moves onto his body if he dies. This is the hook for phase 7's merchant ambushes; the cutthroat can already rob it.
+- **Phone drawing** (`SIM.backBuffer`, `resize`). On a phone (shorter side under 600 CSS px), the world's back buffer holds at most 600,000 pixels. If the whole-number divisor would draw more, the divisor grows to fit the budget, possibly to a fraction (nearest-neighbour scaling; on a pixel-ratio 2–3 screen the uneven pixel widths are too small to see). Desktop screens, including retina, keep the whole number, so their view is unchanged. `?bb=full` brings back the old divisor.
+- **The long-run world checks** (§27) in the soak (`tests/soak/run.py`, one game day in CI): no species dies out (below 25 % of its start) or explodes (above 1.6× + 10); gold does not run away (at most +2,000 per game hour overall, +4,000 in any one hour); no adventurer or outlaw stands in the same spot away from home for two game hours; nobody dead past their time; the law's records (≤ 96) and the event bus (≤ 256) stay bounded; remains come back through the mid-run reload.
+
+### Tests
+
+- `node tests/persist.test.js`: remains rows (duplicates, unknown species and items, expired, broken, the cap), merchant cargo (value, kinds, order, determinism), the back-buffer divisor (desktop, retina desktop, phones at pixel ratios 1, 2 and 3, zoom, no budget).
+- `python3 tests/world-smoke/phase6b.py` (new, called by `world-smoke/run.py`), 14 checks:
+  - remains saved without the expired one, with the uid counter ahead;
+  - after the reload, the same remains with exactly the same items (one taken stays taken), carved stays carved, time left kept;
+  - bad rows dropped and counted, never duplicated; an older save loads;
+  - cargo of real items saved with Tobin; the same cargo after a reload, all of it on his body when he dies; sold on arrival;
+  - pixel-ratio-2 and pixel-ratio-3 phones within the budget, `?bb=full` keeping the old divisor, the player drawn at the centre at every divisor, the desktop unchanged.
+- `tests/soak/run.py --days 1`: all the checks above pass. In this run: 25 species, 940 creatures at the start; gold 2,634 → 7,536 over the day, at most +446 in an hour; remains 59 → 59 through the reload; save 132 KB.
+
+### Decisions
+
+- **Fractional scaling only on phones.** A whole-number divisor keeps pixel art crisp, and desktops can afford it. Phones were the ones paying for it: a pixel-ratio-2 phone drew 2.2× more pixels than a pixel-ratio-3 one. The budget also gives every phone nearly the same view.
+- **The merchant's sale is a ledger**, like the townsfolk's hauls. Shop stock and prices that respond to supply are phase 7's economy.
+- **No save version bump.** Everything is additive, as in phase 6 step 1.
+
+### Not done yet
+
+- Significant world events in the save (§26).
+- Measuring on a real phone. The figures here are emulated in software, with no GPU.
+- Tier C encounter resolution (phase 7).
 
 ## Phase 5, step 4 — NPC death, bodies and looting, the first NPC outlaws (v0.39) — **Tested**
 
@@ -961,13 +1000,19 @@ v0.26 merges phase 3 with the equipment and paper doll work (#19, which already 
   - Drawing one portrait frame at 4× costs 18 ms at pixel ratio 1, 73 ms at ratio 2 and 49 ms at ratio 3 (noon; 25, 95 and 69 ms at night).
   - Next step for phones: choose DP from a budget of back-buffer pixels instead of from the pixel ratio alone, then measure on a real device. The night tint and the light pass are the next numbers to watch.
   - Heap: 61–76 MB with tiers, 69–105 MB without. The save is about 86 KB.
+- **Phones with the back-buffer budget (v0.43)**, portrait 390 × 844, 4× CPU, Saltmarsh Quay at noon, median of 30 frames:
+
+| Pixel ratio | Before (`?bb=full`) | v0.43 |
+|---|---|---|
+| 2 | divisor 1, 1,316,640 pixels, 66.5 ms | divisor 1.48, 600,780 pixels, 32.5 ms |
+| 3 | divisor 2, 740,610 pixels, 43.4 ms | divisor 2.22, 600,780 pixels, 34.9 ms |
 
 ## Next task
 
-Phase 5 is complete. Next is phase 6 step 2 (below), then phase 7 (emergent gameplay: merchant ambushes, dungeon expeditions, camp patrols, a basic economy).
+Phases 5 and 6 are complete. Next is phase 7, emergent gameplay (§29 G):
 
-## Next in phase 6 (step 2)
-
-1. Save creature corpses with their contents and remaining lifetime, and merchant cargo, through the same validated-rows path (no duplicates on load). NPC adventurers (v0.36, the `adv` block) and townsfolk bodies (v0.39, the life block's `npcd`) are already saved.
-2. Phone drawing: pick the back-buffer divisor from a pixel budget (see Performance), then profile on a real phone.
-3. A seeded long-run check with tiers on (the soak), added to the browser suites with the spec's long-running checks: no population explosion or extinction, no infinite loot or gold, no stuck NPCs, a bounded event log and memory.
+1. Merchant ambushes: outlaws and creatures go after the cargo on the cart road; guards escort and respond.
+2. Camp patrols and sorties that reach the roads; tier C encounter resolution for distant fights.
+3. NPC healing and recovery between fights (beyond the healer for ghosts).
+4. A basic economy: shop stock that responds to what townsfolk, adventurers and the merchant bring in and buy.
+5. Dungeon expeditions once the interiors exist.

@@ -56,3 +56,24 @@ function tierWake(e) {
   else if (e.x !== x || e.y !== y) TIER.placed++;
 }
 function tierInspect(e) { return e && e !== P ? { tier: e.tier || '—', tierWhy: TIER_FIXED[e.archetype] || e.dev || e.quest ? 'always local' : tierBusy(e) ? 'busy: local' : 'distance ' + (P ? Math.hypot(e.x - P.x, e.y - P.y).toFixed(0) : '?') + ' m' } : {}; }
+
+/* ================= Phase 6 step 2 (v0.43): creature remains through a reload =================
+   Remains keep their loot, their carving state and their time left through a save and reload, so a reload neither rolls the loot
+   again nor empties a body you were about to loot (§20). Saved as validated rows in the save's `remains` (additive; SIM.remainsRows:
+   one row per key, known species and items only, never an expired body, at most REMAINS_MAX). Item uids are counted by the save. */
+const REMAINS_MAX = 400;
+const REMAINS = { restored: 0, dropped: {} };
+function remainsOf() { return ents.filter(c => c.kind === 'corpse' && c.mon && !c.gone && c.cont && c.expires > GT); }
+function remainsSave() {
+  return remainsOf().slice(-REMAINS_MAX).map(c => ({ key: c.rkey || (c.rkey = 'r' + c.id + '@' + Math.round(c.t0 ?? GT)), type: c.mon, name: c.name, x: Math.round(c.x * 10) / 10, y: Math.round(c.y * 10) / 10,
+    left: Math.round((c.expires - GT) * 10) / 10, items: c.cont.items, skinned: !!c.skinned, killer: c.killer || null, killKind: c.killKind || null, advKill: c.advKill || null, sect: c.sect || 0, gear: c.gear || null }));
+}
+function remainsLoad(rows) {
+  REMAINS.restored = 0; REMAINS.dropped = {}; if (!rows) return;
+  const res = SIM.remainsRows(rows, { validType: t => !!MON[t], validItem: it => !!SF.ITEMS[it.id] && it.qty > 0 && Number.isFinite(it.uid), max: REMAINS_MAX });
+  for (const r of res.rows) { const cont = SF.newContainer('corpse'); cont.items = r.items;
+    addEnt({ kind: 'corpse', mon: r.type, rkey: r.key, sect: r.sect || 0, t0: GT - 9, killer: r.killer, killKind: r.killKind, name: typeof r.name === 'string' ? r.name : MON[r.type].n + ' remains', x: r.x, y: r.y, cont, expires: GT + r.left,
+      skinned: r.skinned || !MON[r.type].skin, gear: r.gear || null, advKill: r.advKill || undefined, advDone: undefined }); REMAINS.restored++; }
+  REMAINS.dropped = res.dropped;
+}
+function remainsScan(scan) { for (const c of remainsOf()) c.cont.items.forEach(scan); }
