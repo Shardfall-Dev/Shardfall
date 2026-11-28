@@ -46,7 +46,9 @@ export async function buildApp(cfg: Config, opts: { db?: Db } = {}): Promise<App
   const gateway = new Gateway(cfg, sessions, chars, world, app.log);
 
   await app.register(cookie);
-  await app.register(rateLimit, { global: true, max: cfg.rateLimit.globalPerMin, timeWindow: '1 minute', allowList: [] });
+  // the API and the WebSocket upgrade are rate limited; the game page and its ~250 audio files are not (one page load would
+  // otherwise use up a player's budget)
+  await app.register(rateLimit, { global: true, max: cfg.rateLimit.globalPerMin, timeWindow: '1 minute', allowList: (req: any) => !(req.url.startsWith('/api/') || req.url.startsWith('/ws')) });
   await app.register(websocket, { options: { maxPayload: P.MAX_MESSAGE_BYTES } });
 
   // security headers for everything this server returns (the game page itself needs inline scripts and data: images)

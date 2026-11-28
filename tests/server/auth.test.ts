@@ -177,3 +177,14 @@ test('nothing secret is logged in responses or the session payload', async () =>
   const s = await c.get('/api/session'); assert.equal(/refresh|access_token|eyJ/.test(s.text), false);
   await sleep(10);
 });
+
+test('the game page and its audio are not rate limited like the API', async () => {
+  const s2 = await startServer({ RATE_LIMIT_PER_MINUTE: '10' });
+  try {
+    const c = new Client(s2.base); const codes: number[] = [];
+    for (let i = 0; i < 15; i++) codes.push((await c.get('/')).status);
+    assert.ok(codes.every(x => x === 200), 'page: ' + codes.join(','));
+    const api: number[] = []; for (let i = 0; i < 12; i++) api.push((await c.get('/api/config')).status);
+    assert.equal(api[11], 429, 'the API is');
+  } finally { await s2.close(); }
+});
