@@ -28,6 +28,15 @@ jobs:
         run: npm run typecheck
       - name: Unit tests (protocol, rules adapter, crypto)
         run: npm run test:unit
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Python Playwright (and WebKit for the phone player)
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps webkit
+      - name: The server's world matches the game build (tools/export-world.py --check)
+        run: python3 tools/export-world.py --check
       - name: Start PostgreSQL, Supabase Auth and Mailpit
         run: docker compose -f server/dev/docker-compose.yml up -d --wait
       - name: Migrations on a fresh database, twice (the second run must be a no-op)
@@ -36,15 +45,14 @@ jobs:
         run: npm run migrate && npm run migrate
       - name: Integration tests (auth, characters, realtime)
         run: npm run test:server
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+      - name: World loop under load (150 bots walking for 20 s)
+        run: BOTS=150 DURATION=20 node --import tsx tests/server/load/bots.ts
       - name: Browser flow (desktop and phone)
         env:
           E2E_SHOTS: ${{ runner.temp }}/e2e-shots
           E2E_PRINT_SHOTS: '1'
+          E2E_WEBKIT: '1'
         run: |
-          pip install playwright
           python3 tests/e2e/online_flow.py
       - name: Production image builds and loads the game rules
         run: |

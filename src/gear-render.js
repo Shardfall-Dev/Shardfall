@@ -218,9 +218,9 @@ function wdAppearance(e) {
 }
 function gearOfActor(e) {
   const ghost = !!((e === P && P.ghost) || (e.kind === 'ally' && e.ghost) || (e.adv && e.ghost));
-  if (e.kind === 'player' || (e.kind === 'ally' && e.equip) || (e.adv && e.equip)) {   // NPC adventurers wear their real equipment (v0.36)
+  if (e.kind === 'player' || e.kind === 'remote' || (e.kind === 'ally' && e.equip) || (e.adv && e.equip)) {   // NPC adventurers wear their real equipment (v0.36)
     if (e.kind === 'ally' && !e._gLook) e._gLook = GEAR.npcLook(e.aid || e.name, { body: 'female', cloth: 'forest' });
-    const look = e.kind === 'player' ? e.look : e._gLook, sig = EQ.signature(e) + '|' + (SF.CREATION ? SF.CREATION.lookKey(look) : '');
+    const look = e.kind === 'player' || e.kind === 'remote' ? e.look : e._gLook, sig = EQ.signature(e) + '|' + (SF.CREATION ? SF.CREATION.lookKey(look) : '');
     if (e._gSig !== sig) { e._gSig = sig; e._gA = { R: GEAR.resolve(e.equip, look), rl: rigLook(look) }; }
     return Object.assign(e._gA, { ghost });
   }
@@ -248,7 +248,7 @@ function grDraw(g, strip, f, x, y, ox, oy) { const S = GR.S, W = RIG.CELL.width,
 /* draw a human actor with the layered renderer; false → the caller draws the previous sprite (flag off, or the strip is not ready) */
 function drawGearActor(g, e, x, y) {
   if (!gearOn() || !RIG) return false;
-  if (!(e.kind === 'player' || e.kind === 'ally' || e.kind === 'npc' || (e.kind === 'mon' && MON[e.type] && MON[e.type].scout))) return false;
+  if (!(e.kind === 'player' || e.kind === 'remote' || e.kind === 'ally' || e.kind === 'npc' || (e.kind === 'mon' && MON[e.type] && MON[e.type].scout))) return false;
   const A = gearOfActor(e), [act, f] = gearPose(e, A), dir = e.sect || 0;
   let strip = grStrip(A, act, dir, A.ghost, e === P), fr = f;
   if (!strip) { strip = GR.strips.get(A.R.key + '#idle#' + dir + (A.ghost ? '#g' : '')); fr = 0; }

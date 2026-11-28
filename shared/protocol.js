@@ -7,26 +7,31 @@
      id    client request id (1–64 chars), echoed on the reply
      seq   server → client: a per-connection sequence number, +1 per message, so the client can detect a gap and resync
      p     payload object
-   This phase is a presence lobby: the server owns the character snapshot, the client only says hello, pings and asks for a
-   resync. Messages that would make the client authoritative (movement, combat, items, gold, skills, stats) are reserved and
-   refused with 'not_authoritative' until the server simulates them. */
+   v2 (Server Movement v1): the server simulates walking. The client sends movement *intents* (move: a direction, how far the
+   stick is pushed, sprint) for each 50 ms step; the server applies at most one per tick per character with the game's own
+   speeds and collision (shared/movement.js, shared/collision.js) and answers with authoritative positions (state) for the
+   characters near you (interest management: actor.enter / actor.leave). Messages that would make the client authoritative over
+   anything else (combat, items, gold, skills, stats) are still refused with 'not_authoritative'. */
 (function (root, factory) {
   const P = factory();
   if (typeof module !== 'undefined' && module.exports) module.exports = P; else root.SF_PROTOCOL = P;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
   const P = {};
-  P.PROTOCOL_VERSION = 1;
+  P.PROTOCOL_VERSION = 2;
   P.MAX_MESSAGE_BYTES = 16 * 1024;     // a single frame, client → server
   P.TICK_MS = 50;                      // the server tick: the same 50 ms fixed step as the game's world simulation (src/world.js)
   P.HEARTBEAT_MS = 15000;              // the server pings; a connection that misses two heartbeats is closed
   P.RECONNECT_GRACE_MS = 10000;        // a dropped character stays present this long, so a quick reconnect is not a leave + join
+  P.MAX_INPUTS = 10;                   // movement intents per move message (0.5 s of 50 ms steps)
+  P.INPUT_QUEUE = 10;                  // intents the server holds per character; older ones are dropped beyond that
+  P.VIEW_RADIUS = 40;                  // tiles: characters closer than this are sent to you
   P.CLOSE = { NORMAL: 1000, GOING_AWAY: 1001, POLICY: 1008, TOO_BIG: 1009, TRY_LATER: 1013,
     UNAUTHORIZED: 4001, FORBIDDEN: 4003, TAKEN_OVER: 4004, PROTOCOL: 4005, RATE_LIMIT: 4008, SESSION_ENDED: 4010 };
 
-  P.CLIENT = ['hello', 'ping', 'resync'];
-  P.SERVER = ['welcome', 'snapshot', 'presence.join', 'presence.leave', 'pong', 'error', 'kicked'];
-  P.RESERVED = ['move', 'stop', 'attack', 'cast', 'use', 'equip', 'unequip', 'pickup', 'drop', 'trade', 'gold', 'skill', 'stat', 'inventory', 'damage', 'craft', 'loot', 'say'];
+  P.CLIENT = ['hello', 'ping', 'resync', 'move'];
+  P.SERVER = ['welcome', 'snapshot', 'presence.join', 'presence.leave', 'pong', 'error', 'kicked', 'state', 'actor.enter', 'actor.leave'];
+  P.RESERVED = ['teleport', 'position', 'attack', 'cast', 'use', 'equip', 'unequip', 'pickup', 'drop', 'trade', 'gold', 'skill', 'stat', 'inventory', 'damage', 'craft', 'loot', 'say'];
 
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
   P.isUuid = s => typeof s === 'string' && UUID.test(s);
@@ -39,7 +44,19 @@
     hello: p => !onlyKeys(p, ['characterId', 'lastSeq']) ? 'unexpected field' : !P.isUuid(p.characterId) ? 'characterId must be a UUID'
       : has(p, 'lastSeq') && !(Number.isSafeInteger(p.lastSeq) && p.lastSeq >= 0) ? 'lastSeq must be a whole number' : null,
     ping: p => !onlyKeys(p, ['t']) ? 'unexpected field' : has(p, 't') && !(typeof p.t === 'number' && Number.isFinite(p.t)) ? 't must be a number' : null,
-    resync: p => !onlyKeys(p, []) ? 'unexpected field' : null };
+    resync: p => !onlyKeys(p, []) ? 'unexpected field' : null,
+    move: p => {
+      if (!onlyKeys(p, ['inputs']) || !Array.isArray(p.inputs)) return 'inputs must be an array';
+      if (p.inputs.length < 1 || p.inputs.length > P.MAX_INPUTS) return 'between 1 and ' + P.MAX_INPUTS + ' inputs';
+      for (const i of p.inputs) {
+        if (!isObj(i) || !onlyKeys(i, ['s', 'x', 'y', 'w', 'r'])) return 'bad input';
+        if (!(Number.isSafeInteger(i.s) && i.s >= 0 && i.s < 2 ** 31)) return 'input s must be a sequence number';
+        for (const k of ['x', 'y']) if (!(typeof i[k] === 'number' && Number.isFinite(i[k]) && Math.abs(i[k]) <= 1.5)) return 'input ' + k + ' must be a direction component';
+        if (!(typeof i.w === 'number' && i.w >= 0 && i.w <= 1)) return 'input w must be 0–1';
+        if (has(i, 'r') && typeof i.r !== 'boolean') return 'input r must be a boolean';
+      }
+      return null;
+    } };
 
   /* parseClient(text) → { ok: true, msg } or { ok: false, code, message, id? }. Never throws. */
   P.parseClient = text => {

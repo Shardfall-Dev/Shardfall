@@ -99,12 +99,25 @@ function makeApi(SF) {
     return null;
   }
 
+  /* characterFromRows(row, items) — a rules-shaped character (str / dex / int, skills, equip, pack, bank) rebuilt from the
+     database, for the shared rules that need one (stamina, carrying weight, armour speed). Items come back as the rules' own
+     item objects ({ id, qty, …props }), each tagged with its server UUID. */
+  function characterFromRows(r, items) {
+    const equip = {}; for (const sl of EQ.SLOT_IDS) equip[sl] = null;
+    const pack = SF.newContainer('pack', 'p1'), bank = SF.newContainer('bank', 'p1');
+    for (const it of items || []) {
+      const o = Object.assign({}, it.props || {}, { id: it.item_def, qty: it.qty, sid: it.id });
+      if (it.container === 'equip' && EQ.SLOT[it.slot]) equip[it.slot] = o; else if (it.container === 'bank') bank.items.push(o); else pack.items.push(o);
+    }
+    return { kind: 'player', name: r.name, str: r.str, dex: r.dex, int: r.int, skills: r.skills, statLocks: r.stat_locks, equip, pack, bank, look: r.appearance, ghost: false };
+  }
+
   /* public creation options for the client (allowlists the server will accept) */
   const creationOptions = () => ({ statPoints: SF.CREATE_STATS, statMin: SF.CREATE_STAT_MIN, statMax: SF.CREATE_STAT_MAX, skillPoints: SF.CREATE_SKILLS,
     skillMax: SF.CREATE_SKILL_MAX, skillSlots: SF.CREATE_SKILL_SLOTS, creatable: CR.CREATABLE.slice(), towns: CR.TOWNS.map(t => ({ id: t.id, name: t.n })),
     nameMin: CR.NAME_MIN, nameMax: CR.NAME_MAX });
 
-  return { SF, RULES_VERSION, nameKey, validateCreation, buildCharacter, checkStoredItem, creationOptions,
+  return { SF, RULES_VERSION, nameKey, validateCreation, buildCharacter, checkStoredItem, creationOptions, characterFromRows,
     itemName: id => (SF.ITEMS[id] ? SF.itemName({ id }) : id), townName: id => (CR.TOWN[id] ? CR.TOWN[id].n : id), title: ch => CR.title(ch) };
 }
 

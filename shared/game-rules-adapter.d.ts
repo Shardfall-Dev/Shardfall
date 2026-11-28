@@ -14,6 +14,7 @@ export interface RulesApi {
   buildCharacter(value: any): BuiltCharacter;
   checkStoredItem(row: { item_def: string; qty: number; container: string; slot: string | null }): string | null;
   creationOptions(): Record<string, unknown>;
+  characterFromRows(row: any, items: any[]): any;
   itemName(id: string): string; townName(id: string): string; title(ch: any): string;
 }
 export declare function load(srcDir?: string): RulesApi;
