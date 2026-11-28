@@ -1,0 +1,28 @@
+{
+  "pack_name": "Shardfall_Human3D",
+  "version": "0.1.0",
+  "armature": "Armature",
+  "cell": [128, 128],
+  "anchor": [64, 106],
+  "supersample": 2,
+  "elevation_deg": 30,
+  "figure_height_m": 1.8,
+  "figure_px": 72,
+  "facing_offset_deg": 0,
+  "outline": "#1c140e",
+  "alpha_cut": 0,
+  "engine": "eevee",
+  "out": "render_out",
+  "layers": [
+    { "id": "body" },
+    { "id": "plate_legs",      "slot": "legs",  "items": ["plate_leggings"],  "z": 2 },
+    { "id": "plate_chest",     "slot": "chest", "items": ["plate_chest"],     "z": 4 },
+    { "id": "plate_arms",      "slot": "arms",  "items": ["plate_arms"],      "z": 5 },
+    { "id": "plate_gauntlets", "slot": "hands", "items": ["plate_gauntlets"], "z": 6 },
+    { "id": "plate_helm",      "slot": "head",  "items": ["plate_helm"],      "z": 8 }
+  ],
+  "actions": [
+    { "name": "Idle", "action": "Idle", "frames": 4, "fps": 4 },
+    { "name": "Walk", "action": "Walk", "frames": 8, "fps": 10 }
+  ]
+}
