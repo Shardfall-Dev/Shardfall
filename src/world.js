@@ -69,7 +69,7 @@ SIM.newRegistry = newRegistry;
    without bound. Movement is transient: it is never kept. */
 SIM.EVENT_TYPES = ['ActorSpawned', 'ActorRemoved', 'ActorMoved', 'ActorDamaged', 'ActorHealed', 'ActorKilled', 'CombatStarted', 'CombatEnded',
   'ItemTransferred', 'ItemCrafted', 'CrimeCommitted', 'CrimeWitnessed', 'ResourceGathered', 'MerchantArrived', 'CampCleared', 'PopulationReplenished', 'AppearanceChanged',
-  'StatChanged', 'CharacterCreated', 'AggressionRecorded', 'MurderReported', 'NotorietyChanged', 'SpellCast', 'ActorResurrected', 'CorpseLooted'];   // SpellCast, ActorResurrected, CorpseLooted: v0.36 NPC adventurers (phase 5 step 3); AggressionRecorded … NotorietyChanged: v0.34 law (phase 5 step 2); AppearanceChanged: v0.25 equipment, for the future layered sprites; StatChanged, CharacterCreated: v0.30 natural attributes and creation
+  'StatChanged', 'CharacterCreated', 'AggressionRecorded', 'MurderReported', 'NotorietyChanged', 'SpellCast', 'ActorResurrected', 'CorpseLooted', 'ActorReturned'];   // ActorReturned: v0.39 a dead townsperson back home (phase 5 step 4);   // SpellCast, ActorResurrected, CorpseLooted: v0.36 NPC adventurers (phase 5 step 3); AggressionRecorded … NotorietyChanged: v0.34 law (phase 5 step 2); AppearanceChanged: v0.25 equipment, for the future layered sprites; StatChanged, CharacterCreated: v0.30 natural attributes and creation
 SIM.TRANSIENT = { ActorMoved: 1 };
 function newBus(opt) {
   opt = opt || {}; const cap = opt.cap || 256, clock = opt.clock || (() => 0), known = new Set(SIM.EVENT_TYPES);
@@ -665,6 +665,70 @@ SIM.advShopping = (style, have, gold, prices, reagents, cfg) => {
 };
 /* the resurrection policy for a dead adventurer */
 SIM.advAfterDeath = cfg => { const p = (cfg || SIM.ADV_CFG).res; return p === 'replace' || p === 'none' ? p : 'healer'; };
+
+/* ---------------- NPC death and NPC crime (§19, §20; Living World phase 5 step 4) ----------------
+   Townsfolk and guards die at 0 health instead of being knocked down: one death transaction, a body holding what they really
+   wore and carried, loot rights, murder reports. Then, like UO's vendors, they come back after a while (the same person, so
+   shops, quests and schedules keep working). The game side is src/npcdeath.js; these are the data and pure decisions. */
+SIM.NPCD_VERSION = 1;
+SIM.NPCD_CFG = {
+  policy: 'return',     // 'return': everyone comes back after `back` seconds; 'none': only the people the town cannot do without come back
+  back: 600,            // seconds dead before a townsperson is back at home
+  unseen: 120,          // extra seconds a return may wait for nobody to be watching the spot (after that it happens anyway)
+  purse: { guard: [15, 40], shop: [20, 60], smith: [20, 60], innkeeper: [25, 70], scholar: [10, 30], astronomer: [10, 30], default: [3, 20] } };
+/* professions the towns cannot do without: shops, guards, the travelling merchant */
+SIM.NPCD_ESSENTIAL = { guard: 1, trader: 1, shop: 1, smith: 1, innkeeper: 1, scholar: 1, astronomer: 1 };
+SIM.npcdReturns = (prof, cfg) => (cfg || SIM.NPCD_CFG).policy !== 'none' || !!SIM.NPCD_ESSENTIAL[prof];
+/* pocket gold on a townsperson's body: their own purse when they keep one (life.gold), else a roll in the profession's range */
+SIM.npcdPurse = (prof, own, rnd, cfg) => {
+  if (Number.isFinite(own) && own >= 0) return Math.floor(own);
+  const P = (cfg || SIM.NPCD_CFG).purse, r = P[prof] || P.default; return r[0] + Math.floor((typeof rnd === 'number' ? rnd : .5) * (r[1] - r[0] + 1));
+};
+/* may a dead townsperson come back now? waited: seconds dead; seen: someone would watch it appear at home */
+SIM.npcdReady = (waited, seen, cfg) => { cfg = cfg || SIM.NPCD_CFG; return waited >= cfg.back && (!seen || waited >= cfg.back + cfg.unseen); };
+/* saved bodies: [{ owner, key, x, y, left, diedAgo, items, gear }] → the rows to restore. One row per key (owner@time of death),
+   only known owners, only items that exist, never an expired body. Returns { rows, dropped } */
+SIM.npcdBodyRows = (rows, o) => {
+  const out = [], seen = new Set(), dropped = {}; const drop = k => { dropped[k] = (dropped[k] || 0) + 1; };
+  for (const r of Array.isArray(rows) ? rows : []) {
+    if (!r || typeof r !== 'object') { drop('shape'); continue; }
+    if (typeof r.owner !== 'string' || !o.validOwner(r.owner)) { drop('owner'); continue; }
+    const key = typeof r.key === 'string' && r.key ? r.key : null; if (!key || seen.has(key)) { drop('duplicate'); continue; }
+    if (![r.x, r.y, r.left].every(Number.isFinite) || r.left <= 0) { drop('number'); continue; }
+    if (!Array.isArray(r.items)) { drop('items'); continue; }
+    seen.add(key); out.push(Object.assign({}, r, { items: r.items.filter(it => it && o.validItem(it)) }));
+  }
+  return { rows: out, dropped };
+};
+
+/* NPC criminals (§19: "criminal NPCs may loot illegally and receive consequences"). Two outlaws on the adventurer controller,
+   living at the outlaw camp: a cutthroat who preys on lone people in the wild (murder) and a cutpurse who loots bodies it has no
+   right to (crime). Both obey the same law as you: grey or red, guards and witnesses react, anyone may fight them lawfully. */
+SIM.CRIM_CFG = { preyRatio: .8, preyOnPlayer: true, crimeGap: 240, bodySight: 18, guardWary: 16, sight: 16 };
+Object.assign(SIM.ADV_STYLES, {
+  cutthroat: { style: 'melee', crim: 'murderer', str: 85, dex: 70, int: 30, skills: { swordsmanship: 75, tactics: 75, anatomy: 60, healing: 50, parrying: 45, hiding: 40, wrestling: 45 },
+    weapon: 'sword', shield: null, wear: ['leather_cap', 'studded_tunic', 'leather_gloves', 'leather_leggings', 'boots', 'cloak', 'shirt', 'trousers'], kit: { bandage: 10, draught: 1 }, cloth: 'charcoal' },
+  cutpurse:  { style: 'melee', crim: 'thief', str: 60, dex: 85, int: 45, skills: { fencing: 62, tactics: 55, hiding: 60, stealing: 60, snooping: 55, lockpicking: 40, healing: 40, wrestling: 40 },
+    weapon: 'dagger', shield: null, wear: ['leather_cap', 'leather_tunic', 'leather_leggings', 'shoes', 'cloak', 'shirt', 'trousers'], kit: { bandage: 8, draught: 1 }, cloth: 'ochre' } });
+SIM.CRIM_ROSTER = [['Vesk, cutthroat', 'cutthroat', 'camp', .9, 'male'], ['Mott, cutpurse', 'cutpurse', 'camp', .45, 'male']];
+/* whom a cutthroat attacks. cands: [{ id, dist, ratio (their strength / its own), guarded (a guard or the law is near), hpF }].
+   The weakest, nearest person it expects to beat, never where a guard would see it. */
+SIM.crimPrey = (cands, cfg) => {
+  cfg = cfg || SIM.CRIM_CFG; let best = null, bs = -1e9;
+  for (const c of cands) {
+    if (c.guarded || !(c.ratio < cfg.preyRatio)) continue;
+    const s = (1 - c.ratio) + .5 * (1 - Math.min(1, c.dist / cfg.sight)) + .3 * (1 - (c.hpF ?? 1));
+    if (s > bs || (s === bs && best && String(c.id) < String(best.id))) { bs = s; best = c; }
+  }
+  return best;
+};
+/* which body a criminal loots. cands: [{ key, dist, lawful (it has the right), items (worth taking), guarded }] — a thief takes what it
+   has no right to as readily as what it does, but not under a guard's eyes; it ignores bodies with nothing worth carrying */
+SIM.crimBody = (cands, cfg) => {
+  cfg = cfg || SIM.CRIM_CFG; let best = null;
+  for (const c of cands) { if (c.guarded || !(c.items > 0) || c.dist > cfg.bodySight) continue; if (!best || c.dist < best.dist || (c.dist === best.dist && String(c.key) < String(best.key))) best = c; }
+  return best;
+};
 
 if (typeof module !== 'undefined' && module.exports) module.exports = SIM; else root.SIM = SIM;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

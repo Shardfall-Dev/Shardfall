@@ -110,14 +110,20 @@ with sync_playwright() as p:
     for (const e of S.ents.filter(e => e.kind === 'mon' && e.sp && !e.gone).slice(0, 25)) e.hp = Math.max(1, Math.round(e.max / 2));
     const packs = {}; for (const e of S.ents) if (e.kind === 'mon' && e.packId && !e.gone) { const k = e.packId; packs[k] = packs[k] || { n: 0, lead: null, ids: [] }; packs[k].n++; packs[k].ids.push(e.actorId); if (e.leader === e) packs[k].lead = e.actorId; }
     const camps = {}; for (const [k, c] of C) camps[k] = c.alive; S.save(); const raw = localStorage.getItem('shardfall.save.v1'); const sv = JSON.parse(raw);
-    return { region: reg[0], killed: victims.length, pop: __T.pop(), packs: Object.values(packs).map(p => [p.lead, p.ids.sort()]).sort(), camps, rows: sv.eco.pop.mons.length, kb: raw.length / 1024, ecoKB: JSON.stringify(sv.eco).length / 1024, v: sv.v, books: __T.books() }; }""")
+    const off = S.ents.filter(e => e.kind === 'mon' && e.sp && !e.gone && !S.canStand({ kind: 'mon' }, e.x, e.y)).map(e => e.actorId);   /* pushed onto ground it cannot stand on: the restore puts it back at its spawner (ecoRestore) */
+    return { region: reg[0], killed: victims.length, off, pop: __T.pop(), packs: Object.values(packs).map(p => [p.lead, p.ids.sort()]).sort(), camps, rows: sv.eco.pop.mons.length, kb: raw.length / 1024, ecoKB: JSON.stringify(sv.eco).length / 1024, v: sv.v, books: __T.books() }; }""")
   check(r['killed'] > 0 and r['rows'] == len(r['pop']), f"the save holds all {r['rows']} spawned creatures ({r['ecoKB']:.0f} KB of a {r['kb']:.0f} KB save; browser storage allows about 5 MB)", {k: r[k] for k in ('killed', 'rows', 'kb')})
   check(r['kb'] < 1024, 'the whole save stays well under 1 MB', r['kb'])
   before = r
   cont(pg); J(pg, HELP)
   r = J(pg, """reg => { const S = __SF; const C = S.ECOS.camps; const packs = {}; for (const e of S.ents) if (e.kind === 'mon' && e.packId && !e.gone) { const k = e.packId; packs[k] = packs[k] || { lead: null, ids: [] }; packs[k].ids.push(e.actorId); if (e.leader === e) packs[k].lead = e.actorId; }
     const camps = {}; for (const [k, c] of C) camps[k] = c.alive; return { pop: __T.pop(), regionNow: S.ents.filter(e => e.kind === 'mon' && e.sp && !e.gone && e.sp.region === reg).length, packs: Object.values(packs).map(p => [p.lead, p.ids.sort()]).sort(), camps, restored: S.ECO_POP.restored, dropped: S.ECO_POP.dropped, books: __T.books() }; }""", before['region'])
-  check(r['pop'] == before['pop'], f"after the reload all {len(r['pop'])} creatures are back with the same ids, species, positions and health", {'a': len(before['pop']), 'b': len(r['pop']), 'diff': [x for x in r['pop'] if x not in before['pop']][:3]})
+  # a creature saved where it cannot stand once the world is rebuilt (a tree that a woodcutter felled grows back on load) comes back at
+  # its spawner: same id, species and health (ecoRestore)
+  off = set(before['off']) | set(J(pg, "pop => pop.filter(x => !__SF.canStand({ kind: 'mon' }, x[2], x[3])).map(x => x[0])", before['pop']))
+  same = lambda a, off: [x if x[0] not in off else [x[0], x[1], x[4]] for x in a]
+  before['off'] = sorted(off)
+  check(same(r['pop'], off) == same(before['pop'], off), f"after the reload all {len(r['pop'])} creatures are back with the same ids, species, positions and health ({len(before['off'])} that stood where they cannot, back at their spawners)", {'a': len(before['pop']), 'b': len(r['pop']), 'diff': [x for x in r['pop'] if x not in before['pop']][:3], 'off': before['off'][:5]})
   check(r['regionNow'] == 0, f"the region you cleared ({before['region']}, {before['killed']} creatures) is still empty right after the reload", r['regionNow'])
   check(r['packs'] == before['packs'] and r['camps'] == before['camps'], f"{len(r['packs'])} packs keep their members and leaders; every camp keeps its count", {'camps': [before['camps'], r['camps']]})
   check(r['books']['n'] == r['books']['reg'] == r['books']['uniq'] and r['books']['spBad'] == 0 and r['books']['campBad'] == 0 and r['dropped'] == 0, 'spawner, camp and registry books are straight after the load; nothing was dropped', r['books'])

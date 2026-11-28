@@ -9,8 +9,9 @@
        their halberds, give up when it leaves the jurisdiction, and go back to patrolling. They also answer a cry for help.
      · Everyone else runs: a hit townsperson drops what they are doing and shelters (phase 4's danger response), shouting for
        the guards; the merchant hurries on.
-     · At 0 health an NPC is knocked down, not killed: creatures lose interest, and after NPC_DOWN_TIME they get up with a
-       third of their health and go home to recover. Real NPC death, corpses and looting are phase 5 step 4.
+     · At 0 health an NPC dies (since v0.39, src/npcdeath.js npcDies): a body with what it wore and carried, loot rights, murder
+       reports; the same person is back at home ten minutes later. (v0.30–v0.38 knocked them down instead; npcDown / npcRise remain
+       only for that history and are no longer called.)
      · Since v0.34 (phase 5 step 2, src/law.js) you can attack townsfolk: it is a crime unless they are grey or red or you have
        a right over them, witnesses call the guards, and the guards fight you inside their jurisdiction like any creature.
    Pure numbers live here as data; the game's existing functions call in through npcFighter / damageNpc / npcCombatTick. */
@@ -44,7 +45,7 @@ function npcArm(e) {
   e.eqMig = SF.EQ.MIGRATION; e.max = Math.round(SF.maxHp(e) * F.hp); e.hp = e.max; e.stam = e.dex; e.sw = SF.newSwing(); e.downed = false; e.downAt = 0; e.foe = null;
 }
 const npcCombatant = e => !!e && e.kind === 'npc' && !!e.npcFight;
-const npcUp = e => npcCombatant(e) && !e.gone && !e.downed && !e.ghost;   // ghost: a dead NPC adventurer (v0.36)
+const npcUp = e => npcCombatant(e) && !e.gone && !e.downed && !e.ghost && !e.npcDead;   // ghost: a dead NPC adventurer (v0.36)
 
 /* ---------- taking a blow (damageActor routes every NPC here) ---------- */
 function damageNpc(e, amt, kind, src, hx) {
@@ -64,11 +65,11 @@ function damageNpc(e, amt, kind, src, hx) {
     else npcFlee(e, who);
     npcCallGuards(e, who);
   }
-  if (e.hp <= 0) npcDown(e, src);
+  if (e.hp <= 0) npcDies(e, src);   // since v0.39 (phase 5 step 4) a death with a body, not a knock-down (src/npcdeath.js)
 }
 /* a townsperson under attack runs for shelter at once and remembers why */
 function npcFlee(e, src, what) {
-  const L = e.life; if (!L) return; SIM.frighten(L.needs, 1); L.needs.safety = 1; const who = src === P ? P.name : 'a ' + src.name;
+  const L = e.life; if (!L) return; SIM.frighten(L.needs, 1); L.needs.safety = 1; const who = src === P ? P.name : src.kind === 'npc' ? String(src.name).split(',')[0] : 'a ' + src.name;
   if (what === 'looting') what = 'theft';   // a looted body is theft to the onlookers (v0.36)
   if (L.prof === 'trader') { L.hurry = true; L.mind.why = (what === 'theft' ? 'robbed by ' : 'attacked by ') + who + ' on the road'; }
   else { L.mind.act = null; L.thinkAt = 0; L.goal = null; }
@@ -138,6 +139,7 @@ function guardFightTick(g, dt) {
     g.scanAt = GT + .5; let best = null, bd = NPC_GUARD_SIGHT;
     ECOS.grid.query(g.x, g.y, NPC_GUARD_SIGHT, c => { if (!npcThreat(g, c)) return; const d = dist(g, c); if (d < bd && npcInJurisdiction(g, c, 0) && los(g, c)) { bd = d; best = c; } });
     if (best) npcEngage(g, best, 'defending ' + (best.target === P ? 'you' : best.target && best.target.name ? best.target.name.split(',')[0] : 'the town') + ' from a ' + best.name);
+    else if ((best = lawOutlawSeen(g))) npcEngage(g, best, (notoOf(best) === 'murderer' ? 'a murderer: ' : 'a criminal: ') + best.name.split(',')[0]);   // grey and red NPC outlaws (v0.39)
     else if (lawGuardTarget(g, P) && !P.hidden && dist(g, P) < NPC_GUARD_SIGHT && npcInJurisdiction(g, P, 0) && los(g, P)) npcEngage(g, P, notoOf(P) === 'murderer' ? 'a murderer in town' : notoOf(P) === 'criminal' ? 'a criminal in town' : 'you attacked him');
   }
   const c = g.foe; if (!c) return false;
@@ -157,6 +159,6 @@ function guardFightTick(g, dt) {
 
 /* ---------- save: health and the knock-down timer by actor id (life save carries it) ---------- */
 function npcSave(e) { if (!npcCombatant(e)) return null; if (e.hp >= e.max && !e.downed) return null; return { hp: Math.round(e.hp), down: e.downed ? Math.max(1e-3, NPC_DOWN_TIME - (GT - e.downAt)) : 0 }; }
-function npcLoad(e, r) { if (!npcCombatant(e) || !r) return; e.hp = cl(Math.round(r.hp) || 0, 0, e.max); if (r.down > 0) { e.downed = true; e.downAt = GT - (NPC_DOWN_TIME - r.down); e.hp = 0; e.nav = null; } else if (e.hp <= 0) e.hp = 1; }
+function npcLoad(e, r) { if (!npcCombatant(e) || !r) return; e.hp = cl(Math.round(r.hp) || 0, 0, e.max); if (r.down > 0) e.hp = Math.max(1, Math.round(e.max / 3)); else if (e.hp <= 0) e.hp = 1; }   // a knock-down saved by v0.30–v0.38: up again (v0.39 has no knock-downs)
 function npcFightDev() { const up = LIFE.npcs.filter(npcUp), dn = LIFE.npcs.filter(e => e.downed).length, fighting = LIFE.npcs.filter(e => e.foe && fighterAlive(e.foe)).length, hurt = up.filter(e => e.hp < e.max).length;
-  return `npc combat: ${fighting} guards fighting · ${dn} knocked down · ${hurt} hurt · hits taken ${NPCF.hitsTaken}, downs ${NPCF.downs}, rises ${NPCF.rises}, guard fights ${NPCF.guardFights}, guard kills ${NPCF.guardKills}, calls ${NPCF.calls}`; }
+  return `npc combat: ${fighting} guards fighting · ${NPCD.dead.length} dead · ${hurt} hurt · hits taken ${NPCF.hitsTaken}, deaths ${NPCD.stats.deaths}, guard fights ${NPCF.guardFights}, guard kills ${NPCF.guardKills}, calls ${NPCF.calls}`; }

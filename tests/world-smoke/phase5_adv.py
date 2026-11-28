@@ -16,7 +16,7 @@ fails = 0
 def check(ok, msg, got=None):
   global fails
   print(('ok   ' if ok else 'FAIL ') + msg + ('' if ok or got is None else '  got: ' + json.dumps(got)[:1200])); fails += 0 if ok else 1
-def page(b, q='?tiers=off'):   # whole-world rules wherever the player stands; tiers are checked once at the end
+def page(b, q='?tiers=off&crim=off'):   # whole-world rules wherever the player stands; tiers are checked once at the end. crim=off: the outlaws (v0.39) have their own suite, phase5_death.py
   ctx = b.new_context(viewport={'width': 844, 'height': 390}); pg = ctx.new_page(); errs = []
   pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('console', lambda m: errs.append('console: ' + m.text) if m.type == 'error' else None)
   pg.add_init_script(HOLD); pg.goto('file://' + f + q); pg.wait_for_timeout(400)
@@ -70,6 +70,7 @@ with sync_playwright() as p:
   check(r['loot'] > 0 and r['lawful'] and r['gains'] > 0, f"they loot their own kills ({r['loot']} bodies, all lawful) and learn from use ({r['gains']} skill gains)", r)
 
   # 3. First Aid by the player's rules: a bandage after the delay; a blow makes the fingers slip; a draught when low
+  pg.evaluate('(' + (SEED % 5) + ')(__SF)')   # a fixed draw for the bandage roll, whatever the hunting run above consumed
   r = J(pg, """() => { const S = __SF, T = __T, e = T.stage(T.A('Aldric'), T.wild(S.lifeTownGeo('vespar').center.x + 70, S.lifeTownGeo('vespar').center.y)); e.hp = Math.round(e.max * .5);
     const b0 = SF.count(e.pack, 'bandage'), s0 = T.seq(); T.run(.2); const started = !!e.adv.tend, kind = e.adv.tend && e.adv.tend.kind;
     const rat = T.mon('rat', e, 1.2); S.damageActor(e, 2, 'phys', rat); const slips = e.adv.tend ? e.adv.tend.slips : -1; S.rmEnt(rat); e.foe = null;
@@ -201,7 +202,7 @@ with sync_playwright() as p:
   ctx, pg, errs = page(b, '?adv=off'); new_char(pg)
   r = J(pg, "() => ({ n: __SF.ADV.list.length, npc: __SF.ents.filter(e => e.role === 'adventurer').length })")
   check(r['n'] == 0 and r['npc'] == 0, '?adv=off: no adventurers', r); ctx.close()
-  ctx, pg, errs = page(b, ''); new_char(pg); J(pg, HELP)
+  ctx, pg, errs = page(b, '?crim=off'); new_char(pg); J(pg, HELP)
   r = J(pg, """() => { const S = __SF; __T.run(30); const tiers = S.ADV.list.map(e => e.tier), orig = S.CONTROL.AdventurerAI; let ms = 0;
     S.CONTROL.AdventurerAI = (e, dt) => { const t = performance.now(); orig(e, dt); ms += performance.now() - t; }; const t0 = performance.now(); __T.run(150); const all = performance.now() - t0; S.CONTROL.AdventurerAI = orig;
     return { tiers, adv: ms / 3000, step: all / 3000 } }""")
