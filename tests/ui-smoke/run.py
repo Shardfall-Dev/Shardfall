@@ -311,10 +311,16 @@ with sync_playwright() as p:
     pg.evaluate(CLEAR_GROUND)
     pg.evaluate("""() => { const S = __SF, P = S.P, SF = S.SF; window.__oldW = P.equip.weapon; P.equip.weapon = SF.newItem('shortbow', 1); SF.addItem(P.pack, SF.newItem('arrow', 20)); P.skills.archery.v = 1000; P.drawn = false; S.weaponChanged(); P.movedAt = -99; }""")
     pg.evaluate(ARM_BOAR.replace("spawnMon('boar', 1.2, 0)", "spawnMon('boar', 5, 0)"))
-    shot = pg.evaluate("() => { for (let i = 0; i < 200 && !__SF.P.shots; i++) { __SF.P.x = window.__b.x - 5; __SF.P.y = window.__b.y; __SF.P.movedAt = -99; __SF.update(.05); } return __SF.P.shots || 0; }")
+    # v0.33.1 follow-up: the loops below keep the player 5 tiles behind the boar, so a charging boar drags the player along. Like
+    # STEP and HOLD they refresh the HUD every step: without it, a slow shot (about 135 steps on a loaded runner) moved the player
+    # 8-16 tiles between two HUD refreshes, past TARGET_RETAIN.jump (6), and the target frame correctly dropped the target as
+    # "travel", so the close button below never appeared (seen 1 in 14 full runs; 2 in 60 isolated repeats under CPU load).
+    shot = pg.evaluate("() => { for (let i = 0; i < 200 && !__SF.P.shots; i++) { __SF.P.x = window.__b.x - 5; __SF.P.y = window.__b.y; __SF.P.movedAt = -99; __SF.update(.05); __SF.refreshHud(); } return __SF.P.shots || 0; }")
     arrows0 = pg.evaluate("__SF.SF.count(__SF.P.pack, 'arrow')")
+    t = pg.evaluate(TGT)
+    check(t is not None and pg.evaluate("__SF.P.sel === window.__b"), 'bow fixture: the boar is still the target when its arrow is in flight', t)
     pg.click('#tgt .tf-x'); pg.wait_for_timeout(50); closed = pg.evaluate(MARK_CLOSE)
-    pg.evaluate("() => { for (let i = 0; i < 60; i++) { __SF.P.x = window.__b.x - 5; __SF.P.y = window.__b.y; __SF.update(.05); } }")
+    pg.evaluate("() => { for (let i = 0; i < 60; i++) { __SF.P.x = window.__b.x - 5; __SF.P.y = window.__b.y; __SF.update(.05); __SF.refreshHud(); } }")
     r = pg.evaluate(AFTER_CLOSE); arrows1 = pg.evaluate("__SF.SF.count(__SF.P.pack, 'arrow')")
     check(shot == 1 and arrows1 == arrows0 and pg.evaluate("__SF.P.shots || 0") == 0 and r['mine'] <= 1, 'a shot in flight when the frame closes may still land; no new arrow is released', [shot, arrows0, arrows1, r['mine']])
     pg.evaluate("() => { const S = __SF, P = S.P; S.rmEnt(window.__b); P.equip.weapon = window.__oldW || null; S.weaponChanged(); }")
