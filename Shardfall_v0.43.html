@@ -5,7 +5,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="screen-orientation" content="landscape">
-<title>Shardfall v0.39</title>
+<title>Shardfall v0.43</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=Alegreya+Sans:wght@400;500;700&family=Cinzel:wght@600;700&display=swap" rel="stylesheet">
 <style>
@@ -3994,6 +3994,40 @@ SIM.advShopping = (style, have, gold, prices, reagents, cfg) => {
 /* the resurrection policy for a dead adventurer */
 SIM.advAfterDeath = cfg => { const p = (cfg || SIM.ADV_CFG).res; return p === 'replace' || p === 'none' ? p : 'healer'; };
 
+/* ---------------- Phase 6 step 2: world-state persistence of remains and cargo, the phone back buffer ----------------
+   Creature remains keep their loot through a reload (§20: "corpse contents resetting after loading" is not allowed, and a reload
+   must not roll the loot again). Rows: [{ key, type, x, y, left, items, skinned, killer, killKind, advKill, sect, gear }].
+   One row per key, known species and items only, never an expired body. Returns { rows, dropped }. */
+SIM.remainsRows = (rows, o) => {
+  const out = [], seen = new Set(), dropped = {}; const drop = k => { dropped[k] = (dropped[k] || 0) + 1; };
+  for (const r of Array.isArray(rows) ? rows : []) {
+    if (!r || typeof r !== 'object') { drop('shape'); continue; }
+    if (typeof r.key !== 'string' || !r.key || seen.has(r.key)) { drop('duplicate'); continue; }
+    if (typeof r.type !== 'string' || !o.validType(r.type)) { drop('species'); continue; }
+    if (![r.x, r.y, r.left].every(Number.isFinite) || r.left <= 0) { drop('number'); continue; }
+    if (!Array.isArray(r.items)) { drop('items'); continue; }
+    seen.add(r.key); out.push(Object.assign({}, r, { items: r.items.filter(it => it && o.validItem(it)), skinned: !!r.skinned }));
+    if (o.max && out.length >= o.max) break;
+  }
+  return { rows: out, dropped };
+};
+/* the travelling merchant's cargo for one leg: goods from his stock list, the dearest first, up to `value` gold at shop prices.
+   rnd() in [0, 1) picks the quantities. Returns [{ id, qty }] */
+SIM.traderCargo = (stock, prices, rnd, value) => {
+  value = value || 160; const ids = stock.filter(id => prices[id] > 0).sort((a, b) => prices[b] - prices[a] || (a < b ? -1 : 1)), out = []; let left = value;
+  for (const id of ids) { if (out.length >= 6 || left <= 0) break; const p = prices[id], n = Math.min(Math.floor(left / p), 1 + Math.floor(rnd() * Math.max(1, Math.floor(40 / p)))); if (n > 0) { out.push({ id, qty: n }); left -= n * p; } }
+  return out;
+};
+/* the back buffer's divisor. The world is drawn into a buffer of (screen pixels / d) and scaled up; d = zoom × pixel ratio would keep
+   the view the same on every screen, but whole numbers keep pixel art crisp. Desktop and small-ratio screens keep the whole number
+   (as before). On a phone, if that buffer would hold more than `budget` pixels, d grows to fit the budget (never below the ideal):
+   fewer pixels to draw, and the view is closer to the intended zoom (a pixel-ratio-2 phone used to round 1.4 down to 1). */
+SIM.backBuffer = (cssW, cssH, dpr, zoom, o) => {
+  o = o || {}; const ideal = zoom * dpr, d0 = Math.max(1, Math.round(ideal)), px = cssW * cssH * dpr * dpr;
+  if (!o.phone || !(o.budget > 0) || px / (d0 * d0) <= o.budget) return d0;
+  return Math.sqrt(px / o.budget);   // > d0, since the whole number was over budget
+};
+
 /* ---------------- NPC death and NPC crime (§19, §20; Living World phase 5 step 4) ----------------
    Townsfolk and guards die at 0 health instead of being knocked down: one death transaction, a body holding what they really
    wore and carried, loot rights, murder reports. Then, like UO's vendors, they come back after a while (the same person, so
@@ -6486,14 +6520,23 @@ function traderThink(e) {
   if (L.phase === 'selling') { L.doing = lifeNight() ? 'sleep' : h >= 12 && h < 13 ? 'eat' : 'trade';   // overnight at the inn; a midday meal if (!L.until) L.until = GT + WS.clock.secondsPerHour();
     L.mind.why = 'selling at ' + (L.town === 'mynoc' ? 'Mynoc' : 'Vespar') + ' market';
     if (GT > L.until && h >= 6 && h < 17) { L.phase = 'travel'; const to = L.route[(L.route.indexOf(L.town) + 1) % L.route.length], G = lifeTownGeo(to), p = lifeSpot(e, G.market, 5); L.dest = to; L.goal = { act: 'travel', x: p.x, y: p.y };
+      L.cargo = SIM.traderCargo(SHOPS.trader || [], SF.PRICES, R, 160).map(c => SF.newItem(c.id, c.qty));   // real goods on the cart for this leg (v0.43): on his body if he falls on the road
       L.mem.note(GT, 'set out for ' + to, null, null, 0); lifeGo(e, L.goal, { maxNodes: 400000, speed: SF.WALK * .6 }); say(e, 'On to ' + (to === 'vespar' ? 'Vespar' : 'Mynoc') + '!'); }
     return; }
   L.doing = 'walk'; L.mind.why = 'on the road to ' + (L.dest === 'vespar' ? 'Vespar' : 'Mynoc');
   const th = lifeDanger(e, 14); L.hurry = !!th; if (th) { if (L.needs.safety < .5) { LIFE.events.frights++; L.mem.note(GT, 'hurried past', aidOf(th), { x: Math.round(e.x), y: Math.round(e.y) }, 120); } SIM.frighten(L.needs, 1); L.mind.why = 'hurrying past a ' + th.name; }
   if (e.nav && e.nav.state === 'failed' && GT > (L.retryAt || 0)) { L.retryAt = GT + 8; lifeGo(e, L.goal, { maxNodes: 400000, speed: SF.WALK * .6 }); }
-  if (Math.hypot(L.goal.x - e.x, L.goal.y - e.y) < 1.5) { L.phase = 'selling'; L.town = L.dest; e.town = L.dest; L.until = GT + WS.clock.secondsPerHour(); L.legs++; L.hurry = false; e.nav = null; L.goal = null; L.needs.hunger = .1;   /* a meal at the market inn */ LIFE.events.arrivals++;
+  if (Math.hypot(L.goal.x - e.x, L.goal.y - e.y) < 1.5) { L.phase = 'selling'; L.town = L.dest; e.town = L.dest; L.until = GT + WS.clock.secondsPerHour(); L.legs++; L.hurry = false; e.nav = null; L.goal = null; L.needs.hunger = .1; traderUnload(e);   /* a meal at the market inn */ LIFE.events.arrivals++;
     L.mem.note(GT, 'arrived in ' + L.dest, null, null, 0); simEmit('MerchantArrived', { actor: aidOf(e), town: L.dest, x: e.x, y: e.y }); say(e, 'Fresh goods from the road!'); }
 }
+
+/* arriving: the cargo is sold at the market (a ledger, like the townsfolk's hauls: shop stock is phase 7) */
+function traderUnload(e) {
+  const L = e.life, c = L.cargo || []; if (!c.length) return; const v = c.reduce((a, it) => a + (SF.PRICES[it.id] || 0) * it.qty, 0);
+  L.cargo = []; L.gold = Math.min(400, (L.gold || 0) + Math.floor(v * .25)); simEmit('ItemTransferred', { actor: aidOf(e), x: e.x, y: e.y, detail: { what: 'sold cargo', value: v } });
+}
+/* item uids the save must count: the merchant's cargo (src/game.js saveData) */
+function lifeScanItems(scan) { const t = LIFE.trader; if (t && t.life && t.life.cargo) t.life.cargo.forEach(scan); }
 
 /* ---------- talking to someone with a life ---------- */
 function lifeTalk(n) {
@@ -6530,7 +6573,7 @@ function lifeDev() {
    Positions are not saved: a load places everyone where the clock says (lifeResume). */
 function lifeSave() {
   const npcs = {}; for (const e of LIFE.npcs) { if (!e.actorId || e.gone) continue; const L = e.life; npcs[e.actorId] = { needs: L.needs, mem: L.mem.save(), carry: L.carry || 0, gold: L.gold ?? null }; const f = npcSave(e); if (f) npcs[e.actorId].fight = f; }
-  const t = LIFE.trader && LIFE.trader.life; return { v: 1, npcs, stock: LIFE.stock, trader: t ? { town: t.town, legs: t.legs, gold: t.gold } : null, law: lawSave(), npcd: npcdSave() };   // npcd: v0.39 the dead and their bodies, additive   // law: v0.34, additive
+  const t = LIFE.trader && LIFE.trader.life; return { v: 1, npcs, stock: LIFE.stock, trader: t ? { town: t.town, legs: t.legs, gold: t.gold, cargo: t.cargo || [] } : null, law: lawSave(), npcd: npcdSave() };   // npcd: v0.39 the dead and their bodies, additive   // law: v0.34, additive
 }
 function lifeLoad(saved) {
   lawLoad(saved && saved.law);   // a new character starts with a clean record
@@ -6539,6 +6582,7 @@ function lifeLoad(saved) {
   for (const e of LIFE.npcs) { const r = e.actorId && saved.npcs[e.actorId]; if (!r) continue; const L = e.life; L.needs = SIM.newNeeds(r.needs); L.mem = SIM.newMemory(8, r.mem); if (r.carry !== undefined) L.carry = r.carry; if (r.gold !== null && r.gold !== undefined) L.gold = r.gold; if (r.fight) npcLoad(e, r.fight); }
   if (saved.stock) for (const k in saved.stock) LIFE.stock[k] = Object.assign(LIFE.stock[k] || {}, saved.stock[k]);
   const t = LIFE.trader; if (t && saved.trader && LIFE.towns[saved.trader.town]) { const L = t.life, G = LIFE.towns[saved.trader.town], p = lifeSpot(t, G.market, 5); L.town = t.town = saved.trader.town; L.legs = saved.trader.legs || 0; L.gold = saved.trader.gold ?? L.gold; L.phase = 'selling'; L.until = 0; lifeTeleport(t, p); t.home = { x: p.x, y: p.y }; }
+  if (t && saved.trader && Array.isArray(saved.trader.cargo)) t.life.cargo = saved.trader.cargo.filter(it => it && SF.ITEMS[it.id] && it.qty > 0 && Number.isFinite(it.uid));   // v0.43
 }
 /* ================= NPC COMBAT (Living World phase 5, step 1, v0.30; master spec §18) =================
    Townsfolk, the travelling merchant and the town guards become real combatants:
@@ -7434,6 +7478,7 @@ function npcDies(e, src) {
   // what they wore and carried, and their purse, on a body under the player's rules
   e.pack = SF.newContainer('pack', e.actorId);
   for (const s in e.equip) e.equip[s] = npcdRealItem(e.equip[s]);
+  if (L && Array.isArray(L.cargo) && L.cargo.length) { e.pack.items.push(...L.cargo); L.cargo = []; }   // the merchant's cargo is on his body (v0.43)
   const gold = SIM.npcdPurse(L && L.prof, L && L.gold, R(), NPCD.cfg); if (gold > 0) e.pack.items.push(SF.newItem('gold', gold)); if (L && Number.isFinite(L.gold)) L.gold = 0;
   const body = SF.deathTransaction(e, GT, { x: e.x, y: e.y }); body.owner = e.actorId; body.key = e.actorId + '@' + GT.toFixed(2);
   addEnt({ kind: 'corpse', npcBody: e.actorId, name: npcdFirst(e) + "'s body", x: e.x, y: e.y, cont: body, expires: body.expires, gear: look, t0: GT, sect: e.sect || 0 });
@@ -7462,7 +7507,7 @@ function npcdReturn(e, p) {
   npcArm(e);   // a fresh outfit, full health (src/npcfight.js)
   const L = e.life; if (L) { L.needs = SIM.newNeeds(); L.mind = {}; L.goal = null; L.thinkAt = 0; L.hurry = false; L.wd = null; L.retryAt = 0;
     if (Number.isFinite(L.gold) || L.gold === 0) L.gold = L.prof === 'trader' ? 120 : 20 + (e.id % 7) * 5;
-    if (L.prof === 'trader') { L.town = e.town = 'mynoc'; L.phase = 'selling'; L.until = 0; L.legs = 0; } }
+    if (L.prof === 'trader') { L.town = e.town = 'mynoc'; L.phase = 'selling'; L.until = 0; L.legs = 0; L.cargo = []; } }
   e.x = p.x; e.y = p.y; if (!canStand(e, e.x, e.y)) { const q = lifeSpot(e, p, 3); if (q) { e.x = q.x; e.y = q.y; } } e._px = e.x; e._py = e.y; e.speed = 0;
   ents.push(e); if (WS && e.archetype) WS.adopt(e, e.archetype);
   NPCD.stats.returns++; simEmit('ActorReturned', { actor: aidOf(e), x: e.x, y: e.y, detail: { after: Math.round(GT - diedAt) } });
@@ -7603,6 +7648,27 @@ function tierWake(e) {
   else if (e.x !== x || e.y !== y) TIER.placed++;
 }
 function tierInspect(e) { return e && e !== P ? { tier: e.tier || '—', tierWhy: TIER_FIXED[e.archetype] || e.dev || e.quest ? 'always local' : tierBusy(e) ? 'busy: local' : 'distance ' + (P ? Math.hypot(e.x - P.x, e.y - P.y).toFixed(0) : '?') + ' m' } : {}; }
+
+/* ================= Phase 6 step 2 (v0.43): creature remains through a reload =================
+   Remains keep their loot, their carving state and their time left through a save and reload, so a reload neither rolls the loot
+   again nor empties a body you were about to loot (§20). Saved as validated rows in the save's `remains` (additive; SIM.remainsRows:
+   one row per key, known species and items only, never an expired body, at most REMAINS_MAX). Item uids are counted by the save. */
+const REMAINS_MAX = 400;
+const REMAINS = { restored: 0, dropped: {} };
+function remainsOf() { return ents.filter(c => c.kind === 'corpse' && c.mon && !c.gone && c.cont && c.expires > GT); }
+function remainsSave() {
+  return remainsOf().slice(-REMAINS_MAX).map(c => ({ key: c.rkey || (c.rkey = 'r' + c.id + '@' + Math.round(c.t0 ?? GT)), type: c.mon, name: c.name, x: Math.round(c.x * 10) / 10, y: Math.round(c.y * 10) / 10,
+    left: Math.round((c.expires - GT) * 10) / 10, items: c.cont.items, skinned: !!c.skinned, killer: c.killer || null, killKind: c.killKind || null, advKill: c.advKill || null, sect: c.sect || 0, gear: c.gear || null }));
+}
+function remainsLoad(rows) {
+  REMAINS.restored = 0; REMAINS.dropped = {}; if (!rows) return;
+  const res = SIM.remainsRows(rows, { validType: t => !!MON[t], validItem: it => !!SF.ITEMS[it.id] && it.qty > 0 && Number.isFinite(it.uid), max: REMAINS_MAX });
+  for (const r of res.rows) { const cont = SF.newContainer('corpse'); cont.items = r.items;
+    addEnt({ kind: 'corpse', mon: r.type, rkey: r.key, sect: r.sect || 0, t0: GT - 9, killer: r.killer, killKind: r.killKind, name: typeof r.name === 'string' ? r.name : MON[r.type].n + ' remains', x: r.x, y: r.y, cont, expires: GT + r.left,
+      skinned: r.skinned || !MON[r.type].skin, gear: r.gear || null, advKill: r.advKill || undefined, advDone: undefined }); REMAINS.restored++; }
+  REMAINS.dropped = res.dropped;
+}
+function remainsScan(scan) { for (const c of remainsOf()) c.cont.items.forEach(scan); }
 /* ================= GAME: actors, intents, combat, magic, gathering, crafting, death ================= */
 const MON = {
   rat:   { n: 'dock rat',    col: '#7a6a62', size: .7,  h: 34, hp: 20, atk: 22, def: 20, dmg: [3, 6],  reach: 1.15, tele: .45, rec: 1.3,  speed: 3.6, aggro: 6,   leash: 16, armor: 4,  diff: 15, loot: { gold: [2, 9] }, skin: { hide: [1, 1] } },
@@ -9469,6 +9535,8 @@ function questMarkers(g, S) {
 /* ================= RENDERING: low-res isometric buffer, fixed camera (yaw 45°, ~2:1 pitch) ================= */
 const cv = $('#c'), mctx = cv.getContext('2d'); let ctx = null;
 let VW = 1, VH = 1, DPR = 1, ZOOM = .7, DP = 2; const ZOOMS = [.5, .7, 1, 1.3];
+/* phones draw at most this many back-buffer pixels (v0.43, SIM.backBuffer); ?bb=full keeps the whole-number divisor everywhere, as before */
+const BB_BUDGET = /[?&#]bb=full\b/.test(location.search + location.hash) ? 0 : 600000;
 const HW = 32, HH = 16, TW = 64, TH = 32;
 const SX = (x, y) => (x - y) * HW, SY = (x, y) => (x + y) * HH;          // continuous world (m) -> world px
 const LB = document.createElement('canvas'), lbx = LB.getContext('2d'); ctx = lbx;
@@ -9476,7 +9544,7 @@ const lc = document.createElement('canvas'), lctx = lc.getContext('2d');
 let CAM = { x: 0, y: 0, f: 1 };
 function resize() {
   DPR = Math.min(3, window.devicePixelRatio || 1); VW = innerWidth; VH = innerHeight; cv.width = Math.round(VW * DPR); cv.height = Math.round(VH * DPR);
-  DP = Math.max(1, Math.round(ZOOM * DPR)); LB.width = Math.ceil(cv.width / DP); LB.height = Math.ceil(cv.height / DP); lc.width = LB.width; lc.height = LB.height;
+  DP = SIM.backBuffer(VW, VH, DPR, ZOOM, { budget: BB_BUDGET, phone: Math.min(VW, VH) < 600 }); LB.width = Math.ceil(cv.width / DP); LB.height = Math.ceil(cv.height / DP); lc.width = LB.width; lc.height = LB.height;
   document.body.classList.toggle('portrait', VH > VW);
 }
 /* ---- tiles ---- */
@@ -10612,9 +10680,9 @@ function saveData() {
     const pets = ents.filter(e => e.kind === 'pet' && e.type && !e.summon && !e.gone && e.hp > 0).map(e => ({ type: e.type, hp: e.hp, order: e.order === 'stay' ? 'stay' : 'follow', slots: e.slots, name: e.name, dx: e.x - P.x, dy: e.y - P.y, x: e.x, y: e.y, aid: e.actorId || null, owner: e.owner || P.charId || null, loyal: e.loyal, fedAgo: GT - (e.fedAt || GT) }));   // v0.33.1: x/y (where a staying pet waits), aid (its actor id) and owner; dx/dy stay for older builds
     const nodes = []; for (const [k, o] of RES) nodes.push([k, o.gen || 1, o.spec || 0, o.n, o.max || 0, Math.round(o.t * 10) / 10]);
     const ally = allySave(); if (ally) { Object.values(ally.equip || {}).forEach(scan); ally.pack.forEach(scan); if (ally.body) ally.body.items.forEach(scan); }
-    npcdScanItems(scan);   // townsfolk bodies (v0.39): their items carry real uids
+    npcdScanItems(scan); remainsScan(scan); lifeScanItems(scan);   // townsfolk bodies (v0.39), creature remains and the merchant's cargo (v0.43): real uids
     const adv = advSave(); advScanItems(adv, scan);   // NPC adventurers (v0.36): their items carry real uids
-    return { v: SAVE_VERSION, char: c, corpses, piles, chests, pets, nodes, ally, sim: WS ? WS.save() : null, eco: ecoSave(), life: lifeSave(), adv, uid: maxUid + 1, gt: GT, savedAt: Date.now(), tab: TAB_ID };
+    return { v: SAVE_VERSION, char: c, corpses, piles, chests, pets, nodes, ally, sim: WS ? WS.save() : null, eco: ecoSave(), life: lifeSave(), adv, remains: remainsSave(), uid: maxUid + 1, gt: GT, savedAt: Date.now(), tab: TAB_ID };
   }
 }
 /* another tab of the same game wrote the save: stop saving here so the two never overwrite each other's progress */
@@ -10719,7 +10787,7 @@ function boot(saved, fresh) {
   if (!saved) simEmit('CharacterCreated', { actor: aidOf(P), charId: P.charId, template: P.created.template, town: P.created.town, body: P.look.body });
   if (saved && !(saved.sim && saved.sim.clock)) WS.clock.setHour(GT, (GT / 60 + 9) % 24);   // older saves keep the hour they were at; from now on a day lasts 120 minutes
   NAV.walk = null; NAV.edge = null; NAV.graph = null; devInit();
-  ents.unshift(P); P.sect = P.sect || 0; P.drawn = false; P.sw = SF.newSwing(); P.movedAt = -99; while (P.hotbar.length < 9) P.hotbar.push(null); Q(); ecoLoad(saved && saved.eco); populate(); lifeLoad(saved && saved.life); advLoad(saved && saved.adv); seedTraps();
+  ents.unshift(P); P.sect = P.sect || 0; P.drawn = false; P.sw = SF.newSwing(); P.movedAt = -99; while (P.hotbar.length < 9) P.hotbar.push(null); Q(); ecoLoad(saved && saved.eco); populate(); lifeLoad(saved && saved.life); advLoad(saved && saved.adv); remainsLoad(saved && saved.remains); seedTraps();
   { const al = makeAlly(saved && saved.ally); const bd = saved && saved.ally && saved.ally.body; if (bd && bd.left > 0) { const cont = SF.newContainer('corpse', al.aid); cont.items = bd.items; cont.diedAt = GT - (bd.diedAgo ?? 999); cont.expires = GT + bd.left; addEnt({ kind: 'corpse', allyBody: al.aid, name: al.name + "'s body", x: bd.x, y: bd.y, cont, expires: GT + bd.left }); } }
   P.bandage = null; if (saved) bandageLoad(saved.char.bandage); P.prep = null; P.held = null; if (saved) statusLoad(saved.char);          // an application in flight resumes once, never twice
   if (saved) for (const pt of saved.pets || []) { if (!pt) continue; const d = MON[pt.type]; if (!d) continue; const at = petLoadPos(pt, saved.char);
@@ -10764,7 +10832,7 @@ function spawnMon(type, dx = 3, dy = 0) { const d = MON[type]; if (!d) return nu
   return addEnt({ kind: 'mon', type, name: d.n, x, y, hp: d.hp, max: d.hp, state: 'idle', home: { x, y }, sect: 0, ward: 0 }); }
 /* __SF is a development and test hook (the browser suites drive the game through it). It is not a security boundary: anything
    here is reachable from the console in an offline single-player game, and a multiplayer server must not trust the client. */
-window.__SF = { SAVE, saveData, get saveLocked() { return saveLocked; }, NPCD, CRIM, npcDies, npcdReturn, npcdTick, npcdLooted, npcdById, npcdSave, npcdLoad, crimPreyFor, crimBodyFor, lawOutlawSeen, advGeo, ADV, npcUp, advTick, advThink, advDamaged, advDies, advResurrect, advCast, advSave, advLoad, advInspect, advDev, advPickGround, advTalk, advLooted, advById, advChoice: advSpellChoice, get LAW() { return LAW; }, LAWF, LAW_WITNESS, lawAggress, lawCrime, lawWitness, lawDowned, lawReport, lawRefuses, lawGuardTarget, lawRegion, notoOf, notoColor, lawSave, lawLoad, toggleArm, attackTick, FRAME_ERR, SHRINES, los, NPCF, NPC_FIGHT, NPC_DOWN_TIME, npcArm, damageNpc, npcEngage, npcCombatant, npcUp, npcSave, ecoTargetable, readSave, validateSave, get WS() { return WS; }, dist, closePanel, lifeSave, LIFE, LIFE_SCHED, lifeTick, lifeResume, lifeInspect, lifeTownGeo, lifeTalk, talk, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
+window.__SF = { REMAINS, remainsSave, remainsLoad, traderUnload, get DP() { return DP; }, get DPR() { return DPR; }, get ZOOM() { return ZOOM; }, BB_BUDGET, LB, SAVE, saveData, get saveLocked() { return saveLocked; }, NPCD, CRIM, npcDies, npcdReturn, npcdTick, npcdLooted, npcdById, npcdSave, npcdLoad, crimPreyFor, crimBodyFor, lawOutlawSeen, advGeo, ADV, npcUp, advTick, advThink, advDamaged, advDies, advResurrect, advCast, advSave, advLoad, advInspect, advDev, advPickGround, advTalk, advLooted, advById, advChoice: advSpellChoice, get LAW() { return LAW; }, LAWF, LAW_WITNESS, lawAggress, lawCrime, lawWitness, lawDowned, lawReport, lawRefuses, lawGuardTarget, lawRegion, notoOf, notoColor, lawSave, lawLoad, toggleArm, attackTick, FRAME_ERR, SHRINES, los, NPCF, NPC_FIGHT, NPC_DOWN_TIME, npcArm, damageNpc, npcEngage, npcCombatant, npcUp, npcSave, ecoTargetable, readSave, validateSave, get WS() { return WS; }, dist, closePanel, lifeSave, LIFE, LIFE_SCHED, lifeTick, lifeResume, lifeInspect, lifeTownGeo, lifeTalk, talk, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
 Object.assign(window.__SF, { TIER, tierStep, tierBusy, tierInspect, tierMeasure, ECO_POP, ecoRestore, ecoSpawnKeys, ecoLoad });   // Living World phase 6 (src/tiers.js, src/ecology.js)
 Object.defineProperties(window.__SF, { PICKT: { get: () => PICKT }, TRACKS: { get: () => TRACKS }, TRACKUI: { get: () => TRACKUI } });   // live views (Object.assign would copy a getter's value)
 Object.assign(window.__SF, { skillCheck, skillUse, noteLearn, SKUI, SKLOG, useAbility, ABIL, TASKS, pickTap, tameStart, loreUse, vetStart, feedPet, peaceUse, enticeUse, provokeStart, provokeUse, stealStart, npcPack, poisonApply, lockUse, untrapUse, stealthUse, hide, finishHide, reveal, trackStart, trackFollow, magicStrike, petLoyaltyTick, petCommand, evalUse, meditate, playMusic, tamedPets, chestTrapRoll, itemSkill, eat, CHESTS, cdLeft, onPlayerMoved, begUse, campUse, lightKindling, makeCamp, forensicUse, herdPick, herdUse, snoopUse, spiritUse, digUse, treasureUp, newTreasureMap, magicLoot, CAMPS, ITEM_SKILL, ghostSpeech, killMon, MG: SF.MAGERY });

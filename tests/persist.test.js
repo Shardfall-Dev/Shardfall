@@ -49,4 +49,45 @@ const many = []; for (let i = 0; i < 2000; i++) many.push({ id: 'mon:deer:' + i,
 eq(SIM.unpackCreatures(SIM.packCreatures(many), opt).list.length, 3, '2000 rows for one spawner restore only as many creatures as it holds');
 const kb = JSON.stringify(SIM.packCreatures(many.map((c, i) => Object.assign({}, c, { x: 1234.56 + i % 7, y: 987.65, hx: 1234.5, hy: 987.6, sp: 'deer@1234,987', pack: i % 300, fedAgo: 123 })))).length / 1024;
 eq(kb < 170, true, `1000 creatures take about ${(kb / 2).toFixed(0)} KB in the save`);
+
+// ---- phase 6 step 2 (v0.43): creature remains, merchant cargo, the phone back buffer
+{
+  const ok = { validType: t => ['wolf', 'rat'].includes(t), validItem: it => ['hide', 'gold'].includes(it.id) };
+  const rows = [
+    { key: 'r1@5', type: 'wolf', x: 1, y: 2, left: 100, items: [{ id: 'hide', qty: 2, uid: 7 }, { id: 'ghost', qty: 1, uid: 8 }], skinned: 1 },
+    { key: 'r1@5', type: 'wolf', x: 1, y: 2, left: 100, items: [] },
+    { key: 'r2@6', type: 'dragon', x: 1, y: 2, left: 100, items: [] },
+    { key: 'r3@6', type: 'rat', x: 1, y: 2, left: 0, items: [] },
+    { key: 'r4@6', type: 'rat', x: 'a', y: 2, left: 5, items: [] },
+    { key: 'r5@6', type: 'rat', x: 1, y: 2, left: 5, items: null },
+    7,
+    { key: 'r6@9', type: 'rat', x: 3, y: 4, left: 9, items: [{ id: 'gold', qty: 3, uid: 9 }] }];
+  const r = SIM.remainsRows(rows, ok);
+  eq(r.rows.map(x => x.key), ['r1@5', 'r6@9'], 'remains: one row per key, the valid ones');
+  eq(r.rows[0].items.map(i => i.id), ['hide'], 'remains: unknown items dropped');
+  eq(r.rows[0].skinned, true, 'remains: the carving state is kept');
+  eq(r.dropped, { duplicate: 1, species: 1, number: 2, items: 1, shape: 1 }, 'remains: every bad row counted');
+  eq(SIM.remainsRows(rows, Object.assign({ max: 1 }, ok)).rows.length, 1, 'remains: at most `max` rows');
+  eq(SIM.remainsRows(undefined, ok).rows, [], 'remains: an older save has none');
+}
+{
+  const prices = { bandage: 2, arrow: 1, hatchet: 25, pickaxe: 30, cloth: 3, ironbar: 12, none: 0 };
+  const c = SIM.traderCargo(Object.keys(prices), prices, () => .5, 160), v = c.reduce((a, x) => a + prices[x.id] * x.qty, 0);
+  eq(c.length > 0 && c.length <= 6 && v <= 160 && v > 60, true, `cargo: goods worth ${v} of 160 gold, at most six kinds`);
+  eq(c.every(x => prices[x.id] > 0 && x.qty > 0), true, 'cargo: only goods with a price, never zero');
+  eq(c[0].id, 'pickaxe', 'cargo: the dearest goods first');
+  eq(JSON.stringify(SIM.traderCargo(Object.keys(prices), prices, () => .5, 160)) === JSON.stringify(c), true, 'cargo: the same draws give the same cargo');
+  eq(SIM.traderCargo([], prices, Math.random), [], 'cargo: nothing to carry, nothing carried');
+}
+{
+  const B = SIM.backBuffer, o = { budget: 600000, phone: true };
+  eq(B(1280, 720, 1, .7, { budget: 600000, phone: false }), 1, 'back buffer: a desktop keeps the whole number (not a phone)');
+  eq(B(1440, 900, 2, .7, { budget: 600000, phone: false }), 1, 'back buffer: a retina desktop keeps the whole number as before');
+  eq(B(390, 844, 1, .7, o), 1, 'back buffer: a pixel-ratio-1 phone within budget keeps 1');
+  const d2 = B(390, 844, 2, .7, o), d3 = B(390, 844, 3, .7, o);
+  eq(d2 > 1.4 && 390 * 844 * 4 / (d2 * d2) <= 600001, true, `back buffer: a pixel-ratio-2 phone fits the budget (d ${d2.toFixed(2)}, was 1)`);
+  eq(d3 >= 2 && 390 * 844 * 9 / (d3 * d3) <= 600001, true, `back buffer: a pixel-ratio-3 phone fits the budget (d ${d3.toFixed(2)}, was 2)`);
+  eq(B(390, 844, 2, .7, { budget: 0, phone: true }), 1, 'back buffer: no budget (?bb=full) keeps the old divisor');
+  eq(B(844, 390, 3, .5, o) >= 1.5, true, 'back buffer: the zoom setting still counts');
+}
 console.log(fails ? fails + ' FAILED' : 'ALL PASS'); process.exit(fails ? 1 : 0);

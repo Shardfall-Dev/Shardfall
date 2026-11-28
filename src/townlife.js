@@ -231,14 +231,23 @@ function traderThink(e) {
   if (L.phase === 'selling') { L.doing = lifeNight() ? 'sleep' : h >= 12 && h < 13 ? 'eat' : 'trade';   // overnight at the inn; a midday meal if (!L.until) L.until = GT + WS.clock.secondsPerHour();
     L.mind.why = 'selling at ' + (L.town === 'mynoc' ? 'Mynoc' : 'Vespar') + ' market';
     if (GT > L.until && h >= 6 && h < 17) { L.phase = 'travel'; const to = L.route[(L.route.indexOf(L.town) + 1) % L.route.length], G = lifeTownGeo(to), p = lifeSpot(e, G.market, 5); L.dest = to; L.goal = { act: 'travel', x: p.x, y: p.y };
+      L.cargo = SIM.traderCargo(SHOPS.trader || [], SF.PRICES, R, 160).map(c => SF.newItem(c.id, c.qty));   // real goods on the cart for this leg (v0.43): on his body if he falls on the road
       L.mem.note(GT, 'set out for ' + to, null, null, 0); lifeGo(e, L.goal, { maxNodes: 400000, speed: SF.WALK * .6 }); say(e, 'On to ' + (to === 'vespar' ? 'Vespar' : 'Mynoc') + '!'); }
     return; }
   L.doing = 'walk'; L.mind.why = 'on the road to ' + (L.dest === 'vespar' ? 'Vespar' : 'Mynoc');
   const th = lifeDanger(e, 14); L.hurry = !!th; if (th) { if (L.needs.safety < .5) { LIFE.events.frights++; L.mem.note(GT, 'hurried past', aidOf(th), { x: Math.round(e.x), y: Math.round(e.y) }, 120); } SIM.frighten(L.needs, 1); L.mind.why = 'hurrying past a ' + th.name; }
   if (e.nav && e.nav.state === 'failed' && GT > (L.retryAt || 0)) { L.retryAt = GT + 8; lifeGo(e, L.goal, { maxNodes: 400000, speed: SF.WALK * .6 }); }
-  if (Math.hypot(L.goal.x - e.x, L.goal.y - e.y) < 1.5) { L.phase = 'selling'; L.town = L.dest; e.town = L.dest; L.until = GT + WS.clock.secondsPerHour(); L.legs++; L.hurry = false; e.nav = null; L.goal = null; L.needs.hunger = .1;   /* a meal at the market inn */ LIFE.events.arrivals++;
+  if (Math.hypot(L.goal.x - e.x, L.goal.y - e.y) < 1.5) { L.phase = 'selling'; L.town = L.dest; e.town = L.dest; L.until = GT + WS.clock.secondsPerHour(); L.legs++; L.hurry = false; e.nav = null; L.goal = null; L.needs.hunger = .1; traderUnload(e);   /* a meal at the market inn */ LIFE.events.arrivals++;
     L.mem.note(GT, 'arrived in ' + L.dest, null, null, 0); simEmit('MerchantArrived', { actor: aidOf(e), town: L.dest, x: e.x, y: e.y }); say(e, 'Fresh goods from the road!'); }
 }
+
+/* arriving: the cargo is sold at the market (a ledger, like the townsfolk's hauls: shop stock is phase 7) */
+function traderUnload(e) {
+  const L = e.life, c = L.cargo || []; if (!c.length) return; const v = c.reduce((a, it) => a + (SF.PRICES[it.id] || 0) * it.qty, 0);
+  L.cargo = []; L.gold = Math.min(400, (L.gold || 0) + Math.floor(v * .25)); simEmit('ItemTransferred', { actor: aidOf(e), x: e.x, y: e.y, detail: { what: 'sold cargo', value: v } });
+}
+/* item uids the save must count: the merchant's cargo (src/game.js saveData) */
+function lifeScanItems(scan) { const t = LIFE.trader; if (t && t.life && t.life.cargo) t.life.cargo.forEach(scan); }
 
 /* ---------- talking to someone with a life ---------- */
 function lifeTalk(n) {
@@ -275,7 +284,7 @@ function lifeDev() {
    Positions are not saved: a load places everyone where the clock says (lifeResume). */
 function lifeSave() {
   const npcs = {}; for (const e of LIFE.npcs) { if (!e.actorId || e.gone) continue; const L = e.life; npcs[e.actorId] = { needs: L.needs, mem: L.mem.save(), carry: L.carry || 0, gold: L.gold ?? null }; const f = npcSave(e); if (f) npcs[e.actorId].fight = f; }
-  const t = LIFE.trader && LIFE.trader.life; return { v: 1, npcs, stock: LIFE.stock, trader: t ? { town: t.town, legs: t.legs, gold: t.gold } : null, law: lawSave(), npcd: npcdSave() };   // npcd: v0.39 the dead and their bodies, additive   // law: v0.34, additive
+  const t = LIFE.trader && LIFE.trader.life; return { v: 1, npcs, stock: LIFE.stock, trader: t ? { town: t.town, legs: t.legs, gold: t.gold, cargo: t.cargo || [] } : null, law: lawSave(), npcd: npcdSave() };   // npcd: v0.39 the dead and their bodies, additive   // law: v0.34, additive
 }
 function lifeLoad(saved) {
   lawLoad(saved && saved.law);   // a new character starts with a clean record
@@ -284,4 +293,5 @@ function lifeLoad(saved) {
   for (const e of LIFE.npcs) { const r = e.actorId && saved.npcs[e.actorId]; if (!r) continue; const L = e.life; L.needs = SIM.newNeeds(r.needs); L.mem = SIM.newMemory(8, r.mem); if (r.carry !== undefined) L.carry = r.carry; if (r.gold !== null && r.gold !== undefined) L.gold = r.gold; if (r.fight) npcLoad(e, r.fight); }
   if (saved.stock) for (const k in saved.stock) LIFE.stock[k] = Object.assign(LIFE.stock[k] || {}, saved.stock[k]);
   const t = LIFE.trader; if (t && saved.trader && LIFE.towns[saved.trader.town]) { const L = t.life, G = LIFE.towns[saved.trader.town], p = lifeSpot(t, G.market, 5); L.town = t.town = saved.trader.town; L.legs = saved.trader.legs || 0; L.gold = saved.trader.gold ?? L.gold; L.phase = 'selling'; L.until = 0; lifeTeleport(t, p); t.home = { x: p.x, y: p.y }; }
+  if (t && saved.trader && Array.isArray(saved.trader.cargo)) t.life.cargo = saved.trader.cargo.filter(it => it && SF.ITEMS[it.id] && it.qty > 0 && Number.isFinite(it.uid));   // v0.43
 }
