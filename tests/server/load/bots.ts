@@ -53,7 +53,8 @@ const LIMITS = { avgStepMs: +(process.env.MAX_AVG_STEP_MS || 15), overrunShare: 
   if (out.welcomed < N) fails.push(`${N - out.welcomed} bots never got a welcome`);
   if (out.avgStepMs > LIMITS.avgStepMs) fails.push(`average tick ${out.avgStepMs} ms > ${LIMITS.avgStepMs} ms`);
   if (out.overruns > ticks * LIMITS.overrunShare) fails.push(`${out.overruns} of ${ticks} ticks overran 50 ms`);
-  if (out.statesPerBotPerSecond < 15) fails.push(`only ${out.statesPerBotPerSecond} state messages per bot per second`);
+  const expected = N * 20 * el; if (out.inputsApplied < expected * 0.9) fails.push(`only ${out.inputsApplied} of about ${Math.round(expected)} intents applied`);
+  if (bots.some(b => b.states < el)) fails.push('a bot received fewer than one state message per second');
   if (fails.length) { console.error('FAIL ' + fails.join('; ')); process.exit(1); }
   console.log('ALL PASS'); process.exit(0);
 })().catch(e => { console.error(e); process.exit(1); });

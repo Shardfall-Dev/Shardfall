@@ -39,6 +39,7 @@ export class Gateway {
   private heartbeat: NodeJS.Timeout | null = null;
   private sessionCheck: NodeJS.Timeout | null = null;
   private saver: NodeJS.Timeout | null = null;
+  private stopping = false;
   counters = { opened: 0, closed: 0, rejectedUpgrades: 0, takeovers: 0, reconnects: 0, refused: 0 };
 
   constructor(private cfg: Config, private sessions: Sessions, private chars: Characters, private world: World, private log: any) {
@@ -47,7 +48,7 @@ export class Gateway {
   }
   /* save positions (never blocks the tick; failures are logged and retried at the next save) */
   private persist(list: Actor[]) {
-    if (!list.length) return Promise.resolve();
+    if (!list.length || this.stopping) return Promise.resolve();
     return this.chars.savePositions(list.map(a => ({ id: a.characterId, x: a.s.x, y: a.s.y, sect: a.s.sect ?? 0, town: a.info.town, stam: a.s.stam })))
       .then(() => undefined, e => { for (const a of list) a.dirty = true; this.log.error({ err: (e as Error).message }, 'saving positions failed'); });
   }
@@ -196,7 +197,7 @@ export class Gateway {
   /* stop: tell everyone, close every connection, and save where every character stands */
   async shutdown() {
     if (this.heartbeat) clearInterval(this.heartbeat); if (this.sessionCheck) clearInterval(this.sessionCheck); if (this.saver) clearInterval(this.saver);
-    await this.persist([...this.world.actors.values()]);
+    await this.persist([...this.world.actors.values()]); this.stopping = true;   // everything is saved; late socket closes save nothing more
     for (const e of this.presence.values()) if (e.graceTimer) clearTimeout(e.graceTimer);
     for (const c of [...this.conns]) { c.noGrace = true; this.send(c, 'kicked', { reason: 'server_restart' }, undefined, true); try { c.socket.close(P.CLOSE.GOING_AWAY, 'server restart'); } catch { /* */ } }
   }
