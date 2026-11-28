@@ -98,9 +98,10 @@ async def main():
             # an offline character first: its save must survive everything online untouched
             await pa.goto(BASE + '/'); await pa.wait_for_selector('[data-c=new]')
             check(await pa.evaluate("__CC.quick({name:'Offlina', template:'archer', town:'quay'})"), 'offline character starts as before')
-            await pa.wait_for_timeout(500); offline = await pa.evaluate("localStorage.getItem('shardfall.save.v1')")
+            await pa.wait_for_timeout(500)
+            await pa.goto(BASE + '/'); await pa.wait_for_selector('[data-c=cont]')   # leaving the game saves it one last time
+            offline = await pa.evaluate("localStorage.getItem('shardfall.save.v1')")
             check(bool(offline) and '"Offlina"' in offline, 'offline save written to localStorage')
-            await pa.goto(BASE + '/'); await pa.wait_for_selector('[data-c=cont]')
             await shot(pa, 'A_00_title_with_offline_save')
             na, nb = 'Alder' + secrets.token_hex(2).translate(str.maketrans('0123456789', 'abcdefghij')), 'Briar' + secrets.token_hex(2).translate(str.maketrans('0123456789', 'abcdefghij'))
             ea, eb = f'a.{secrets.token_hex(4)}@shardfall.test', f'b.{secrets.token_hex(4)}@shardfall.test'
