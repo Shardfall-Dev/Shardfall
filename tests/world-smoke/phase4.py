@@ -16,7 +16,8 @@ def check(ok, msg, got=None):
 def page(b):
   ctx = b.new_context(viewport={'width': 844, 'height': 390}); pg = ctx.new_page(); errs = []
   pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('console', lambda m: errs.append('console: ' + m.text) if m.type == 'error' else None)
-  pg.add_init_script(HOLD); pg.goto('file://' + f); pg.wait_for_timeout(400)
+  pg.add_init_script(HOLD); pg.goto('file://' + f + '?tiers=off');   # these scenarios test the whole world's rules wherever the player stands; tiers are tested in phase6.py
+  pg.wait_for_timeout(400)
   return ctx, pg, errs
 def new_char(pg, seed=None):
   pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_timeout(400)

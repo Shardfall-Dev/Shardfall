@@ -433,6 +433,58 @@ SIM.inspect = (e, extra) => {
   return Object.assign(o, extra || {});
 };
 
+/* ================= Phase 6: simulation tiers and world-state persistence (master spec §25–26) =================
+   Tiers. Every actor away from the player gets one of three levels of detail:
+     A — local: every 50 ms step (full movement, collision, combat, perception, animation, sound).
+     B — regional: one step in `bEvery`, with the skipped time handed over (reduced decisions, coarser movement, never drawn).
+     C — distant: not stepped at all. Creatures hold where they are; townsfolk follow their schedule abstractly and are
+         placed where the day has taken them when they come back into range (src/tiers.js). Populations, camps, the clock
+         and saving carry on for the whole world.
+   Radius A follows the camera (§25: "adjusted to actual camera scale"): it is never smaller than the farthest corner of the
+   screen plus a margin, so nothing on screen ever runs at the reduced rate. A small hysteresis keeps an actor on the
+   boundary from flipping tier every step. Pure: the game measures the screen and distances. */
+SIM.TIER = { A: 40, B: 120, gapB: 60, margin: 8, hyst: 6, bEvery: 4 };
+/* the distance in metres from the player to the farthest visible corner, for a screen of halfW × halfH world pixels and the
+   isometric projection SX = (x − y)·hw, SY = (x + y)·hh */
+SIM.viewRadius = (halfW, halfH, hw, hh) => { const a = halfW / (hw || 32), b = halfH / (hh || 16); return Math.sqrt((a * a + b * b) / 2); };
+SIM.tierRadii = (viewR, cfg) => { cfg = cfg || SIM.TIER; const a = Math.max(cfg.A, (viewR || 0) + cfg.margin); return { a, b: Math.max(cfg.B, a + cfg.gapB) }; };
+SIM.tierOf = (d, prev, radii, hyst) => {
+  const h = hyst === undefined ? SIM.TIER.hyst : hyst;
+  if (d <= radii.a + (prev === 'A' ? h : 0)) return 'A';
+  if (d <= radii.b + (prev === 'A' || prev === 'B' ? h : 0)) return 'B';
+  return 'C';
+};
+/* is this the step an actor of this tier runs? Tier B actors are staggered by id so a quarter of them run each step */
+SIM.tierDue = (tier, stepN, id, every) => tier === 'A' ? true : tier === 'B' ? ((stepN + (id | 0)) % (every || SIM.TIER.bEvery)) === 0 : false;
+
+/* Population persistence. Spawned creatures are saved one by one (§26: regional populations, actor identity), as compact
+   rows, so a region the player thinned out stays thin after a reload and every creature keeps its id:
+     [actorId, type, spawnerKey, x, y, hp, homeX, homeY, packId, flags, purse, fedAgo]   flags: 1 pack leader · 2 hidden
+   unpackCreatures validates rows before anything is spawned from them: unknown species or spawners, broken numbers, a
+   repeated id and more creatures than a spawner can hold are dropped (and counted), never duplicated. */
+SIM.POP_VERSION = 1;
+const r1 = v => Math.round(v * 10) / 10;
+SIM.packCreatures = list => list.map(c => [c.id, c.type, c.sp, r1(c.x), r1(c.y), Math.max(1, Math.round(c.hp)), r1(c.hx), r1(c.hy), c.pack | 0, (c.lead ? 1 : 0) | (c.hidden ? 2 : 0), c.purse | 0, Math.max(0, Math.round(c.fedAgo || 0))]);
+SIM.unpackCreatures = (rows, o) => {
+  const out = [], seen = new Set(), per = new Map(); let dropped = 0; const why = {};
+  const drop = k => { dropped++; why[k] = (why[k] || 0) + 1; };
+  const fin = v => typeof v === 'number' && Number.isFinite(v);
+  for (const r of Array.isArray(rows) ? rows : []) {
+    if (!Array.isArray(r) || r.length < 8) { drop('shape'); continue; }
+    const [id, type, sp, x, y, hp, hx, hy, pack, flags, purse, fedAgo] = r;
+    if (typeof id !== 'string' || !id) { drop('id'); continue; }
+    if (seen.has(id)) { drop('duplicate'); continue; }
+    if (!o.validType(type)) { drop('species'); continue; }
+    const cap = o.capOf(sp); if (!cap) { drop('spawner'); continue; }
+    if (![x, y, hp, hx, hy].every(fin)) { drop('number'); continue; }
+    if ((per.get(sp) || 0) >= cap) { drop('over cap'); continue; }
+    seen.add(id); per.set(sp, (per.get(sp) || 0) + 1);
+    const max = o.maxHp(type);
+    out.push({ id, type, sp, x, y, hp: Math.min(max, Math.max(1, hp)), hx, hy, pack: fin(pack) ? pack | 0 : 0, lead: !!((flags | 0) & 1), hidden: !!((flags | 0) & 2), purse: fin(purse) ? Math.max(0, purse | 0) : 0, fedAgo: fin(fedAgo) ? Math.max(0, fedAgo) : 0 });
+  }
+  return { list: out, dropped, why };
+};
+
 if (typeof module !== 'undefined' && module.exports) module.exports = SIM; else root.SIM = SIM;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
 </script>

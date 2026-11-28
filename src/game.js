@@ -64,6 +64,7 @@ function idKey(e, a) {
   if (a === 'player') return { id: 'player:' + (e.id || 'p1') };
   if (a === 'hireling') return { prefix: 'npc', name: e.aid || e.name };
   if (e.kind === 'npc') return { prefix: 'npc', name: e.name };
+  if (e.restoreId) return { id: e.restoreId, prefix: 'mon:' + (e.type || 'x') };   // a saved creature keeps its id (phase 6)
   return { prefix: (e.kind === 'pet' ? (a === 'summon' ? 'summon' : 'pet') : 'mon') + ':' + (e.type || 'x') };
 }
 /* give an entity its id and controller; re-derive the controller when it changes kind (a tamed creature keeps its id) */
@@ -852,7 +853,7 @@ function populate() {
   const c = ZONES.camp; npc('healer', 'Old Fenna, camp healer', c.cx + 2.5, c.cy + 1.5); npc('campbank', 'Crow, camp strongbox', c.cx - 3.5, c.cy - 3.5); npc('outlaw', 'Mags, fence', c.cx + 3.5, c.cy - 3.5);
   annPopulate(npc);
   lifePopulate(npc);   // Living World phase 4: homes, workplaces, routines, residents, guard patrols, the travelling merchant (src/townlife.js)
-  for (let i = 0; i < 12; i++) { for (const s of SPAWNS) s.next = 0; spawnTick(true); }
+  if (!ecoRestore()) for (let i = 0; i < 12; i++) { for (const s of SPAWNS) s.next = 0; spawnTick(true); }   // a save with its creatures brings them back (phase 6); otherwise the world fills fresh
 }
 const SHOPS = { provisioner: ['hatchet', 'pickaxe', 'knife', 'rod', 'tongs', 'sewkit', 'cloth', 'vial', 'bandage', 'lanternoil', 'cookedmeat', 'shirt', 'trousers', 'shoes', 'cloak', 'lute', 'lockpick', 'repairkit'], smith: ['dagger', 'kryss', 'spear', 'sword', 'battleaxe', 'glaive', 'mace', 'waraxe', 'hammer', 'ironbar', 'ringmail_tunic', 'ringmail_sleeves', 'ringmail_gloves', 'ringmail_leggings', 'chain_coif', 'chain_tunic', 'chain_leggings', 'plate_gorget', 'plate_chest', 'plate_arms', 'plate_gauntlets', 'plate_leggings', 'bascinet', 'open_helm', 'closed_helm', 'plate_helm', 'buckler', 'metal_shield', 'kite_shield'], workshop: ['shortbow', 'crossbow', 'heavycrossbow', 'arrow', 'bolt', 'pine', 'buckler', 'wooden_shield', 'strap', 'trapkit', 'repairkit'], apothecary: ['reedash', 'shelldust', 'marshroot', 'lanternoil', 'blacksalt', 'vial', 'draught', 'antidote', 'manatonic', 'stamtonic', 'cinder'], outlaw: ['bandage', 'draught', 'arrow', 'cookedmeat', 'cloth', 'vial', 'reedash', 'marshroot', 'knife', 'dagger', 'lockpick', 'venom', 'trapkit'] };
 Object.assign(SHOPS, ANN_SHOPS);
@@ -889,7 +890,7 @@ function update(dt) {
   for (const e of ents.slice()) {                                    // every actor is driven by its controller; corpses are objects that decay
     if (e.gone || e === P) continue;
     if (e.kind === 'corpse') { if (GT > e.expires) { if (e.mine) log('Your body has crumbled to dust, and everything on it is gone.', '#ff6a5a'); rmEnt(e); if (P.lootOpen === e) { closePanel(); P.lootOpen = null; } } continue; }
-    const tick = CONTROL[WS ? simAdopt(e) : SIM.controllerFor(archetypeOf(e))]; if (tick) tick(e, dt);
+    const tick = CONTROL[WS ? simAdopt(e) : SIM.controllerFor(archetypeOf(e))]; if (tick) { const td = tierStep(e, dt); if (td) tick(e, td); }   // simulation tiers A/B/C (src/tiers.js)
   }
   if (DEV.on) DEV.aiMs = DEV.aiMs * .95 + (performance.now() - aiT0) * .05;
   sndTick();
@@ -899,7 +900,6 @@ function update(dt) {
 /* controllers (master spec §3). The player's controller is the input code above (playerMove, attackTick, prepTick); creatures run
    monsterTick and the ecosystem (ecology.js); townsfolk, merchants and guards follow their routines in townlife.js (lifeTick). */
 function monsterTick(e, dt) {
-  dt = ecoSkip(e, dt); if (!dt) return;   // distant idle creatures run at a quarter rate (src/ecology.js)
   if (e.stam !== undefined && GT - (e.hitT || -9) > .75) e.stam = Math.min(monT2A(MON[e.type]).dex, e.stam + 3 * dt); const s0 = e.state; aiMon(e, dt); if (e.state !== s0) monSound(e, s0); ecoSoundTick(e);
   if (e.poison && GT >= e.poison.next) { e.poison.next = GT + SF.POISON_GAP; damageMon(e, SF.POISON[e.poison.tier], 'poison'); if (e.poison && --e.poison.ticks <= 0) e.poison = null; }
 }
@@ -3108,5 +3108,6 @@ function spawnMon(type, dx = 3, dy = 0) { const d = MON[type]; if (!d) return nu
 /* __SF is a development and test hook (the browser suites drive the game through it). It is not a security boundary: anything
    here is reachable from the console in an offline single-player game, and a multiplayer server must not trust the client. */
 window.__SF = { FRAME_ERR, SHRINES, los, NPCF, NPC_FIGHT, NPC_DOWN_TIME, npcArm, damageNpc, npcEngage, npcCombatant, npcUp, npcSave, ecoTargetable, readSave, validateSave, get WS() { return WS; }, dist, closePanel, lifeSave, LIFE, LIFE_SCHED, lifeTick, lifeResume, lifeInspect, lifeTownGeo, lifeTalk, talk, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
+Object.assign(window.__SF, { TIER, tierStep, tierBusy, tierInspect, tierMeasure, ECO_POP, ecoRestore, ecoSpawnKeys, ecoLoad });   // Living World phase 6 (src/tiers.js, src/ecology.js)
 Object.defineProperties(window.__SF, { PICKT: { get: () => PICKT }, TRACKS: { get: () => TRACKS }, TRACKUI: { get: () => TRACKUI } });   // live views (Object.assign would copy a getter's value)
 Object.assign(window.__SF, { skillCheck, skillUse, noteLearn, SKUI, SKLOG, useAbility, ABIL, TASKS, pickTap, tameStart, loreUse, vetStart, feedPet, peaceUse, enticeUse, provokeStart, provokeUse, stealStart, npcPack, poisonApply, lockUse, untrapUse, stealthUse, hide, finishHide, reveal, trackStart, trackFollow, magicStrike, petLoyaltyTick, petCommand, evalUse, meditate, playMusic, tamedPets, chestTrapRoll, itemSkill, eat, CHESTS, cdLeft, onPlayerMoved, begUse, campUse, lightKindling, makeCamp, forensicUse, herdPick, herdUse, snoopUse, spiritUse, digUse, treasureUp, newTreasureMap, magicLoot, CAMPS, ITEM_SKILL, ghostSpeech, killMon, MG: SF.MAGERY });

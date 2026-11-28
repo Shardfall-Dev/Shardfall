@@ -260,7 +260,7 @@ function devRender() {
   const prevSel = document.getElementById('devdest') ? document.getElementById('devdest').value : null;
   const B = (a, l, extra) => `<button data-dev="${a}" ${extra || ''} style="font:10px monospace;margin:1px;padding:2px 4px">${l}</button>`;
   p.innerHTML = `<b>${esc(document.title)}</b> · sim ${Math.round(1 / STEPPER.step)} Hz (${DEV.stepRate.toFixed(0)}/s) · ${DEV.fps.toFixed(0)} fps${SIMPAUSE ? ' · <b style="color:#f88">PAUSED</b>' : ''}<br>
-  actors ${acts.length} · visible ${visible} · regional — · distant — <span style="color:#889">(tiers: phase 6)</span><br>
+  actors ${acts.length} · visible ${visible} · tiers ${TIER.on ? `local ${TIER.last.A} (busy ${TIER.last.busy}) · regional ${TIER.last.B} · distant ${TIER.last.C} · A ≤ ${TIER.radii.a.toFixed(0)} m, B ≤ ${TIER.radii.b.toFixed(0)} m · woke ${TIER.woke} (placed ${TIER.placed}, walked ${TIER.walked})` : 'off (?tiers=off)'}<br>
   NPCs ${npcs} · creatures ${mons} · ${Object.entries(by).map(([k, v]) => k + ' ' + v).join(', ')}<br>
   time ${SIM.fmtHour(h)} · day ${C.dayAt(GT)} · ${PERIOD_NAME[C.periodAt(GT)]} · ${C.dayMinutes} min/day · light ${lightNow().dark.toFixed(2)}<br>
   paths: queue ${NAV.jobs.length} · cache ${NAV.cache.size} · searched ${NAV.searches} · failed ${NAV.failed} · cache hits ${NAV.hits}<br>

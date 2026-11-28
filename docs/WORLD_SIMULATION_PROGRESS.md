@@ -20,7 +20,7 @@ The spec's development sequence (§29, phases A–G) is numbered 1–7 here. Eac
 | 3 | C | Population and monster ecosystem: regions and habitats, species profiles as data, roaming, territories, predator/prey, monster-vs-monster factions, creature audio | 1, 2 | **Tested** (v0.25) |
 | 4 | D | Living NPCs: named townsfolk with homes, workplaces and schedules; guards patrolling; merchants travelling; resource workers; basic adventurers | 1, 2, 3 (factions) | **Tested** (v0.27); adventurers moved to phase 5, which gives NPCs combat |
 | 5 | E | Shared combat and law: NPC-vs-NPC and NPC-vs-monster combat, NPC spellcasting through Magery, actor death and looting, criminal flags, murder counts, guards, witnesses | 1, 3, 4 | **Partial**: step 1 (NPCs as combatants, guards fight creatures) **Tested** (v0.30); law, adventurers, NPC death and looting planned |
-| 6 | F | Persistence and optimisation: world-state save (regions, camps, corpses, cargo), simulation tiers A/B/C, spatial index, mobile profiling, regression tests | 1–5 | Planned |
+| 6 | F | Persistence and optimisation: world-state save (regions, camps, corpses, cargo), simulation tiers A/B/C, spatial index, mobile profiling, regression tests | 1–5 | **Partial**: step 1 (tiers A/B/C, the population saved creature by creature, phone profiling, tier and persistence tests) **Tested** (v0.35, built alongside phase 5 step 2); corpses, cargo and NPC-adventurer state wait for phase 5 steps 3–4 |
 | 7 | G | Emergent gameplay: merchant ambushes, dungeon expeditions, camp patrols, NPC healing and recovery, basic economy, encounters | 1–6 | Planned |
 
 Spatial indexing (phase 6 in the spec) is needed earlier: phase 3 adds dozens of roaming actors with perception, and `aiMon` already checks every entity against every other for push-apart (see Performance). Plan to pull a chunk index into phase 3.
@@ -451,6 +451,67 @@ Requested on 2026-11-26: bigger distances, more camps, and places for dungeons. 
 - **Creatures respawn on load as before; camp clearance is the one thing saved now.** Saving every creature is phase 6 (§26).
 - **The quarter-rate tier for distant idle creatures** is a stopgap so the larger population costs less than the old one did. Phase 6 replaces it with the spec's tiers A/B/C.
 
+## Phase 6, step 1 — Simulation tiers, the population saved, phone profiling (v0.35) — **Tested**
+
+Built on a branch of its own (`feature/living-world-phase6a`, from v0.33) while phase 5 step 2 (criminality) was in progress elsewhere. It touches neither law nor combat, adds its save data inside the existing `eco` block (the save version is unchanged), and leaves corpses, merchant cargo and NPC adventurers to phase 5 steps 3–4.
+
+### What was built
+
+- **Simulation tiers A/B/C (§25)**, replacing the phase 3 stopgap (idle creatures beyond 80 m thought at a quarter rate).
+  - Pure rules in `src/world.js`: `SIM.TIER` (A 40 m, B 120 m, B at least A + 60 m, 6 m hysteresis, B runs one step in four), `SIM.viewRadius`, `SIM.tierRadii`, `SIM.tierOf`, `SIM.tierDue`.
+  - **`src/tiers.js`** (new, built between NPC combat and the game). `tierStep(e, dt)` runs inside the controller dispatch in `update()` and returns the time the controller should simulate this step:
+    - **A, local:** every step, as before. Radius A follows the camera: it is never smaller than the distance to the screen's farthest corner (with the renderer's culling margins) plus 8 m, so nothing on screen ever runs at a reduced rate. On a phone that is the 40 m minimum; on a 2560 × 1440 desktop it grows to 56 m.
+    - **B, regional:** one step in four, staggered by id, with the skipped time handed over (at most 0.5 s at once).
+    - **C, distant:** not stepped. A creature holds where it is; its spawner, camp and region books, the clock, populations and saving carry on for the whole world. A townsperson's day goes on abstractly: when it comes back into range its needs catch up on the hours it missed and it stands where its schedule has taken it (`lifeResume`, the rule used after a load). If that spot is near the player, it walks there instead, so nobody appears on screen.
+    - **Always A:** the player, pets, summons, Wren, quest creatures, developer travellers, and anyone busy. A creature is busy when it is fighting, chasing, fleeing, hurt, poisoned, on a camp sortie or following one. An NPC is busy when it is knocked down, fighting, hurt or poisoned. A fight never runs at a reduced rate.
+    - **Never below B:** the guards, who must answer a fight in their town, and the travelling merchant, whose journey is the content.
+    - An actor's id, state and position never change on a tier change except by that schedule rule, so nothing is duplicated or lost.
+  - The developer panel's tier line (left as "phase 6" in v0.22) now shows actors per tier, the radii and the wake-ups. `?tiers=off` runs every actor every step, for comparison.
+- **The population is saved creature by creature (§26: regional populations, actor identity).**
+  - Every creature a spawner made is one compact row in `eco.pop` (`SIM.packCreatures`): id, species, spawner, position, health, home, pack and leader, hidden, purse, last meal. About 80 bytes each: 923 creatures took 73 KB of an 86 KB save. Browser storage allows about 5 MB, so localStorage is still enough and IndexedDB is not needed yet.
+  - Spawners get a stable key from species and position (`ecoSpawnKeys`), independent of the order they are built in.
+  - On load, `populate()` calls `ecoRestore()` instead of the boot fill. The rows are validated first (`SIM.unpackCreatures`): an unknown species or spawner, a broken number, a repeated id or more creatures than a spawner holds are dropped and counted, never duplicated. Each creature comes back with its own id (`restoreId` → `WS.adopt` claims it), its pack and leader, and counted back into its spawner and camp. A creature whose ground is no longer walkable goes back to its spawner.
+  - A region the player thinned out stays thin: vacancies refill at each spawner's own pace, out of sight, as always, not all at once on load.
+  - Creatures in a fight are saved where they stand, calm (a reload ends fights, as before). Pets, summons and quest creatures keep their own save paths.
+  - A save from before v0.35 has no rows and boots with a fresh population, as before. Older builds ignore the rows.
+- **Phone profiling** (`tests/perf/phone.py`, a measurement, not a CI gate): phone screens (390 × 844 portrait and 844 × 390 landscape, device pixel ratio 3, touch), CPU slowed 4× and 6× through the DevTools protocol, Saltmarsh Quay and Vespar, noon and night, tiers on and off. Results under Performance.
+
+### Tests
+
+- `node tests/persist.test.js Shardfall_v0.35.html` (new, in CI), 27 checks. Tier radii from the screen; tier by distance; hysteresis at both boundaries (a walk out and back changes tier exactly four times; wobbling on a boundary never flips); B runs one step in four for every id, spread evenly. Population rows: the row format, a JSON round trip, stable re-packing, every kind of bad row dropped and counted, health clamped, 2000 rows for one spawner restoring only its capacity, the size of 1000 rows.
+- `python3 tests/world-smoke/phase6.py Shardfall_v0.35.html` (new; `world-smoke/run.py` runs it), in Chrome at phone size:
+  1. Tiers by distance (at the Quay: about 14 local, 38 regional, 966 distant); radius A covers the screen plus the margin; guards and the merchant never go distant; Wren is always local; a distant creature in a fight runs every step and drops back when calm.
+  2. On a 2560 × 1440 screen radius A grows to 56 m.
+  3. A distant boar holds for 10 s; with the player 60 m away it roams again. The player visits six places across the world: at every stop each actor is registered once, every spawner and camp count matches its live creatures, and no named actor is lost (about 200 wake-ups).
+  4. Vespar's townsfolk, distant while you are at the Quay, wake when you come within regional range at noon: they stand where the noon schedule took them (all placed out of view), with six hours of needs caught up. Arriving in the middle of town at dusk, those whose evening place is near you set off on foot instead. The town carries on with every book straight.
+  5. Persistence. One wild region is cleared and 25 creatures wounded, then the game is saved and reloaded:
+     - all 923 creatures are back with the same ids, species, positions and health;
+     - the cleared region is still empty;
+     - 171 packs keep their members and leaders, and every camp keeps its count;
+     - the books are straight and nothing is dropped;
+     - vacancies refill gradually, and five minutes later the books are still straight;
+     - the same save loaded twice gives the same creatures.
+  6. A save with four bad rows (a repeated id, an unknown species, an unknown spawner, a broken number) drops exactly those. A save from before v0.35 boots with a fresh population.
+  7. Cost on a seeded world at the Quay: 0.41 ms per step with tiers, 2.26 ms without (desktop, this container).
+- **Long run** (`tests/soak/run.py`, 3 game days with tiers on, the player moved between towns, camps and the wilds, saved and reloaded half way, so the population went through a restore): all checks pass. Step mean 0.43 ms (worst hourly p95 1.1 ms; earlier soaks without tiers ran around 1.3–1.8 ms). Actors stay at 1,020–1,027 (945–951 creatures). The heap does not grow (first quarter 87 MB, last 85 MB). Path queue, cache, log and effects stay bounded. No page errors (the only failures are Google Fonts requests this machine cannot reach).
+- **Regression on v0.35:** every node suite, `check-build.py` and every browser suite in the CI list pass in this container (world-smoke 189 ok, including phase 6's 31; no intermittent failures this time).
+- Existing scenarios that test whole-world rules wherever the player stands (`world-smoke` phases 3, 4 and 5: three-day ecosystem runs, a whole town's day watched from the Quay, guards fighting in Vespar while the player is elsewhere) now open with `?tiers=off`. What they test runs at full rate around the player, where tier A changes nothing. Phase 1's wandering boar is now picked inside regional range, and its reload check now expects saved creatures to keep their ids while new ones take fresh numbers.
+
+### Decisions
+
+- **Distant creatures hold rather than move abstractly.** Their idle roaming is invisible, and their hunger, camp and sortie timers run on world time, so nothing piles up. Distant predator and prey encounters, and fights between camps, wait for phase 7's bounded encounter resolution.
+- **Townsfolk follow the schedule, not their path.** A townsperson coming back into range is placed by the clock, as after a load, which is cheap and always consistent.
+- **Guards and the merchant are never distant.** There are only ten of them, and they are the ones whose absence a player would notice.
+- **Tier A is the screen, not a fixed radius**, so a big monitor never shows stepped movement.
+- **No save version bump.** The creature rows are additive inside `eco` (v2), like the camp clearances in v0.25. This also keeps phase 6 clear of phase 5 step 2's save changes.
+- **Corpses, cargo and NPC adventurer state** are left for when phase 5 steps 3–4 create them. Player corpses and dropped piles were already saved.
+
+### Not done yet (phase 6)
+
+- World-state save of NPC corpses and merchant cargo (after phase 5 steps 3–4); significant world events in the save.
+- Rendering on phones: see Performance. The simulation is no longer the cost; drawing is.
+- Tier C encounter resolution for creatures (phase 7 overlaps).
+
 ## Phase 5, step 1 — NPCs as combatants (v0.30) — **Tested**
 
 ### What was built
@@ -713,6 +774,9 @@ v0.26 merges phase 3 with the equipment and paper doll work (#19, which already 
 | v0.28.1 (≈1,020 entities, ≈945 creatures; update only, one run of 1,000 steps after boot, v0.28 in the same run: 1.04 ms) | 1.84 ms | — | — |
 | v0.30 (≈1,050 entities; update only, 3 runs of 2,000 steps after 400 warm-up steps; v0.29.2 in the same run: 1.28 ms) | 1.39 ms | — | — |
 
+| v0.35, tiers on (≈1,020 entities; seeded, 2,000 steps after 400 at the Quay; phase6.py) | 0.41 ms | — | — |
+| v0.35, `?tiers=off` (the same run) | 2.26 ms | — | — |
+
 - Each figure is the average of 3 runs of 4,000 updates and 200 renders.
 - **v0.23 update cost.** It rose from 0.80 to 1.20 ms per step. This is the creature push-apart in `aiMon`, which compares every entity with every other: with 256 entities instead of 212 that is 1.46× the pairs, which matches the measurement. It is still far inside the 50 ms step, but it is the first sign of the quadratic cost the audit flagged. The phase 3 spatial index removes it.
 - **v0.23 start-up:** 1.66 s to enter the world (was 1.0 s); about 72 MB of heap (was about 31 MB).
@@ -721,7 +785,20 @@ v0.26 merges phase 3 with the equipment and paper doll work (#19, which already 
 - **The travel graph** is built once, in about 250 ms.
 - **v0.25 update cost.** It fell from 1.21 to 0.49 ms per step although there are more than twice as many actors. Push-apart, perception and calls for help go through the spatial index, and idle creatures more than 80 m away think at a quarter rate. Near a busy camp everything runs at full rate; the seeded three-day run averaged about 0.5 ms per step.
 - **v0.25 start-up:** 1.92 s to enter the world (v0.24 measured again: 1.65 s). The habitat survey and the larger first population add about 0.3 s. Heap after start: about 52 MB (v0.24: about 49 MB in the same run).
-- **Phones are not measured yet.** That is phase 6, but the night pass and the graph build are the two numbers to watch.
+- **Phones (v0.35, `tests/perf/phone.py`).** These are emulated phones: Chrome in this container at device pixel ratio 3, with the CPU slowed down 4× and 6× through the DevTools protocol. There is no GPU here, so drawing is done in software and costs more than on a real phone. Each figure is the mean over Saltmarsh Quay and Vespar at noon and at night; p95 is the worst case seen.
+
+| CPU | Screen | Step, tiers on | Step, tiers off | Draw | Frame rate |
+|---|---|---|---|---|---|
+| 4× | portrait 390 × 844 | 2.7 ms (p95 ≤ 8.8) | 11.8 ms (p95 ≤ 33) | 46–62 ms | 11–18 fps |
+| 4× | landscape 844 × 390 | 2.7 ms (p95 ≤ 13.5) | 10.5 ms (p95 ≤ 30) | 50–64 ms | 12–18 fps |
+| 6× | portrait | 3.8 ms (p95 ≤ 18.6) | 16.1 ms (p95 ≤ 41) | 68–103 ms | 6–13 fps |
+| 6× | landscape | 3.6 ms (p95 ≤ 13.6) | 15.9 ms (p95 ≤ 47) | 76–102 ms | 6–11 fps |
+
+  - **The simulation is now cheap on a phone.** With tiers, a 50 ms step costs about 3 ms even at 6×; without them it cost 10–17 ms, with spikes to 47 ms.
+  - **Drawing is now the cost**, and it depends on how many pixels the back buffer has. The back buffer is the screen divided by `DP = round(ZOOM × devicePixelRatio)`. At the default zoom 0.7, a pixel-ratio-3 phone draws at ⅔ resolution (DP 2). A pixel-ratio-2 phone draws at full resolution (DP 1), which has the most pixels of the three.
+  - Drawing one portrait frame at 4× costs 18 ms at pixel ratio 1, 73 ms at ratio 2 and 49 ms at ratio 3 (noon; 25, 95 and 69 ms at night).
+  - Next step for phones: choose DP from a budget of back-buffer pixels instead of from the pixel ratio alone, then measure on a real device. The night tint and the light pass are the next numbers to watch.
+  - Heap: 61–76 MB with tiers, 69–105 MB without. The save is about 86 KB.
 
 ## Next task (phase 5, step 2)
 
@@ -733,3 +810,9 @@ Criminality and murder (§19), now that NPCs can be hurt and guards can fight:
 4. Short- and long-term murder counts with decay, saved; five make you red.
 
 Then step 3 (the first NPC adventurers) and step 4 (NPC death, corpses and looting under the player's rules).
+
+## Next in phase 6 (step 2, after phase 5 steps 3–4)
+
+1. Save NPC corpses with their contents and remaining lifetime, merchant cargo and NPC adventurers' state through the same validated-rows path as the creatures (no duplicates on load).
+2. Phone drawing: pick the back-buffer divisor from a pixel budget (see Performance), then profile on a real phone.
+3. A seeded long-run check with tiers on (the soak), added to the browser suites with the spec's long-running checks: no population explosion or extinction, no infinite loot or gold, no stuck NPCs, a bounded event log and memory.

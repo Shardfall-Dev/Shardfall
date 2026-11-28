@@ -18,7 +18,8 @@ def check(ok, msg, got=None):
 def page(b):
   ctx = b.new_context(viewport={'width': 844, 'height': 390}); pg = ctx.new_page(); errs = []
   pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('console', lambda m: errs.append('console: ' + m.text) if m.type == 'error' else None)
-  pg.add_init_script(HOLD); pg.goto('file://' + f); pg.wait_for_timeout(400)
+  pg.add_init_script(HOLD); pg.goto('file://' + f + '?tiers=off');   # these scenarios test the whole world's rules wherever the player stands; tiers are tested in phase6.py
+  pg.wait_for_timeout(400)
   return ctx, pg, errs
 def new_char(pg, seed=None):
   pg.evaluate('localStorage.clear()'); pg.reload(); pg.wait_for_timeout(400)
@@ -142,7 +143,7 @@ with sync_playwright() as p:
   pg.reload(); pg.wait_for_timeout(400); pg.click('[data-c=cont]'); pg.wait_for_timeout(400); J(pg, HELP)
   r = J(pg, """() => { const S = __SF, T = __T, c = S.ECOS.camps.get('kragmaw'), sp = S.SPAWNS.filter(s => s.camp === c);
     const boot = S.ents.filter(e => e.kind === 'mon' && e.sp && e.sp.camp === c).length; for (let i = 0; i < 20; i++) { for (const s of sp) s.next = 0; S.spawnTick(); S.update(.05); }
-    const after = S.ents.filter(e => e.kind === 'mon' && e.sp && e.sp.camp === c).length; const other = S.ECOS.camps.get('cutpurse').alive;
+    const after = S.ents.filter(e => e.kind === 'mon' && e.sp && e.sp.camp === c).length; const oc = S.ECOS.camps.get('cutpurse'), osp = S.SPAWNS.filter(s => s.camp === oc); for (let i = 0; i < 20; i++) { for (const s of osp) s.next = 0; S.spawnTick(); } const other = oc.alive;   // since phase 6 the save brings back the creatures it had; the others refill at their spawners' pace (forced here)
     c.clearedAt = S.GT - c.recover - 1; c.nextAt = 0; const r0 = S.ECOS.replenished; const steps = [];
     for (let k = 0; k < 6; k++) { for (let i = 0; i < 5; i++) { for (const s of sp) s.next = 0; S.spawnTick(); } steps.push(c.alive); c.nextAt = S.GT; for (let i = 0; i < Math.ceil(c.trickle / .05); i++) S.update(.05); }
     return { boot, after, cleared0: true, other, steps, cap: c.cap, cleared: c.cleared, repl: S.ECOS.replenished - r0 }; }""")

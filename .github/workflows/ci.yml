@@ -36,7 +36,7 @@ jobs:
         run: python3 tests/check-build.py "$GAME"
       - name: Rules suites
         run: |
-          for t in rules skills stats creation magery equipment combat world inventory gear painted wardrobe; do
+          for t in rules skills stats creation magery equipment combat world persist inventory gear painted wardrobe; do
             echo "::group::$t"; node "tests/$t.test.js" "$GAME"; echo "::endgroup::"
           done
 

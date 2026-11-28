@@ -5,7 +5,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="screen-orientation" content="landscape">
-<title>Shardfall v0.33</title>
+<title>Shardfall v0.35</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=Alegreya+Sans:wght@400;500;700&family=Cinzel:wght@600;700&display=swap" rel="stylesheet">
 <style>
@@ -3721,6 +3721,58 @@ SIM.inspect = (e, extra) => {
   return Object.assign(o, extra || {});
 };
 
+/* ================= Phase 6: simulation tiers and world-state persistence (master spec §25–26) =================
+   Tiers. Every actor away from the player gets one of three levels of detail:
+     A — local: every 50 ms step (full movement, collision, combat, perception, animation, sound).
+     B — regional: one step in `bEvery`, with the skipped time handed over (reduced decisions, coarser movement, never drawn).
+     C — distant: not stepped at all. Creatures hold where they are; townsfolk follow their schedule abstractly and are
+         placed where the day has taken them when they come back into range (src/tiers.js). Populations, camps, the clock
+         and saving carry on for the whole world.
+   Radius A follows the camera (§25: "adjusted to actual camera scale"): it is never smaller than the farthest corner of the
+   screen plus a margin, so nothing on screen ever runs at the reduced rate. A small hysteresis keeps an actor on the
+   boundary from flipping tier every step. Pure: the game measures the screen and distances. */
+SIM.TIER = { A: 40, B: 120, gapB: 60, margin: 8, hyst: 6, bEvery: 4 };
+/* the distance in metres from the player to the farthest visible corner, for a screen of halfW × halfH world pixels and the
+   isometric projection SX = (x − y)·hw, SY = (x + y)·hh */
+SIM.viewRadius = (halfW, halfH, hw, hh) => { const a = halfW / (hw || 32), b = halfH / (hh || 16); return Math.sqrt((a * a + b * b) / 2); };
+SIM.tierRadii = (viewR, cfg) => { cfg = cfg || SIM.TIER; const a = Math.max(cfg.A, (viewR || 0) + cfg.margin); return { a, b: Math.max(cfg.B, a + cfg.gapB) }; };
+SIM.tierOf = (d, prev, radii, hyst) => {
+  const h = hyst === undefined ? SIM.TIER.hyst : hyst;
+  if (d <= radii.a + (prev === 'A' ? h : 0)) return 'A';
+  if (d <= radii.b + (prev === 'A' || prev === 'B' ? h : 0)) return 'B';
+  return 'C';
+};
+/* is this the step an actor of this tier runs? Tier B actors are staggered by id so a quarter of them run each step */
+SIM.tierDue = (tier, stepN, id, every) => tier === 'A' ? true : tier === 'B' ? ((stepN + (id | 0)) % (every || SIM.TIER.bEvery)) === 0 : false;
+
+/* Population persistence. Spawned creatures are saved one by one (§26: regional populations, actor identity), as compact
+   rows, so a region the player thinned out stays thin after a reload and every creature keeps its id:
+     [actorId, type, spawnerKey, x, y, hp, homeX, homeY, packId, flags, purse, fedAgo]   flags: 1 pack leader · 2 hidden
+   unpackCreatures validates rows before anything is spawned from them: unknown species or spawners, broken numbers, a
+   repeated id and more creatures than a spawner can hold are dropped (and counted), never duplicated. */
+SIM.POP_VERSION = 1;
+const r1 = v => Math.round(v * 10) / 10;
+SIM.packCreatures = list => list.map(c => [c.id, c.type, c.sp, r1(c.x), r1(c.y), Math.max(1, Math.round(c.hp)), r1(c.hx), r1(c.hy), c.pack | 0, (c.lead ? 1 : 0) | (c.hidden ? 2 : 0), c.purse | 0, Math.max(0, Math.round(c.fedAgo || 0))]);
+SIM.unpackCreatures = (rows, o) => {
+  const out = [], seen = new Set(), per = new Map(); let dropped = 0; const why = {};
+  const drop = k => { dropped++; why[k] = (why[k] || 0) + 1; };
+  const fin = v => typeof v === 'number' && Number.isFinite(v);
+  for (const r of Array.isArray(rows) ? rows : []) {
+    if (!Array.isArray(r) || r.length < 8) { drop('shape'); continue; }
+    const [id, type, sp, x, y, hp, hx, hy, pack, flags, purse, fedAgo] = r;
+    if (typeof id !== 'string' || !id) { drop('id'); continue; }
+    if (seen.has(id)) { drop('duplicate'); continue; }
+    if (!o.validType(type)) { drop('species'); continue; }
+    const cap = o.capOf(sp); if (!cap) { drop('spawner'); continue; }
+    if (![x, y, hp, hx, hy].every(fin)) { drop('number'); continue; }
+    if ((per.get(sp) || 0) >= cap) { drop('over cap'); continue; }
+    seen.add(id); per.set(sp, (per.get(sp) || 0) + 1);
+    const max = o.maxHp(type);
+    out.push({ id, type, sp, x, y, hp: Math.min(max, Math.max(1, hp)), hx, hy, pack: fin(pack) ? pack | 0 : 0, lead: !!((flags | 0) & 1), hidden: !!((flags | 0) & 2), purse: fin(purse) ? Math.max(0, purse | 0) : 0, fedAgo: fin(fedAgo) ? Math.max(0, fedAgo) : 0 });
+  }
+  return { list: out, dropped, why };
+};
+
 if (typeof module !== 'undefined' && module.exports) module.exports = SIM; else root.SIM = SIM;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
 </script>
@@ -5462,7 +5514,7 @@ function devRender() {
   const prevSel = document.getElementById('devdest') ? document.getElementById('devdest').value : null;
   const B = (a, l, extra) => `<button data-dev="${a}" ${extra || ''} style="font:10px monospace;margin:1px;padding:2px 4px">${l}</button>`;
   p.innerHTML = `<b>${esc(document.title)}</b> · sim ${Math.round(1 / STEPPER.step)} Hz (${DEV.stepRate.toFixed(0)}/s) · ${DEV.fps.toFixed(0)} fps${SIMPAUSE ? ' · <b style="color:#f88">PAUSED</b>' : ''}<br>
-  actors ${acts.length} · visible ${visible} · regional — · distant — <span style="color:#889">(tiers: phase 6)</span><br>
+  actors ${acts.length} · visible ${visible} · tiers ${TIER.on ? `local ${TIER.last.A} (busy ${TIER.last.busy}) · regional ${TIER.last.B} · distant ${TIER.last.C} · A ≤ ${TIER.radii.a.toFixed(0)} m, B ≤ ${TIER.radii.b.toFixed(0)} m · woke ${TIER.woke} (placed ${TIER.placed}, walked ${TIER.walked})` : 'off (?tiers=off)'}<br>
   NPCs ${npcs} · creatures ${mons} · ${Object.entries(by).map(([k, v]) => k + ' ' + v).join(', ')}<br>
   time ${SIM.fmtHour(h)} · day ${C.dayAt(GT)} · ${PERIOD_NAME[C.periodAt(GT)]} · ${C.dayMinutes} min/day · light ${lightNow().dark.toFixed(2)}<br>
   paths: queue ${NAV.jobs.length} · cache ${NAV.cache.size} · searched ${NAV.searches} · failed ${NAV.failed} · cache hits ${NAV.hits}<br>
@@ -5575,7 +5627,7 @@ const ECO_FACTIONS = SIM.newFactions(SIM.FACTION_RULES);
 
 /* ---------- state ---------- */
 const ECOS = { grid: SIM.newGrid(8), camps: new Map(), packs: new Map(), regions: new Map(), dark: 0, period: 'day', stepN: 0, idleAt: 0, howlAt: 0, packN: 0, rng: null, kills: 0, mvm: 0, hunts: 0, flees: 0, cleared: 0, replenished: 0, sunk: 0, sorties: 0, thinkMs: 0 };
-const ECO_SPAWN_GAP = 22, ECO_FAR = 80;   // no spawning within 22 m of the player (out of view, no pop-in); creatures beyond 80 m that are idle think at a quarter rate
+const ECO_SPAWN_GAP = 22;   // no spawning within 22 m of the player (out of view, no pop-in). How often a creature thinks by distance: the simulation tiers (src/tiers.js)
 
 function factionOf(e) {
   if (!e) return null; if (e === P || e.kind === 'ally' || e.kind === 'pet') return 'adventurers';
@@ -5845,12 +5897,6 @@ function ecoTick() {
   if (ECOS.stepN % 10 === 1) { const L = lightNow(); ECOS.dark = levelAt(Math.floor(P.x), Math.floor(P.y)) ? .8 : L.dark; ECOS.period = WS ? WS.clock.periodAt(GT) : 'day'; }
   if (ECOS.stepN % 20 === 7) { ecoCampTick(); ecoSinkTick(); }
 }
-/* distant idle creatures think and move at a quarter rate (a first simulation tier; phase 6 formalises tiers A/B/C) */
-function ecoSkip(e, dt) {
-  if (e.state !== 'idle' || e.target || e.sortie || (e.leader && e.leader.sortie) || !P) { if (e._acc) { const a = e._acc; e._acc = 0; return a + dt; } return dt; }
-  const far = Math.abs(e.x - P.x) + Math.abs(e.y - P.y) > ECO_FAR; if (!far) { const a = (e._acc || 0) + dt; e._acc = 0; return a; }
-  e._acc = (e._acc || 0) + dt; if ((ECOS.stepN + e.id) % 4) return 0; const a = e._acc; e._acc = 0; return a;
-}
 /* push-apart through the index (was every entity against every other) */
 function ecoSeparate(m) { ECOS.grid.query(m.x, m.y, .7, o => { if (o === m || (o.kind !== 'mon' && o.kind !== 'pet') || o.gone) return; const dx = m.x - o.x, dy = m.y - o.y, l = Math.hypot(dx, dy); if (l > 0 && l < .7) moveBy(m, dx / l * .02, dy / l * .02); }); }
 /* sound (§23): detection on the first sight of a target, rare idle calls nearby, night howls in the distance. Audio randomness
@@ -5867,11 +5913,50 @@ function ecoSoundTick(m) {
   if (dd < 18 && m.act !== 'asleep' && SFXA.has(sp + '.alert')) { ECOS.idleAt = GT + 4; sndAt(sp + '.alert', m, { gain: .3, prio: 1 }); }
 }
 
-/* ---------- save: camp clearance (creatures themselves respawn on load until world-state persistence, phase 6) ---------- */
-function ecoSave() { const camps = {}; for (const [k, c] of ECOS.camps) camps[k] = c.save(); return { v: 1, camps }; }
+/* ---------- save: camp clearance and, since v0.34 (phase 6), every spawned creature ----------
+   Each creature a spawner made is saved as one compact row (SIM.packCreatures): id, species, spawner, position, health, home,
+   pack, purse and when it last ate. On load the rows are validated (SIM.unpackCreatures) and the creatures come back with
+   their ids instead of a fresh boot fill, so a region the player thinned out stays thin; the empty places refill at each
+   spawner's own pace, out of sight, as always. A save without rows (older builds) fills the world fresh, as before. Creatures
+   in a fight are saved where they stand, calm: a reload ends fights, as it always has. Pets, summons and quest creatures are
+   saved by their own systems. Older builds ignore the rows (the block stays additive; the save version is unchanged). */
+const ECO_POP = { pending: null, restored: 0, dropped: 0, why: {} };
+function ecoSpawnKeys() {
+  if (SPAWNS._keyed === SPAWNS.length) return; const seen = new Map();
+  for (const s of SPAWNS) { const b = s.type + '@' + Math.round(s.x) + ',' + Math.round(s.y), k = (seen.get(b) || 0) + 1; seen.set(b, k); s.key = k > 1 ? b + '#' + k : b; }
+  SPAWNS._keyed = SPAWNS.length;
+}
+const ecoSaveable = e => e.kind === 'mon' && e.sp && !e.gone && !e.dead && !e.quest && e.hp > 0 && e.actorId;
+function ecoSave() {
+  const camps = {}; for (const [k, c] of ECOS.camps) camps[k] = c.save(); ecoSpawnKeys();
+  const list = []; for (const e of ents) if (ecoSaveable(e)) list.push({ id: e.actorId, type: e.type, sp: e.sp.key, x: e.x, y: e.y, hp: e.hp, hx: e.home ? e.home.x : e.x, hy: e.home ? e.home.y : e.y, pack: e.packId || 0, lead: e.packId && e.leader === e, hidden: e.hidden, purse: e.purse, fedAgo: GT - (e.fedAt ?? GT) });
+  return { v: 2, camps, pop: { v: SIM.POP_VERSION, mons: SIM.packCreatures(list) } };
+}
 function ecoLoad(saved) {
+  ECO_POP.pending = saved && saved.pop && saved.pop.v === SIM.POP_VERSION && Array.isArray(saved.pop.mons) ? saved.pop.mons : null;
   const camps = saved && saved.camps; if (!camps) return;
   for (const [k, c] of ECOS.camps) if (camps[k]) { const nc = SIM.newCamp({ id: c.id, cap: c.cap, recover: c.recover, trickle: c.trickle }, camps[k]); for (const f of ['name', 'x', 'y', 'site', 'kind', 'sortieAt']) nc[f] = c[f]; ECOS.camps.set(k, nc); for (const s of SPAWNS) if (s.camp === c) s.camp = nc; }
+}
+/* called by populate() instead of the boot fill: true when the save brought its creatures back */
+function ecoRestore() {
+  const rows = ECO_POP.pending; ECO_POP.pending = null; if (!rows) return false;
+  ecoSpawnKeys(); const byKey = new Map(SPAWNS.map(s => [s.key, s]));
+  const capOf = k => { const s = byKey.get(k); return s ? Math.max(s.max, s.nightMax || 0) : 0; };
+  const r = SIM.unpackCreatures(rows, { validType: t => !!MON[t], capOf, maxHp: t => MON[t].hp });
+  ECO_POP.dropped = r.dropped; ECO_POP.why = r.why; if (r.dropped) console.warn('creatures dropped on load', r.why);
+  const packs = new Map();
+  for (const c of r.list) {
+    const s = byKey.get(c.sp), d = MON[c.type]; let x = c.x, y = c.y;
+    if (!canStand({ kind: 'mon' }, x, y)) { const at = ecoSpot(s, true); if (!at) { ECO_POP.dropped++; continue; } [x, y] = at; }   // the ground changed under it: back to its spawner
+    const m = addEnt({ kind: 'mon', type: c.type, name: d.n, x, y, hp: c.hp, max: d.hp, state: 'idle', home: { x: c.hx, y: c.hy }, sp: s, sect: rnd(0, 7), ward: d.ward && !d.wardEvery ? d.ward : 0, hidden: c.hidden, purse: c.purse, restoreId: c.id });
+    delete m.restoreId; m.fedAt = GT - c.fedAgo; s.n++; ECOS.grid.add(m);
+    if (s.camp) { s.camp.alive++; s.camp.ever = true; }   // counted back in, not a replenishment (the camp's own record came with the save)
+    if (c.pack) { let g = packs.get(c.pack); if (!g) packs.set(c.pack, g = []); if (c.lead) g.unshift(m); else g.push(m); }
+  }
+  for (const g of packs.values()) { const pk = ++ECOS.packN; ECOS.packs.set(pk, g); for (const m of g) { m.packId = pk; m.leader = g[0]; m.ownLeader = g[0]; } }
+  for (const s of SPAWNS) { const cap = ecoNight() && s.nightMax ? s.nightMax : s.max; s.next = s.n < cap ? GT + (s.delay || (s.eco || s.camp ? ecoP(s.type).resp : 9)) * (.3 + R() * .7) : 0; }   // vacancies refill at the spawner's pace, not all at once
+  ECO_POP.restored = r.list.length - (ECO_POP.dropped - r.dropped);
+  return true;
 }
 function ecoInspect(e) {
   if (!e || e.kind !== 'mon') return {}; const pr = ecoP(e.type), r = SIM.senseRange(ecoSenseOf(e), ecoSenseCtx(e));
@@ -6315,6 +6400,64 @@ function npcSave(e) { if (!npcCombatant(e)) return null; if (e.hp >= e.max && !e
 function npcLoad(e, r) { if (!npcCombatant(e) || !r) return; e.hp = cl(Math.round(r.hp) || 0, 0, e.max); if (r.down > 0) { e.downed = true; e.downAt = GT - (NPC_DOWN_TIME - r.down); e.hp = 0; e.nav = null; } else if (e.hp <= 0) e.hp = 1; }
 function npcFightDev() { const up = LIFE.npcs.filter(npcUp), dn = LIFE.npcs.filter(e => e.downed).length, fighting = LIFE.npcs.filter(e => e.foe && alive(e.foe)).length, hurt = up.filter(e => e.hp < e.max).length;
   return `npc combat: ${fighting} guards fighting · ${dn} knocked down · ${hurt} hurt · hits taken ${NPCF.hitsTaken}, downs ${NPCF.downs}, rises ${NPCF.rises}, guard fights ${NPCF.guardFights}, guard kills ${NPCF.guardKills}, calls ${NPCF.calls}`; }
+/* ================= SIMULATION TIERS (Living World phase 6, v0.34; master spec §25) =================
+   Replaces the phase 3 stopgap (idle creatures beyond 80 m thought at a quarter rate) with the spec's three tiers. The pure
+   rules are in src/world.js (SIM.tierOf, SIM.tierRadii, SIM.tierDue); this file decides each actor's tier every step, just
+   before its controller runs (the dispatch in update(), src/game.js), and hands the controller the time it should simulate:
+     · A (local, within the screen plus a margin, never less than 40 m): every step, as before.
+     · B (regional, out to 120 m or A + 60 m): one step in four, staggered by id, with the skipped time handed over. Off screen,
+       so the coarser movement is never seen.
+     · C (distant): not stepped. A creature holds where it is (its spawner, camp and region bookkeeping carry on, and it is
+       saved like any other). A townsperson's day goes on abstractly: when it comes back into range its needs catch up on the
+       hours it missed and it stands where its schedule has taken it (lifeResume, the same rule as after a load), unless that
+       spot is near the player, in which case it walks there.
+   Always tier A, whatever the distance: the player, pets, summons and the hireling (they follow the player), quest creatures,
+   developer travellers, and anyone busy: a creature that is fighting, chasing, fleeing, hurt, poisoned, on a camp sortie or
+   following one; an NPC that is knocked down, fighting, hurt or poisoned. So a fight never runs at a reduced rate.
+   Never below B: the guards (they must answer a fight in their town) and the travelling merchant (his journey is the content).
+   An actor's id, state and position never change on a tier change except by that schedule rule, so nothing is duplicated:
+   the tests move the player across the world and check the registry, the spawner counts and the actor list.
+   Disable with ?tiers=off (every actor every step, for comparison). */
+const TIER = { on: !/[?&#]tiers=off\b/.test(location.search + location.hash), radii: { a: SIM.TIER.A, b: SIM.TIER.B }, view: 0,
+  counts: { A: 0, B: 0, C: 0, busy: 0 }, last: { A: 0, B: 0, C: 0, busy: 0 }, seen: -1, woke: 0, placed: 0, walked: 0 };
+const TIER_FIXED = { player: 1, pet: 1, summon: 1, hireling: 1 };
+/* radius A follows the camera: the farthest visible corner (with the same margins the renderer culls by) plus SIM.TIER.margin */
+function tierMeasure() {
+  if (typeof cv === 'undefined' || !cv.width) return;
+  const vw = cv.width / DP, vh = cv.height / DP; TIER.view = SIM.viewRadius(vw / 2 + 100, vh / 2 + 120, HW, HH); TIER.radii = SIM.tierRadii(TIER.view);
+}
+function tierBusy(e) {
+  if (e.kind === 'mon') return e.state !== 'idle' || !!e.target || !!e.sortie || !!(e.leader && e.leader.sortie) || e.hp < e.max || !!e.poison;
+  if (e.kind === 'npc') return !!e.downed || !!e.foe || GT - (e.lastCombat ?? -99) < 6 || !!e.poison || (e.max > 0 && e.hp < e.max);
+  return false;
+}
+/* the time the actor's controller should simulate this step: dt (A), the gathered time on its B turn, or 0 */
+function tierStep(e, dt) {
+  if (TIER.seen !== ECOS.stepN) { TIER.seen = ECOS.stepN; TIER.last = TIER.counts; TIER.counts = { A: 0, B: 0, C: 0, busy: 0 }; if (ECOS.stepN % 20 === 1 || !TIER.view) tierMeasure(); }
+  if (!TIER.on || !P || e === P) return dt;
+  let t;
+  if (TIER_FIXED[e.archetype] || e.dev || e.quest) t = 'A';
+  else if (tierBusy(e)) { t = 'A'; TIER.counts.busy++; }
+  else {
+    t = SIM.tierOf(Math.hypot(e.x - P.x, e.y - P.y), e.tier, TIER.radii);
+    if (t === 'C' && (e.archetype === 'guard' || (typeof LIFE !== 'undefined' && LIFE.trader === e))) t = 'B';
+  }
+  const prev = e.tier; e.tier = t; TIER.counts[t]++;
+  if (prev === 'C' && t !== 'C') tierWake(e);
+  if (t === 'C') { if (prev !== 'C') e.tierAt = GT; e._acc = 0; return 0; }
+  if (t === 'A') { const a = (e._acc || 0) + dt; e._acc = 0; return a; }
+  e._acc = (e._acc || 0) + dt; if (!SIM.tierDue('B', ECOS.stepN, e.id)) return 0;
+  const a = Math.min(e._acc, .5); e._acc = 0; return a;   // a long gap (just left A or C) is not replayed as one big step
+}
+/* back from tier C. Creatures simply carry on. A townsperson catches up on its day. */
+function tierWake(e) {
+  TIER.woke++; const L = e.life; if (!L || e.dev || L.prof === 'trader' || typeof lifeResume !== 'function') return;
+  const away = Math.max(0, GT - (e.tierAt ?? GT)); if (away > 0 && WS) L.needs = SIM.needsTick(L.needs, away / WS.clock.secondsPerHour(), L.doing);
+  const x = e.x, y = e.y; lifeResume(e);
+  if (Math.hypot(e.x - P.x, e.y - P.y) <= TIER.radii.a + SIM.TIER.hyst) { e.x = x; e.y = y; e._px = x; e._py = y; L.goal = null; L.thinkAt = 0; e.nav = null; TIER.walked++; }   // never appear in view: walk there instead
+  else if (e.x !== x || e.y !== y) TIER.placed++;
+}
+function tierInspect(e) { return e && e !== P ? { tier: e.tier || '—', tierWhy: TIER_FIXED[e.archetype] || e.dev || e.quest ? 'always local' : tierBusy(e) ? 'busy: local' : 'distance ' + (P ? Math.hypot(e.x - P.x, e.y - P.y).toFixed(0) : '?') + ' m' } : {}; }
 /* ================= GAME: actors, intents, combat, magic, gathering, crafting, death ================= */
 const MON = {
   rat:   { n: 'dock rat',    col: '#7a6a62', size: .7,  h: 34, hp: 20, atk: 22, def: 20, dmg: [3, 6],  reach: 1.15, tele: .45, rec: 1.3,  speed: 3.6, aggro: 6,   leash: 16, armor: 4,  diff: 15, loot: { gold: [2, 9] }, skin: { hide: [1, 1] } },
@@ -6381,6 +6524,7 @@ function idKey(e, a) {
   if (a === 'player') return { id: 'player:' + (e.id || 'p1') };
   if (a === 'hireling') return { prefix: 'npc', name: e.aid || e.name };
   if (e.kind === 'npc') return { prefix: 'npc', name: e.name };
+  if (e.restoreId) return { id: e.restoreId, prefix: 'mon:' + (e.type || 'x') };   // a saved creature keeps its id (phase 6)
   return { prefix: (e.kind === 'pet' ? (a === 'summon' ? 'summon' : 'pet') : 'mon') + ':' + (e.type || 'x') };
 }
 /* give an entity its id and controller; re-derive the controller when it changes kind (a tamed creature keeps its id) */
@@ -7169,7 +7313,7 @@ function populate() {
   const c = ZONES.camp; npc('healer', 'Old Fenna, camp healer', c.cx + 2.5, c.cy + 1.5); npc('campbank', 'Crow, camp strongbox', c.cx - 3.5, c.cy - 3.5); npc('outlaw', 'Mags, fence', c.cx + 3.5, c.cy - 3.5);
   annPopulate(npc);
   lifePopulate(npc);   // Living World phase 4: homes, workplaces, routines, residents, guard patrols, the travelling merchant (src/townlife.js)
-  for (let i = 0; i < 12; i++) { for (const s of SPAWNS) s.next = 0; spawnTick(true); }
+  if (!ecoRestore()) for (let i = 0; i < 12; i++) { for (const s of SPAWNS) s.next = 0; spawnTick(true); }   // a save with its creatures brings them back (phase 6); otherwise the world fills fresh
 }
 const SHOPS = { provisioner: ['hatchet', 'pickaxe', 'knife', 'rod', 'tongs', 'sewkit', 'cloth', 'vial', 'bandage', 'lanternoil', 'cookedmeat', 'shirt', 'trousers', 'shoes', 'cloak', 'lute', 'lockpick', 'repairkit'], smith: ['dagger', 'kryss', 'spear', 'sword', 'battleaxe', 'glaive', 'mace', 'waraxe', 'hammer', 'ironbar', 'ringmail_tunic', 'ringmail_sleeves', 'ringmail_gloves', 'ringmail_leggings', 'chain_coif', 'chain_tunic', 'chain_leggings', 'plate_gorget', 'plate_chest', 'plate_arms', 'plate_gauntlets', 'plate_leggings', 'bascinet', 'open_helm', 'closed_helm', 'plate_helm', 'buckler', 'metal_shield', 'kite_shield'], workshop: ['shortbow', 'crossbow', 'heavycrossbow', 'arrow', 'bolt', 'pine', 'buckler', 'wooden_shield', 'strap', 'trapkit', 'repairkit'], apothecary: ['reedash', 'shelldust', 'marshroot', 'lanternoil', 'blacksalt', 'vial', 'draught', 'antidote', 'manatonic', 'stamtonic', 'cinder'], outlaw: ['bandage', 'draught', 'arrow', 'cookedmeat', 'cloth', 'vial', 'reedash', 'marshroot', 'knife', 'dagger', 'lockpick', 'venom', 'trapkit'] };
 Object.assign(SHOPS, ANN_SHOPS);
@@ -7206,7 +7350,7 @@ function update(dt) {
   for (const e of ents.slice()) {                                    // every actor is driven by its controller; corpses are objects that decay
     if (e.gone || e === P) continue;
     if (e.kind === 'corpse') { if (GT > e.expires) { if (e.mine) log('Your body has crumbled to dust, and everything on it is gone.', '#ff6a5a'); rmEnt(e); if (P.lootOpen === e) { closePanel(); P.lootOpen = null; } } continue; }
-    const tick = CONTROL[WS ? simAdopt(e) : SIM.controllerFor(archetypeOf(e))]; if (tick) tick(e, dt);
+    const tick = CONTROL[WS ? simAdopt(e) : SIM.controllerFor(archetypeOf(e))]; if (tick) { const td = tierStep(e, dt); if (td) tick(e, td); }   // simulation tiers A/B/C (src/tiers.js)
   }
   if (DEV.on) DEV.aiMs = DEV.aiMs * .95 + (performance.now() - aiT0) * .05;
   sndTick();
@@ -7216,7 +7360,6 @@ function update(dt) {
 /* controllers (master spec §3). The player's controller is the input code above (playerMove, attackTick, prepTick); creatures run
    monsterTick and the ecosystem (ecology.js); townsfolk, merchants and guards follow their routines in townlife.js (lifeTick). */
 function monsterTick(e, dt) {
-  dt = ecoSkip(e, dt); if (!dt) return;   // distant idle creatures run at a quarter rate (src/ecology.js)
   if (e.stam !== undefined && GT - (e.hitT || -9) > .75) e.stam = Math.min(monT2A(MON[e.type]).dex, e.stam + 3 * dt); const s0 = e.state; aiMon(e, dt); if (e.state !== s0) monSound(e, s0); ecoSoundTick(e);
   if (e.poison && GT >= e.poison.next) { e.poison.next = GT + SF.POISON_GAP; damageMon(e, SF.POISON[e.poison.tier], 'poison'); if (e.poison && --e.poison.ticks <= 0) e.poison = null; }
 }
@@ -9425,6 +9568,7 @@ function spawnMon(type, dx = 3, dy = 0) { const d = MON[type]; if (!d) return nu
 /* __SF is a development and test hook (the browser suites drive the game through it). It is not a security boundary: anything
    here is reachable from the console in an offline single-player game, and a multiplayer server must not trust the client. */
 window.__SF = { FRAME_ERR, SHRINES, los, NPCF, NPC_FIGHT, NPC_DOWN_TIME, npcArm, damageNpc, npcEngage, npcCombatant, npcUp, npcSave, ecoTargetable, readSave, validateSave, get WS() { return WS; }, dist, closePanel, lifeSave, LIFE, LIFE_SCHED, lifeTick, lifeResume, lifeInspect, lifeTownGeo, lifeTalk, talk, ECO, ECOS, ECO_FACTIONS, factionOf, ecoThink, ecoInspect, ecoRegionCounts, ecoSave, ecoEnemy, ecoSeesPlayer, spawnTick, ecoTick, rmEnt, ecoP, ecoActivity, ecoSenseOf, ecoSenseCtx, get CRE() { return CRE; }, sndAt, beastSprite, FRONT, annWarp, annUnwarp, ANN_RIGID, get ANN_BOUNDS() { return ANN_BOUNDS; }, STAIRS, KBUILD, insideBuild, NAV, navTo, navStep, navStatic, navRequest, navTick, navGraph, navPlaces, devTraveller, lightNow, hourOfDay, STEPPER, simStep, get ALPHA() { return ALPHA; }, DEV, setDoor, SIM, simAdopt, archetypeOf, damageActor, aidOf, CONTROL, inspect: e => SIM.inspect(e, e ? Object.assign({ tick: e === P || !!CONTROL[e.ctrl] }, e === P ? { hp: [Math.round(P.hp), SF.maxHp(P)] } : null) : null), LOG, spawnMon, ANN, annTravel, annGateTo, get miniImg() { return miniImg; }, canStand, drawMap, openScreen, closeScreen, get SCREEN() { return SCREEN; }, get PANEL_K() { return PANEL; }, GW: W, GH: H, BESTIARY, bestiaryPose, get BSI() { return BSI; }, aiMon, setRng: f => { R = f || Math.random; }, RES, gq, GQD, questEvent, startCraft, startSurvey, finishStroke, migrateSave, save, get CUI() { return CUI; }, isQuayNode, QUAY_ROCKS, QUAY_TREES, guildObjective, moveBy, BUILD, LM, protAt, zoneAt, BLK, levelAt, get Q() { return Q(); }, get P() { return P; }, ents, update, render, tapWorld, interact, useSlot, castSlot, toggleArm, ACT, MON, SF, get GT() { return GT; }, get CAM() { return CAM; }, startGather, nodeAt, CHESTS, TRAPS, openPanel, get PANEL() { return PANEL; }, get AIM() { return AIM; }, releaseHeld, tAt, T, finishGather, nodeStock, SHRINES, STATIONS, damagePlayer, DOORS, useDoor, surfaceStep, damageMon, killMon, addEnt, openCorpse, JOY, firstAid, firstAidOther, finishFirstAid, swingAt, strikeOne, applyBlow, fighter, allyOf, allyDies, damageAlly, allyCommand, anatomyCheck, weaponChanged, findTool, makeAlly, FX, EFX, tSet, refreshHud, SPAWNS, screenOf: e => ({ x: (SX(e.x, e.y) - CAM.x) / CAM.f, y: (SY(e.x, e.y) - CAM.y) / CAM.f }), get W() { return wDef(); } };
+Object.assign(window.__SF, { TIER, tierStep, tierBusy, tierInspect, tierMeasure, ECO_POP, ecoRestore, ecoSpawnKeys, ecoLoad });   // Living World phase 6 (src/tiers.js, src/ecology.js)
 Object.defineProperties(window.__SF, { PICKT: { get: () => PICKT }, TRACKS: { get: () => TRACKS }, TRACKUI: { get: () => TRACKUI } });   // live views (Object.assign would copy a getter's value)
 Object.assign(window.__SF, { skillCheck, skillUse, noteLearn, SKUI, SKLOG, useAbility, ABIL, TASKS, pickTap, tameStart, loreUse, vetStart, feedPet, peaceUse, enticeUse, provokeStart, provokeUse, stealStart, npcPack, poisonApply, lockUse, untrapUse, stealthUse, hide, finishHide, reveal, trackStart, trackFollow, magicStrike, petLoyaltyTick, petCommand, evalUse, meditate, playMusic, tamedPets, chestTrapRoll, itemSkill, eat, CHESTS, cdLeft, onPlayerMoved, begUse, campUse, lightKindling, makeCamp, forensicUse, herdPick, herdUse, snoopUse, spiritUse, digUse, treasureUp, newTreasureMap, magicLoot, CAMPS, ITEM_SKILL, ghostSpeech, killMon, MG: SF.MAGERY });
 
