@@ -9579,13 +9579,30 @@ function renderEqWin(force) {
   const b = el.querySelector('.eqb'), st = b ? b.scrollTop : 0; el.innerHTML = h; el.hidden = false; const nb = el.querySelector('.eqb'); if (nb) nb.scrollTop = st;
   placeEqWin();
 }
-function placeEqWin() { const el = $('#eqwin'); const p = SETTINGS.eqPos || { x: 8, y: 118 }; const w = el.offsetWidth || 300, h = el.offsetHeight || 300; const x = cl(p.x, 0, Math.max(0, VW - w)), y = cl(p.y, 0, Math.max(0, VH - h)); el.style.left = x + 'px'; el.style.top = y + 'px'; }
+/* the phone's safe area (iPhone camera island, rounded corners, home bar): read once from a probe, again on resize / rotation */
+const SAFE = { t: 0, r: 0, b: 0, l: 0, ok: false };
+function readSafe() {
+  let pr = document.getElementById('sfsafe');
+  if (!pr) { pr = document.createElement('div'); pr.id = 'sfsafe'; pr.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)'; document.body.appendChild(pr); }
+  const cs = getComputedStyle(pr), n = v => parseFloat(v) || 0;
+  SAFE.t = n(cs.paddingTop); SAFE.r = n(cs.paddingRight); SAFE.b = n(cs.paddingBottom); SAFE.l = n(cs.paddingLeft); SAFE.ok = true;
+}
+/* the window stays inside the safe area, so the camera island never covers the left slot column */
+function placeEqWin() {
+  const el = $('#eqwin'); if (!SAFE.ok) readSafe();
+  el.style.maxHeight = (SAFE.t || SAFE.b) ? Math.max(200, VH - SAFE.t - SAFE.b - 8) + 'px' : '';
+  const p = SETTINGS.eqPos || { x: 8, y: 118 }; const w = el.offsetWidth || 300, h = el.offsetHeight || 300;
+  const x0 = SAFE.l + (SAFE.l ? 4 : 0), y0 = SAFE.t, x1 = VW - SAFE.r - w, y1 = VH - SAFE.b - h;
+  const x = cl(p.x, x0, Math.max(x0, x1)), y = cl(p.y, y0, Math.max(y0, y1));
+  el.style.left = x + 'px'; el.style.top = y + 'px';
+}
 /* the window moves by its title bar and remembers where it was put */
 { let mv = null;
   document.addEventListener('pointerdown', e => { const hd = e.target.closest('[data-eqmove]'); if (!hd || e.target.closest('button')) return; const el = $('#eqwin'); const r = el.getBoundingClientRect(); mv = { id: e.pointerId, dx: e.clientX - r.left, dy: e.clientY - r.top }; try { hd.setPointerCapture(e.pointerId); } catch (_) { } e.preventDefault(); });
   document.addEventListener('pointermove', e => { if (!mv || e.pointerId !== mv.id) return; SETTINGS.eqPos = { x: Math.round(e.clientX - mv.dx), y: Math.round(e.clientY - mv.dy) }; placeEqWin(); });
   document.addEventListener('pointerup', e => { if (mv && e.pointerId === mv.id) { mv = null; saveSettings(); } }); }
-addEventListener('resize', () => { if (SETTINGS.eqOpen) placeEqWin(); });
+addEventListener('resize', () => { SAFE.ok = false; if (SETTINGS.eqOpen) placeEqWin(); });
+addEventListener('orientationchange', () => setTimeout(() => { SAFE.ok = false; if (SETTINGS.eqOpen) placeEqWin(); }, 250));
 /* called after every equipment change and from the HUD refresh: transient effective stats, the appearance-change hook, the window */
 function eqChanged() { renderEqWin(true); if (PANEL === 'bag' || PANEL === 'gear') renderPanel(); }
 function eqTick() {
