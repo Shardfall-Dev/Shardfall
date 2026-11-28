@@ -1,5 +1,6 @@
 # Browser flow for Server Foundation v1 against the real stack (server/dev/docker-compose.yml + the Shardfall server):
-# two separate accounts — one on a desktop browser, one on a phone-sized touch browser (iPhone viewport, Safari user agent) —
+# two separate accounts — one on desktop Chrome, one on a phone (WebKit with the iPhone 13 profile when E2E_WEBKIT=1, else a
+# phone-sized touch Chrome) —
 # register, confirm their email from the Mailpit inbox, create a character with the existing creator, enter the alpha lobby and
 # see each other; one signs out and the other sees the leave. The offline save made before is byte-identical afterwards.
 # usage: python3 tests/e2e/online_flow.py   (env: E2E_SHOTS=dir for screenshots, E2E_BASE to use an already running server)
@@ -92,8 +93,12 @@ async def main():
         async with async_playwright() as p:
             b = await p.chromium.launch(executable_path=CHROME, args=['--no-sandbox'])
             A = await b.new_context(viewport={'width': 1280, 'height': 800})
-            B = await b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=3, is_mobile=True, has_touch=True,
-                                    user_agent='Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1')
+            wk = None
+            if os.environ.get('E2E_WEBKIT'):   # the phone player in WebKit (Safari's engine) with Playwright's iPhone 13 profile
+                wk = await p.webkit.launch(); B = await wk.new_context(**p.devices['iPhone 13'])
+            else:
+                B = await b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=3, is_mobile=True, has_touch=True,
+                                        user_agent='Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1')
             pa, pb = await A.new_page(), await B.new_page(); errors = []
             for pg in (pa, pb): pg.on('pageerror', lambda e: errors.append(str(e)))
             # an offline character first: its save must survive everything online untouched
@@ -139,6 +144,7 @@ async def main():
             check(not any('shardfall' in k and k != 'shardfall.save.v1' and 'online' in k for k in await pa.evaluate('Object.keys(localStorage)')), 'online play stores nothing in localStorage')
             check(not errors, 'no page errors' + (f': {errors[:3]}' if errors else ''))
             await b.close()
+            if wk: await wk.close()
     finally:
         if srv:
             srv.terminate()

@@ -31,8 +31,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Python Playwright
-        run: pip install playwright
+      - name: Python Playwright (and WebKit for the phone player)
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps webkit
       - name: The server's world matches the game build (tools/export-world.py --check)
         run: python3 tools/export-world.py --check
       - name: Start PostgreSQL, Supabase Auth and Mailpit
@@ -49,6 +51,7 @@ jobs:
         env:
           E2E_SHOTS: ${{ runner.temp }}/e2e-shots
           E2E_PRINT_SHOTS: '1'
+          E2E_WEBKIT: '1'
         run: |
           python3 tests/e2e/online_flow.py
       - name: Production image builds and loads the game rules
