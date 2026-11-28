@@ -5,7 +5,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="screen-orientation" content="landscape">
-<title>Shardfall v0.39</title>
+<title>Shardfall v0.40</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=Alegreya+Sans:wght@400;500;700&family=Cinzel:wght@600;700&display=swap" rel="stylesheet">
 <style>
@@ -201,6 +201,15 @@ a.ccb{display:flex;align-items:center;justify-content:center;text-decoration:non
 #cc .cckv .ccbadge{color:#f3e6c8;font:700 11px var(--px);padding:1px 8px;vertical-align:middle}
 @media (max-width:620px){.onpage{margin:6px;padding:12px}.onlobby{grid-template-columns:1fr}.ontop{gap:6px;padding:6px 8px}.ontop .ccmark{display:none}}
 @media (max-height:500px){.onpage{margin:6px}.oncard{min-height:110px}.onport{width:48px;height:96px}}
+/* ---- the online world (src/online.js): only walking is live; actions that would change the world are hidden ---- */
+body.online #b-atk, body.online .slot, body.online #b-page, body.online #b-int, body.online #b-cancel, body.online #b-menu, body.online #obj { display: none !important; }
+#owbar{position:fixed;left:50%;top:max(8px,env(safe-area-inset-top));transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:10px;padding:6px 10px 6px 12px;border:1px solid var(--brass);border-radius:8px;
+  background:linear-gradient(rgba(58,40,24,.94),rgba(23,13,7,.94));color:#f3e6c8;font:13px var(--px);box-shadow:0 4px 14px rgba(0,0,0,.5);white-space:nowrap}
+#owbar .owalpha{padding:1px 6px;border-radius:4px;background:#4a2e12;color:#f0c94a;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+#owend{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(5,4,2,.6)}
+#owend .owendbox{max-width:420px;margin:16px;padding:18px 20px;border:2px solid #6a4a26;border-radius:8px;color:var(--inkp);background:linear-gradient(var(--parch),var(--parch2));text-align:center}
+#owend h2{margin:0 0 8px;font:700 22px var(--gothic);color:#4a2e12}
+@media (max-width:620px){#owbar{top:auto;bottom:max(14px,env(safe-area-inset-bottom));left:auto;right:10px;transform:none;gap:6px;font-size:12px;padding:4px 6px 4px 8px}#owbar .owalpha{display:none}}
 /* attribute lock buttons (Character page and paper doll) */
 .lk{min-width:30px;min-height:30px;padding:0 4px;border-radius:5px;border:1px solid var(--edge);background:#14203a;color:var(--ink);font:12px var(--px);vertical-align:middle;cursor:pointer}
 .lk-hold{color:#f0c040}.lk-lower{color:#ff8a6a}

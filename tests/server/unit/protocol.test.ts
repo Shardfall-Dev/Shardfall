@@ -14,7 +14,7 @@ test('valid client messages parse', () => {
 });
 
 test('every gameplay message a client could forge is refused as not authoritative', () => {
-  for (const type of ['move', 'attack', 'cast', 'equip', 'pickup', 'drop', 'trade', 'gold', 'skill', 'stat', 'inventory', 'damage', 'craft', 'loot']) {
+  for (const type of ['teleport', 'position', 'attack', 'cast', 'equip', 'pickup', 'drop', 'trade', 'gold', 'skill', 'stat', 'inventory', 'damage', 'craft', 'loot']) {
     const r = P.parseClient(env({ type, p: { gold: 1e9, x: 1, y: 2 } }));
     assert.equal(r.ok, false); assert.equal((r as any).code, 'not_authoritative', type);
   }
@@ -29,6 +29,15 @@ test('malformed frames are refused with a reason, never thrown', () => {
     [env({ type: 'ping', p: { t: 'x' } }), 'bad_payload'], ['x'.repeat(P.MAX_MESSAGE_BYTES + 1), 'too_big'], [env({ type: '__proto__' }), 'unknown_type'],
   ];
   for (const [t, code] of bad) { const r = P.parseClient(t); assert.equal(r.ok, false); assert.equal((r as any).code, code, String(t).slice(0, 40)); }
+});
+
+test('movement intents: up to ten 50 ms steps, each a direction, a push and a sprint flag — never a position', () => {
+  const ok = P.parseClient(env({ type: 'move', p: { inputs: [{ s: 1, x: .7, y: -.7, w: 1, r: true }, { s: 2, x: 0, y: 0, w: 0 }] } }));
+  assert.equal(ok.ok, true);
+  const bad: object[] = [{ inputs: [] }, { inputs: Array.from({ length: 11 }, (_, i) => ({ s: i, x: 1, y: 0, w: 1 })) }, { inputs: [{ s: 1, x: 1, y: 0, w: 1, px: 900 }] },
+    { inputs: [{ s: -1, x: 1, y: 0, w: 1 }] }, { inputs: [{ s: 1, x: 99, y: 0, w: 1 }] }, { inputs: [{ s: 1, x: 1, y: 0, w: 2 }] }, { inputs: [{ s: 1, x: 1, y: 0, w: 1, r: 'yes' }] },
+    { inputs: [{ s: 1.5, x: 1, y: 0, w: 1 }] }, { x: 5, y: 5 }];
+  for (const p of bad) assert.equal((P.parseClient(env({ type: 'move', p })) as any).code, 'bad_payload', JSON.stringify(p));
 });
 
 test('encode / parseServer round trip carries id and sequence', () => {

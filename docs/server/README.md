@@ -3,8 +3,11 @@
 The first step from the single-player browser game towards a persistent MMORPG: real accounts, an online character roster kept on
 the server, and authenticated realtime connections. The specification is [SERVER_FOUNDATION_V1.md](SERVER_FOUNDATION_V1.md).
 
-**What this is not yet:** the world is not simulated on the server. Online play today is account → roster → character creation →
-an *alpha test lobby* where connected players see each other. Movement, combat, NPCs, crafting, trading, PvP and loot still run
+**Update — Server Movement v1 (v0.40):** online characters now walk in the real world together and the server decides where
+everyone is; see [MOVEMENT.md](MOVEMENT.md). The rest of this page describes the foundation (accounts, sessions, roster,
+gateway), which is unchanged.
+
+**What this is not yet:** apart from walking, the world is not simulated on the server. Movement, combat, NPCs, crafting, trading, PvP and loot still run
 only in the offline game. The UI says so on every online screen; nothing here should be described as "multiplayer" until the
 gameplay itself is server-authoritative.
 
