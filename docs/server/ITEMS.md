@@ -78,5 +78,5 @@ another character's body (there is no criminal system online, so it is not possi
 
 ## Next
 
-Banks, vendors and the economy online (buying and selling against server prices, gold as server items), then crafting and
-gathering on the server, then magic.
+Banks, vendors and the economy online (buying and selling against server prices, gold as server items) — done in v0.45,
+[ECONOMY.md](ECONOMY.md) — then crafting and gathering on the server, then magic.

@@ -31,7 +31,7 @@ interface Entry { characterId: string; accountId: string; realmId: string; conn:
 /* what a character visibly wears (item ids and their look-relevant fields), for others to draw it */
 const wornOf = (ch: any) => { const o: Record<string, any> = {}; for (const i of ch.items || []) if (i.container === 'equip' && i.slot) o[i.slot] = Object.assign({}, i.props, { id: i.itemDef }); return o; };
 const BUCKET = 40, REFILL_PER_S = 20, MAX_OUTBOX = 512, MAX_BUFFERED = 1 << 20, SESSION_CHECK_MS = 30_000, SAVE_MS = 30_000;
-const NOTICE = 'Walking, creatures, combat and items are server-authoritative: the server decides where everyone is, what the wildlife does, every blow and every item. Trading, crafting, banks and shops are not online yet.';
+const NOTICE = 'Walking, creatures, combat, items, banks and shops are server-authoritative: the server decides where everyone is, what the wildlife does, every blow, every item and every coin. Trading between players and crafting are not online yet.';
 
 export class Gateway {
   private conns = new Set<Conn>();
@@ -47,6 +47,7 @@ export class Gateway {
     world.onFlush(() => this.flush());
     world.setSink((a: Actor, type: string, payload: object) => { const e = this.presence.get(a.characterId); if (e && e.conn) this.send(e.conn, type, payload); });
     world.onInventory = (a: Actor) => { void this.saveItems(a); };
+    world.onTrade = t => this.log.info({ character: t.characterId, op: t.op, keeper: t.keeper, itemDef: t.itemDef, qty: t.qty, gold: t.gold }, 'counter');
   }
   /* save a character's items (Server Items v1). The rows are taken now, and every save in the server runs in one queue, in the
      order the changes happened: an item handed from one character to another (a body looted by its owner, a pile picked up) is
@@ -111,8 +112,8 @@ export class Gateway {
     if (m.type === 'hello') return this.hello(c, m.p.characterId, m.id);
     if (!c.characterId) return this.error(c, 'hello_first', 'Say hello with a character first.', m.id);
     if (m.type === 'move') { this.world.input(c.characterId, m.p.inputs as any); return; }
-    if (m.type === 'target' || m.type === 'resurrect' || m.type === 'item') {
-      const why = m.type === 'target' ? this.world.target(c.characterId, m.p.nid as number | null) : m.type === 'item' ? this.world.item(c.characterId, m.p as any) : this.world.resurrect(c.characterId, m.p.at as 'shrine' | 'bound');
+    if (m.type === 'target' || m.type === 'resurrect' || m.type === 'item' || m.type === 'counter') {
+      const why = m.type === 'target' ? this.world.target(c.characterId, m.p.nid as number | null) : m.type === 'item' ? this.world.item(c.characterId, m.p as any) : m.type === 'counter' ? this.world.counter(c.characterId, m.p as any) : this.world.resurrect(c.characterId, m.p.at as 'shrine' | 'bound');
       if (why) this.send(c, 'combat', { k: 'refused', what: m.type, reason: why }, m.id, true);
       return;
     }
@@ -146,7 +147,7 @@ export class Gateway {
       ch: rc, hp: ch.vitals.hp, mana: ch.vitals.mana, ghost: !!ch.ghost, bound: ch.boundShrine,
       position: ch.position, info: { characterId, name: ch.name, body: ch.body, appearance: ch.appearance, title: ch.title, town: ch.startingTown, equip: wornOf(ch) } });
     const t = this.world.terrain!;
-    this.send(c, 'welcome', { protocol: P.PROTOCOL_VERSION, tick: this.world.tick, tickMs: P.TICK_MS, serverAuthoritative: false, authoritative: { movement: true, creatures: !!this.world.clockInfo(), combat: this.world.combatOn, items: this.world.combatOn }, clock: this.world.clockInfo(),
+    this.send(c, 'welcome', { protocol: P.PROTOCOL_VERSION, tick: this.world.tick, tickMs: P.TICK_MS, serverAuthoritative: false, authoritative: { movement: true, creatures: !!this.world.clockInfo(), combat: this.world.combatOn, items: this.world.combatOn, economy: this.world.economyOn }, clock: this.world.clockInfo(),
       notice: NOTICE, resumed: resumed || inWorld, character: ch, presence: this.others(c),
       world: { hash: t.hash, W: t.world.W, H: t.world.H, step: MV.STEP, viewRadius: this.world.viewRadius }, you: this.world.selfPayload(actor) }, reqId, true);
     this.world.sendInventory(characterId);   // after the welcome: the live items (Server Items v1)

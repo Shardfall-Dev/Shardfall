@@ -17,6 +17,9 @@
    fight are the server's; 'combat' events go to everyone in view.
    Since Server Items v1 the characters' items are the server's too (item commands on the shared SF.EQ rules), and remains
    (creature loot, a dead character's body, dropped piles) are bodies in the interest grid (actor.enter kind 'remains').
+   Since Server Economy v1 the offline game's bankers and shopkeepers keep their posts online (server/src/world/economy.ts):
+   they are bodies in the interest grid (actor.enter kind 'npc'), and every purchase, sale, deposit and withdrawal at their
+   counters is a counter command checked by the server with the game's own rules and price list.
    Nothing a client sends sets a position, a speed or a stamina value. Combat, NPCs, items and the rest are not simulated here
    yet; they will arrive as further systems in this loop, one at a time. */
 import P = require('../../../shared/protocol');
@@ -27,6 +30,7 @@ import { Population, type Creature, type CreatureHost, type PopulationData, type
 import type { SimApi } from '../../../shared/game-rules-adapter';
 import { playerSwing, creatureBlow, weaponOf, type Learned } from './combat';
 import { ITEMS, stamp, allItems, findSid, inventoryOf, publicItem, rollLoot, wornOf, type Remains } from './items';
+import { buy, sell, deposit, depositGold, depositWorn, withdraw, stockOf, offersFor, type EconomyData, type Keeper, type Result } from './economy';
 
 export interface Input { s: number; x: number; y: number; w: number; r?: boolean }
 export interface ActorInfo { characterId: string; name: string; body: string; appearance: any; title: string | null; town: string; equip: Record<string, any> }
@@ -45,7 +49,10 @@ export interface CombatOpts { SF: any; seed?: number }
 export const COMBAT = { inCombat: 6, regenPerSec: .1, shrineReach: 2.5, ghostReturn: 12 };   // game.js inCombat, the unfed regeneration, nearestRes reach, ghostret wait
 export type Sink = (a: Actor, type: string, payload: object) => void;
 /* anything with a place in the interest grid: a character or a creature */
-export type Body = Actor | Creature | Remains;
+export type Body = Actor | Creature | Remains | Keeper;
+export interface CounterCmd { op: string; at: number; itemDef?: string; item?: string; slot?: string; qty?: number }
+/* one completed counter transaction (the gateway logs it) */
+export interface Trade { characterId: string; op: string; keeper: string; itemDef?: string; qty?: number; gold?: number }
 export interface CreatureOpts { data: PopulationData; sim: SimApi; clock: Clock; seed?: number }
 
 const CELL = 16, LEAVE_MARGIN = 4, MAX_CREDIT = 3, SELF_KEEPALIVE_TICKS = 20;
@@ -61,6 +68,11 @@ export class World {
   readonly populations = new Map<string, Population>();
   readonly remains = new Map<number, Remains>();
   private shots: Shot[] = [];
+  /* the counters (Server Economy v1): keepers by nid, and which realms have theirs */
+  readonly keepers = new Map<number, Keeper>();
+  private keeperRealms = new Set<string>();
+  private eco: EconomyData | null = null;
+  onTrade: (t: Trade) => void = () => {};
   /* called when a character's items changed and must be saved now (the gateway writes them) */
   onInventory: (a: Actor) => void = () => {};
   private creatureOpts: CreatureOpts | null;
@@ -72,8 +84,9 @@ export class World {
   readonly viewRadius: number;
   stats = { ticks: 0, overruns: 0, lastStepMs: 0, maxStepMs: 0, totalStepMs: 0, inputsApplied: 0, inputsDropped: 0, inputsLate: 0, actors: 0, creatures: 0, creaturesActive: 0, creatureMs: 0 };
 
-  constructor(public terrain: Terrain | null, opts: { viewRadius?: number; creatures?: CreatureOpts | null; combat?: CombatOpts | null } = {}) {
+  constructor(public terrain: Terrain | null, opts: { viewRadius?: number; creatures?: CreatureOpts | null; combat?: CombatOpts | null; economy?: EconomyData | null } = {}) {
     this.viewRadius = opts.viewRadius || P.VIEW_RADIUS; this.creatureOpts = opts.creatures || null;
+    if (opts.economy && opts.combat) this.eco = opts.economy;
     if (opts.combat && opts.creatures) { this.SF = opts.combat.SF; this.crng = opts.creatures.sim.stream(opts.combat.seed ?? 2026, 'combat'); }
     const each = (realmId: string, x: number, y: number, r: number, fn: (b: Body) => void) => {
       const span = Math.ceil(r / CELL), cx = Math.floor(x / CELL), cy = Math.floor(y / CELL), r2 = r * r;
@@ -149,6 +162,7 @@ export class World {
     if (a.ch) { const mx = this.SF.maxHp(a.ch); a.hp = Math.min(mx, Math.max(a.ghost ? 0 : 1, o.hp ?? mx)); if (a.ghost) { a.hp = 0; a.ctx = Object.assign({}, a.ctx, { ghost: true }); } }
     this.actors.set(o.characterId, a); this.byNid.set(a.nid, a); this.place(a); this.stats.actors = this.actors.size;
     this.population(o.realmId);   // the realm's creatures, filled out of this first character's sight
+    this.placeKeepers(o.realmId);   // the realm's bankers and shopkeepers at their posts
     return { actor: a, resumed: false };
   }
   /* detach(): the connection dropped — the character stays where it is (reconnect grace), stops moving and receives nothing */
@@ -172,7 +186,8 @@ export class World {
   }
   setCtx(characterId: string, ctx: MV.MoveCtx) { const a = this.actors.get(characterId); if (a) { a.ctx = ctx; a.s.stam = Math.min(a.s.stam, ctx.stamMax); } }
   /* the public face of an actor for actor.enter */
-  enterPayload(b: Body) { return b.kind === 'creature' ? this.creaturePayload(b) : b.kind === 'remains' ? this.remainsPayload(b) : this.playerPayload(b); }
+  enterPayload(b: Body) { return b.kind === 'creature' ? this.creaturePayload(b) : b.kind === 'remains' ? this.remainsPayload(b) : b.kind === 'npc' ? this.keeperPayload(b) : this.playerPayload(b); }
+  keeperPayload(k: Keeper) { return { kind: 'npc', nid: k.nid, x: r3(k.s.x), y: r3(k.s.y), sect: 0, role: k.post.role, name: k.post.name, counter: k.post.kind, town: k.post.town }; }
   remainsPayload(r: Remains) { return { kind: 'remains', nid: r.nid, x: r3(r.s.x), y: r3(r.s.y), sect: r.s.sect, name: r.name, mon: r.mon, pile: r.pile, owner: r.owner, ownerName: r.ownerName, left: Math.max(0, Math.round(r.expires - this.now)), items: r.cont.items.map(publicItem) }; }
   creaturePayload(c: Creature) { return { kind: 'creature', nid: c.nid, type: c.type, name: c.d.n, x: r3(c.s.x), y: r3(c.s.y), sect: c.s.sect, speed: r3(c.speed), hp: c.hp, max: c.max }; }
   playerPayload(a: Actor) { return { kind: 'player', nid: a.nid, characterId: a.characterId, name: a.info.name, body: a.info.body, appearance: a.info.appearance, title: a.info.title, town: a.info.town, equip: a.info.equip, x: r3(a.s.x), y: r3(a.s.y), sect: a.s.sect ?? 0, speed: r3(a.speed) }; }
@@ -227,6 +242,7 @@ export class World {
 
   get now() { return this.tick * MV.STEP; }
   get combatOn() { return !!this.SF; }
+  get economyOn() { return !!(this.SF && this.eco); }
   /* a 'combat' event for everyone viewing within the view radius of a point */
   event(realmId: string, x: number, y: number, payload: object) {
     const r2 = this.viewRadius * this.viewRadius;
@@ -439,6 +455,49 @@ export class World {
       case 'mergeall': { const n = EQ.mergeAll(ch.pack); if (n) this.inventoryChanged(a, true); return n ? null : 'Nothing to merge.'; }
       default: return 'Unknown item command.';
     }
+  }
+  /* ---------- counters (Server Economy v1) ---------- */
+  placeKeepers(realmId: string) {
+    if (!this.eco || this.keeperRealms.has(realmId)) return; this.keeperRealms.add(realmId);
+    for (const post of this.eco.posts) {
+      const k: Keeper = { kind: 'npc', nid: this.nextNid++, realmId, s: { x: post.x, y: post.y, sect: 0 }, speed: 0, changed: false, cell: -1, post };
+      this.keepers.set(k.nid, k); this.place(k);
+    }
+  }
+  /* what the character sees at a keeper's counter: a shop's stock and what it would pay for each backpack item, or the bank */
+  counterView(a: Actor, k: Keeper) {
+    const SF = this.SF, base = { nid: k.nid, kind: k.post.kind, role: k.post.role, name: k.post.name };
+    if (k.post.kind === 'bank') return Object.assign(base, { bank: a.ch.bank.items.map(publicItem), gold: SF.count(a.ch.bank, 'gold') });
+    return Object.assign(base, { stock: stockOf(SF, this.eco!, k.post), offers: offersFor(SF, this.eco!, a.ch), gold: SF.count(a.ch.pack, 'gold') });
+  }
+  /* counter(): one counter command — open, buy, sell, deposit, depositgold, depositworn, withdraw — at the keeper 'at'.
+     The live situation is checked every time (game.js atCounter): alive, the keeper exists in this realm, within reach, and
+     the right kind of counter. Returns a refusal reason or null; on success the inventory is saved and the counter redrawn. */
+  counter(characterId: string, cmd: CounterCmd): string | null {
+    const a = this.actors.get(characterId); if (!a || !a.ch || !this.eco) return 'Counters are not available.';
+    if (a.ghost) return 'The keeper cannot see you.';
+    const k = this.keepers.get(cmd.at); if (!k || k.realmId !== a.realmId) return 'There is no one at that counter.';
+    if (Math.hypot(k.s.x - a.s.x, k.s.y - a.s.y) > this.eco.reach + .5) return 'You are no longer at the counter.';
+    const SF = this.SF, ch = a.ch, post = k.post;
+    const bankOnly = ['deposit', 'depositgold', 'depositworn', 'withdraw'], shopOnly = ['buy', 'sell'];
+    if (bankOnly.includes(cmd.op) && post.kind !== 'bank') return 'This keeper keeps no bank.';
+    if (shopOnly.includes(cmd.op) && post.kind !== 'shop') return 'This keeper does not trade.';
+    let r: Result, look = false; const pack = (sid?: string) => sid ? findSid(ch.pack.items, sid) : null;
+    switch (cmd.op) {
+      case 'open': this.sink(a, 'counter', this.counterView(a, k)); return null;
+      case 'buy': r = buy(SF, this.eco, ch, post, cmd.itemDef || '', cmd.qty ?? 1); break;
+      case 'sell': { const it = pack(cmd.item); r = it ? sell(SF, this.eco, ch, post, it, cmd.qty) : { ok: false, reason: 'That item is not in your backpack.' }; break; }
+      case 'deposit': { const it = pack(cmd.item); r = it ? deposit(SF, ch, it) : { ok: false, reason: 'That item is not in your backpack.' }; break; }
+      case 'depositgold': r = depositGold(SF, ch); break;
+      case 'depositworn': r = depositWorn(SF, ch, cmd.slot || ''); look = r.ok; break;
+      case 'withdraw': { const it = cmd.item ? findSid(ch.bank.items, cmd.item) : null; r = withdraw(SF, ch, it); break; }
+      default: return 'Unknown counter command.';
+    }
+    if (!r.ok) return r.reason;
+    this.inventoryChanged(a, true, look);
+    this.sink(a, 'counter', this.counterView(a, k));
+    this.onTrade({ characterId, op: cmd.op, keeper: post.key, itemDef: cmd.itemDef, qty: cmd.qty, gold: r.gold });
+    return null;
   }
   /* the live inventory for a character that just (re)joined: the welcome's snapshot comes from the database, which can trail memory */
   sendInventory(characterId: string) { const a = this.actors.get(characterId); if (a && a.ch) this.sink(a, 'inv', inventoryOf(a.ch)); }

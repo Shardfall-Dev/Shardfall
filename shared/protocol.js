@@ -26,14 +26,21 @@
    (from: the nid of remains); refusals come back as combat { k: 'refused', what: 'item', reason } with the request id. The server
    answers with your inventory (inv { pack, equip, bank }), announces remains (actor.enter kind 'remains' with their items),
    updates them (remains { nid, items }), and tells those in view about a changed look (combat { k: 'look', t, equip }), a broken
-   piece (k: 'broke') and arrows (k: 'shot' | 'wide' | 'blocked'). */
+   piece (k: 'broke') and arrows (k: 'shot' | 'wide' | 'blocked').
+   v6 (Server Economy v1): banks and shops are the server's. The offline game's bankers and shopkeepers arrive as
+   actor.enter kind 'npc' ({ nid, x, y, role, name, counter: 'bank' | 'shop', town }). Beside one (4 tiles) a client sends
+   counter { op: 'open' | 'buy' | 'sell' | 'deposit' | 'depositgold' | 'depositworn' | 'withdraw', at, itemDef?, item?, slot?, qty? }
+   (at: the keeper's nid; itemDef: what to buy, from that shop's stock; item: a server id from your backpack, or your bank to
+   withdraw). Never a price or an amount of gold. The server answers counter { nid, kind, name, role, stock?, offers?, bank?,
+   gold } (a shop's stock with prices and what it pays for each backpack item by id, or your bank) and inv; refusals come back as
+   combat { k: 'refused', what: 'counter', reason } with the request id. */
 (function (root, factory) {
   const P = factory();
   if (typeof module !== 'undefined' && module.exports) module.exports = P; else root.SF_PROTOCOL = P;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
   const P = {};
-  P.PROTOCOL_VERSION = 5;
+  P.PROTOCOL_VERSION = 6;
   P.MAX_MESSAGE_BYTES = 16 * 1024;     // a single frame, client → server
   P.TICK_MS = 50;                      // the server tick: the same 50 ms fixed step as the game's world simulation (src/world.js)
   P.HEARTBEAT_MS = 15000;              // the server pings; a connection that misses two heartbeats is closed
@@ -44,9 +51,10 @@
   P.CLOSE = { NORMAL: 1000, GOING_AWAY: 1001, POLICY: 1008, TOO_BIG: 1009, TRY_LATER: 1013,
     UNAUTHORIZED: 4001, FORBIDDEN: 4003, TAKEN_OVER: 4004, PROTOCOL: 4005, RATE_LIMIT: 4008, SESSION_ENDED: 4010 };
 
-  P.CLIENT = ['hello', 'ping', 'resync', 'move', 'target', 'resurrect', 'item'];
+  P.CLIENT = ['hello', 'ping', 'resync', 'move', 'target', 'resurrect', 'item', 'counter'];
+  P.COUNTER_OPS = ['open', 'buy', 'sell', 'deposit', 'depositgold', 'depositworn', 'withdraw'];
   P.ITEM_OPS = ['equip', 'unequip', 'drop', 'take', 'takeall', 'split', 'merge', 'mergeall'];
-  P.SERVER = ['welcome', 'snapshot', 'presence.join', 'presence.leave', 'pong', 'error', 'kicked', 'state', 'actor.enter', 'actor.leave', 'combat', 'gain', 'inv', 'remains'];
+  P.SERVER = ['welcome', 'snapshot', 'presence.join', 'presence.leave', 'pong', 'error', 'kicked', 'state', 'actor.enter', 'actor.leave', 'combat', 'gain', 'inv', 'remains', 'counter'];
   P.RESERVED = ['teleport', 'position', 'attack', 'cast', 'use', 'equip', 'unequip', 'pickup', 'drop', 'trade', 'gold', 'skill', 'stat', 'inventory', 'damage', 'craft', 'loot', 'say'];
 
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -69,6 +77,17 @@
       if (has(p, 'qty') && !(Number.isSafeInteger(p.qty) && p.qty >= 1 && p.qty <= 1e9)) return 'qty must be a whole number from 1';
       if (has(p, 'from') && !(Number.isSafeInteger(p.from) && p.from > 0)) return 'from must be the remains id';
       const need = { equip: ['item'], unequip: ['slot'], drop: ['item'], take: ['item', 'from'], takeall: ['from'], split: ['item', 'qty'], merge: ['item', 'into'], mergeall: [] }[p.op];
+      for (const k of need) if (!has(p, k)) return p.op + ' needs ' + k;
+      return null;
+    },
+    counter: p => {
+      if (!onlyKeys(p, ['op', 'at', 'itemDef', 'item', 'slot', 'qty']) || !P.COUNTER_OPS.includes(p.op)) return 'op must be one of ' + P.COUNTER_OPS.join(', ');
+      if (!(Number.isSafeInteger(p.at) && p.at > 0)) return 'at must be the keeper id';
+      if (has(p, 'itemDef') && !(typeof p.itemDef === 'string' && /^[a-z0-9_]{1,40}$/.test(p.itemDef))) return 'itemDef must be an item kind';
+      if (has(p, 'item') && !P.isUuid(p.item)) return 'item must be an item id';
+      if (has(p, 'slot') && !(typeof p.slot === 'string' && /^[a-z_]{1,20}$/.test(p.slot))) return 'slot must be a slot name';
+      if (has(p, 'qty') && !(Number.isSafeInteger(p.qty) && p.qty >= 1 && p.qty <= 1e9)) return 'qty must be a whole number from 1';
+      const need = { open: [], buy: ['itemDef'], sell: ['item'], deposit: ['item'], depositgold: [], depositworn: ['slot'], withdraw: ['item'] }[p.op];
       for (const k of need) if (!has(p, k)) return p.op + ' needs ' + k;
       return null;
     },
