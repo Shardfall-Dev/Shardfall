@@ -22,7 +22,8 @@ def start_server():
     env.update({'NODE_ENV': 'development', 'PUBLIC_URL': BASE, 'PORT': str(PORT), 'DATABASE_URL': os.environ.get('DATABASE_URL', 'postgres://postgres:postgres@localhost:54329/postgres'),
                 'DATABASE_SSL': 'off', 'SUPABASE_AUTH_URL': os.environ.get('TEST_SUPABASE_AUTH_URL', 'http://localhost:9999'), 'SESSION_ENCRYPTION_KEY': base64.b64encode(secrets.token_bytes(32)).decode(),
                 'OAUTH_GOOGLE_ENABLED': 'true', 'AUTH_RATE_LIMIT_PER_MINUTE': '200', 'LOG_LEVEL': 'warn'})
-    p = subprocess.Popen(['node', '--import', 'tsx', 'server/src/index.ts'], cwd=ROOT, env=env)
+    log = open(os.path.join(SHOTS, 'server.log'), 'w')   # its own file: a shared pipe can be left non-blocking by node
+    p = subprocess.Popen(['node', '--import', 'tsx', 'server/src/index.ts'], cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
     for _ in range(120):
         try:
             if urllib.request.urlopen(BASE + '/api/ready', timeout=2).status == 200: return p
@@ -82,6 +83,9 @@ async def register_and_create(page, email, char_name, tag):
     check(await page.locator('text=Alpha test lobby').count() == 1, f'{tag}: lobby states plainly it is an alpha, not server-simulated')
 
 async def main():
+    for fd in (1, 2):
+        try: os.set_blocking(fd, True)
+        except Exception: pass
     srv = None if os.environ.get('E2E_BASE') else start_server()
     try:
         async with async_playwright() as p:
@@ -122,7 +126,9 @@ async def main():
             check(not errors, 'no page errors' + (f': {errors[:3]}' if errors else ''))
             await b.close()
     finally:
-        if srv: srv.terminate()
+        if srv:
+            srv.terminate()
+            if fails: print(open(os.path.join(SHOTS, 'server.log')).read()[-4000:])
     print(('ALL PASS' if not fails else f'{fails} FAILED') + f' — screenshots in {SHOTS}')
     sys.exit(1 if fails else 0)
 
