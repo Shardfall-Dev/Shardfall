@@ -24,7 +24,7 @@ interface Conn {
 interface Entry { characterId: string; accountId: string; realmId: string; conn: Conn | null; info: ReturnType<typeof P.presenceOf>; graceTimer: NodeJS.Timeout | null }
 
 const BUCKET = 20, REFILL_PER_S = 10, MAX_OUTBOX = 256, MAX_BUFFERED = 1 << 20, SESSION_CHECK_MS = 30_000;
-const NOTICE = 'Alpha test lobby: you can see who else is online. Movement, combat and the world are not server-simulated yet.';
+const NOTICE = 'You can see who else is online. Movement, combat and the world are not simulated on the server yet.';
 
 export class Gateway {
   private conns = new Set<Conn>();

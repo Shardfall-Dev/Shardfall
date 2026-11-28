@@ -197,6 +197,7 @@ a.ccb{display:flex;align-items:center;justify-content:center;text-decoration:non
 .onperson{display:flex;gap:8px;align-items:center;padding:6px;border:1px solid #a08458;border-radius:6px;background:#fbf3df}.onperson.me{border-width:2px}
 .onperson .onport{width:48px;height:96px}.onperson div{display:flex;flex-direction:column;min-width:0}.onperson b{font:700 15px var(--gothic);color:#4a2e12;overflow-wrap:anywhere}
 .ondanger{border-color:#9a2a14}
+#cc .cckv .ccbadge{color:#f3e6c8;font:700 11px var(--px);padding:1px 8px;vertical-align:middle}
 @media (max-width:620px){.onpage{margin:6px;padding:12px}.onlobby{grid-template-columns:1fr}.ontop{gap:6px;padding:6px 8px}.ontop .ccmark{display:none}}
 @media (max-height:500px){.onpage{margin:6px}.oncard{min-height:110px}.onport{width:48px;height:96px}}
 /* attribute lock buttons (Character page and paper doll) */
@@ -10629,7 +10630,7 @@ function onPlay(id) {
   const ch = ON.roster && ON.roster.characters.find(c => c.id === id); if (!ch || !ONP) return;
   onLobbyClose(true);
   ON.lobby = { id, ch, character: null, presence: new Map(), status: 'connecting', note: '', rtt: null, tick: null, seq: 0, tries: 0, ws: null, timer: 0, pingT: 0, stop: false, joinedAt: 0 };
-  ON.view = 'lobby'; ccRender(); onConnect();
+  ON.view = 'lobby'; ON.msg = ''; ON.err = ''; ccRender(); onConnect();
 }
 function onConnect() {
   const L = ON.lobby; if (!L || L.stop) return;

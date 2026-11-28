@@ -91,7 +91,7 @@ function onPlay(id) {
   const ch = ON.roster && ON.roster.characters.find(c => c.id === id); if (!ch || !ONP) return;
   onLobbyClose(true);
   ON.lobby = { id, ch, character: null, presence: new Map(), status: 'connecting', note: '', rtt: null, tick: null, seq: 0, tries: 0, ws: null, timer: 0, pingT: 0, stop: false, joinedAt: 0 };
-  ON.view = 'lobby'; ccRender(); onConnect();
+  ON.view = 'lobby'; ON.msg = ''; ON.err = ''; ccRender(); onConnect();
 }
 function onConnect() {
   const L = ON.lobby; if (!L || L.stop) return;
