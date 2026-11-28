@@ -34,12 +34,16 @@ test('drop and take: a pile another character sees; the items move in the databa
   const A = await join(a); const B = await join(b);
   const inv = await A.w.wait(m => m.type === 'inv'); const thing = inv.p.pack.find((i: any) => i.itemDef === 'bandage') || inv.p.pack[0];
   const before = await rows(a.ch.id); const total = before.length;
+  const unitsOf = async (def: string) => Number((await srv.db.query('select coalesce(sum(qty), 0) as n from game.items where character_id = any($1) and item_def = $2', [[a.ch.id, b.ch.id], def])).rows[0].n);
+  const units0 = await unitsOf(thing.itemDef);
   assert.equal(await cmd(A.w, { op: 'drop', item: thing.id }), null);
   const seen = await B.w.wait(m => m.type === 'actor.enter' && m.p.kind === 'remains', 5000); assert.ok(seen.p.items.some((i: any) => i.id === thing.id));
   await sleep(300); assert.equal((await rows(a.ch.id)).length, total - 1, 'gone from the dropper');
   assert.equal(await cmd(B.w, { op: 'take', from: seen.p.nid, item: thing.id }), null, 'the finder stands on the same spot');
-  await sleep(400); const all = (await srv.db.query('select character_id from game.items where id = $1', [thing.id])).rows;
-  assert.equal(all.length, 1); assert.equal(all[0].character_id, b.ch.id, 'one row, now the finder\'s');
+  await sleep(400);
+  assert.equal(await unitsOf(thing.itemDef), units0, 'every unit is in the database once: none lost, none duplicated');
+  const all = (await srv.db.query('select character_id from game.items where id = $1', [thing.id])).rows;
+  assert.ok(all.length <= 1 && (all.length === 0 || all[0].character_id === b.ch.id), 'the dropped stack is the finder\'s, or merged into the finder\'s own stack');
   assert.match(await cmd(A.w, { op: 'take', from: seen.p.nid, item: thing.id }) || '', /gone/, 'it cannot be taken twice');
   A.w.close(); B.w.close(); await sleep(200);
 });
